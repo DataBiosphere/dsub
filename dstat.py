@@ -1,0 +1,153 @@
+# Copyright 2016 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""View dsub job and task status.
+
+Follows the model of bjobs, sinfo, qstat, etc.
+"""
+
+import argparse
+import collections
+
+from lib import dsub_util
+from providers import provider_base
+
+import tabulate
+
+MAX_ERROR_MESSAGE_LENGTH = 30
+MAX_INPUT_ARGS_LENGTH = 50
+
+
+def parse_arguments():
+  """Parses command line arguments.
+
+  Returns:
+    A Namespace of parsed arguments.
+  """
+  parser = argparse.ArgumentParser(
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+  parser.add_argument(
+      '--project',
+      required=True,
+      help='Cloud project ID in which to query pipeline operations')
+  parser.add_argument(
+      '-j',
+      '--job-list',
+      nargs='*',
+      help='A list of jobs on which to check status')
+  parser.add_argument(
+      '-u',
+      '--user-list',
+      nargs='*',
+      default=[dsub_util.get_default_user()],
+      help="""Lists only those jobs which were submitted by the list of users.
+          Use "*" to list jobs of any user.""")
+  parser.add_argument(
+      '--status-list',
+      nargs='*',
+      default=['RUNNING'],
+      choices=['RUNNING', 'SUCCESS', 'FAILURE', 'CANCELED', '*'],
+      help="""Lists only those jobs which match the specified status(es).
+          Use "*" to list jobs of any status.""")
+  parser.add_argument(
+      '-l',
+      '--long',
+      action='store_true',
+      help='Toggle long output with full operation identifiers'
+      ' and input parameters.')
+  return parser.parse_args()
+
+
+def trim_display_field(value, length):
+  if len(value) > length:
+    return value[:length - 3] + '...'
+
+  return value
+
+
+def main():
+  # Parse args and validate
+  args = parse_arguments()
+
+  # Set up the Genomics Pipelines service interface
+  provider = provider_base.get_provider(args)
+
+  jobs = provider.get_jobs(
+      args.status_list, user_list=args.user_list, job_list=args.job_list)
+
+  # Try to keep the default behavior rational based on real usage patterns.
+  # Most common usage:
+  # * User kicked of one or more single-operation jobs, or
+  # * User kicked off a single "array job".
+  # * User just wants to check on status of their own running jobs.
+  #
+  # qstat and hence gjobs.py defaults to listing jobs for the current user, so
+  # there is no need to include user information in the default output.
+
+  # The information you want in that case is very different than other uses,
+  # such as:
+  # * I want to see all jobs currently pending/running
+  # * I want to see status for a particular job or set of jobs
+  #   (including the finished jobs)
+
+  # Job name is typically short
+  # Job ID is typically long
+  # Task ID is short
+
+  table = []
+
+  for job in jobs:
+    job_name = provider.get_job_field(job, 'job-name')
+    job_id = provider.get_job_field(job, 'job-id')
+    task_id = provider.get_job_field(job, 'task-id')
+
+    status, last_update = provider.get_job_status_message(job)
+
+    row = collections.OrderedDict()
+    if job_name:
+      row['Job Name'] = job_name
+    if task_id:
+      row['Task'] = task_id
+
+    row['Status'] = trim_display_field(status, MAX_ERROR_MESSAGE_LENGTH)
+    row['Last Update'] = last_update
+
+    if args.long:
+      create_time = provider.get_job_field(job, 'create-time')
+      end_time = provider.get_job_field(job, 'end-time')
+
+      inputs = provider.get_job_field(job, 'inputs')
+      input_str = ','.join('%s=%s' % (key, value)
+                           for key, value in inputs.iteritems())
+
+      user_id = provider.get_job_field(job, 'user-id')
+      internal_id = provider.get_job_field(job, 'internal-id')
+
+      row['Created'] = create_time
+      row['Ended'] = end_time if end_time else 'NA'
+      row['User'] = user_id
+
+      row['Job ID'] = job_id
+      row['Internal ID'] = internal_id
+
+      row['Inputs'] = trim_display_field(input_str, MAX_INPUT_ARGS_LENGTH)
+
+    table.append(row)
+
+  if table:
+    print tabulate.tabulate(table, headers='keys')
+
+
+if __name__ == '__main__':
+  main()

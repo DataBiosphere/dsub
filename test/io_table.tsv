@@ -1,0 +1,4 @@
+TEST_NAME	--input INPUT_PATH	--output OUTPUT_PATH
+io_table	gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam	gs://mbookman-dsub-test/dsub/sh/io_table/output/1/*.md5
+io_table	gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom1.LS454.ssaha2.CEU.high_coverage.20100311.bam	gs://mbookman-dsub-test/dsub/sh/io_table/output/2/*.md5
+io_table	gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/pilot_data/data/NA12878/alignment/NA12878.chrom11.SOLID.corona.SRP000032.2009_08.bam	gs://mbookman-dsub-test/dsub/sh/io_table/output/3/*.md5
