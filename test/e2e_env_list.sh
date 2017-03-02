@@ -36,7 +36,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   "${DSUB}" \
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
-    --image_name "ubuntu" \
+    --image-name "ubuntu" \
     --zones "us-central1-*" \
     --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
     --env VAR4="VAL4" \

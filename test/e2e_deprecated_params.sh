@@ -37,7 +37,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   "${DSUB}" \
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
-    --image_name "ubuntu" \
+    --image-name "ubuntu" \
     --zones "us-central1-*" \
     --wait \
     "${SCRIPT_DIR}/script_env_test.sh" \

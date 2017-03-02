@@ -33,7 +33,7 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
       '%s/script_env_test.sh' % test.TEST_DIR,
       '--project', test.PROJECT_ID,
       '--logging', test.LOGGING,
-      '--image_name', 'ubuntu',
+      '--image-name', 'ubuntu',
       '--zones', 'us-central1-*',
       '--env', 'VAR1=VAL1', 'VAR2=VAL2', 'VAR3=VAL3',
       '--env', 'VAR4=VAL4',

@@ -471,11 +471,11 @@ def parse_arguments(prog, argv):
       '--ram', default=2, type=int, help='Minimum RAM per job in GB')
   parser.add_argument(
       '--disk',
-      default=128,
+      default=200,
       type=int,
       help='Size (in GB) of data disk to attach for each job')
   parser.add_argument(
-      '--boot_disk', default=10, type=int, help='Size (in GB) of the boot disk')
+      '--boot-disk', default=10, type=int, help='Size (in GB) of the boot disk')
   parser.add_argument(
       '--zones',
       default=None,
@@ -489,7 +489,7 @@ def parse_arguments(prog, argv):
       ' jobs\'s parent shell, and each row specifies the values'
       ' of those variables for each job.')
   parser.add_argument(
-      '--image_name',
+      '--image-name',
       default='ubuntu:14.04',
       help='Image name from either Docker Hub or Google'
       ' Container Repository. Users that run pipelines must'
