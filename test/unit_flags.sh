@@ -32,11 +32,13 @@ function run_dsub_with_command() {
   local command="${1:-}"
   local script="${2:-}"
   local zones="${3:-${ZONE}}"
+  local preemptible="${4:-}"
 
   "${DSUB}" \
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
     --zones "${zones}" \
+    "${preemptible:+--preemptible}" \
     --env TEST_NAME="${TEST_NAME}" \
     --command "${command}" \
     "${script}" \
@@ -187,6 +189,55 @@ function test_zones_multi_regional() {
 }
 readonly -f test_zones_multi_regional
 
+function test_preemptible() {
+  local subtest="${FUNCNAME[0]}"
+
+  if run_dsub_with_command \
+    'echo "${TEST_NAME}"' \
+    "" \
+    "us-*" \
+    "True"; then
+
+    # Check that stderr is empty
+    assert_err_empty
+
+    # Check that the output contains expected values
+    assert_output_value_equals \
+     "[0].ephemeralPipeline.resources.preemptible" "True"
+    assert_output_value_equals \
+     "[0].pipelineArgs.resources.preemptible" "True"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_preemptible
+
+function test_no_preemptible() {
+  local subtest="${FUNCNAME[0]}"
+
+  if run_dsub_with_command \
+    'echo "${TEST_NAME}"' \
+    "" \
+    "us-*"; then
+
+    # Check that stderr is empty
+    assert_err_empty
+
+    # Check that the output contains expected values
+    assert_output_value_equals \
+     "[0].ephemeralPipeline.resources.preemptible" "False"
+    assert_output_value_equals \
+     "[0].pipelineArgs.resources.preemptible" "False"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_preemptible
+
 # Run the tests
 trap "exit_handler" EXIT
 
@@ -201,3 +252,7 @@ echo
 test_zone_single
 test_zones_regional
 test_zones_multi_regional
+
+echo
+test_preemptible
+test_no_preemptible

@@ -387,8 +387,8 @@ class _Pipelines(object):
 
   @classmethod
   def build_pipeline(cls, project, cpu_cores, ram, disk_size, boot_disk_size,
-                     zones, image_name, script_name, envs, inputs, outputs,
-                     pipeline_name):
+                     preemptible, image_name, zones, script_name, envs, inputs,
+                     outputs, pipeline_name):
     """Builds a pipeline configuration for execution.
 
     Args:
@@ -397,8 +397,9 @@ class _Pipelines(object):
       ram: int GB of RAM required per job.
       disk_size: int GB of disk to attach under /mnt/data.
       boot_disk_size: int GB of disk for boot.
-      zones: list of zone names for jobs to be run at.
+      preemptible: use a preemptible VM for the job
       image_name: string Docker image name in which to run.
+      zones: list of zone names for jobs to be run at.
       script_name: file name of the script to run.
       envs: list of EnvParam objects specifying environment variables to set
         within each job.
@@ -462,6 +463,7 @@ class _Pipelines(object):
                 'minimumCpuCores': cpu_cores,
                 'minimumRamGb': ram,
                 'bootDiskSizeGb': boot_disk_size,
+                'preemptible': preemptible,
 
                 # Create a data disk that is attached to the VM and destroyed
                 # when the pipeline terminates.
@@ -486,7 +488,8 @@ class _Pipelines(object):
     # pyformat: enable
 
   @classmethod
-  def build_pipeline_args(cls, project, script, job_data, logging_dir, scopes):
+  def build_pipeline_args(cls, project, script, job_data, preemptible,
+                          logging_dir, scopes):
     """Builds pipeline args for execution.
 
     Args:
@@ -494,6 +497,7 @@ class _Pipelines(object):
       script: Body of the script to execute.
       job_data: dictionary of value for envs, inputs, and outputs for this
           pipeline instance.
+      preemptible: use a preemptible VM for the job
       logging_dir: directory for job logging output.
       scopes: list of scope.
 
@@ -525,6 +529,9 @@ class _Pipelines(object):
     return {
         'pipelineArgs': {
             'projectId': project,
+            'resources': {
+                'preemptible': preemptible,
+            },
             'inputs': inputs,
             'outputs': outputs,
             'labels': labels,
@@ -845,8 +852,9 @@ class GoogleJobProvider(object):
         ram=job_resources.ram,
         disk_size=job_resources.disk_size,
         boot_disk_size=job_resources.boot_disk_size,
-        zones=job_resources.zones,
+        preemptible=job_resources.preemptible,
         image_name=job_resources.image_name,
+        zones=job_resources.zones,
         script_name=script.name,
         envs=job_data['envs'],
         inputs=job_data['inputs'],
@@ -855,9 +863,9 @@ class GoogleJobProvider(object):
 
     # Build the pipelineArgs for this job.
     pipeline.update(
-        _Pipelines.build_pipeline_args(self._project, script.value, job_data,
-                                       job_resources.logging,
-                                       job_resources.scopes))
+        _Pipelines.build_pipeline_args(
+            self._project, script.value, job_data, job_resources.preemptible,
+            job_resources.logging, job_resources.scopes))
 
     return pipeline
 

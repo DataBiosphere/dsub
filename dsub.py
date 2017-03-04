@@ -117,8 +117,8 @@ def split_pair(pair_string, separator, nullable_idx):
 
 class JobResources(
     collections.namedtuple('JobResources', [
-        'cpu_cores', 'ram', 'disk_size', 'boot_disk_size', 'image_name',
-        'logging', 'zones', 'scopes'
+        'cpu_cores', 'ram', 'disk_size', 'boot_disk_size', 'preemptible',
+        'image_name', 'logging', 'zones', 'scopes'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -127,6 +127,7 @@ class JobResources(
     ram (float): amount of memory (in GB)
     disk_size (int): size of the data disk (in GB)
     boot_disk_size (int): size of the boot disk (in GB)
+    preemptible (bool): use a preemptible VM for the job
     image_name (str): docker image name
     logging (str): path to location for jobs to write logs
     zones (str): location in which to run the job
@@ -139,13 +140,14 @@ class JobResources(
               ram=1,
               disk_size=10,
               boot_disk_size=10,
+              preemptible=False,
               image_name=None,
               logging=None,
               zones=None,
               scopes=None):
-    return super(JobResources, cls).__new__(cls, cpu_cores, ram, disk_size,
-                                            boot_disk_size, image_name, logging,
-                                            zones, scopes)
+    return super(JobResources,
+                 cls).__new__(cls, cpu_cores, ram, disk_size, boot_disk_size,
+                              preemptible, image_name, logging, zones, scopes)
 
 
 def validate_param_name(name, param_type):
@@ -477,6 +479,11 @@ def parse_arguments(prog, argv):
   parser.add_argument(
       '--boot-disk', default=10, type=int, help='Size (in GB) of the boot disk')
   parser.add_argument(
+      '--preemptible',
+      default=False,
+      action='store_true',
+      help='Use a preemptible VM for the job')
+  parser.add_argument(
       '--zones',
       default=None,
       nargs='+',
@@ -590,6 +597,7 @@ def get_job_resources(args):
       ram=args.ram,
       disk_size=args.disk,
       boot_disk_size=args.boot_disk,
+      preemptible=args.preemptible,
       image_name=args.image_name,
       zones=args.zones,
       logging=args.logging,
