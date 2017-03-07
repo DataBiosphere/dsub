@@ -36,7 +36,7 @@ Examples:
       --logging gs://mybucket/mylogs/bamstats-sample1.log \
       --input gs://mybucket/mypath/sample1.bam \
       --output gs://mybucket/mypath/sample1.stats.txt \
-      --image_name quay.io/collaboratory/dockstore-tool-bamstats \
+      --image quay.io/collaboratory/dockstore-tool-bamstats \
       my-bamstats-wrapper.sh
 
 Commands submitted by dsub will run a Docker task (on a GCE VM) where
@@ -180,7 +180,7 @@ dstat --project my-cloud-project
 with no additional arguments will display a list of running jobs for the USER.
 
 ```bash
-dstat --project my-cloud-project --job-list <job-id>
+dstat --project my-cloud-project --jobs <job-id>
 ```
 
 will display the running job (including tasks).
@@ -190,14 +190,14 @@ will display the running job (including tasks).
 The `ddel` script allows for deleting jobs:
 
 ```bash
-ddel --project my-cloud-project --job-list <job-id>
+ddel --project my-cloud-project --jobs <job-id>
 ```
 
 will delete the running job (including tasks).
 
 ```bash
 ddel --project my-cloud-project \
-  --job-list <job-id> --task-list <task-id1> <task-id2>
+  --jobs <job-id> --tasks <task-id1> <task-id2>
 ```
 
 will delete the running tasks.
