@@ -42,29 +42,27 @@ def parse_arguments():
       required=True,
       help='Cloud project ID in which to query pipeline operations')
   parser.add_argument(
-      '-j',
-      '--job-list',
-      nargs='*',
-      help='A list of jobs on which to check status')
+      '-j', '--jobs', nargs='*', help='A list of jobs on which to check status')
   parser.add_argument(
       '-u',
-      '--user-list',
+      '--users',
       nargs='*',
       default=[dsub_util.get_default_user()],
       help="""Lists only those jobs which were submitted by the list of users.
           Use "*" to list jobs of any user.""")
   parser.add_argument(
-      '--status-list',
+      '-s',
+      '--status',
       nargs='*',
       default=['RUNNING'],
       choices=['RUNNING', 'SUCCESS', 'FAILURE', 'CANCELED', '*'],
       help="""Lists only those jobs which match the specified status(es).
           Use "*" to list jobs of any status.""")
   parser.add_argument(
-      '-l',
-      '--long',
+      '-f',
+      '--full',
       action='store_true',
-      help='Toggle long output with full operation identifiers'
+      help='Toggle output with full operation identifiers'
       ' and input parameters.')
   return parser.parse_args()
 
@@ -84,7 +82,7 @@ def main():
   provider = provider_base.get_provider(args)
 
   jobs = provider.get_jobs(
-      args.status_list, user_list=args.user_list, job_list=args.job_list)
+      args.status, user_list=args.users, job_list=args.jobs)
 
   # Try to keep the default behavior rational based on real usage patterns.
   # Most common usage:
@@ -92,7 +90,7 @@ def main():
   # * User kicked off a single "array job".
   # * User just wants to check on status of their own running jobs.
   #
-  # qstat and hence gjobs.py defaults to listing jobs for the current user, so
+  # qstat and hence dstat.py defaults to listing jobs for the current user, so
   # there is no need to include user information in the default output.
 
   # The information you want in that case is very different than other uses,
@@ -123,7 +121,7 @@ def main():
     row['Status'] = trim_display_field(status, MAX_ERROR_MESSAGE_LENGTH)
     row['Last Update'] = last_update
 
-    if args.long:
+    if args.full:
       create_time = provider.get_job_field(job, 'create-time')
       end_time = provider.get_job_field(job, 'end-time')
 

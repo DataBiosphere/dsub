@@ -386,19 +386,19 @@ class _Pipelines(object):
                              copy_output_dirs)
 
   @classmethod
-  def build_pipeline(cls, project, cpu_cores, ram, disk_size, boot_disk_size,
-                     preemptible, image_name, zones, script_name, envs, inputs,
-                     outputs, pipeline_name):
+  def build_pipeline(cls, project, min_cores, min_ram, disk_size,
+                     boot_disk_size, preemptible, image, zones, script_name,
+                     envs, inputs, outputs, pipeline_name):
     """Builds a pipeline configuration for execution.
 
     Args:
       project: string name of project.
-      cpu_cores: int number of CPU cores required per job.
-      ram: int GB of RAM required per job.
+      min_cores: int number of CPU cores required per job.
+      min_ram: int GB of RAM required per job.
       disk_size: int GB of disk to attach under /mnt/data.
       boot_disk_size: int GB of disk for boot.
       preemptible: use a preemptible VM for the job
-      image_name: string Docker image name in which to run.
+      image: string Docker image name in which to run.
       zones: list of zone names for jobs to be run at.
       script_name: file name of the script to run.
       envs: list of EnvParam objects specifying environment variables to set
@@ -460,8 +460,8 @@ class _Pipelines(object):
 
             # Define the resources needed for this pipeline.
             'resources': {
-                'minimumCpuCores': cpu_cores,
-                'minimumRamGb': ram,
+                'minimumCpuCores': min_cores,
+                'minimumRamGb': min_ram,
                 'bootDiskSizeGb': boot_disk_size,
                 'preemptible': preemptible,
 
@@ -480,7 +480,7 @@ class _Pipelines(object):
             'outputParameters': output_files,
 
             'docker': {
-                'imageName': image_name,
+                'imageName': image,
                 'cmd': docker_command,
             }
         }
@@ -848,12 +848,12 @@ class GoogleJobProvider(object):
     # parameters localCopy.path changes based on the remote_uri.
     pipeline = _Pipelines.build_pipeline(
         project=self._project,
-        cpu_cores=job_resources.cpu_cores,
-        ram=job_resources.ram,
+        min_cores=job_resources.min_cores,
+        min_ram=job_resources.min_ram,
         disk_size=job_resources.disk_size,
         boot_disk_size=job_resources.boot_disk_size,
         preemptible=job_resources.preemptible,
-        image_name=job_resources.image_name,
+        image=job_resources.image,
         zones=job_resources.zones,
         script_name=script.name,
         envs=job_data['envs'],

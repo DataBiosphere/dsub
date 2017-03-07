@@ -36,18 +36,18 @@ def parse_arguments():
       help='Cloud project ID in which to find and delete the job(s)')
   parser.add_argument(
       '-j',
-      '--job-list',
+      '--jobs',
       required=True,
       nargs='*',
       help='List of job-ids to delete')
   parser.add_argument(
       '-t',
-      '--task-list',
+      '--tasks',
       nargs='*',
       help='List of tasks in an array job to delete.')
   parser.add_argument(
       '-u',
-      '--user-list',
+      '--users',
       default=[dsub_util.get_default_user()],
       help="""Deletes only those jobs which were submitted by the list of users.
           Use "*" to delete jobs of any user.""")
@@ -62,9 +62,8 @@ def main():
   provider = provider_base.get_provider(args)
 
   # Delete the requested jobs
-  deleted_jobs, error_messages = provider.delete_jobs(args.user_list,
-                                                      args.job_list,
-                                                      args.task_list)
+  deleted_jobs, error_messages = provider.delete_jobs(args.users, args.jobs,
+                                                      args.tasks)
   count = len(deleted_jobs)
 
   print '%d job%s deleted' % (count, '' if count == 1 else 's')

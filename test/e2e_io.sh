@@ -49,7 +49,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --zones "us-central1-f" \
     --input INPUT_PATH="${INPUT_BAM}" \
     --output OUTPUT_PATH="${OUTPUTS}/*.md5" \
-    --disk 500 \
+    --disk-size 500 \
     --wait \
     "${SCRIPT_DIR}/script_io_test.sh"
 

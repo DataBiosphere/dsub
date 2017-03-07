@@ -117,18 +117,18 @@ def split_pair(pair_string, separator, nullable_idx):
 
 class JobResources(
     collections.namedtuple('JobResources', [
-        'cpu_cores', 'ram', 'disk_size', 'boot_disk_size', 'preemptible',
-        'image_name', 'logging', 'zones', 'scopes'
+        'min_cores', 'min_ram', 'disk_size', 'boot_disk_size', 'preemptible',
+        'image', 'logging', 'zones', 'scopes'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
   Attributes:
-    cpu_cores (int): number of CPU cores
-    ram (float): amount of memory (in GB)
+    min_cores (int): number of CPU cores
+    min_ram (float): amount of memory (in GB)
     disk_size (int): size of the data disk (in GB)
     boot_disk_size (int): size of the boot disk (in GB)
     preemptible (bool): use a preemptible VM for the job
-    image_name (str): docker image name
+    image (str): Docker image name
     logging (str): path to location for jobs to write logs
     zones (str): location in which to run the job
     scopes (list): OAuth2 scopes for the job
@@ -136,18 +136,18 @@ class JobResources(
   __slots__ = ()
 
   def __new__(cls,
-              cpu_cores=1,
-              ram=1,
+              min_cores=1,
+              min_ram=1,
               disk_size=10,
               boot_disk_size=10,
               preemptible=False,
-              image_name=None,
+              image=None,
               logging=None,
               zones=None,
               scopes=None):
-    return super(JobResources,
-                 cls).__new__(cls, cpu_cores, ram, disk_size, boot_disk_size,
-                              preemptible, image_name, logging, zones, scopes)
+    return super(JobResources, cls).__new__(cls, min_cores, min_ram, disk_size,
+                                            boot_disk_size, preemptible, image,
+                                            logging, zones, scopes)
 
 
 def validate_param_name(name, param_type):
@@ -468,16 +468,19 @@ def parse_arguments(prog, argv):
       help='Name for pipeline. Defaults to the script name or'
       'first token of the --command if specified.')
   parser.add_argument(
-      '--cpu-cores', default=1, type=int, help='Minimum CPU cores for each job')
+      '--min-cores', default=1, type=int, help='Minimum CPU cores for each job')
   parser.add_argument(
-      '--ram', default=2, type=int, help='Minimum RAM per job in GB')
+      '--min-ram', default=3.75, type=float, help='Minimum RAM per job in GB')
   parser.add_argument(
-      '--disk',
+      '--disk-size',
       default=200,
       type=int,
       help='Size (in GB) of data disk to attach for each job')
   parser.add_argument(
-      '--boot-disk', default=10, type=int, help='Size (in GB) of the boot disk')
+      '--boot-disk-size',
+      default=10,
+      type=int,
+      help='Size (in GB) of the boot disk')
   parser.add_argument(
       '--preemptible',
       default=False,
@@ -496,11 +499,10 @@ def parse_arguments(prog, argv):
       ' jobs\'s parent shell, and each row specifies the values'
       ' of those variables for each job.')
   parser.add_argument(
-      '--image-name',
+      '--image',
       default='ubuntu:14.04',
-      help='Image name from either Docker Hub or Google'
-      ' Container Repository. Users that run pipelines must'
-      ' have READ access to the image.')
+      help='Image name from Docker Hub, Google Container Repository, or other'
+      ' Docker image service. The pipeline must have READ access to the image.')
   parser.add_argument(
       '--scopes',
       default=DEFAULT_SCOPES,
@@ -593,12 +595,12 @@ def get_job_resources(args):
   """
 
   return JobResources(
-      cpu_cores=args.cpu_cores,
-      ram=args.ram,
-      disk_size=args.disk,
-      boot_disk_size=args.boot_disk,
+      min_cores=args.min_cores,
+      min_ram=args.min_ram,
+      disk_size=args.disk_size,
+      boot_disk_size=args.boot_disk_size,
       preemptible=args.preemptible,
-      image_name=args.image_name,
+      image=args.image,
       zones=args.zones,
       logging=args.logging,
       scopes=args.scopes)
