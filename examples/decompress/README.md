@@ -15,12 +15,7 @@ that are stored in a public bucket,
 
 ## Set up
 
-* Follow the Google Genomics Pipelines API
-[Get Ready](https://cloud.google.com/genomics/v1alpha2/pipelines#get_ready)
-instructions.
-* Clone this repository to your local workstation
-* Follow the [Setup](../../README.md#setup) instructions to install dependent
-Python libraries
+* Follow the [Setup](../../README.md#setup) instructions.
 
 ## Decompress one file
 
@@ -38,8 +33,8 @@ dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging gs://MY-BUCKET-PATH/logging/ \
-  --disk 200 \
-  --image_name ubuntu:14.04 \
+  --disk-size 200 \
+  --image ubuntu:14.04 \
   --input INPUT_VCF="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/working/20130723_phase3_wg/cornell/ALL.ChrY.Cornell.20130502.SNPs.Genotypes.vcf.gz" \
   --output OUTPUT_VCF="gs://MY-BUCKET-PATH/output/ALL.ChrY.Cornell.20130502.SNPs.Genotypes.vcf" \
   --command 'gunzip ${INPUT_VCF} && \
@@ -121,8 +116,8 @@ dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging MY-BUCKET-PATH/logging/ \
-  --disk 200 \
-  --image_name ubuntu:14.04 \
+  --disk-size 200 \
+  --image ubuntu:14.04 \
   --table submit_list.tsv \
   --command 'gunzip ${INPUT_VCF} && \
              mv ${INPUT_VCF%.gz} $(dirname ${OUTPUT_VCF})' \

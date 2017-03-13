@@ -206,15 +206,27 @@ will delete the running tasks.
 
 To setup:
 
--   Setup a virtualenv (optional, but very strongly recommended).
+- Follow the Google Genomics Pipelines API
+[Get Ready](https://cloud.google.com/genomics/v1alpha2/pipelines#get_ready)
+instructions.
+
+- Authorize applications such as dsub to access Google Cloud resources by creating
+[Application Default Credentials](https://developers.google.com/identity/protocols/application-default-credentials). Run the command:
+
+    [gcloud auth application-default login](https://cloud.google.com/sdk/gcloud/reference/auth/application-default/login)
+
+- Clone this repository to your local workstation
+
+- Change directory into the root directory of the local clone of the repository.
+
+- Setup a virtualenv (optional, but very strongly recommended).
 
     ```bash
-    cd $HOME
     virtualenv dsub_libs
     source dsub_libs/bin/activate
     ```
 
--   Install dependent libraries
+- Install dependent libraries
 
     ```bash
     pip install --upgrade oauth2client==1.5.2 google-api-python-client python-dateutil pytz tabulate
@@ -222,9 +234,9 @@ To setup:
 
 And then you can run with:
 
--   `ddel [flags]`
--   `dstat [flags]`
--   `dsub [flags] my_script.sh`
+-   `./ddel [flags]`
+-   `./dstat [flags]`
+-   `./dsub [flags] my_script.sh`
 
 
 To see the full set of parameters for dsub, dstat, ddel, pass the
