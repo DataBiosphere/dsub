@@ -41,8 +41,8 @@ readonly DSUB_DIR="${SCRIPT_DIR}/../.."
   --project "${MY_PROJECT}" \
   --zones us-central1-f us-central1-c us-central1-b us-central1-a \
   --logging "${MY_BUCKET_PATH}"/logging/ \
-  --disk 200 \
-  --image_name ubuntu:14.04 \
+  --disk-size 200 \
+  --image ubuntu:14.04 \
   --table "${SCRIPT_DIR}"/submit_list.tsv \
   --command 'gunzip ${INPUT_VCF} && \
              mv ${INPUT_VCF%.gz} $(dirname ${OUTPUT_VCF})' \
