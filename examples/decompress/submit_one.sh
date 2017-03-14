@@ -41,8 +41,8 @@ readonly DSUB_DIR="${SCRIPT_DIR}/../.."
   --project "${MY_PROJECT}" \
   --zones us-central1-f us-central1-c us-central1-b us-central1-a \
   --logging "${MY_BUCKET_PATH}"/logging/ \
-  --disk 200 \
-  --image_name ubuntu:14.04 \
+  --disk-size 200 \
+  --image ubuntu:14.04 \
   --input INPUT_VCF=${INPUT_VCF} \
   --output OUTPUT_VCF="${OUTPUT_VCF}" \
   --command 'gunzip ${INPUT_VCF} && \
