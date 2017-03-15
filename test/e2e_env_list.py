@@ -30,11 +30,11 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
 
   # pyformat: disable
   launched_job = dsub.call([
-      '%s/script_env_test.sh' % test.TEST_DIR,
       '--project', test.PROJECT_ID,
       '--logging', test.LOGGING,
       '--image', 'ubuntu',
       '--zones', 'us-central1-*',
+      '--script', '%s/script_env_test.sh' % test.TEST_DIR,
       '--env', 'VAR1=VAL1', 'VAR2=VAL2', 'VAR3=VAL3',
       '--env', 'VAR4=VAL4',
       '--env', 'VAR5=VAL5',

@@ -43,11 +43,11 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
     --zones "us-central1-*" \
+    --script "${SCRIPT_DIR}/script_io_auto.sh" \
     --env TEST_NAME="${TEST_NAME}" \
     --input "${INPUT_BAM}" "${INPUT_BAMS}" \
     --output "${OUTPUT_FILE}" "${OUTPUT_DIR}" \
-    --wait \
-    "${SCRIPT_DIR}/script_io_auto.sh"
+    --wait
 
 fi
 

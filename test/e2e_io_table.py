@@ -30,10 +30,10 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
 
   # pyformat: disable
   launched_job = dsub.call([
-      '%s/script_io_test.sh' % test.TEST_DIR,
       '--project', test.PROJECT_ID,
       '--logging', test.LOGGING,
       '--zones', 'us-central1-*',
+      '--script', '%s/script_io_test.sh' % test.TEST_DIR,
       '--table', test.TABLE_FILE,
       '--wait'])
   # pyformat: enable

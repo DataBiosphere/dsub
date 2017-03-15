@@ -38,11 +38,11 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --logging "${LOGGING}" \
     --image "ubuntu" \
     --zones "us-central1-*" \
+    --script "${SCRIPT_DIR}/script_env_test.sh" \
     --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
     --env VAR4="VAL4" \
     --env VAR5="VAL5" \
-    --wait \
-    "${SCRIPT_DIR}/script_env_test.sh"
+    --wait
 
 fi
 

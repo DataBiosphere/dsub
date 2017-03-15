@@ -94,13 +94,13 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --image "debian" \
     --logging "${LOGGING}" \
     --zones "us-central1-*" \
+    --script "${SCRIPT_DIR}/script_io_recursive.sh" \
     --env FILE_CONTENTS="${FILE_CONTENTS}" \
     --input INPUT_PATH_SHALLOW="${INPUTS}/shallow/*" \
     --input-recursive INPUT_PATH_DEEP="${INPUTS}/deep/" \
     --output OUTPUT_PATH_SHALLOW="${OUTPUTS}/shallow/*" \
     --output-recursive OUTPUT_PATH_DEEP="${OUTPUTS}/deep/" \
-    --wait \
-    "${SCRIPT_DIR}/script_io_recursive.sh"
+    --wait
 
 fi
 
