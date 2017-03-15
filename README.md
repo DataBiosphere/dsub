@@ -27,17 +27,17 @@ Examples:
     dsub \
       --project my-cloud-project \
       --logging gs://mybucket/mylogs/vcfstats-sample1.log \
+      --script my-vcfstats-script.py \
       --input gs://mybucket/mypath/sample1.vcf \
-      --output gs://mybucket/mypath/sample1.stats.txt \
-      my-vcfstats-script.py
+      --output gs://mybucket/mypath/sample1.stats.txt
 
     dsub \
       --project my-cloud-project \
       --logging gs://mybucket/mylogs/bamstats-sample1.log \
-      --input gs://mybucket/mypath/sample1.bam \
-      --output gs://mybucket/mypath/sample1.stats.txt \
       --image quay.io/collaboratory/dockstore-tool-bamstats \
-      my-bamstats-wrapper.sh
+      --script my-bamstats-wrapper.sh \
+      --input gs://mybucket/mypath/sample1.bam \
+      --output gs://mybucket/mypath/sample1.stats.txt
 
 Commands submitted by dsub will run a Docker task (on a GCE VM) where
 the specified input files have been automatically localized to:

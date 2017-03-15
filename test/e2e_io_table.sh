@@ -45,9 +45,9 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
     --zones "us-central1-*" \
+    --script "${SCRIPT_DIR}/script_io_test.sh" \
     --table "${TABLE_FILE}" \
-    --wait \
-    "${SCRIPT_DIR}/script_io_test.sh"
+    --wait
 
 fi
 

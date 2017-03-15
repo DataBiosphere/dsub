@@ -568,13 +568,14 @@ def parse_arguments(prog, argv):
       metavar='KEY=REMOTE_PATH')
   parser.add_argument(
       '--command',
-      help='Command to execute inside the job\'s docker container',
+      help='Command to run inside the job\'s Docker container',
       metavar='COMMAND')
   parser.add_argument(
-      'script',
-      nargs='?',
-      help='Path to script to run in Docker container.',
+      '--script',
+      help='Local path to a script to run inside the job\'s Docker container.',
       metavar='SCRIPT')
+  parser.add_argument(
+      'deprecated_script', nargs='?', help=argparse.SUPPRESS, metavar='SCRIPT')
   parser.add_argument(
       'params',
       nargs='*',
@@ -869,6 +870,14 @@ def main(prog, argv):
 
   if args.command and args.script:
     raise ValueError('Cannot supply both --command and a script name')
+
+  if args.deprecated_script:
+    print_error('Using a positional argument for the job script is '
+                'deprecated.')
+    print_error('Use the --script argument instead.')
+
+    # Set the script from the deprecated positional argument.
+    args.script = args.deprecated_script
 
   if args.params:
     print_error('Using positional arguments for input variables is '
