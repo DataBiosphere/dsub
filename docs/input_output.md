@@ -1,17 +1,28 @@
 # File handling with dsub
 
-dsub is designed to make it easy to get input files from a remote storage
-location (such as [Google Cloud Storage](https://cloud.google.com/storage/))
-to your Docker container and then get output files from the Docker container
-back out to a permanent remote storage location.
+An on-premises job scheduler like Grid Engine typically uses a shared file
+system. Your Grid Engine scripts can reference files by their paths on the
+shared file system.
+
+With dsub, your input files reside in a
+[Google Cloud Storage](https://cloud.google.com/storage/) bucket
+and your output files will also be copied out to Cloud Storage.
+
+When you submit a job with dsub
+
+* your input files will be automatically copied from bucket paths to local disk
+* your code will work on the local file system inside the Docker container
+* your output files will be automatically copied from local disk back to bucket
+paths.
 
 Rather than giving many options of what disks to allocate and where to
 put input and output files, `dsub` is prescriptive.
 
 * All input and output is written to a single data disk mounted at `/mnt/data`.
-* All input and output paths mirror the remote storage location.
+* All input and output paths mirror the remote storage location with a local
+path of the form `/mnt/data/gs/bucket/path`.
 
-Environment variables are made available to your job indicating the
+Environment variables are made available to your script indicating the
 Docker container input and output paths.
 
 There are several common use cases for both input and output, each described
@@ -72,7 +83,7 @@ for INPUT_FILE in "$(ls "${INPUT_FILES}")"; do
 done
 ```
 
-### 3. Copy a directory, recursively from Cloud Storage.
+### 3. Copy a directory recursively from Cloud Storage.
 
 To recursively copy a directory from Cloud Storage, use the
 `dsub` command-line flag `--input-recursive`.
@@ -101,9 +112,8 @@ the `dsub` command-line:
 --output OUTPUT_FILE=gs://bucket/path/file.bam
 ```
 
-Then have your job write the output file to the path
-`/mnt/data/output/gs/bucket/path/file.bam` within the Docker container.
-
+Then have your script write the output file to
+`${OUTPUT_FILE}` within the Docker container.
 The file will be automatically copied to Cloud Storage when your script or
 command exits with success.
 
@@ -122,11 +132,10 @@ the `dsub` command-line:
 --output OUTPUT_FILES=gs://bucket/path/*.bam
 ```
 
-Then have your job write output files to the path
-`/mnt/data/output/gs/bucket/path` within the Docker container.
-
+Then have your job write output files to
+`${OUTPUT_FILES}` within the Docker container.
 All files matching the pattern `/mnt/data/output/gs/bucket/path/*.bam` will be
-automatically copied to the Cloud Storage when your script or
+automatically copied to Cloud Storage when your script or
 command exits with success.
 
 The Docker container will receive the environment variable:
@@ -153,7 +162,7 @@ OUTPUT_FILE_PATTERN="$(basename "${OUTPUT_FILES}")"
 OUTPUT_EXTENSION="${OUTPUT_FILE_PATTERN##*.}"
 ```
 
-### 3. Copy a directory, recursively to Cloud Storage.
+### 3. Copy a directory recursively to Cloud Storage.
 
 To recursively copy a directory of output to Cloud Storage, use the
 `dsub` command-line flag `--output-recursive`:
@@ -162,11 +171,11 @@ To recursively copy a directory of output to Cloud Storage, use the
 --output-recursive OUTPUT_PATH=gs://bucket/path
 ```
 
-Then have your job write output files and subdirectories to the path
-`/mnt/data/output/gs/bucket/path` within the Docker container.
-
-The object(s) at the Cloud Storage path will be recursively copied and
-made available at the path `/mnt/data/input/gs/bucket/path`.
+Then have your job write output files and subdirectories to
+`${OUTPUT_PATH}` within the Docker container.
+All files and directories under the path `/mnt/data/output/gs/bucket/path`
+will be automatically copied to Cloud Storage when your script or
+command exits with success.
 
 The Docker container will receive the environment variable:
 

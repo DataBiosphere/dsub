@@ -58,6 +58,8 @@ See the [Input/Output docs](docs/input_output.md) for more details.
 
 In the above example, your Docker script will receive environment variables
 `INPUT_FILE` and `OUTPUT_FILE` set automatically.
+You can reference the `--input` and `--output` values from your script using
+standard bash notation, like `${INPUT_FILE}` and `${OUTPUT_FILE}`.
 
 To pass simple, non-file, values to your jobs, use the `--env` parameter:
 
@@ -65,7 +67,7 @@ To pass simple, non-file, values to your jobs, use the `--env` parameter:
     --env SAMTOOLS_TASK=index \
 
 Note that each of the `--env`, `--input`, and `--output` parameters supports
-a multiple space-separated values for a single flag, or multiple flags.
+multiple space-separated values for a single flag, or multiple flags.
 For example:
 
     --env NAME1=VALUE1 NAME2=VALUE2
