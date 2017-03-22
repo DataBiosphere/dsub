@@ -26,104 +26,49 @@ Examples:
 
     dsub \
       --project my-cloud-project \
-      --logging gs://mybucket/mylogs/vcfstats-sample1.log \
-      --script my-vcfstats-script.py \
-      --input gs://mybucket/mypath/sample1.vcf \
-      --output gs://mybucket/mypath/sample1.stats.txt
-
-    dsub \
-      --project my-cloud-project \
       --logging gs://mybucket/mylogs/bamstats-sample1.log \
       --image quay.io/collaboratory/dockstore-tool-bamstats \
       --script my-bamstats-wrapper.sh \
-      --input gs://mybucket/mypath/sample1.bam \
-      --output gs://mybucket/mypath/sample1.stats.txt
+      --input INPUT_FILE=gs://mybucket/mypath/sample1.bam \
+      --output OUTPUT_FILE=gs://mybucket/mypath/sample1.stats.txt
 
-Commands submitted by dsub will run a Docker task (on a GCE VM) where
-the specified input files have been automatically localized to:
+This command submitted by dsub will run a Docker task where the specified
+input files have been automatically localized to disk.
+For example, the `INPUT_FILE` will be localized to:
 
-    /mnt/data/input/gs
+    /mnt/data/input/gs/mybucket/mypath/sample1.bam
 
-In the above examples, the input files would be localized to:
+A Docker container will be created from the image at
+`quay.io/collaboratory/dockstore-tool-bamstats` and the local script
+`my-bamstats-wrapper.sh` will be executed.
 
-    /mnt/data/input/gs/mybucket/mypath/
-
-On successful completion of the Docker task, the output files will be
+On successful completion of the Docker task, the output file will be
 automatically de-localized from:
 
-    /mnt/data/output/gs
+    /mnt/data/output/gs/mybucket/mypath/sample1.stats.txt
 
-In the above examples, the output files would be de-localized from:
+More support is available for input and output handling such as:
 
-    /mnt/data/output/gs/mybucket/mypath/
+  * wildcards on filenames
+  * recursive directory copying
 
-Support for wildcards *on filenames* is available for both inputs and outputs.
-For example:
+See the [Input/Output docs](docs/input_output.md) for more details.
 
-    --input gs://mybucket/mypath/*.bam
-    --output gs://mybucket/mypath/*.bam.bai
+#### Script variables
 
-#### Recursive copy
+In the above example, your Docker script will receive environment variables
+`INPUT_FILE` and `OUTPUT_FILE` set automatically.
+You can reference the `--input` and `--output` values from your script using
+standard bash notation, like `${INPUT_FILE}` and `${OUTPUT_FILE}`.
 
-Support for recursive copy is available for inputs and outputs.
-
-For inputs, this allows you to pull an entire tree of inputs from
-Google Cloud Storage (GCS), for example:
-
-    dsub ... \
-      --input-recursive INPUT_PATH=gs://bucket/path
-
-Your pipelines script will get a variable INPUT_PATH, which contains the
-on-disk location, `/mnt/data/input/gs/bucket/path`.
-
-For outputs, this allows you to generate output with subdirectories and
-dsub will recursively copy your output to GCS. For example:
-
-    dsub ... \
-      --output-recursive OUTPUT_PATH=gs://bucket/path
-
-Your pipelines script will get a variable OUTPUT_PATH, which contains the
-on-disk location, `/mnt/data/output/gs/bucket/path`.
-
-As a convenience, if a recursive input or output parameter is passed, dsub will
-automatically install the [Google Cloud SDK](https://cloud.google.com/sdk/docs/)
-at runtime (before your script executes). For large jobs, you are encouraged
-to install gcloud in your Docker image when it is built.
-
-#### Unsupported path formats:
-
-* GCS recursive wildcards (**) are not supported
-* Wildcards in the middle of a path are not supported
-* Output parameters to a directory are not supported, instead:
-  * use an explicit wildcard on the filename (such as `gs://mybucket/mypath/*`)
-  * use the recursive copy feature
-
-#### Script parameters
-
-If your Docker task script needs to refer to inputs or outputs explicitly,
-names can be provided for the input and output parameters. These
-parameters will be available as environment variables in the Docker container.
-
-For example:
-
-    --input OLD_VCF=gs://mybucket/mypath1/sample.vcf \
-    --input NEW_VCF=gs://mybucket/mypath2/sample.vcf \
-    --output OUTPUT=gs://mybucket/mypath/*
-
-will result in the following environment variables being set:
-
-    OLD_VCF=/mnt/data/input/gs/mypath1/sample.vcf
-    NEW_VCF=/mnt/data/input/gs/mypath2/sample.vcf
-    OUTPUT=/mnt/data/output/gs/mypath/*
-
-To pass simple environment variables to your jobs, use the `--env` parameter:
+To pass simple, non-file, values to your jobs, use the `--env` parameter:
 
     --env SAMPLE_ID=NA12878 \
     --env SAMTOOLS_TASK=index \
 
 Note that each of the `--env`, `--input`, and `--output` parameters supports
-a single value for a flag, multiple space-separated values for a single flag,
-or multiple flags. For example:
+multiple space-separated values for a single flag, or multiple flags.
+For example:
 
     --env NAME1=VALUE1 NAME2=VALUE2
 
@@ -238,6 +183,7 @@ And then you can run with:
 -   `./dstat [flags]`
 -   `./dsub [flags] my_script.sh`
 
+## Help
 
 To see the full set of parameters for dsub, dstat, ddel, pass the
 `--help` flag.
