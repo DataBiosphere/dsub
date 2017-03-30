@@ -1,0 +1,4 @@
+--input INPUT_VCF	--output OUTPUT_FILE
+gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/working/20140708_previous_phase3/v2_vcfs/ALL.chr21.phase3_shapeit2_mvncall_integrated_v2.20130502.genotypes.vcf.gz	gs://MY-BUCKET/get_vcf_sample_ids/output/ALL.chr21.phase3_shapeit2_mvncall_integrated_v2.20130502.genotypes.txt
+gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/working/20140708_previous_phase3/v1_vcfs/ALL.chr21.phase3_shapeit2_mvncall_integrated.20130502.genotype.vcf.gz	gs://MY-BUCKET/get_vcf_sample_ids/output/ALL.chr21.phase3_shapeit2_mvncall_integrated.20130502.genotype.txt
+gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/working/20110721_exome_call_sets/bcm/ALL.BCM_Illumina_Mosaik_ontarget_plus50bp_822.20110521.snp.exome.genotypes.vcf.gz	gs://MY-BUCKET/get_vcf_sample_ids/output/ALL.BCM_Illumina_Mosaik_ontarget_plus50bp_822.20110521.snp.exome.genotypes.txt

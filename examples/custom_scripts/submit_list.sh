@@ -17,7 +17,7 @@
 # submit_list.sh
 #
 # Usage:
-#   submit_list.sh PROJECT-ID BUCKET
+#   submit_list.sh PROJECT-ID BUCKET SCRIPT
 #
 # Wrapper script to decompress a list of VCF files and copy each to a
 # Cloud Storage bucket. Each VCF is decompressed as a separate task.
@@ -27,22 +27,44 @@
 set -o errexit
 set -o nounset
 
-readonly MY_PROJECT=${1}
-readonly MY_BUCKET=${2}
-
 readonly SCRIPT_DIR="$(dirname "${0}")"
+
+if [[ $# -ne 3 ]]; then
+  2>&1 echo "Usage: ${0} project-id bucket script"
+  2>&1 echo
+  2>&1 echo "  script is either of:"
+  2>&1 echo "    ${SCRIPT_DIR}/get_vcf_sample_ids.sh"
+  2>&1 echo "    ${SCRIPT_DIR}/get_vcf_sample_ids.py"
+  exit 1
+fi
+
+readonly MY_PROJECT=${1}
+readonly MY_BUCKET_PATH=${2}
+readonly SCRIPT=${3}
+
+declare IMAGE="ubuntu:14.04"
+if [[ ${SCRIPT} == *.py ]]; then
+  IMAGE="python:2.7"
+fi
+readonly IMAGE
+
+readonly OUTPUT_ROOT="gs://${MY_BUCKET_PATH}/get_vcf_sample_ids"
+readonly LOGGING="${OUTPUT_ROOT}/logging"
 
 # Assume that we are in the "examples/<example_name>" directory
 readonly DSUB_DIR="${SCRIPT_DIR}/../.."
+
+echo "Logging will be written to:"
+echo "  ${LOGGING}"
+echo
 
 # Launch the task
 "${DSUB_DIR}"/dsub \
   --project "${MY_PROJECT}" \
   --zones "us-central1-*" \
-  --logging "${MY_BUCKET}/decompress_list/logging/" \
+  --logging "${LOGGING}" \
   --disk-size 200 \
-  --image ubuntu:14.04 \
+  --image "${IMAGE}" \
+  --script "${SCRIPT}" \
   --table "${SCRIPT_DIR}"/submit_list.tsv \
-  --command 'gunzip ${INPUT_VCF} && \
-             mv ${INPUT_VCF%.gz} $(dirname ${OUTPUT_VCF})' \
   --wait
