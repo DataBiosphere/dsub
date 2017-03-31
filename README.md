@@ -292,5 +292,5 @@ To cancel specific tasks, run:
 ## What next?
 
 * See the [examples](examples).
-* See more details about [scripts, commands, and docker](docs/input_output.md).
+* See more details about [scripts, commands, and docker](docs/code.md).
 * See more details about [input and output](docs/input_output.md).

@@ -18,7 +18,8 @@ All of the source VCF files are stored in a public bucket at
 
 ## Set up
 
-* Follow the [dsub setup](../../README.md#setup) instructions.
+* Follow the [dsub geting started](../../README.md#getting-started)
+instructions.
 
 ## Decompress one file
 
