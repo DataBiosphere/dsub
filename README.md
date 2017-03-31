@@ -2,194 +2,295 @@
 
 This is not an official Google product.
 
-# Simple Docker batch jobs on Google Compute Engine (GCE)
+# dsub: simple batch jobs with Docker
 
 ## Overview
 
-Provides a command-line interface for submitting script-based jobs to a
-job execution engine. Jobs are currently backed by the Google Genomics
-Pipelines API.
+dsub is a command-line tool that makes it easy to submit and run batch scripts
+in the cloud. dsub uses Docker, which makes it easy to package up portable
+code that people can run anywhere Docker is supported.
 
-`dsub` provides two modes of execution:
+The dsub user experience is modeled after traditional high-performance
+computing job schedulers like Grid Engine and Slurm. You write a script and
+then submit it to a job scheduler from a shell prompt on your local machine.
 
-* launch a single job where parameters are specified on the command-line.
-* launch a batch of jobs where parameters are specified in a tab-separated
-(TSV) file.
+For now, dsub supports Google Cloud as the backend batch job runner. With help
+from the community, we'd like to add other backends, such as a local runner,
+Grid Engine, Slurm, Amazon Batch, and Azure Batch.
 
-The former is largely intended for enabling iterative development of the job
-methods. The latter enables you to ramp up execution from a single input to
-a batch.
+If others find dsub useful, our hope is to contribute dsub to an open-source
+foundation for use by the wider batch computing community.
 
-### Command-line execution
+## Getting started
 
-Examples:
+1.  Clone this repository.
+
+        git clone https://github.com/googlegenomics/task-submission-tools
+        cd task-submission-tools
+
+1.  Setup a Python virtualenv (optional but strongly recommended).
+
+        virtualenv dsub_libs
+        source dsub_libs/bin/activate
+
+1.  Install dependent libraries.
+
+        pip install --upgrade oauth2client==1.5.2 google-api-python-client python-dateutil pytz tabulate
+
+1.  Verify the installation by running:
+
+        ./dsub --help`
+
+1.   (Optional) [Install Docker](https://docs.docker.com/engine/installation/).
+
+     This is necessary only if you're going to create your own Docker images.
+
+### Getting started on Google Cloud
+
+1.  Sign up for a Google Cloud Platform account and
+    [create a project](https://console.cloud.google.com/project?).
+
+1.  [Enable the APIs](https://console.cloud.google.com/flows/enableapi?apiid=genomics,storage_component,compute_component&redirect=https://console.cloud.google.com).
+
+1.  [Install the Google Cloud SDK](https://cloud.google.com/sdk/) and run
+
+        gcloud init
+
+    This will set up your default project and grant credentials to the Google
+    Cloud SDK. Now provide [credentials](https://developers.google.com/identity/protocols/application-default-credentials)
+    so dsub can call Google APIs:
+
+        gcloud application-default login
+
+1.  Create a [Google Cloud Storage](https://cloud.google.com/storage) bucket.
+
+    The dsub logs and output files will be written to a bucket. Create a
+    bucket using the [storage browser](https://cloud.google.com/storage/browser?project=)
+    or run the command-line utility [gsutil](https://cloud.google.com/storage/docs/gsutil), included in
+    the Cloud SDK.
+
+        gsutil mb gs://my-bucket
+
+    Change `my-bucket` to a unique name that follows the
+    [bucket-naming conventions](https://cloud.google.com/storage/docs/bucket-naming).
+
+    (By default, the bucket will be in the US, but you can change or
+    refine the [location](https://cloud.google.com/storage/docs/bucket-locations) setting with the
+    `-l` option.)
+
+## Running a job
+
+Here's the simplest example:
 
     dsub \
-      --project my-cloud-project \
-      --logging gs://mybucket/mylogs/bamstats-sample1.log \
-      --image quay.io/collaboratory/dockstore-tool-bamstats \
-      --script my-bamstats-wrapper.sh \
-      --input INPUT_FILE=gs://mybucket/mypath/sample1.bam \
-      --output OUTPUT_FILE=gs://mybucket/mypath/sample1.stats.txt
+        --project my-cloud-project \
+        --logging gs://my-bucket/logs \
+        --command "echo hello"
 
-This command submitted by dsub will run a Docker task where the specified
-input files have been automatically localized to disk.
-For example, the `INPUT_FILE` will be localized to:
+Change `my-cloud-project` to your Google Cloud project, and `my-bucket` to
+the bucket you created above.
 
-    /mnt/data/input/gs/mybucket/mypath/sample1.bam
+After running dsub, the output will be a server-generated job id.
+The output of the script command will be written to the logging folder.
 
-A Docker container will be created from the image at
-`quay.io/collaboratory/dockstore-tool-bamstats` and the local script
-`my-bamstats-wrapper.sh` will be executed.
+The following sections show how to run more complex jobs.
 
-On successful completion of the Docker task, the output file will be
-automatically de-localized from:
+### Defining what code to run
 
-    /mnt/data/output/gs/mybucket/mypath/sample1.stats.txt
+You can provide a shell command directly in the dsub command-line, as in the
+hello example above.
 
-More support is available for input and output handling such as:
+You can also save your script to a file, like `hello.sh`. Then you can run:
 
-  * wildcards on filenames
-  * recursive directory copying
+    dsub \
+        --project my-cloud-project \
+        --logging gs://my-bucket/logs \
+        --script hello.sh
 
-See the [Input/Output docs](docs/input_output.md) for more details.
+If your script has dependencies that are not stored in your Docker image,
+you can transfer them to the local disk. See the instructions below for
+working with input and output files and folders.
 
-#### Script variables
+### Selecting a Docker image
 
-In the above example, your Docker script will receive environment variables
-`INPUT_FILE` and `OUTPUT_FILE` set automatically.
-You can reference the `--input` and `--output` values from your script using
-standard bash notation, like `${INPUT_FILE}` and `${OUTPUT_FILE}`.
+By default, dsub uses a stock Ubuntu image. You can change the image
+by passing the `--image` flag.
 
-To pass simple, non-file, values to your jobs, use the `--env` parameter:
+    dsub \
+        --project my-cloud-project \
+        --logging gs://my-bucket/logs \
+        --image ubuntu:16.04 \
+        --script hello.sh
 
-    --env SAMPLE_ID=NA12878 \
-    --env SAMTOOLS_TASK=index \
+### Passing parameters to your script
 
-Note that each of the `--env`, `--input`, and `--output` parameters supports
-multiple space-separated values for a single flag, or multiple flags.
-For example:
+You can pass environment variables to your script using the `--env` flag.
 
-    --env NAME1=VALUE1 NAME2=VALUE2
+    dsub \
+        --project my-cloud-project \
+        --logging gs://my-bucket/logs \
+        --env MESSAGE=hello \
+        --command "echo ${MESSAGE}"
 
-or
+The environment variable `MESSAGE` will be assigned the value `hello` when
+your Docker container runs.
 
-    --env NAME1=VALUE1 \
-    --env NAME2=VALUE2
+Your script or command can reference the variable like any other Linux
+environment variable, as `${MESSAGE}`.
 
-### TSV file batch execution
+To set multiple environment variables, you can repeat the flag:
 
-A TSV file can be used to specify environment variables, input, and output
-parameters for multiple jobs.
+    --env VAR1=value1 \
+    --env VAR2=value2
 
-The first line of the TSV file specifies the names and types of the parameters.
-Just as on the command-line, inputs and outputs can be anonymous or named:
+You can also set multiple variables, space-delimited, with a single flag:
 
-    --env SAMPLE_ID<tab>--input<tab>--output
+    --env VAR1=value1 VAR2=value2
 
-or:
+### Working with input and output files and folders
+
+dsub mimics the behavior of a shared file system using cloud storage
+bucket paths for input and output files and folders. You specify
+the cloud storage bucket path. Paths can be:
+
+* file paths like `gs://my-bucket/my-file`
+* folder paths like `gs://my-bucket/my-folder`
+* wildcard paths like `gs://my-bucket/my-folder/*`
+
+See the [inputs and outputs](docs/input_output.md) documentation for more details.
+
+### Transferring input files to a Google Cloud Storage bucket.
+
+If your script expects to read local input files that are not already
+contained within your Docker image, the files must be available in Google
+Cloud Storage.
+
+If your script has dependent files, you can make them available to your script
+by:
+
+ * Building a private Docker image with the dependent files and publishing the
+   image to a public site, or privately to Google Container Registry
+ * Uploading the files to Google Cloud Storage
+
+To upload the files to Google Cloud Storage, you can use the
+[storage browser](https://console.cloud.google.com/storage/browser?project=) or
+[gsutil](https://cloud.google.com/storage/docs/gsutil). You can also run on data
+that’s public or shared with your service account, an email address that you
+can find in the [Google Cloud Console](https://console.cloud.google.com).
+
+#### Files
+
+To specify input and output files, use the `--input` and `--output` flags:
+
+    dsub \
+        --project my-cloud-project \
+        --logging gs://my-bucket/logs \
+        --input INPUT_FILE=gs://my-bucket/my-input-file \
+        --output OUTPUT_FILE=gs://my-bucket/my-output-file \
+        --command "cat ${INPUT_FILE} > ${OUTPUT_FILE}"
+
+The input file will be copied from `gs://my-bucket/my-input-file` to a local
+path given by the environment variable `${INPUT_FILE}`. Inside your script, you
+can reference the local file path using the environment variable.
+
+The output file will be written to local disk at the location given by
+`${OUTPUT_FILE}`. Inside your script, you can reference the local file path
+using the environment variable. After the script completes, the output file
+will be copied to the bucket path `gs://my-bucket/my-output-file`.
+
+#### Folders
+
+To copy folders rather than files, use the `--input-recursive` or
+`output-recursive` flags:
+
+    dsub \
+        --project my-cloud-project \
+        --logging gs://my-bucket/logs \
+        --input-recursive FOLDER=gs://my-bucket/my-folder \
+        --command "find ${FOLDER} -name 'foo*'"
+
+### Setting resource requirements
+
+By default, dsub launches a VM with a single CPU core, a default number of
+GB of memory (3.75 GB on Google Compute Engine), and a default disk size
+(200 GB).
+
+To change the minimum RAM, use the `--min-ram` flag.
+
+To change the minimum number of CPU cores, use the `--min-cores` flag.
+
+To change the disk size, use the `--disk-size` flag.
+
+Before you choose especially large or unusual values, be sure to check the
+available VM instance types and maximum disk size. On Google Cloud, the
+machine type will be selected from the best matching
+[predefined machine types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types).
+
+### Submitting a batch job
+
+You can run a batch job consisting of an array of many tasks, rather than a
+single task as in all of the examples so far. To run a batch of tasks, create
+a tab-separated values (TSV) file containing the environment variables and
+input and output parameters for multiple tasks.
+
+The first line of the TSV file specifies the names and types of the
+parameters. For example:
 
     --env SAMPLE_ID<tab>--input VCF_FILE<tab>--output OUTPUT_PATH
 
 The first line also supports bare-word variables which are treated as
-the names of environment variables.
+the names of environment variables. This example is equivalent to the previous:
 
-### Job Control
+    SAMPLE_ID<tab>--input VCF_FILE<tab>--output OUTPUT_PATH
 
-Each job submitted by dsub is given a set of metadata values which can be
-utilized for job identification and job control.
+### Viewing job status
 
-The metadata associated with each job includes:
+The `dstat` command displays the status of jobs:
 
-* `job-name`: defaults to the name of the *script* file, can be explicitly set
-  with the --name parameter
-* `user-id`: the `USER` environment variable value
-* `job-id`: takes the form `<job-name>--<userid>--<timestamp>` where the
-  `job-name` portion is truncated at 10 characters and the `timestamp`
-  portion is out to hundredths of a second and of the form `YYMMDD-HHMMSS-XX`
+    ./dstat --project my-cloud-project
+
+With no additional arguments, dstat will display a list of *running* jobs for
+the current `USER`.
+
+To display the status of a specific job, use the `--jobs` flag:
+
+    ./dstat --project my-cloud-project --jobs job-id
+
+For a batch job, the output will list all *running* tasks.
+
+Each job submitted by dsub is given a set of metadata values that can be
+used for job identification and job control. The metadata associated with
+each job includes:
+
+* `job-name`: defaults to the name of your script file or the first word of
+  your script command; it can be explicitly set
+  with the `--name` parameter.
+* `user-id`: the `USER` environment variable value.
+* `job-id`: takes the form `job-name--userid--timestamp` where the
+  `job-name` is truncated at 10 characters and the `timestamp` is of the form
+  `YYMMDD-HHMMSS-XX`, unique to hundredths of a second.
 * `task-id`: if the job is a "table job", each task gets a sequential value
   of the form "task-*n*" where *n* is 1-based.
 
-Note that each metadata element must conform to the
-[Compute Engine label specification]
-(https://cloud.google.com/compute/docs/reference/beta/instances/setLabels#labels).
+Metadata can be used to cancel a job or individual tasks within a batch job.
 
-### View Job Status
+### Cancelling a job
 
-The `dstat` script allows for viewing job status:
+The `ddel` command will cancel running jobs. To delete a running job:
 
-```bash
-dstat --project my-cloud-project
-```
+    ./ddel --project my-cloud-project --jobs job-id
 
-with no additional arguments will display a list of running jobs for the USER.
+If the job is a batch job, all tasks will be canceled.
 
-```bash
-dstat --project my-cloud-project --jobs <job-id>
-```
+To cancel specific tasks, run:
 
-will display the running job (including tasks).
+    ./ddel \
+        --project my-cloud-project \
+        --jobs job-id \
+        --tasks task-id1 task-id2
 
-### Cancel Jobs
+## What next?
 
-The `ddel` script allows for deleting jobs:
-
-```bash
-ddel --project my-cloud-project --jobs <job-id>
-```
-
-will delete the running job (including tasks).
-
-```bash
-ddel --project my-cloud-project \
-  --jobs <job-id> --tasks <task-id1> <task-id2>
-```
-
-will delete the running tasks.
-
-## Setup
-
-To setup:
-
-- Follow the Google Genomics Pipelines API
-[Get Ready](https://cloud.google.com/genomics/v1alpha2/pipelines#get_ready)
-instructions.
-
-- Authorize applications such as dsub to access Google Cloud resources by creating
-[Application Default Credentials](https://developers.google.com/identity/protocols/application-default-credentials). Run the command:
-
-    [gcloud auth application-default login](https://cloud.google.com/sdk/gcloud/reference/auth/application-default/login)
-
-- Clone this repository to your local workstation
-
-- Change directory into the root directory of the local clone of the repository.
-
-- Setup a virtualenv (optional, but very strongly recommended).
-
-    ```bash
-    virtualenv dsub_libs
-    source dsub_libs/bin/activate
-    ```
-
-- Install dependent libraries
-
-    ```bash
-    pip install --upgrade oauth2client==1.5.2 google-api-python-client python-dateutil pytz tabulate
-    ```
-
-And then you can run with:
-
--   `./ddel [flags]`
--   `./dstat [flags]`
--   `./dsub [flags] my_script.sh`
-
-## Help
-
-To see the full set of parameters for dsub, dstat, ddel, pass the
-`--help` flag.
-
-## Examples
-
-A simple getting started example can be found in the directory:
-
-* examples/[decompress](examples/decompress)
+* See the [examples](examples).
+* See more details about [scripts, commands, and docker](docs/code.md).
+* See more details about [input and output](docs/input_output.md).
