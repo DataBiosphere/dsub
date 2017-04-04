@@ -39,12 +39,12 @@ function run_dsub_with_command() {
     --logging "${LOGGING}" \
     --zones "${zones}" \
     "${preemptible:+--preemptible}" \
-    --env TEST_NAME="${TEST_NAME}" \
     --command "${command}" \
-    "${script}" \
+    --script "${script}" \
+    --env TEST_NAME="${TEST_NAME}" \
     --dry-run \
-    2> "${TEST_STDERR}" \
-    1> "${TEST_STDOUT}"
+    1> "${TEST_STDOUT}" \
+    2> "${TEST_STDERR}"
 }
 readonly -f run_dsub_with_command
 
@@ -55,9 +55,6 @@ function test_with_command() {
 
   if run_dsub_with_command \
     'echo "${TEST_NAME}"'; then
-
-    # Check that stderr is empty
-    assert_err_empty
 
     # Check that the output contains expected values
     assert_pipeline_environment_variable_equals \
@@ -120,11 +117,8 @@ function test_zone_single() {
     "" \
     "us-central1-f"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected values
-    assert_output_value_equals \
+    assert_err_value_equals \
       "[0].ephemeralPipeline.resources.zones.[0]" "us-central1-f"
 
     test_passed "${subtest}"
@@ -142,13 +136,10 @@ function test_zones_regional() {
     "" \
     "us-central1-*"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected values
     local idx=0
     for zone in us-central1-a us-central1-b us-central1-c us-central1-f; do
-      assert_output_value_equals \
+      assert_err_value_equals \
         "[0].ephemeralPipeline.resources.zones.[${idx}]" ${zone}
 
       ((++idx))
@@ -169,14 +160,11 @@ function test_zones_multi_regional() {
     "" \
     "us-*"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected values
     local idx=0
     for zone in us-central1-a us-central1-b us-central1-c us-central1-f \
                 us-east1-b us-east1-c us-east1-d us-west1-a us-west1-b; do
-      assert_output_value_equals \
+      assert_err_value_equals \
         "[0].ephemeralPipeline.resources.zones.[${idx}]" ${zone}
 
       ((++idx))
@@ -198,13 +186,10 @@ function test_preemptible() {
     "us-*" \
     "True"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected values
-    assert_output_value_equals \
+    assert_err_value_equals \
      "[0].ephemeralPipeline.resources.preemptible" "True"
-    assert_output_value_equals \
+    assert_err_value_equals \
      "[0].pipelineArgs.resources.preemptible" "True"
 
     test_passed "${subtest}"
@@ -222,13 +207,10 @@ function test_no_preemptible() {
     "" \
     "us-*"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected values
-    assert_output_value_equals \
+    assert_err_value_equals \
      "[0].ephemeralPipeline.resources.preemptible" "False"
-    assert_output_value_equals \
+    assert_err_value_equals \
      "[0].pipelineArgs.resources.preemptible" "False"
 
     test_passed "${subtest}"

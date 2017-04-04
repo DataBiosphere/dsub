@@ -19,6 +19,7 @@ Follows the model of bjobs, sinfo, qstat, etc.
 
 import argparse
 import collections
+import time
 
 from lib import dsub_util
 from providers import provider_base
@@ -59,6 +60,14 @@ def parse_arguments():
       help="""Lists only those jobs which match the specified status(es).
           Use "*" to list jobs of any status.""")
   parser.add_argument(
+      '--poll-interval',
+      default=10,
+      type=int,
+      help='Polling interval (in seconds) for checking job status '
+      'when --wait is set.')
+  parser.add_argument(
+      '--wait', action='store_true', help='Wait until jobs have all completed.')
+  parser.add_argument(
       '-f',
       '--full',
       action='store_true',
@@ -70,8 +79,40 @@ def parse_arguments():
 def trim_display_field(value, length):
   if len(value) > length:
     return value[:length - 3] + '...'
-
   return value
+
+
+def prepare_row(provider, job, full):
+  """return ordered dict with the job's info (more if "full" is set)."""
+  job_name = provider.get_job_field(job, 'job-name')
+  job_id = provider.get_job_field(job, 'job-id')
+  task_id = provider.get_job_field(job, 'task-id')
+  status, last_update = provider.get_job_status_message(job)
+
+  row = collections.OrderedDict()
+  if job_name:
+    row['Job Name'] = job_name
+  if task_id:
+    row['Task'] = task_id
+
+  row['Status'] = trim_display_field(status, MAX_ERROR_MESSAGE_LENGTH)
+  row['Last Update'] = last_update
+
+  if full:
+    create_time = provider.get_job_field(job, 'create-time')
+    end_time = provider.get_job_field(job, 'end-time')
+    inputs = provider.get_job_field(job, 'inputs')
+    input_str = ','.join('%s=%s' % (key, value)
+                         for key, value in inputs.iteritems())
+    user_id = provider.get_job_field(job, 'user-id')
+    internal_id = provider.get_job_field(job, 'internal-id')
+    row['Created'] = create_time
+    row['Ended'] = end_time if end_time else 'NA'
+    row['User'] = user_id
+    row['Job ID'] = job_id
+    row['Internal ID'] = internal_id
+    row['Inputs'] = trim_display_field(input_str, MAX_INPUT_ARGS_LENGTH)
+  return row
 
 
 def main():
@@ -81,71 +122,47 @@ def main():
   # Set up the Genomics Pipelines service interface
   provider = provider_base.get_provider(args)
 
-  jobs = provider.get_jobs(
-      args.status, user_list=args.users, job_list=args.jobs)
+  # Track if any jobs are running in the event --wait was requested.
+  some_job_running = True
+  while some_job_running:
 
-  # Try to keep the default behavior rational based on real usage patterns.
-  # Most common usage:
-  # * User kicked of one or more single-operation jobs, or
-  # * User kicked off a single "array job".
-  # * User just wants to check on status of their own running jobs.
-  #
-  # qstat and hence dstat.py defaults to listing jobs for the current user, so
-  # there is no need to include user information in the default output.
+    jobs = provider.get_jobs(
+        args.status, user_list=args.users, job_list=args.jobs)
 
-  # The information you want in that case is very different than other uses,
-  # such as:
-  # * I want to see all jobs currently pending/running
-  # * I want to see status for a particular job or set of jobs
-  #   (including the finished jobs)
+    # Try to keep the default behavior rational based on real usage patterns.
+    # Most common usage:
+    # * User kicked of one or more single-operation jobs, or
+    # * User kicked off a single "array job".
+    # * User just wants to check on status of their own running jobs.
+    #
+    # qstat and hence dstat.py defaults to listing jobs for the current user, so
+    # there is no need to include user information in the default output.
 
-  # Job name is typically short
-  # Job ID is typically long
-  # Task ID is short
+    # The information you want in that case is very different than other uses,
+    # such as:
+    # * I want to see all jobs currently pending/running
+    # * I want to see status for a particular job or set of jobs
+    #   (including the finished jobs)
 
-  table = []
+    # Job name is typically short
+    # Job ID is typically long
+    # Task ID is short
 
-  for job in jobs:
-    job_name = provider.get_job_field(job, 'job-name')
-    job_id = provider.get_job_field(job, 'job-id')
-    task_id = provider.get_job_field(job, 'task-id')
+    table = []
 
-    status, last_update = provider.get_job_status_message(job)
+    some_job_running = False
+    for job in jobs:
+      table.append(prepare_row(provider, job, args.full))
+      if provider.get_job_field(job, 'job-status') == 'RUNNING':
+        some_job_running = True
 
-    row = collections.OrderedDict()
-    if job_name:
-      row['Job Name'] = job_name
-    if task_id:
-      row['Task'] = task_id
+    if table:
+      print tabulate.tabulate(table, headers='keys')
 
-    row['Status'] = trim_display_field(status, MAX_ERROR_MESSAGE_LENGTH)
-    row['Last Update'] = last_update
-
-    if args.full:
-      create_time = provider.get_job_field(job, 'create-time')
-      end_time = provider.get_job_field(job, 'end-time')
-
-      inputs = provider.get_job_field(job, 'inputs')
-      input_str = ','.join('%s=%s' % (key, value)
-                           for key, value in inputs.iteritems())
-
-      user_id = provider.get_job_field(job, 'user-id')
-      internal_id = provider.get_job_field(job, 'internal-id')
-
-      row['Created'] = create_time
-      row['Ended'] = end_time if end_time else 'NA'
-      row['User'] = user_id
-
-      row['Job ID'] = job_id
-      row['Internal ID'] = internal_id
-
-      row['Inputs'] = trim_display_field(input_str, MAX_INPUT_ARGS_LENGTH)
-
-    table.append(row)
-
-  if table:
-    print tabulate.tabulate(table, headers='keys')
-
+    if args.wait and some_job_running:
+      time.sleep(args.poll_interval)
+    else:
+      break
 
 if __name__ == '__main__':
   main()

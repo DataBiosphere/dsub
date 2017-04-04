@@ -37,10 +37,10 @@ function run_dsub_with_script() {
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
     --zones "${ZONE}" \
+    --script "${SCRIPT}" \
     --name "${name}" \
-    "${SCRIPT}" \
-    2> "${TEST_STDERR}" \
-    1> "${TEST_STDOUT}"
+    1> "${TEST_STDOUT}" \
+    2> "${TEST_STDERR}"
 }
 readonly -f run_dsub_with_script
 
@@ -55,8 +55,8 @@ function run_dsub_with_command() {
     --zones "${ZONE}" \
     --name "${name}" \
     --command "${command}" \
-    2> "${TEST_STDERR}" \
-    1> "${TEST_STDOUT}"
+    1> "${TEST_STDOUT}" \
+    2> "${TEST_STDERR}"
 }
 readonly -f run_dsub_with_command
 
@@ -67,13 +67,10 @@ function test_default_name_from_script() {
 
   if run_dsub_with_script ""; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected labels:
     #   "labels": {
-    #     "job-id": "dummy--mbookman--161129-133400-96", 
-    #     "job-name": "dummy", 
+    #     "job-id": "dummy--mbookman--161129-133400-96",
+    #     "job-name": "dummy",
     #     "user-id": "mbookman"
     #   }
 
@@ -94,13 +91,10 @@ function test_explicit_name_override_script() {
 
   if run_dsub_with_script "my-job"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected labels
     #   "labels": {
-    #     "job-id": "my-job--mbookman--161129-133655-41", 
-    #     "job-name": "my-job", 
+    #     "job-id": "my-job--mbookman--161129-133655-41",
+    #     "job-name": "my-job",
     #     "user-id": "mbookman"
     #   }
 
@@ -123,13 +117,10 @@ function test_default_name_from_command() {
   if run_dsub_with_command \
     "/in/my/docker/analysis.py"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected labels:
     #   "labels": {
-    #     "job-id": "analysis--mbookman--161129-133400-96", 
-    #     "job-name": "analysis", 
+    #     "job-id": "analysis--mbookman--161129-133400-96",
+    #     "job-name": "analysis",
     #     "user-id": "mbookman"
     #   }
 
@@ -152,13 +143,10 @@ function test_explicit_name_override_command() {
     "/in/my/docker/analysis.py"\
     "my-job"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected labels
     #   "labels": {
-    #     "job-id": "my-job--mbookman--161129-133655-41", 
-    #     "job-name": "my-job", 
+    #     "job-id": "my-job--mbookman--161129-133655-41",
+    #     "job-name": "my-job",
     #     "user-id": "mbookman"
     #   }
 
@@ -180,13 +168,10 @@ function test_long_name() {
 
   if run_dsub_with_script "my-job-which-has-a-long-name"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected labels
     #   "labels": {
-    #     "job-id": "my-job--mbookman--161129-133655-41", 
-    #     "job-name": "my-job", 
+    #     "job-id": "my-job--mbookman--161129-133655-41",
+    #     "job-name": "my-job",
     #     "user-id": "mbookman"
     #   }
 

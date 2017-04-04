@@ -658,6 +658,8 @@ class _Operations(object):
       return metadata['labels'].get('task-id')
     elif field == 'user-id':
       return metadata['labels'].get('user-id')
+    elif field == 'job-status':
+      return metadata['job-status']
     elif field == 'inputs':
       return metadata['request']['pipelineArgs']['inputs']
     elif field == 'create-time':
@@ -726,6 +728,26 @@ class _Operations(object):
     g = [int(val) for val in m.groups()]
     dt = datetime(g[0], g[1], g[2], g[3], g[4], g[5], tzinfo=pytz.utc)
     return dt.astimezone(tzlocal()).strftime('%Y-%m-%d %H:%M:%S')
+
+  @classmethod
+  def operation_status(cls, operation):
+    """Returns the status of this operation.
+
+    ie. RUNNING, SUCCESS, CANCELED or FAILURE.
+
+    Args:
+      operation: Operation
+
+    Returns:
+      A printable status string
+    """
+    if not operation['done']:
+      return 'RUNNING'
+    if 'error' not in operation:
+      return 'SUCCESS'
+    if operation['error'].get('code', 0) == 1:
+      return 'CANCELED'
+    return 'FAILURE'
 
   @classmethod
   def operation_status_message(cls, operation):
@@ -945,6 +967,8 @@ class GoogleJobProvider(object):
 
     if not status_list:
       status_list = ['*']
+    if not user_list:
+      user_list = ['*']
     if not job_list:
       job_list = ['*']
     if not task_list:
@@ -963,6 +987,8 @@ class GoogleJobProvider(object):
                 task_id=task_id)
 
             ops = _Operations.list(self._service, ops_filter, max_jobs)
+            for o in ops:
+              o['metadata']['job-status'] = _Operations.operation_status(o)
 
             if ops:
               operations.extend(ops)

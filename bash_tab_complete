@@ -1,0 +1,64 @@
+# To use, in the Bash shell:
+# source bash_tab_complete
+#
+# Then you can use the "tab" key to auto-complete options in the
+# command line for dsub, dstat, or ddel.
+#
+# ./dsub --pro<TAB>
+# ./dsub --project
+#
+# If you update dsub or related tools, you can source this file again
+# to update the tab completion rules.
+
+
+declare -A cmdline_options_for_dstar
+
+cmdline_options_for_dstar[dstat]=""
+cmdline_options_for_dstar[dsub]=""
+cmdline_options_for_dstar[ddel]=""
+
+
+
+_find_options_for()
+{
+    local tool="$1"
+    2>&1 "$tool" | grep -oe '\-[a-zA-Z_\-]*' | sort | uniq | xargs
+}
+
+_go_with_options()
+{
+    local options="$@"
+    local cur
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    COMPREPLY=( $(compgen -W "${options}" -- ${cur}) )
+    return 0
+}
+
+_magic_options_for()
+{
+    local tool="$1"
+    local tool_path="$2"
+    if [ -z "${cmdline_options_for_dstar[$tool]}" ]; then
+        cmdline_options_for_dstar[$tool]="$(_find_options_for $tool_path)"
+    fi
+    _go_with_options "${cmdline_options_for_dstar[$tool]}"
+}
+
+_dsub()
+{
+    _magic_options_for "dsub" "$1"
+}
+
+_dstat()
+{
+    _magic_options_for "dstat" "$1"
+}
+
+_ddel()
+{
+    _magic_options_for "ddel" "$1"
+}
+
+complete -o default -F _dsub dsub
+complete -o default -F _dstat dstat
+complete -o default -F _ddel ddel

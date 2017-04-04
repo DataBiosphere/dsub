@@ -1,4 +1,4 @@
-# File handling with dsub
+# File handling
 
 An on-premises job scheduler like Grid Engine typically uses a shared file
 system. Your Grid Engine scripts can reference files by their paths on the

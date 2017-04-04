@@ -36,11 +36,11 @@ function run_dsub() {
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
     --zones "${ZONE}" \
+    --script "${SCRIPT}" \
     --table "${table}" \
     --dry-run \
-    "${SCRIPT}" \
-    2> "${TEST_STDERR}" \
-    1> "${TEST_STDOUT}"
+    1> "${TEST_STDOUT}" \
+    2> "${TEST_STDERR}"
 }
 readonly -f run_dsub
 
@@ -61,14 +61,11 @@ na12879
 
   if run_dsub "${tsv_file}"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected labels
     #   "labels": {
-    #     "job-id": "dummy--mbookman--161129-145520-09", 
-    #     "job-name": "dummy", 
-    #     "task-id": "task-1", 
+    #     "job-id": "dummy--mbookman--161129-145520-09",
+    #     "job-name": "dummy",
+    #     "task-id": "task-1",
     #     "user-id": "mbookman"
     #   }
 

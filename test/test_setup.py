@@ -27,9 +27,6 @@
 import os
 import sys
 
-# # Automatically add the path to the dsub directory (the parent directory)
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 # Compute the name of the test from the calling script
 # (trim the e2e_ or unit_ prefix, along with the .py extension)
 TEST_NAME = os.path.splitext(os.path.basename(sys.argv[0]).split('_', 1)[1])[0]

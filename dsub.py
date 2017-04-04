@@ -18,15 +18,18 @@ Follows the model of bsub, qsub, srun, etc.
 """
 
 import argparse
-import collections
-import csv
+from contextlib import contextmanager
 import os
-import re
 import sys
 import time
 
 from lib import dsub_util
+from lib import job_util
+from lib import param_util
+from lib.dsub_util import print_error
 from providers import provider_base
+
+SLEEP_FUNCTION = time.sleep  # so we can replace it in tests
 
 DEFAULT_SCOPES = ['https://www.googleapis.com/auth/bigquery',]
 
@@ -93,73 +96,43 @@ DEFAULT_SCOPES = ['https://www.googleapis.com/auth/bigquery',]
 DEFAULT_INPUT_LOCAL_PATH = 'input'
 DEFAULT_OUTPUT_LOCAL_PATH = 'output'
 
-AUTO_PREFIX_INPUT = 'INPUT_'  # Prefix for auto-generated input names
-AUTO_PREFIX_OUTPUT = 'OUTPUT_'  # Prefix for auto-generated output names
 
+class Printer(object):
+  """File-like stream object that redirects stdout to stderr.
 
-def print_error(msg):
-  """Utility routine to emit messages to stderr."""
-  print >> sys.stderr, msg
-
-
-def split_pair(pair_string, separator, nullable_idx):
-  """Split a pair, which can have one empty value."""
-
-  pair = pair_string.split(separator, 1)
-  if len(pair) == 1:
-    if nullable_idx == 0:
-      return [None, pair[0]]
-    else:
-      return [pair[0], None]
-  else:
-    return pair
-
-
-class JobResources(
-    collections.namedtuple('JobResources', [
-        'min_cores', 'min_ram', 'disk_size', 'boot_disk_size', 'preemptible',
-        'image', 'logging', 'zones', 'scopes'
-    ])):
-  """Job resource parameters related to CPUs, memory, and disk.
-
-  Attributes:
-    min_cores (int): number of CPU cores
-    min_ram (float): amount of memory (in GB)
-    disk_size (int): size of the data disk (in GB)
-    boot_disk_size (int): size of the boot disk (in GB)
-    preemptible (bool): use a preemptible VM for the job
-    image (str): Docker image name
-    logging (str): path to location for jobs to write logs
-    zones (str): location in which to run the job
-    scopes (list): OAuth2 scopes for the job
+  Args:
+    object: parent object. Linter made me write this.
   """
-  __slots__ = ()
 
-  def __new__(cls,
-              min_cores=1,
-              min_ram=1,
-              disk_size=10,
-              boot_disk_size=10,
-              preemptible=False,
-              image=None,
-              logging=None,
-              zones=None,
-              scopes=None):
-    return super(JobResources, cls).__new__(cls, min_cores, min_ram, disk_size,
-                                            boot_disk_size, preemptible, image,
-                                            logging, zones, scopes)
+  def __init__(self, args):
+    self._args = args
+    self._actual_stdout = sys.stdout
+
+  def write(self, buf):
+    sys.stderr.write(buf)
 
 
-def validate_param_name(name, param_type):
-  """Validate that the name follows posix conventions for env variables."""
+@contextmanager
+def replace_print_with(printer):
+  """Sys.out replacer.
 
-  # http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_235
-  #
-  # 3.235 Name
-  # In the shell command language, a word consisting solely of underscores,
-  # digits, and alphabetics from the portable character set.
-  if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name):
-    raise ValueError('Invalid %s: %s' % (param_type, name))
+  Use it like this:
+  with replace_print_with(fileobj):
+    print "hello"  # writes to the file
+  print "done"  # prints to stdout
+
+  Args:
+    printer: a file-like object that will replace stdout.
+
+  Yields:
+    The printer.
+  """
+  previous_stdout = sys.stdout
+  sys.stdout = printer
+  try:
+    yield printer
+  finally:
+    sys.stdout = previous_stdout
 
 
 class ListParamAction(argparse.Action):
@@ -190,256 +163,6 @@ class ListParamAction(argparse.Action):
       params.append(arg)
 
     setattr(namespace, self.dest, params)
-
-
-class EnvParam(collections.namedtuple('EnvParam', ['name', 'value'])):
-  """Name/value input parameter to a pipeline.
-
-  Attributes:
-    name (str): the input parameter and environment variable name.
-    value (str): the variable value (optional).
-  """
-  __slots__ = ()
-
-  def __new__(cls, name, value=None):
-    validate_param_name(name, 'Environment variable')
-    return super(EnvParam, cls).__new__(cls, name, value)
-
-
-class FileParam(
-    collections.namedtuple('FileParam',
-                           ['name', 'docker_path', 'remote_uri', 'recursive'])):
-  """File parameter to be automatically localized or de-localized.
-
-  Input files are automatically localized from GCS to the pipeline VM's
-  local block disk(s).
-
-  Output files are automatically de-localized to GCS from the pipeline VM's
-  local block disk(s).
-
-  Attributes:
-    name (str): the parameter and environment variable name.
-    docker_path (str): the on-VM location; also set as the environment variable
-        value.
-    remote_uri (str): the GCS path.
-  """
-  __slots__ = ()
-
-  def __new__(cls, name, docker_path=None, remote_uri=None, recursive=False):
-    return super(FileParam, cls).__new__(cls, name, docker_path, remote_uri,
-                                         recursive)
-
-
-class InputFileParam(FileParam):
-  """Simple typed-derivative of a FileParam."""
-
-  def __new__(cls, name, docker_path=None, remote_uri=None, recursive=False):
-    validate_param_name(name, 'Input parameter')
-    return super(InputFileParam, cls).__new__(cls, name, docker_path,
-                                              remote_uri, recursive)
-
-
-class OutputFileParam(FileParam):
-  """Simple typed-derivative of a FileParam."""
-
-  def __new__(cls, name, docker_path=None, remote_uri=None, recursive=False):
-    validate_param_name(name, 'Input parameter')
-    return super(OutputFileParam, cls).__new__(cls, name, docker_path,
-                                               remote_uri, recursive)
-
-
-class FileParamUtil(object):
-  """Base class helper for producing FileParams from args or a table file.
-
-  InputFileParams and OutputFileParams can be produced from either arguments
-  passed on the command-line or as a combination of the definition in the table
-  header plus cell values in table records.
-
-  This class encapsulates the generation of the FileParam name, if none is
-  specified (get_variable_name()) as well as common path validation for
-  input and output arguments (validate_paths).
-  """
-
-  def __init__(self, auto_prefix, relative_path):
-    self._auto_prefix = auto_prefix
-    self._auto_index = 0
-    self._relative_path = relative_path
-
-  def get_variable_name(self, name):
-    """Produce a default variable name if none is specified."""
-    if not name:
-      name = '%s%s' % (self._auto_prefix, self._auto_index)
-      self._auto_index += 1
-
-    return name
-
-  @staticmethod
-  def _validate_paths(remote_uri):
-    """Do basic validation of the remote_uri, return the path and filename."""
-
-    # Only GCS paths are currently supported
-    if not remote_uri.startswith('gs://'):
-      raise ValueError('Only Cloud Storage URIs (gs://) supported: %s' %
-                       remote_uri)
-
-    # Only support file URLs and *filename* wildcards
-    # Wildcards at the directory level or "**" syntax would require better
-    # support from the Pipelines API *or* doing expansion here and
-    # (potentially) producing a series of FileParams, instead of one.
-    path = os.path.dirname(remote_uri)
-    filename = os.path.basename(remote_uri)
-
-    if '*' in path:
-      raise ValueError(
-          'Wildcards in remote paths only supported for files: %s' % remote_uri)
-
-    if '**' in filename:
-      raise ValueError('Recursive wildcards ("**") not supported: %s' %
-                       remote_uri)
-
-    return path, filename
-
-  @staticmethod
-  def _uri_to_localpath(uri):
-    return uri.replace('gs://', 'gs/')
-
-
-class InputFileParamUtil(FileParamUtil):
-
-  def __init__(self, docker_path):
-    super(InputFileParamUtil, self).__init__(AUTO_PREFIX_INPUT, docker_path)
-
-  def parse_uri(self, remote_uri, recursive):
-    """Return a valid docker_path and remote_uri from the remote_uri."""
-
-    # Validate and then tokenize the remote URI in order to build the
-    # docker_path and remote_uri.
-    path, filename = self._validate_paths(remote_uri)
-
-    if recursive:
-      # For recursive copies, the remote_uri must be a directory path, with
-      # or without the trailing slash; the remote_uri cannot contain wildcards.
-      if '*' in filename:
-        raise ValueError(
-            'Input variables that are recursive must not contain wildcards: %s'
-            % remote_uri)
-
-      # Non-recursive parameters explicitly set the target path to include
-      # a trailing slash when the target path is a directory; be consistent
-      # here and normalize the path to always have a single trailing slash
-      remote_uri = remote_uri.rstrip('/') + '/'
-      docker_path = '%s/%s' % (self._relative_path,
-                               self._uri_to_localpath(remote_uri))
-    else:
-      # The translation for inputs of the remote_uri into the docker_path is
-      # fairly straight forward.
-      #
-      # If the "filename" portion is a wildcard, then the docker_path must
-      # explicitly be a directory, with a trailing slash, otherwise there can
-      # be ambiguity based on the runtime inputs.
-      #
-      #   gsutil cp gs://bucket/path/*.bam <mnt>/input/gs/bucket/path
-      #
-      # produces different results dependening on whether *.bam matches a single
-      # file or multiple. In the first case, it produces a single file called
-      # "path". In the second case it produces a directory called "path" with
-      # multiple files.
-      #
-      # The result of:
-      #
-      #   gsutil cp gs://bucket/path/*.bam <mnt>/input/gs/bucket/path/
-      #
-      # is consistent: a directory called "path" with one or more files.
-      docker_path = '%s/%s/' % (self._relative_path,
-                                self._uri_to_localpath(path))
-
-      # If the file portion of the path is not a wildcard, then the local target
-      # is a filename.
-      if '*' not in filename:
-        docker_path += filename
-
-    # The docker path is a relative path to the provider-specific mount point
-    docker_path = docker_path.lstrip('/')
-
-    return docker_path, remote_uri
-
-
-class OutputFileParamUtil(FileParamUtil):
-
-  def __init__(self, docker_path):
-    super(OutputFileParamUtil, self).__init__(AUTO_PREFIX_OUTPUT, docker_path)
-
-  def parse_uri(self, remote_uri, recursive):
-    """Return a valid docker_path and remote_uri from the remote_uri."""
-
-    # Validate and then tokenize the remote URI in order to build the
-    # docker_path and remote_uri.
-    #
-    # For output variables, the "file" portion of the remote URI indicates
-    # what to copy from the pipeline's docker path to the remote destination:
-    #   gs://bucket/path/filename
-    # turns into:
-    #   gsutil cp <mnt>/output/gs/bucket/path/filename gs://bucket/path/
-    #
-    # In the above example, we would create:
-    #   docker_path = output/gs/bucket/path/filename
-    #   remote_uri = gs://bucket/path/
-    path, filename = self._validate_paths(remote_uri)
-
-    if recursive:
-      # For recursive copies, the remote_uri must be a directory path, with
-      # or without the trailing slash; the remote_uri cannot contain wildcards.
-      if '*' in filename:
-        raise ValueError(
-            'Output variables that are recursive must not contain wildcards: %s'
-            % remote_uri)
-
-      # Non-recursive parameters explicitly set the target path to include
-      # a trailing slash when the target path is a directory; be consistent
-      # here and normalize the path to always have a single trailing slash
-      remote_uri = remote_uri.rstrip('/') + '/'
-      docker_path = '%s/%s' % (self._relative_path,
-                               self._uri_to_localpath(remote_uri))
-    else:
-      # The remote_uri for a non-recursive output variable must be a filename
-      # or a wildcard
-      if remote_uri.endswith('/'):
-        raise ValueError(
-            'Output variables that are not recursive must reference a '
-            'filename or wildcard: %s' % remote_uri)
-
-      # Put the docker path together as:
-      #  [output]/[gs/bucket/path/filename]
-      docker_path = '%s/%s' % (self._relative_path,
-                               self._uri_to_localpath(remote_uri))
-
-      # If the filename contains a wildcard, make sure the remote_uri target
-      # is clearly a directory path. Otherwise if the local wildcard ends up
-      # matching a single file, the remote_uri will be a file, rather than a
-      # directory containing a file.
-      #
-      # gsutil cp <mnt>/output/gs/bucket/path/*.bam gs://bucket/path
-      #
-      # produces different results if *.bam matches a single file vs. multiple.
-      if '*' in filename:
-        remote_uri = '%s/' % path
-
-    return docker_path, remote_uri
-
-
-class Script(object):
-  """Script to be run by for the job.
-
-  The Pipeline's API specifically supports bash commands as the docker
-  command. To support any type of script (Python, Ruby, etc.), the contents
-  are uploaded as a simple environment variable input parameter.
-  The docker command then writes the variable contents to a file and
-  executes it.
-  """
-
-  def __init__(self, name, value):
-    self.name = name
-    self.value = value
 
 
 def parse_arguments(prog, argv):
@@ -514,19 +237,15 @@ def parse_arguments(prog, argv):
       action='store_true',
       help='Print the pipeline(s) that would be run and then exit.')
   parser.add_argument(
-      '--verbose',
-      default=False,
-      action='store_true',
-      help='Verbose output of parameters and operations?')
-  parser.add_argument(
       '--wait',
       action='store_true',
-      help='Wait for all operations to complete?')
+      help='Wait for the job to finish all its tasks.')
   parser.add_argument(
       '--poll-interval',
-      default=5,
+      default=10,
       type=int,
-      help='Polling interval for checking operation status')
+      help='Polling interval (in seconds) for checking job status '
+      'when --wait or --after are set.')
   parser.add_argument(
       '--env',
       nargs='*',
@@ -567,6 +286,11 @@ def parse_arguments(prog, argv):
       ' execution environment',
       metavar='KEY=REMOTE_PATH')
   parser.add_argument(
+      '--after',
+      nargs='+',
+      default=[],
+      help='Job ID(s) to wait for before starting this job.')
+  parser.add_argument(
       '--command',
       help='Command to run inside the job\'s Docker container',
       metavar='COMMAND')
@@ -595,7 +319,7 @@ def get_job_resources(args):
     JobResources object containing the requested resources for the job
   """
 
-  return JobResources(
+  return job_util.JobResources(
       min_cores=args.min_cores,
       min_ram=args.min_ram,
       disk_size=args.disk_size,
@@ -627,237 +351,78 @@ def get_job_metadata(args, script, provider):
   return job_metadata
 
 
-def args_to_job_data(envs, inputs, inputs_recursive, outputs, outputs_recursive,
-                     input_file_param_util, output_file_param_util):
-  """Parse env, input, and output parameters into a job parameters and data.
-
-  Passing arguments on the command-line allows for launching a single job.
-  The env, input, and output arguments encode both the definition of the
-  job as well as the single job's values.
-
-  Env arguments are simple name=value pairs.
-  Input and output file arguments can contain name=value pairs or just values.
-  Either of the following is valid:
-
-    remote_uri
-    myfile=remote_uri
-
-  Args:
-    envs: list of environment variable job parameters
-    inputs: list of file input parameters
-    inputs_recursive: list of recursive directory input parameters
-    outputs: list of file output parameters
-    outputs_recursive: list of recursive directory output parameters
-    input_file_param_util: Utility for producing InputFileParam objects.
-    output_file_param_util: Utility for producing OutputFileParam objects.
-
-  Returns:
-    job_data: an array of length one, containing a dictionary of
-    'envs', 'inputs', and 'outputs' that defines the set of parameters and data
-    for a job.
-  """
-
-  # For environment variables, we need to:
-  #   * split the input into name=value pairs (value optional)
-  #   * Create the EnvParam object
-  env_data = []
-  for arg in envs:
-    name, value = split_pair(arg, '=', 1)
-    env_data.append(EnvParam(name, value))
-
-  # For input files, we need to:
-  #   * split the input into name=remote_uri pairs (name optional)
-  #   * validate the remote uri
-  #   * generate a docker_path
-  input_data = []
-  for (recursive, args) in ((False, inputs), (True, inputs_recursive)):
-    for arg in args:
-      name, remote_uri = split_pair(arg, '=', 0)
-
-      name = input_file_param_util.get_variable_name(name)
-      docker_path, remote_uri = input_file_param_util.parse_uri(remote_uri,
-                                                                recursive)
-      input_data.append(
-          InputFileParam(name, docker_path, remote_uri, recursive))
-
-  # For output files, we need to:
-  #   * split the input into name=remote_uri pairs (name optional)
-  #   * validate the remote uri
-  #   * generate the remote uri
-  #   * generate a docker_path
-  output_data = []
-  for (recursive, args) in ((False, outputs), (True, outputs_recursive)):
-    for arg in args:
-      name, remote_uri = split_pair(arg, '=', 0)
-
-      name = output_file_param_util.get_variable_name(name)
-      docker_path, remote_uri = output_file_param_util.parse_uri(remote_uri,
-                                                                 recursive)
-      output_data.append(
-          OutputFileParam(name, docker_path, remote_uri, recursive))
-
-  return [{
-      'envs': env_data,
-      'inputs': input_data,
-      'outputs': output_data,
-  }]
+def tasks_to_job_ids(provider, task_list):
+  """Returns the set of job IDs for the given tasks."""
+  return set([provider.get_job_field(t, 'job-id') for t in task_list])
 
 
-def parse_job_table_header(header, input_file_param_util,
-                           output_file_param_util):
-  """Parse the first row of the job table into env, input, output definitions.
+def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
+  """Print status info as we wait for those jobs.
 
-  Elements are formatted similar to their equivalent command-line arguments,
-  but with associated values coming from the data rows.
-
-  Environment variables columns are headered as "--env <name>"
-  Inputs columns are headered as "--input <name>" with the name optional.
-  Outputs columns are headered as "--output <name>" with the name optional.
-
-  For historical reasons, bareword column headers (such as "JOB_ID") are
-  equivalent to "--env var_name".
-
-  Args:
-    header: The first row of the tab-delimited jobs table file.
-    input_file_param_util: Utility for producing InputFileParam objects.
-    output_file_param_util: Utility for producing OutputFileParam objects.
-
-  Returns:
-    job_params: A list of EnvParams and FileParams for the environment
-    variables, input file parameters, and output file parameters.
-
-  Raises:
-    ValueError: If a header contains a ":" and the prefix is not supported.
-  """
-  job_params = []
-
-  # Tokenize the header line and process each field
-  header_columns = header.split('\t')
-  for col in header_columns:
-
-    # Reserve the "-" and "--" namespace.
-    # If the column has no leading "-", treat it as an environment variable
-    col_type = '--env'
-    col_value = col
-    if col.startswith('-'):
-      col_type, col_value = split_pair(col, ' ', 1)
-
-    if col_type == '--env':
-      job_params.append(EnvParam(col_value))
-
-    elif col_type == '--input' or col_type == '--input-recursive':
-      name = input_file_param_util.get_variable_name(col_value)
-      job_params.append(
-          InputFileParam(
-              name, recursive=(col_type.endswith('recursive'))))
-
-    elif col_type == '--output' or col_type == '--output-recursive':
-      name = output_file_param_util.get_variable_name(col_value)
-      job_params.append(
-          OutputFileParam(
-              name, recursive=(col_type.endswith('recursive'))))
-
-    else:
-      raise ValueError('Unrecognized column header: %s' % col)
-
-  return job_params
-
-
-def table_to_job_data(path, input_file_param_util, output_file_param_util):
-  """Parses a table of parameters from a TSV.
-
-  Args:
-    path: Path to a TSV file with the first line specifying the environment
-    variables, input, and output parameters as column headings. Subsequent
-    lines specify parameter values, one row per job.
-    input_file_param_util: Utility for producing InputFileParam objects.
-    output_file_param_util: Utility for producing OutputFileParam objects.
-
-  Returns:
-    job_data: an array of records, each containing a dictionary of
-    'envs', 'inputs', and 'outputs' that defines the set of parameters and data
-    for each job.
-
-  Raises:
-    ValueError: If no job records were provided
-  """
-  job_data = []
-
-  with open(path, 'r') as param_file:
-    # Read the first line and extract the fieldnames
-    job_params = parse_job_table_header(param_file.readline().rstrip(),
-                                        input_file_param_util,
-                                        output_file_param_util)
-
-    # Parse the rest of the file as job data
-    reader = csv.reader(param_file, delimiter='\t')
-
-    # Build a list of records from the parsed input table
-    for row in reader:
-      if len(row) != len(job_params):
-        print_error('Unexpected number of fields %s vs %s: line %s' %
-                    (len(row), len(job_params), reader.line_num))
-
-      # Each row can contain "envs", "inputs", "outputs"
-      envs = []
-      inputs = []
-      outputs = []
-
-      for i in range(0, len(job_params)):
-        param = job_params[i]
-        if isinstance(param, EnvParam):
-          envs.append(EnvParam(param.name, row[i]))
-
-        elif isinstance(param, InputFileParam):
-          docker_path, remote_uri = input_file_param_util.parse_uri(
-              row[i], param.recursive)
-          inputs.append(
-              InputFileParam(param.name, docker_path, remote_uri,
-                             param.recursive))
-
-        elif isinstance(param, OutputFileParam):
-          docker_path, remote_uri = output_file_param_util.parse_uri(
-              row[i], param.recursive)
-          outputs.append(
-              OutputFileParam(param.name, docker_path, remote_uri,
-                              param.recursive))
-
-      job_data.append({'envs': envs, 'inputs': inputs, 'outputs': outputs})
-
-  # Ensure that there are jobs to execute (and not just a header)
-  if not job_data:
-    raise ValueError('No jobs found in %s' % param_file)
-
-  return job_data
-
-
-def wait_for_operations(provider, job_metadata, poll_interval):
-  """Waits for a set of operations to complete.
+  Blocks until either all of the listed jobs succeed,
+  or one of them fails.
 
   Args:
     provider: job service provider
-    job_metadata: global metadata for the submitted job
+    jobid_list: a list of job IDs (string) to wait for
+    poll_interval: integer seconds to wait between iterations
+    stop_on_failure: whether to stop waiting if one of the tasks fails.
+
+  Returns:
+    Empty list if there was no error,
+    a list of error messages from the failed tasks otherwise.
+  """
+  job_set = set(jobid_list)
+  error_messages = []
+  while job_set and (not error_messages or not stop_on_failure):
+    print 'Waiting for: %s.' % (', '.join(job_set))
+
+    jobs_left = wait_for_any_job(provider, job_set, poll_interval)
+    jobs_completed = job_set.difference(jobs_left)
+    tasks_completed = provider.get_jobs(
+        ['RUNNING', 'SUCCESS', 'FAILURE', 'CANCELED'],
+        job_list=jobs_completed,
+        max_jobs=len(jobs_completed))
+    if len(tasks_completed) != len(jobs_completed):
+      # print info about the jobs we couldn't find
+      # (likely a typo in the command line).
+      jobs_found = tasks_to_job_ids(provider, tasks_completed)
+      jobs_not_found = jobs_completed.difference(jobs_found)
+      for j in jobs_not_found:
+        error = '%s: not found' % (j)
+        print_error('  %s' % (error))
+        error_messages += [error]
+
+    for t in tasks_completed:
+      job_id = provider.get_job_field(t, 'job-id')
+      status = provider.get_job_status_message(t)
+      print '  %s: %s' % (str(job_id), str(status))
+      if status[0] in ['FAILURE', 'CANCELED']:
+        error_messages += [provider.get_job_completion_messages([t])]
+
+    job_set = jobs_left
+
+  return error_messages
+
+
+def wait_for_any_job(provider, jobid_list, poll_interval):
+  """Waits until any of the listed jobs is not running.
+
+  Args:
+    provider: job service provider
+    jobid_list: a list of job IDs (string) to wait for
     poll_interval: integer seconds to wait between iterations
 
   Returns:
-    A list of error messages from failed operations.
+    A set of the jobIDs with still at least one running task.
   """
-  user_id = job_metadata['user-id']
-  job_id = job_metadata['job-id']
-
   while True:
-    # While waiting for RUNNING operations to complete, we only ned to fetch
-    # a single operation each time
-    running_ops = provider.get_jobs(
-        ['RUNNING'], user_list=[user_id], job_list=[job_id], max_jobs=1)
-    if not running_ops:
-      break
-
-    time.sleep(poll_interval)
-
-  bad_ops = provider.get_jobs(
-      ['FAILURE', 'CANCELED'], user_list=[user_id], job_list=[job_id])
-  return provider.get_job_completion_messages(bad_ops)
+    running_jobs = tasks_to_job_ids(provider,
+                                    provider.get_jobs(
+                                        ['RUNNING'], job_list=jobid_list))
+    if len(running_jobs) != len(jobid_list):
+      return running_jobs
+    SLEEP_FUNCTION(poll_interval)
 
 
 def call(argv):
@@ -867,7 +432,18 @@ def call(argv):
 def main(prog, argv):
   # Parse args and validate
   args = parse_arguments(prog, argv)
+  # intent:
+  # * dsub tightly controls the output to stdout.
+  # * wrap the main body such that output goes to stderr.
+  # * only emit the job-id to stdout (which can then be used programmatically).
+  with replace_print_with(Printer(args)):
+    launched_job = run_main(args)
+  print launched_job.get('job-id', '')
+  return launched_job
 
+
+def run_main(args):
+  """Actual dsub body, post-stdout-redirection."""
   if args.command and args.script:
     raise ValueError('Cannot supply both --command and a script name')
 
@@ -898,11 +474,12 @@ def main(prog, argv):
       command_name = args.name
     else:
       command_name = args.command.split(' ', 1)[0]
-    script = Script(command_name, args.command)
+    script = job_util.Script(command_name, args.command)
   elif args.script:
     # Read the script file
     with open(args.script, 'r') as script_file:
-      script = Script(os.path.basename(args.script), script_file.read())
+      script = job_util.Script(
+          os.path.basename(args.script), script_file.read())
   else:
     raise ValueError('One of --command or a script name must be supplied')
 
@@ -914,42 +491,60 @@ def main(prog, argv):
   job_metadata = get_job_metadata(args, script, provider)
 
   # Set up job parameters and job data from a table file or the command-line
-  input_file_param_util = InputFileParamUtil(DEFAULT_INPUT_LOCAL_PATH)
-  output_file_param_util = OutputFileParamUtil(DEFAULT_OUTPUT_LOCAL_PATH)
+  input_file_param_util = param_util.InputFileParamUtil(
+      DEFAULT_INPUT_LOCAL_PATH)
+  output_file_param_util = param_util.OutputFileParamUtil(
+      DEFAULT_OUTPUT_LOCAL_PATH)
   if args.table:
-    all_job_data = table_to_job_data(args.table, input_file_param_util,
-                                     output_file_param_util)
+    all_job_data = param_util.table_to_job_data(
+        args.table, input_file_param_util, output_file_param_util)
   else:
-    all_job_data = args_to_job_data(args.env, args.input, args.input_recursive,
-                                    args.output, args.output_recursive,
-                                    input_file_param_util,
-                                    output_file_param_util)
+    all_job_data = param_util.args_to_job_data(
+        args.env, args.input, args.input_recursive, args.output,
+        args.output_recursive, input_file_param_util, output_file_param_util)
 
   if not args.dry_run:
     print 'Job: %s' % job_metadata['job-id']
+
+  if args.after:
+    if args.dry_run:
+      print '(Pretend) waiting for: %s.' % (args.after)
+    else:
+      print 'Waiting for predecessor jobs to complete...'
+      error_messages = wait_after(provider, args.after, args.poll_interval,
+                                  True)
+      if error_messages:
+        print('One or more predecessor jobs completed, but did not succeed. '
+              'Exiting.')
+        for msg in error_messages:
+          print_error(msg)
+        sys.exit(1)
 
   # Launch all the job tasks!
   launched_job = provider.submit_job(job_resources, job_metadata, all_job_data)
 
   if not args.dry_run:
     print 'Launched job-id: %s' % launched_job['job-id']
-    print '        user-id: %s' % launched_job['user-id']
     if launched_job.get('task-id'):
-      for task_id in launched_job['task-id']:
-        print '  Task: %s' % task_id
+      print '%s task(s)' % len(launched_job['task-id'])
+    print 'To check the status, run:'
+    print '  dstat --project %s --jobs %s' % (args.project,
+                                              launched_job['job-id'])
+    print 'To cancel the job, run:'
+    print '  ddel --project %s --jobs %s' % (args.project,
+                                             launched_job['job-id'])
 
-  # Poll for operation completion
+  # Poll for job completion
   if args.wait:
-    print 'Waiting for jobs to complete...'
+    print 'Waiting for job to complete...'
 
-    error_messages = wait_for_operations(provider, job_metadata,
-                                         args.poll_interval)
+    error_messages = wait_after(provider, [job_metadata['job-id']],
+                                args.poll_interval, False)
     if error_messages:
       for msg in error_messages:
         print_error(msg)
       sys.exit(1)
 
-  # Return a list of the jobs/tasks
   return launched_job
 
 

@@ -243,6 +243,11 @@ the names of environment variables. This example is equivalent to the previous:
 
     SAMPLE_ID<tab>--input VCF_FILE<tab>--output OUTPUT_PATH
 
+### Job control
+
+It's possible to wait for a job to complete before starting another, see [job
+control with dsub](docs/job_control.md).
+
 ### Viewing job status
 
 The `dstat` command displays the status of jobs:

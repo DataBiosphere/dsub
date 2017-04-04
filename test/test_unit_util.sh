@@ -62,32 +62,32 @@ readonly -f test_failed
 # Generic routines for checking test output (stdout and stderr)
 #
 
-function get_stdout_value() {
+function get_stderr_value() {
   local value="${1}"
 
   python "${SCRIPT_DIR}"/get_json_value.py \
-    "$(<"${TEST_STDOUT}")" "${value}"
+    "$(<"${TEST_STDERR}")" "${value}"
 }
-readonly -f get_stdout_value
+readonly -f get_stderr_value
 
-function assert_output_value_equals() {
+function assert_err_value_equals() {
   local key="${1}"
   local value="${2}"
 
-  local actual=$(get_stdout_value "${key}")
+  local actual=$(get_stderr_value "${key}")
   if [[ "${actual}" != "${value}" ]]; then
     2>&1 echo "Assert: actual value for ${key}, ${actual}, does not match expected: ${value}"
 
     exit 1
   fi
 }
-readonly -f assert_output_value_equals
+readonly -f assert_err_value_equals
 
-function assert_output_value_matches() {
+function assert_err_value_matches() {
   local key="${1}"
   local re="${2}"
 
-  local actual=$(get_stdout_value "${key}")
+  local actual=$(get_stderr_value "${key}")
   if ! echo "${actual}" | grep --quiet "${re}"; then
     2>&1 echo "Assert: value for ${key} does not match expected pattern:"
     2>&1 echo "EXPECTED pattern:"
@@ -98,7 +98,7 @@ function assert_output_value_matches() {
     exit 1
   fi
 }
-readonly -f assert_output_value_matches
+readonly -f assert_err_value_matches
 
 function assert_output_contains() {
   local expected="${1}"
@@ -153,7 +153,7 @@ function assert_pipeline_label_equals() {
   local label="${2}"
   local value="${3}"
 
-  assert_output_value_equals \
+  assert_err_value_equals \
     "[${job_idx}].pipelineArgs.labels.${label}" \
     "${value}"
 }
@@ -168,7 +168,7 @@ function assert_pipeline_label_matches() {
   local label="${2}"
   local re="${3}"
 
-  assert_output_value_matches \
+  assert_err_value_matches \
     "[${job_idx}].pipelineArgs.labels.${label}" \
     "${re}"
 }
@@ -182,7 +182,7 @@ function assert_pipeline_environment_variable_equals() {
   local var_name="${2}"
   local var_value="${3}"
 
-  assert_output_value_equals \
+  assert_err_value_equals \
     "[${job_idx}].pipelineArgs.inputs.${var_name}" \
     "${var_value}"
 }
@@ -198,11 +198,11 @@ function assert_pipeline_input_parameter_equals() {
   local docker_path="${3}"
   local remote_uri="${4}"
 
-  assert_output_value_equals \
+  assert_err_value_equals \
     "[${job_idx}].ephemeralPipeline.inputParameters.{name=\"${var_name}\"}.localCopy.path" \
     "${docker_path}"
 
-  assert_output_value_equals \
+  assert_err_value_equals \
     "[${job_idx}].pipelineArgs.inputs.${var_name}" \
     "${remote_uri}"
 }
@@ -218,11 +218,11 @@ function assert_pipeline_output_parameter_equals() {
   local docker_path="${3}"
   local remote_uri="${4}"
 
-  assert_output_value_equals \
+  assert_err_value_equals \
     "[${job_idx}].ephemeralPipeline.outputParameters.{name=\"${var_name}\"}.localCopy.path" \
     "${docker_path}"
 
-  assert_output_value_equals \
+  assert_err_value_equals \
     "[${job_idx}].pipelineArgs.outputs.${var_name}" \
     "${remote_uri}"
 }
