@@ -184,7 +184,7 @@ class InputFileParamUtil(FileParamUtil):
       #
       #   gsutil cp gs://bucket/path/*.bam <mnt>/input/gs/bucket/path
       #
-      # produces different results dependening on whether *.bam matches a single
+      # produces different results depending on whether *.bam matches a single
       # file or multiple. In the first case, it produces a single file called
       # "path". In the second case it produces a directory called "path" with
       # multiple files.

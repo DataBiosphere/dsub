@@ -131,9 +131,9 @@ def main():
 
     # Try to keep the default behavior rational based on real usage patterns.
     # Most common usage:
-    # * User kicked of one or more single-operation jobs, or
+    # * User kicked off one or more single-operation jobs, or
     # * User kicked off a single "array job".
-    # * User just wants to check on status of their own running jobs.
+    # * User just wants to check on the status of their own running jobs.
     #
     # qstat and hence dstat.py defaults to listing jobs for the current user, so
     # there is no need to include user information in the default output.

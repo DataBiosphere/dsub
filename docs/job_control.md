@@ -52,7 +52,7 @@ JOBID_A=$(./dsub ...)
 JOBID_B=$(./dsub ...)
 ```
 
-Then pass these value to the `--after` flag for launching Job C
+Then pass these values to the `--after` flag for launching Job C
 
 ```
 ./dsub ... --after "${JOB_A}" "${JOB_B}"
