@@ -27,14 +27,17 @@ dsub ... --wait
 
 # Launch step 3
 dsub ...
+```
 
 If you want to handle the error explicitly, the dsub exit status can be handled as:
 
+```
 # Launch step 1 and block until completion
 if ! dsub ... --wait; then
   echo "Step 1 failed!"
   exit 1
 fi
+```
 
 ## Example with --after
 
