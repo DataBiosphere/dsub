@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Setup module for end-to-end dsub tests."""
 
 # test_setup_e2e.py
@@ -40,20 +39,10 @@ import sys
 import test_setup
 import test_util
 
-TEST_VARS = (
-    "TEST_NAME",
-    "TEST_DIR",
-    "TEST_TEMP",
-    "TABLE_FILE",
-    "TABLE_FILE_TMPL",)
-TEST_E2E_VARS = (
-    "PROJECT_ID",
-    "DSUB_BUCKET",
-    "LOGGING",
-    "INPUTS",
-    "OUTPUTS",
-    "DOCKER_INPUTS",
-    "DOCKER_OUTPUTS",)
+TEST_VARS = ("TEST_NAME", "TEST_DIR", "TEST_TEMP", "TABLE_FILE",
+             "TABLE_FILE_TMPL",)
+TEST_E2E_VARS = ("PROJECT_ID", "DSUB_BUCKET", "LOGGING", "INPUTS", "OUTPUTS",
+                 "DOCKER_INPUTS", "DOCKER_OUTPUTS",)
 
 
 def _environ():
@@ -103,22 +92,24 @@ if not test_util.gsutil_ls_check("gs://%s" % DSUB_BUCKET):
   sys.exit(1)
 
 # Set standard LOGGING, INPUTS, and OUTPUTS values
+TEST_REMOTE_ROOT = "gs://%s/dsub/py/%s" % (DSUB_BUCKET, TEST_NAME)
+TEST_DOCKER_ROOT = "gs/%s/dsub/py/%s" % (DSUB_BUCKET, TEST_NAME)
+
 if TABLE_FILE:
   # For table-based tests, the logging path is a directory.
   # Eventually each job should have its own sub-directory,
   # and named logging files but we need to add dsub support for that.
-  LOGGING = "gs://%s/dsub/py/%s/logging/" % (DSUB_BUCKET, TEST_NAME)
+  LOGGING = "%s/logging" % TEST_REMOTE_ROOT
 else:
   # For regular tests, the logging path is a named file.
-  LOGGING = "gs://%s/dsub/py/%s/logging/%s.log" % (DSUB_BUCKET, TEST_NAME,
-                                                   TEST_NAME)
+  LOGGING = TEST_REMOTE_ROOT + "/%s/logging/%s.log" % (TEST_NAME, TEST_NAME)
   STDOUT_LOG = "%s/%s-stdout.log" % (os.path.dirname(LOGGING), TEST_NAME)
   STDERR_LOG = "%s/%s-stderr.log" % (os.path.dirname(LOGGING), TEST_NAME)
 
-INPUTS = "gs://%s/dsub/py/%s/input" % (DSUB_BUCKET, TEST_NAME)
-OUTPUTS = "gs://%s/dsub/py/%s/output" % (DSUB_BUCKET, TEST_NAME)
-DOCKER_INPUTS = "gs/%s/dsub/py/%s/input" % (DSUB_BUCKET, TEST_NAME)
-DOCKER_OUTPUTS = "gs/%s/dsub/py/%s/output" % (DSUB_BUCKET, TEST_NAME)
+INPUTS = "%s/input" % TEST_REMOTE_ROOT
+OUTPUTS = "%s/output" % TEST_REMOTE_ROOT
+DOCKER_INPUTS = "%s/input" % TEST_DOCKER_ROOT
+DOCKER_OUTPUTS = "%s/output" % TEST_DOCKER_ROOT
 
 print "Logging path: %s" % LOGGING
 print "Input path: %s" % INPUTS
@@ -126,25 +117,12 @@ print "Output path: %s" % OUTPUTS
 
 if not os.environ.get("CHECK_RESULTS_ONLY"):
 
-  print "  Checking if logging files already exists"
-  if test_util.gsutil_ls_check(LOGGING):
-    print >> sys.stderr, "Logging files exist: %s" % LOGGING
+  print "  Checking if remote test files already exists"
+  if test_util.gsutil_ls_check("%s/**" % TEST_REMOTE_ROOT):
+    print >> sys.stderr, "Test files exist: %s" % TEST_REMOTE_ROOT
     print >> sys.stderr, "Remove contents:"
-    print >> sys.stderr, "  gsutil -m rm %s/**" % os.path.dirname(LOGGING)
-    sys.exit(1)
-
-  print "  Checking if input path already exists"
-  if test_util.gsutil_ls_check(INPUTS):
-    print >> sys.stderr, "Input path exists: %s" % INPUTS
-    print >> sys.stderr, "Remove contents:"
-    print >> sys.stderr, "  gsutil -m rm %s/**" % INPUTS
-    sys.exit(1)
-
-  print "  Checking if output path already exists"
-  if test_util.gsutil_ls_check(OUTPUTS):
-    print >> sys.stderr, "Output path exists: %s" % OUTPUTS
-    print >> sys.stderr, "Remove contents:"
-    print >> sys.stderr, "  gsutil -m rm %s/**" % OUTPUTS
+    print >> sys.stderr, "  gsutil -m rm %s/**" % os.path.dirname(
+        TEST_REMOTE_ROOT)
     sys.exit(1)
 
 if TABLE_FILE:

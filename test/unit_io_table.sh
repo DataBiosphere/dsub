@@ -35,11 +35,11 @@ function run_dsub() {
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
     --zones "${ZONE}" \
+    --script "${SCRIPT}" \
     --table "${table}" \
     --dry-run \
-    "${SCRIPT}" \
-    2> "${TEST_STDERR}" \
-    1> "${TEST_STDOUT}"
+    1> "${TEST_STDOUT}" \
+    2> "${TEST_STDERR}"
 }
 readonly -f run_dsub
 
@@ -59,9 +59,6 @@ gs://bucket2/path1\tgs://bucket2/path2
 '
 
   if run_dsub "${tsv_file}"; then
-
-    # Check that stderr is empty
-    assert_err_empty
 
     # Check that the output contains expected paths
 
@@ -99,9 +96,6 @@ gs://bucket2/path1\tgs://bucket2/path2
 
   if run_dsub "${tsv_file}"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected paths
 
     assert_pipeline_input_parameter_equals \
@@ -137,9 +131,6 @@ gs://bucket2/path1\tgs://bucket2/path2
 '
 
   if run_dsub "${tsv_file}"; then
-
-    # Check that stderr is empty
-    assert_err_empty
 
     # Check that the output contains expected paths
 
@@ -177,9 +168,6 @@ gs://bucket2/path1\tgs://bucket2/path2
 
   if run_dsub "${tsv_file}"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # Check that the output contains expected paths
 
     assert_pipeline_output_parameter_equals \
@@ -216,9 +204,6 @@ gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
 
   if run_dsub "${tsv_file}"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # A direct export of an environment variable for INPUT_PATH_DEEP
     # should be created in the docker command instead of a pipelines
     # output parameter.
@@ -233,12 +218,12 @@ gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
       "input/gs/bucket1/path1/shallow/" "gs://bucket1/path1/shallow/*"
 
     # The docker command should include an export of the OUTPUT_PATH
-    assert_output_value_matches \
+    assert_err_value_matches \
       "[0].ephemeralPipeline.docker.cmd" \
       "^export INPUT_PATH_DEEP=/mnt/data/input/gs/bucket1/path1/deep$"
 
     # The docker command should include an rsync of the INPUT_PATH_DEEP
-    assert_output_value_matches \
+    assert_err_value_matches \
       "[0].ephemeralPipeline.docker.cmd" \
       "gsutil -m rsync -r gs://bucket1/path1/deep/ /mnt/data/input/gs/bucket1/path1/deep/"
 
@@ -263,9 +248,6 @@ gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
 
   if run_dsub "${tsv_file}"; then
 
-    # Check that stderr is empty
-    assert_err_empty
-
     # A direct export of an environment variable for OUTPUT_PATH_DEEP
     # should be created in the docker command instead of a pipelines
     # output parameter.
@@ -280,12 +262,12 @@ gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
       "output/gs/bucket1/path1/shallow/*" "gs://bucket1/path1/shallow/"
 
     # The docker command should include an export of the OUTPUT_PATH_DEEP
-    assert_output_value_matches \
+    assert_err_value_matches \
       "[0].ephemeralPipeline.docker.cmd" \
       "^export OUTPUT_PATH_DEEP=/mnt/data/output/gs/bucket1/path1/deep$"
 
     # The docker command should include an rsync of the OUTPUT_PATH
-    assert_output_value_matches \
+    assert_err_value_matches \
       "[0].ephemeralPipeline.docker.cmd" \
       "gsutil -m rsync -r /mnt/data/output/gs/bucket1/path1/deep/ gs://bucket1/path1/deep/"
 

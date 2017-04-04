@@ -45,15 +45,15 @@ function run_dsub() {
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
     --zones "${ZONE}" \
+    --script "${SCRIPT}" \
     --env TEST_NAME="${TEST_NAME}" \
     ${input:+--input "${input}"} \
     ${output:+--output "${output}"} \
     ${input_recursive:+--input-recursive "${input_recursive}"} \
     ${output_recursive:+--output-recursive "${output_recursive}"} \
     --dry-run \
-    "${SCRIPT}" \
-    2> "${TEST_STDERR}" \
-    1> "${TEST_STDOUT}"
+    1> "${TEST_STDOUT}" \
+    2> "${TEST_STDERR}"
 }
 readonly -f run_dsub
 
@@ -65,9 +65,6 @@ function test_input_file() {
   if run_dsub \
     gs://bucket/path/file.bam \
     gs://bucket/path/*; then
-
-    # Check that stderr is empty
-    assert_err_empty
 
     # Check that the output contains expected paths
 
@@ -87,9 +84,6 @@ function test_input_wildcard() {
   if run_dsub \
     gs://bucket/path/file*.bam \
     gs://bucket/path/*; then
-
-    # Check that stderr is empty
-    assert_err_empty
 
     # Check that the output contains expected paths
 
@@ -154,10 +148,8 @@ function test_output_file() {
     gs://bucket/path/file.bam \
     gs://bucket/path/file.bam.bai; then
 
-    assert_err_empty
-
     # Test that output includes creation of output directories
-    assert_output_contains "mkdir -p /mnt/data/output/gs/bucket/path"
+    assert_err_contains "mkdir -p /mnt/data/output/gs/bucket/path"
 
     # Test that output contains expected paths
 
@@ -178,8 +170,6 @@ function test_output_wildcard() {
   if run_dsub \
     gs://bucket/path/file.bam \
     gs://bucket/path/*.bai; then
-
-    assert_err_empty
 
     assert_pipeline_output_parameter_equals \
       0 "OUTPUT_0" "output/gs/bucket/path/*.bai" "gs://bucket/path/"
@@ -222,19 +212,17 @@ function test_input_recursive() {
     "INPUT_PATH=gs://bucket/path/" \
     ""; then
 
-    assert_err_empty
-
     # No INPUT_PATH input parameter should have been created
     assert_pipeline_input_parameter_equals \
       0 "INPUT_PATH" "" ""
 
     # The docker command should include an export of the INPUT_PATH
-    assert_output_value_matches \
+    assert_err_value_matches \
       "[0].ephemeralPipeline.docker.cmd" \
       "^export INPUT_PATH=/mnt/data/input/gs/bucket/path$"
 
     # The docker command should include an rsync of the OUTPUT_PATH
-    assert_output_value_matches \
+    assert_err_value_matches \
       "[0].ephemeralPipeline.docker.cmd" \
       "gsutil -m rsync -r gs://bucket/path/ /mnt/data/input/gs/bucket/path/"
 
@@ -254,19 +242,17 @@ function test_output_recursive() {
     "" \
     "OUTPUT_PATH=gs://bucket/path/"; then
 
-    assert_err_empty
-
     # No OUTPUT_PATH output parameter should have been created
     assert_pipeline_output_parameter_equals \
       0 "OUTPUT_PATH" "" ""
 
     # The docker command should include an export of the OUTPUT_PATH
-    assert_output_value_matches \
+    assert_err_value_matches \
       "[0].ephemeralPipeline.docker.cmd" \
       "^export OUTPUT_PATH=/mnt/data/output/gs/bucket/path$"
 
     # The docker command should include an rsync of the OUTPUT_PATH
-    assert_output_value_matches \
+    assert_err_value_matches \
       "[0].ephemeralPipeline.docker.cmd" \
       "gsutil -m rsync -r /mnt/data/output/gs/bucket/path/ gs://bucket/path/"
 

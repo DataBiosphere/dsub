@@ -1,0 +1,142 @@
+# Copyright 2016 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Unit tests for dsub.
+"""
+
+import unittest
+import dsub
+import fake_time
+import providers.stub
+
+
+def establish_chronology(chronology):
+  dsub.SLEEP_FUNCTION = fake_time.FakeTime(chronology).sleep
+
+
+def nothing_happens():
+  yield 1
+
+
+class TestWaitForAnyJob(unittest.TestCase):
+
+  def progressive_chronology(self):
+    self.prov.set_operations([{
+        'job-id': 'job-1',
+        'status': ('RUNNING', '123')
+    }, {
+        'job-id': 'job-2',
+        'status': ('RUNNING', '123')
+    }])
+    yield 2
+    self.prov.set_operations([{
+        'job-id': 'job-1',
+        'status': ('SUCCESS', '123')
+    }, {
+        'job-id': 'job-2',
+        'status': ('RUNNING', '123')
+    }])
+    yield 1
+    self.prov.set_operations([{
+        'job-id': 'job-1',
+        'status': ('SUCCESS', '123')
+    }, {
+        'job-id': 'job-2',
+        'status': ('FAILURE', '123')
+    }])
+    yield 1
+
+  def test_already_succeeded(self):
+    prov = providers.stub.StubJobProvider()
+    prov.set_operations([{'job-id': 'myjob', 'status': 'SUCCESS'}])
+    establish_chronology(nothing_happens())
+    ret = dsub.wait_for_any_job(prov, ['myjob'], 1)
+    self.assertEqual(ret, set([]))
+
+  def test_succeeds(self):
+    self.prov = providers.stub.StubJobProvider()
+    establish_chronology(self.progressive_chronology())
+    ret = dsub.wait_for_any_job(self.prov, ['job-1'], 1)
+    self.assertEqual(ret, set([]))
+
+  def test_fails(self):
+    self.prov = providers.stub.StubJobProvider()
+    establish_chronology(self.progressive_chronology())
+    ret = dsub.wait_for_any_job(self.prov, ['job-2'], 1)
+    self.assertEqual(ret, set([]))
+
+  def test_multiple_jobs(self):
+    self.prov = providers.stub.StubJobProvider()
+    establish_chronology(self.progressive_chronology())
+    ret = dsub.wait_for_any_job(self.prov, ['job-1', 'job-2'], 1)
+    self.assertEqual(ret, set(['job-2']))
+
+
+class TestWaitAfter(unittest.TestCase):
+
+  def progressive_chronology(self):
+    self.prov.set_operations([{
+        'job-id': 'job-1',
+        'status': ('RUNNING', '123')
+    }, {
+        'job-id': 'job-2',
+        'status': ('RUNNING', '123')
+    }])
+    yield 2
+    self.prov.set_operations([{
+        'job-id': 'job-1',
+        'status': ('SUCCESS', '123')
+    }, {
+        'job-id': 'job-2',
+        'status': ('RUNNING', '123')
+    }])
+    yield 1
+    self.prov.set_operations([{
+        'job-id': 'job-1',
+        'status': ('SUCCESS', '123')
+    }, {
+        'job-id': 'job-2',
+        'status': ('FAILURE', '123'),
+        'error-message': 'failed to frob'
+    }])
+    yield 1
+
+  def test_already_succeeded(self):
+    prov = providers.stub.StubJobProvider()
+    prov.set_operations([{'job-id': 'myjob', 'status': ('SUCCESS', '123')}])
+    establish_chronology(nothing_happens())
+    ret = dsub.wait_after(prov, ['myjob'], 1, True)
+    self.assertEqual(ret, [])
+
+  def test_job_not_found(self):
+    prov = providers.stub.StubJobProvider()
+    prov.set_operations([{'job-id': 'myjob', 'status': ('SUCCESS', '123')}])
+    establish_chronology(nothing_happens())
+    ret = dsub.wait_after(prov, ['some_other_job'], 1, True)
+    self.assertTrue(ret)
+
+  def test_job_1(self):
+    self.prov = providers.stub.StubJobProvider()
+    establish_chronology(self.progressive_chronology())
+    ret = dsub.wait_after(self.prov, ['job-1'], 1, True)
+    self.assertEqual(ret, [])
+
+  def test_job_2(self):
+    self.prov = providers.stub.StubJobProvider()
+    establish_chronology(self.progressive_chronology())
+    ret = dsub.wait_after(self.prov, ['job-2'], 1, True)
+    self.assertEqual(ret, [['failed to frob']])
+
+
+if __name__ == '__main__':
+  unittest.main()

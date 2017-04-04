@@ -37,7 +37,7 @@ readonly DSUB_DIR="$(dirname "${SCRIPT_DIR}")"
 readonly DSUB="${DSUB_DIR}/dsub"
 
 if [[ "${TEST_NAME}" == *_table ]]; then
-  readonly TABLE_FILE_TMPL="${TEST_DIR}/${TEST_NAME}.tsv.tmpl"
+  readonly TABLE_FILE_TMPL="${TEST_DIR}/${TABLE_FILE_TMPL_NAME:-${TEST_NAME}}.tsv.tmpl"
   readonly TABLE_FILE="${TEST_DIR}/${TEST_NAME}.tsv"
 fi
 

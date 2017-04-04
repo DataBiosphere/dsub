@@ -71,49 +71,39 @@ if ! gsutil ls "gs://${DSUB_BUCKET}" 2>/dev/null; then
 fi
 
 # Set standard LOGGING, INPUTS, and OUTPUTS values
+readonly TEST_REMOTE_ROOT="gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}"
+readonly TEST_DOCKER_ROOT="gs/${DSUB_BUCKET}/dsub/sh/${TEST_NAME}"
+
 if [[ -n "${TABLE_FILE:-}" ]]; then
   # For table-based tests, the logging path is a directory.
   # Eventually each job should have its own sub-directory,
   # and named logging files but we need to add dsub support for that.
-  readonly LOGGING="gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/logging/"
+  readonly LOGGING="${TEST_REMOTE_ROOT}/${TEST_NAME}/logging"
 else
   # For regular tests, the logging path is a named file.
-  readonly LOGGING="gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/logging/${TEST_NAME}.log"
+  readonly LOGGING="${TEST_REMOTE_ROOT}/logging/${TEST_NAME}.log"
   readonly STDOUT_LOG="$(dirname "${LOGGING}")/${TEST_NAME}-stdout.log"
   readonly STDERR_LOG="$(dirname "${LOGGING}")/${TEST_NAME}-stderr.log"
 fi
-readonly INPUTS="gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/input"
-readonly OUTPUTS="gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/output"
-readonly DOCKER_INPUTS="gs/${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/input"
-readonly DOCKER_OUTPUTS="gs/${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/output"
+readonly INPUTS="${TEST_REMOTE_ROOT}/input"
+readonly OUTPUTS="${TEST_REMOTE_ROOT}//output"
+readonly DOCKER_INPUTS="${TEST_DOCKER_ROOT}/input"
+readonly DOCKER_OUTPUTS="${TEST_DOCKER_ROOT}/output"
 
 echo "Logging path: ${LOGGING}"
 echo "Input path: ${INPUTS}"
 echo "Output path: ${OUTPUTS}"
 
+# For tests that exercise remote dsub parameters (like TSV file)
+readonly DSUB_PARAMS="gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/params"
+
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
-  echo "  Checking if logging files already exists"
-  if gsutil ls "${LOGGING}" 2>/dev/null; then
-    2>&1 echo "Logging files exist: ${LOGGING}"
+  echo "  Checking if remote test files already exists"
+  if gsutil ls "${TEST_REMOTE_ROOT}/**" 2>/dev/null; then
+    2>&1 echo "Test files exist: ${TEST_REMOTE_ROOT}"
     2>&1 echo "Remove contents:"
-    2>&1 echo "  gsutil -m rm $(dirname "${LOGGING}")/**"
-    exit 1
-  fi
-
-  echo "  Checking if input path already exists"
-  if gsutil ls "${INPUTS}" 2>/dev/null; then
-    2>&1 echo "Input path exists: ${INPUTS}"
-    2>&1 echo "Remove contents:"
-    2>&1 echo "  gsutil -m rm ${INPUTS}/**"
-    exit 1
-  fi
-
-  echo "  Checking if output path already exists"
-  if gsutil ls "${OUTPUTS}" 2>/dev/null; then
-    2>&1 echo "Output path exists: ${OUTPUTS}"
-    2>&1 echo "Remove contents:"
-    2>&1 echo "  gsutil -m rm ${OUTPUTS}/**"
+    2>&1 echo "  gsutil -m rm ${TEST_REMOTE_ROOT}/**"
     exit 1
   fi
 
