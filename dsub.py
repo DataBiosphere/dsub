@@ -212,6 +212,7 @@ def parse_arguments(prog, argv):
   parser.add_argument(
       '--zones',
       default=None,
+      required=True,
       nargs='+',
       help='List of Google Compute Engine zones.')
   parser.add_argument(
@@ -298,14 +299,6 @@ def parse_arguments(prog, argv):
       '--script',
       help='Local path to a script to run inside the job\'s Docker container.',
       metavar='SCRIPT')
-  parser.add_argument(
-      'deprecated_script', nargs='?', help=argparse.SUPPRESS, metavar='SCRIPT')
-  parser.add_argument(
-      'params',
-      nargs='*',
-      default=[],
-      help=argparse.SUPPRESS,
-      metavar='KEY=VALUE')
   return parser.parse_args(argv)
 
 
@@ -446,22 +439,6 @@ def run_main(args):
   """Actual dsub body, post-stdout-redirection."""
   if args.command and args.script:
     raise ValueError('Cannot supply both --command and a script name')
-
-  if args.deprecated_script:
-    print_error('Using a positional argument for the job script is '
-                'deprecated.')
-    print_error('Use the --script argument instead.')
-
-    # Set the script from the deprecated positional argument.
-    args.script = args.deprecated_script
-
-  if args.params:
-    print_error('Using positional arguments for input variables is '
-                'deprecated.')
-    print_error('Use the --env argument instead.')
-
-    # Merge args.params into args.env
-    args.env.extend(args.params)
 
   if (args.env or args.input or args.input_recursive or args.output or
       args.output_recursive) and args.table:
