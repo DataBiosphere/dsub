@@ -33,16 +33,18 @@ def get_default_user():
   return pwd.getpwuid(os.getuid())[0]
 
 
-def _load_file_from_gcs(gcs_file_path):
+def _load_file_from_gcs(gcs_file_path, credentials=None):
   """Load context from a text file in gcs.
 
   Args:
     gcs_file_path: The target file path; should have the 'gs://' prefix.
+    credentials: Optional credential to be used to load the file from gcs.
 
   Returns:
     The content of the text file as a string.
   """
-  credentials = GoogleCredentials.get_application_default()
+  if credentials is None:
+    credentials = GoogleCredentials.get_application_default()
   gcs_service = discovery.build('storage', 'v1', credentials=credentials)
 
   bucket_name, object_name = gcs_file_path[len('gs://'):].split('/', 1)
@@ -57,18 +59,19 @@ def _load_file_from_gcs(gcs_file_path):
   return StringIO(file_handle.getvalue())
 
 
-def load_file(file_path):
+def load_file(file_path, credentials=None):
   """Load a file from either local or gcs.
 
   Args:
     file_path: The target file path, which should have the prefix 'gs://' if
                to be loaded from gcs.
+    credentials: Optional credential to be used to load the file from gcs.
 
   Returns:
     A python File object if loading file from local or a StringIO object if
     loading from gcs.
   """
   if file_path.startswith('gs://'):
-    return _load_file_from_gcs(file_path)
+    return _load_file_from_gcs(file_path, credentials)
   else:
     return open(file_path, 'r')

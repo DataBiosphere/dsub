@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# USAGE: source test/setup_virtualenv
+#
+# This will set up virtualenv and install the necessary python library,
+# as explained in the README.
+#
+# You can call this from anywhere.
+#
+# If you execute this instead of sourcing it, it will not work.
+
+if [[ $(basename "${VIRTUAL_ENV:-}") == "dsub_libs" && -d "${VIRTUAL_ENV:-}" ]]; then
+  echo "We are already running in a virtual environment:"
+  echo "${VIRTUAL_ENV}"
+  echo "It ends in dsub_libs so it's probably the same I was about to set up."
+  echo "Skipping."
+  return
+fi
+
+echo "Creating virtualenv in: ${PWD}/dsub_libs"
+
+if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+  echo "WARNING: a virtual environment is already active: ${VIRTUAL_ENV}"
+  echo "WARNING: continuing to set up and activate dsub_libs"
+fi
+
+if [[ ! -f dsub_libs/bin/activate ]]; then
+  echo "setting up dsub_libs/"
+  if ! virtualenv dsub_libs; then
+    echo "virtualenv call failed"
+    return
+  fi
+fi
+
+if [[ ! -f dsub_libs/bin/activate ]]; then
+  echo "dsub_libs/bin/activate not found. Did the virtualenv call fail?"
+  return
+fi
+
+if source dsub_libs/bin/activate; then
+  echo "virtualenv activate succeeded."
+else
+  echo "virtualenv activate failed."
+fi
+
+if [[ $(basename "${VIRTUAL_ENV:-}") != "dsub_libs" ]]; then
+  echo "Error: We should be in the dsub_libs virtualenv but are not."
+  echo "We are in: ${VIRTUAL_ENV:-}"
+  return
+fi
+
+pip install --upgrade oauth2client==1.5.2 google-api-python-client python-dateutil pytz tabulate
+
+echo "virtualenv should be correctly set up now. When you are done type"
+echo "'deactivate' to exit the virtualenv environment."

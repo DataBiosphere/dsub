@@ -82,6 +82,37 @@ class TestWaitForAnyJob(unittest.TestCase):
     self.assertEqual(ret, set(['job-2']))
 
 
+class TestWaitForAnyJobBatch(unittest.TestCase):
+
+  def progressive_chronology(self):
+    self.prov.set_operations([{
+        'job-id': 'job-1',
+        'task-id': 'task-1',
+        'status': ('RUNNING', '123')
+    }, {
+        'job-id': 'job-1',
+        'task-id': 'task-2',
+        'status': ('RUNNING', '123')
+    }])
+    yield 2
+    self.prov.set_operations([{
+        'job-id': 'job-1',
+        'task-id': 'task-1',
+        'status': ('RUNNING', '123')
+    }, {
+        'job-id': 'job-1',
+        'task-id': 'task-2',
+        'status': ('FAILURE', '123')
+    }])
+    yield 1
+
+  def test_multiple_tasks(self):
+    self.prov = providers.stub.StubJobProvider()
+    establish_chronology(self.progressive_chronology())
+    ret = dsub.wait_for_any_job(self.prov, ['job-1'], 1)
+    self.assertEqual(ret, set([]))
+
+
 class TestWaitAfter(unittest.TestCase):
 
   def progressive_chronology(self):
@@ -136,6 +167,84 @@ class TestWaitAfter(unittest.TestCase):
     establish_chronology(self.progressive_chronology())
     ret = dsub.wait_after(self.prov, ['job-2'], 1, True)
     self.assertEqual(ret, [['failed to frob']])
+
+
+class TestWaitAfterBatch(unittest.TestCase):
+
+  def fail_in_sequence(self):
+    self.prov.set_operations([{
+        'job-id': 'job-1',
+        'task-id': 'task-1',
+        'status': ('RUNNING', '123')
+    }, {
+        'job-id': 'job-1',
+        'task-id': 'task-2',
+        'status': ('RUNNING', '123')
+    }])
+    yield 2
+    self.prov.set_operations([{
+        'job-id': 'job-1',
+        'task-id': 'task-1',
+        'status': ('RUNNING', '123')
+    }, {
+        'job-id': 'job-1',
+        'task-id': 'task-2',
+        'status': ('FAILURE', '123'),
+        'error-message': 'failed to frob'
+    }])
+    yield 1
+    self.prov.set_operations([{
+        'job-id': 'job-1',
+        'task-id': 'task-1',
+        'status': ('FAILURE', '123'),
+        'error-message': 'needs food badly'
+    }, {
+        'job-id': 'job-1',
+        'task-id': 'task-2',
+        'status': ('FAILURE', '123'),
+        'error-message': 'failed to frob'
+    }])
+    yield 1
+
+  def test_job_2(self):
+    self.prov = providers.stub.StubJobProvider()
+    establish_chronology(self.fail_in_sequence())
+    ret = dsub.wait_after(self.prov, ['job-1'], 1, True)
+    self.assertEqual(ret, [['failed to frob']])
+
+
+class TestDominantTask(unittest.TestCase):
+
+  def test_earliest_failure(self):
+    prov = providers.stub.StubJobProvider()
+    ops = [{
+        'job-id': 'job-1',
+        'task-id': 'task-1',
+        'end-time': 1,
+        'status': ('SUCCESS', '1')
+    }, {
+        'job-id': 'job-1',
+        'task-id': 'task-2',
+        'end-time': 3,
+        'status': ('FAILURE', '1')
+    }, {
+        'job-id': 'job-1',
+        'task-id': 'task-3',
+        'end-time': 2,
+        'status': ('FAILURE', '1')
+    }, {
+        'job-id': 'job-1',
+        'task-id': 'task-4',
+        'end-time': 4,
+        'status': ('FAILURE', '1')
+    }, {
+        'job-id': 'job-1',
+        'task-id': 'task-5',
+        'end-time': 5,
+        'status': ('SUCCESS', '1')
+    }]
+    ret = dsub.dominant_task_for_jobs(prov, ops)
+    self.assertEqual(ret[0]['task-id'], 'task-3')
 
 
 if __name__ == '__main__':

@@ -753,6 +753,8 @@ class _Operations(object):
   def operation_status_message(cls, operation):
     """Returns the most relevant status string and last updated date string.
 
+    This string is meant for display only.
+
     Args:
       operation: Operation
 
@@ -944,12 +946,12 @@ class GoogleJobProvider(object):
                max_jobs=0):
     """Return a list of operations based on the input criteria.
 
-    If any of the filters are empty or "*", then no filtering is performed on
+    If any of the filters are empty or ["*"], then no filtering is performed on
     that field.
 
     Args:
-      status_list: a list of job status strings to return. Valid status strings
-        are 'RUNNING', 'SUCCESS', 'FAILURE', or 'CANCELED'.
+      status_list: ['*'], or a list of job status strings to return. Valid
+        status strings are 'RUNNING', 'SUCCESS', 'FAILURE', or 'CANCELED'.
       user_list: a list of ids for the user(s) who launched the job.
       job_list: a list of job ids to return.
       task_list: a list of specific tasks within the specified job(s) to return.
@@ -1024,6 +1026,16 @@ class GoogleJobProvider(object):
     return _Operations.get_operation_field(job, field)
 
   def get_job_status_message(self, op):
+    """Returns the most relevant status string and last updated date string.
+
+    This string is meant for display only.
+
+    Args:
+      op: task
+
+    Returns:
+      A printable status string and date string.
+    """
     return _Operations.operation_status_message(op)
 
   def get_job_completion_messages(self, ops):
