@@ -243,6 +243,8 @@ the names of environment variables. This example is equivalent to the previous:
 
     SAMPLE_ID<tab>--input VCF_FILE<tab>--output OUTPUT_PATH
 
+Then pass this file to dsub using the `--table` parameter.
+
 ### Job control
 
 It's possible to wait for a job to complete before starting another, see [job

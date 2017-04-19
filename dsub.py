@@ -18,6 +18,7 @@ Follows the model of bsub, qsub, srun, etc.
 """
 
 import argparse
+import collections
 from contextlib import contextmanager
 import os
 import sys
@@ -101,7 +102,7 @@ class Printer(object):
   """File-like stream object that redirects stdout to stderr.
 
   Args:
-    object: parent object. Linter made me write this.
+    object: parent object.
   """
 
   def __init__(self, args):
@@ -365,32 +366,47 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
     Empty list if there was no error,
     a list of error messages from the failed tasks otherwise.
   """
+
+  # Each time through the loop, the job_set is re-set to the jobs remaining to
+  # check. Jobs are removed from the list when they complete.
+  #
+  # We exit the loop when:
+  # * No jobs remain are running, OR
+  # * stop_on_failure is TRUE AND at least one job returned an error
   job_set = set(jobid_list)
   error_messages = []
   while job_set and (not error_messages or not stop_on_failure):
     print 'Waiting for: %s.' % (', '.join(job_set))
 
+    # Poll until any remaining jobs have completed
     jobs_left = wait_for_any_job(provider, job_set, poll_interval)
+
+    # Calculate which jobs just completed
     jobs_completed = job_set.difference(jobs_left)
-    tasks_completed = provider.get_jobs(
-        ['RUNNING', 'SUCCESS', 'FAILURE', 'CANCELED'],
-        job_list=jobs_completed,
-        max_jobs=len(jobs_completed))
-    if len(tasks_completed) != len(jobs_completed):
+
+    # Get all tasks for the newly completed jobs
+    tasks_completed = provider.get_jobs(['*'], job_list=jobs_completed)
+
+    # We don't want to overwhelm the user with output when there are many
+    # tasks per job. So we get a single "dominant" task for each of the
+    # completed jobs (one that is representative of the job's fate).
+    dominant_job_tasks = dominant_task_for_jobs(provider, tasks_completed)
+    if len(dominant_job_tasks) != len(jobs_completed):
       # print info about the jobs we couldn't find
-      # (likely a typo in the command line).
-      jobs_found = tasks_to_job_ids(provider, tasks_completed)
+      # (should only occur for "--after" where the job ID is a typo).
+      jobs_found = tasks_to_job_ids(provider, dominant_job_tasks)
       jobs_not_found = jobs_completed.difference(jobs_found)
       for j in jobs_not_found:
         error = '%s: not found' % (j)
         print_error('  %s' % (error))
         error_messages += [error]
 
-    for t in tasks_completed:
+    # Print the dominant task for the completed jobs
+    for t in dominant_job_tasks:
       job_id = provider.get_job_field(t, 'job-id')
-      status = provider.get_job_status_message(t)
+      status = provider.get_job_field(t, 'job-status')
       print '  %s: %s' % (str(job_id), str(status))
-      if status[0] in ['FAILURE', 'CANCELED']:
+      if status in ['FAILURE', 'CANCELED']:
         error_messages += [provider.get_job_completion_messages([t])]
 
     job_set = jobs_left
@@ -398,8 +414,65 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
   return error_messages
 
 
+def dominant_task_for_jobs(provider, tasks):
+  """A list with, for each job, its dominant task.
+
+  The dominant task is the one that exemplifies its job's
+  status. It is either:
+  - the first (FAILURE or CANCELED) task, or if none
+  - the first RUNNING task, or if none
+  - the first SUCCESS task.
+
+  Args:
+    provider: job service provider
+    tasks: a list of tasks to consider
+
+  Returns:
+    A list with, for each job, its dominant task.
+  """
+
+  per_job = group_tasks_by_jobid(provider, tasks)
+
+  ret = []
+  for job_id in per_job.keys():
+    tasks_in_salience_order = sorted(
+        per_job[job_id], key=lambda t: importance_of_task(provider, t))
+    ret.append(tasks_in_salience_order[0])
+  return ret
+
+
+def group_tasks_by_jobid(provider, tasks):
+  """A defaultdict with, for each job, a list of its tasks."""
+  ret = collections.defaultdict(list)
+  for t in tasks:
+    ret[provider.get_job_field(t, 'job-id')].append(t)
+  return ret
+
+
+def importance_of_task(provider, task):
+  """Tuple (importance, end-time). Smaller values are more important."""
+  # The status of a job is going to be determined by the roll-up of its tasks.
+  # A FAILURE or CANCELED task means the job has FAILED.
+  # If none, then any RUNNING task, the job is still RUNNING.
+  # If none, then the job status is SUCCESS.
+  #
+  # Thus the dominant task for each job is one that exemplifies its
+  # status:
+  #
+  # 1- The first (FAILURE or CANCELED) task, or if none
+  # 2- The first RUNNING task, or if none
+  # 3- The first SUCCESS task.
+  importance = {'FAILURE': 0, 'CANCELED': 0, 'RUNNING': 1, 'SUCCESS': 2}
+  return (importance[provider.get_job_field(task, 'job-status')],
+          provider.get_job_field(task, 'end-time'))
+
+
 def wait_for_any_job(provider, jobid_list, poll_interval):
   """Waits until any of the listed jobs is not running.
+
+  In particular, if any of the jobs sees one of its tasks fail,
+  we count the whole job as failing (but do not terminate the remaining
+  tasks ourselves).
 
   Args:
     provider: job service provider
@@ -409,12 +482,22 @@ def wait_for_any_job(provider, jobid_list, poll_interval):
   Returns:
     A set of the jobIDs with still at least one running task.
   """
+  if not jobid_list:
+    return
   while True:
-    running_jobs = tasks_to_job_ids(provider,
-                                    provider.get_jobs(
-                                        ['RUNNING'], job_list=jobid_list))
-    if len(running_jobs) != len(jobid_list):
-      return running_jobs
+    tasks = provider.get_jobs('*', job_list=jobid_list)
+    running_jobs = set([])
+    failed_jobs = set([])
+    for t in tasks:
+      status = provider.get_job_field(t, 'job-status')
+      job_id = provider.get_job_field(t, 'job-id')
+      if status in ['FAILURE', 'CANCELED']:
+        failed_jobs.add(job_id)
+      if status == 'RUNNING':
+        running_jobs.add(job_id)
+    remaining_jobs = running_jobs.difference(failed_jobs)
+    if failed_jobs or len(remaining_jobs) != len(jobid_list):
+      return remaining_jobs
     SLEEP_FUNCTION(poll_interval)
 
 
@@ -454,9 +537,8 @@ def run_main(args):
     script = job_util.Script(command_name, args.command)
   elif args.script:
     # Read the script file
-    with open(args.script, 'r') as script_file:
-      script = job_util.Script(
-          os.path.basename(args.script), script_file.read())
+    script_file = dsub_util.load_file(args.script)
+    script = job_util.Script(os.path.basename(args.script), script_file.read())
   else:
     raise ValueError('One of --command or a script name must be supplied')
 
@@ -505,8 +587,8 @@ def run_main(args):
     if launched_job.get('task-id'):
       print '%s task(s)' % len(launched_job['task-id'])
     print 'To check the status, run:'
-    print '  dstat --project %s --jobs %s' % (args.project,
-                                              launched_job['job-id'])
+    print '  dstat --project %s --jobs %s --status \'*\'' % (
+        args.project, launched_job['job-id'])
     print 'To cancel the job, run:'
     print '  ddel --project %s --jobs %s' % (args.project,
                                              launched_job['job-id'])

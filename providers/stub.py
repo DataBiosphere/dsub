@@ -67,12 +67,12 @@ class StubJobProvider(object):
                max_jobs=0):
     """Return a list of operations based on the input criteria.
 
-    If any of the filters are empty or "*", then no filtering is performed on
+    If any of the filters are empty or "[*]", then no filtering is performed on
     that field.
 
     Args:
-      status_list: a list of job status strings to return. Valid status strings
-        are 'RUNNING', 'SUCCESS', 'FAILURE', or 'CANCELED'.
+      status_list: ['*'], or a list of job status strings to return. Valid
+        status strings are 'RUNNING', 'SUCCESS', 'FAILURE', or 'CANCELED'.
       user_list: a list of ids for the user(s) who launched the job.
       job_list: a list of job ids to return.
       task_list: a list of specific tasks within the specified job(s) to return.
@@ -84,8 +84,8 @@ class StubJobProvider(object):
 
     operations = [
         x for x in self._operations
-        if ((status_list == '*' or x.get('status', (None, None
-                                                   ))[0] in status_list) and
+        if ((not status_list or status_list[0] == '*' or
+             x.get('status', (None, None))[0] in status_list) and
             (user_list == '*' or x.get('user', None) in user_list) and
             (job_list == '*' or x.get('job-id', None) in job_list) and
             (task_list == '*' or x.get('task-id', None) in task_list))
@@ -95,10 +95,19 @@ class StubJobProvider(object):
     return operations
 
   def get_job_field(self, job, field):
-    return job[field]
+    if field == 'job-status':
+      return job['status'][0]
+    return job.get(field, None)
 
   def get_job_status_message(self, op):
-    return op.get('status', (None, None))
+    # Mimic the behavior of the Google one, which
+    # will return "Success", or the error message if there's one.
+    ret = op.get('status', (None, None))
+    if ret[0] == 'SUCCESS':
+      ret = ('Success', ret[1])
+    elif op.has_key('error-message'):
+      ret = (op['error-message'], ret[1])
+    return ret
 
   def get_job_completion_messages(self, ops):
     error_messages = []

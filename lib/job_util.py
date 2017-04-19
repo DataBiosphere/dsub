@@ -60,6 +60,10 @@ class Script(object):
   are uploaded as a simple environment variable input parameter.
   The docker command then writes the variable contents to a file and
   executes it.
+
+  Attributes:
+    name: (str) File name of this script.
+    value: (str) Content of this script.
   """
 
   def __init__(self, name, value):
