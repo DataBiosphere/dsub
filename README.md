@@ -299,5 +299,8 @@ To cancel specific tasks, run:
 ## What next?
 
 * See the [examples](examples).
-* See more details about [scripts, commands, and docker](docs/code.md).
-* See more details about [input and output](docs/input_output.md).
+* See more documentation for:
+  * [scripts, commands, and docker](docs/code.md)
+  * [input and output](docs/input_output.md)
+  * [job control](docs/job_control.md)
+  * [checking status and troubleshooting](docs/troubleshooting.md)

@@ -158,6 +158,7 @@ def main():
 
     if table:
       print tabulate.tabulate(table, headers='keys')
+      print
 
     if args.wait and some_job_running:
       time.sleep(args.poll_interval)
