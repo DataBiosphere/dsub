@@ -11,7 +11,7 @@ container in order to run:
 
 The following explains each option and how to choose which to use.
 
-## --command "shell string"
+## --command 'shell string'
 
 By default a `dsub` job runs in the context of an Ubuntu Docker container.
 In its simplest form, a dsub call with a `--command` string will execute
@@ -22,7 +22,7 @@ For example:
 ```
 dsub ... \
   --env MESSAGE="hello" \
-  --command "echo ${MESSAGE}"
+  --command 'echo ${MESSAGE}'
 ```
 
 will write the message ("hello") to standard output, which will be
@@ -33,6 +33,20 @@ a simple operation, such as compressing or decompressing a file, or performing
 a simple file rewrite operation using
 [sed](https://www.gnu.org/software/sed/) or
 [awk](https://www.gnu.org/software/gawk/).
+
+**Be sure to enclose your `command string` in single quotes and not double
+quotes. If you use double quotes, the command will be expanded in your local
+shell before being passed to dsub. If your command flag was in double quotes
+as:**
+
+    dsub \
+        --project my-cloud-project \
+        --logging gs://my-bucket/logs \
+        --env MESSAGE=hello \
+        --command "echo ${MESSAGE}"
+
+**Then assuming you did not have the variable `MESSAGE` in your local shell,
+the above command would be passed to dsub as "echo "**
 
 For an example that uses `--command`, see the
 [decompress](../examples/decompress) example.

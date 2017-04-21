@@ -85,7 +85,7 @@ Here's the simplest example:
     dsub \
         --project my-cloud-project \
         --logging gs://my-bucket/logs \
-        --command "echo hello"
+        --command 'echo hello'
 
 Change `my-cloud-project` to your Google Cloud project, and `my-bucket` to
 the bucket you created above.
@@ -130,13 +130,18 @@ You can pass environment variables to your script using the `--env` flag.
         --project my-cloud-project \
         --logging gs://my-bucket/logs \
         --env MESSAGE=hello \
-        --command "echo ${MESSAGE}"
+        --command 'echo ${MESSAGE}'
 
 The environment variable `MESSAGE` will be assigned the value `hello` when
 your Docker container runs.
 
 Your script or command can reference the variable like any other Linux
 environment variable, as `${MESSAGE}`.
+
+**Be sure to enclose your command string in single quotes and not double
+quotes. If you use double quotes, the command will be expanded in your local
+shell before being passed to dsub. For more information on using the
+`--command` flag, see [Scripts, Commands, and Docker](docs/code.md)**
 
 To set multiple environment variables, you can repeat the flag:
 
@@ -187,7 +192,7 @@ To specify input and output files, use the `--input` and `--output` flags:
         --logging gs://my-bucket/logs \
         --input INPUT_FILE=gs://my-bucket/my-input-file \
         --output OUTPUT_FILE=gs://my-bucket/my-output-file \
-        --command "cat ${INPUT_FILE} > ${OUTPUT_FILE}"
+        --command 'cat ${INPUT_FILE} > ${OUTPUT_FILE}'
 
 The input file will be copied from `gs://my-bucket/my-input-file` to a local
 path given by the environment variable `${INPUT_FILE}`. Inside your script, you
@@ -207,7 +212,7 @@ To copy folders rather than files, use the `--input-recursive` or
         --project my-cloud-project \
         --logging gs://my-bucket/logs \
         --input-recursive FOLDER=gs://my-bucket/my-folder \
-        --command "find ${FOLDER} -name 'foo*'"
+        --command 'find ${FOLDER} -name "foo*"'
 
 ### Setting resource requirements
 
@@ -300,7 +305,7 @@ To cancel specific tasks, run:
 
 * See the [examples](examples).
 * See more documentation for:
-  * [scripts, commands, and docker](docs/code.md)
-  * [input and output](docs/input_output.md)
-  * [job control](docs/job_control.md)
-  * [checking status and troubleshooting](docs/troubleshooting.md)
+  * [Scripts, Commands, and Docker](docs/code.md)
+  * [Input and Output File Handling](docs/input_output.md)
+  * [Job Control](docs/job_control.md)
+  * [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
