@@ -1,4 +1,4 @@
-# Checking status and troubleshooting jobs
+# Checking Status and Troubleshooting Jobs
 
 Once jobs are launched using `dsub`, you'll typically want to check on status.
 If something goes wrong, you'll want to discover why.

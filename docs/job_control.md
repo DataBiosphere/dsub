@@ -1,4 +1,4 @@
-# Job control
+# Job Control
 
 dsub provides two simple mechanisms for specifying job dependencies. This
 enables you to sequence or run in parallel multiple jobs, each of which can have
