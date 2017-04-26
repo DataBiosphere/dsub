@@ -25,8 +25,8 @@ foundation for use by the wider batch computing community.
 
 1.  Clone this repository.
 
-        git clone https://github.com/googlegenomics/task-submission-tools
-        cd task-submission-tools
+        git clone https://github.com/googlegenomics/dsub
+        cd dsub
 
 1.  Setup a Python virtualenv (optional but strongly recommended).
 
@@ -39,7 +39,7 @@ foundation for use by the wider batch computing community.
 
 1.  Verify the installation by running:
 
-        ./dsub --help`
+        ./dsub --help
 
 1.   (Optional) [Install Docker](https://docs.docker.com/engine/installation/).
 
