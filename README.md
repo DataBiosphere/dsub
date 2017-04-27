@@ -35,7 +35,7 @@ foundation for use by the wider batch computing community.
 
 1.  Install dependent libraries.
 
-        pip install --upgrade oauth2client==1.5.2 google-api-python-client python-dateutil pytz tabulate
+        pip install --upgrade oauth2client==1.5.2 google-api-python-client python-dateutil pytz pyyaml tabulate
 
 1.  Verify the installation by running:
 
