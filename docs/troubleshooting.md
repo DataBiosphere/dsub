@@ -120,22 +120,104 @@ my-job-name     task-3  running-docker  2017-04-11 16:24:39
 
 ## Getting detailed job information
 
-The default output from `dstat` is brief. To see more details,
-use the `--full` flag:
+The default output from `dstat` is brief tabular text, fit for display on an
+80 character terminal. The number of columns is small and column values may
+be truncated for space.
+
+`dstat` also supports a `full` output format. When the `--full` flag is used,
+the output automatically changes to [YAML](http://yaml.org/) which is
+"a human friendly data serialization standard" and more appropriate for
+detailed output.
+
+You can use the `--full` and `--format` parameters together to get the output
+you want. `--format` supports the values `json`, `text`, and `yaml`.
+
+### Full output (default format YAML)
 
 ```
 $ ./dstat --project my-project \
   --jobs my-job-id \
   --full
-Job Name        Status    Last Update          Created              Ended    User      Job ID                                  Internal ID                                                         Inputs
---------------  --------  -------------------  -------------------  -------  --------  --------------------------------------  ------------------------------------------------------------------  --------------------------------------------------
-my-job-name     Pending   2017-04-11 16:47:06  2017-04-11 16:47:06  NA       <userid>  my-job-id                               operations/OPERATION-ID                                             _SCRIPT=#!/bin/bash
+- create-time: '2017-04-11 16:47:06'
+  end-time: '2017-04-11 16:51:38'
+  inputs:
+    INPUT_PATH: gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam
+    _SCRIPT: |+
+      #!/bin/bash
 
-# Copyright 2016 Google In...
+      # Copyright 2016 Google Inc. All Rights Reserved.
+      #
+      # Licensed under the Apache License, Version 2.0 (the "License");
+<trimmed for brevity>
+      readonly INPUT_FILE_LIST="$(ls "${INPUT_PATH}")"
+
+      for INPUT_FILE in "${INPUT_FILE_LIST[@]}"; do
+        FILE_NAME="$(basename "${INPUT_FILE}")"
+
+        md5sum "${INPUT_FILE}" | awk '{ print $1 }' > "${OUTPUT_DIR}/${FILE_NAME}.md5"
+      done
+
+  internal-id: operations/OPERATION-ID
+  job-id: my-job-id
+  job-name: my-job-name
+  last-update: '2017-04-11 16:51:38'
+  outputs:
+    OUTPUT_PATH: gs://my-bucket/path/output
+  status: Success
+  user-id: my-user
 ```
 
 Note the `Internal ID` in this example provides the
 [Google Pipelines API operation name](https://cloud.google.com/genomics/reference/rest/v1alpha2/operations#name).
+
+### Full output as tabular text
+
+```
+$ ./dstat --project my-project \
+  --jobs my-job-id \
+  --format text \
+  --full
+Job ID                                  Job Name        Status    Last Update          Created              Ended                User      Internal ID                                                         Inputs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  Outputs
+--------------------------------------  --------------  --------  -------------------  -------------------  -------------------  --------  ------------------------------------------------------------------  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  -------------------------------------------------------
+my-job-id                               my-job-name     Success   2017-04-11 16:51:38  2017-04-11 16:47:06  2017-04-11 16:51:38  my-user   operations/OPERATION-ID                                             INPUT_PATH=gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam, _SCRIPT=#!/bin/bash
+# Copyright 2016 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+<trimmed for brevity>
+for INPUT_FILE in "${INPUT_FILE_LIST[@]}"; do
+  FILE_NAME="$(basename "${INPUT_FILE}")"
+
+  md5sum "${INPUT_FILE}" | awk '{ print $1 }' > "${OUTPUT_DIR}/${FILE_NAME}.md5"
+done  OUTPUT_PATH=gs://my-bucket/path/output
+```
+
+### Full output as JSON
+
+```
+$ ./dstat --project my-project \
+  --jobs my-job-id \
+  --format json \
+  --full
+[
+  {
+    "status": "Success",
+    "inputs": {
+      "_SCRIPT": "#!/bin/bash\n\n# Copyright 2016 Google Inc. All Rights Reserved.\n#\n# Licensed under the Apache License, Version 2.0 (the \"License\");\n<trimmed for brevity>for INPUT_FILE in \"${INPUT_FILE_LIST[@]}\"; do\n  FILE_NAME=\"$(basename \"${INPUT_FILE}\")\"\n\n  md5sum \"${INPUT_FILE}\" | awk '{ print $1 }' > \"${OUTPUT_DIR}/${FILE_NAME}.md5\"\ndone\n\n", 
+      "INPUT_PATH": "gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam"
+    },
+    "job-name": "my-job-name",
+    "outputs": {
+      "OUTPUT_PATH": "gs://my-bucket/path/output"
+    },
+    "create-time": "2017-04-11 16:47:06",
+    "end-time": "2017-04-11 16:51:38",
+    "internal-id": "operations/OPERATION-ID",
+    "last-update": "2017-04-11 16:51:38",
+    "user-id": "my-user",
+    "job-id": "my-job-id"
+  }
+]
+```
 
 ## Viewing logs
 

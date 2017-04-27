@@ -3,14 +3,14 @@
 set -o errexit
 set -o nounset
 
-if [[ "$#" -gt 0 ]]; then
+if [[ "${1:-}" == "--help" ]]; then
   cat <<EOF
 USAGE:
-  $0
+  $0 [unit|e2e]
 
 Sets up a virtualenv named dsub_libs in the current working directory and runs
-the unit tests. If the virtualenv already exists, will install the dependent
-dsub libraries into it.
+the (fast) unit and/or (slow) e2e tests (runs both if unspecified).
+If the virtualenv already exists, will install the dependent dsub libraries into it.
 EOF
   exit 0
 fi
@@ -31,10 +31,10 @@ echo ""
 echo "Starting tests."
 echo ""
 
-# TODO: once this works reliably, add the e2e tests
+echo "Your test bucket is: gs://${USER}-dsub-test"
 
-if ! python -m unittest discover -s test/unit/; then
-  echo "A test in test/unit/ failed."
+if ! test/run_tests.sh "$@"; then
+  echo "test/run_tests $* failed."
   exit 1
 fi
 

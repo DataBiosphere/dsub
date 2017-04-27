@@ -134,6 +134,8 @@ _ZONES = [
     'asia-northeast1-a',
     'asia-northeast1-b',
     'asia-northeast1-c',
+    'asia-southeast1-a',
+    'asia-southeast1-b',
     'europe-west1-b',
     'europe-west1-c',
     'europe-west1-d',
@@ -631,12 +633,13 @@ class _Operations(object):
                              operation['error']['message']))
 
   @classmethod
-  def get_operation_field(cls, operation, field):
+  def get_operation_field(cls, operation, field, default=None):
     """Returns a value from the operation for a specific set of field names.
 
     Args:
       operation: an operation object returned from operations.list()
       field: a dsub-specific job metadata key
+      default: default value to return if field does not exist or is empty.
 
     Returns:
       A text string for the field or a list for 'inputs'.
@@ -645,30 +648,41 @@ class _Operations(object):
       ValueError: if the field label is not supported by the operation
     """
 
+    metadata = operation.get('metadata')
+
     if field == 'internal-id':
-      return operation['name']
-
-    metadata = operation['metadata']
-
-    if field == 'job-name':
-      return metadata['labels'].get('job-name')
+      value = operation['name']
+    elif field == 'job-name':
+      value = metadata['labels'].get('job-name')
     elif field == 'job-id':
-      return metadata['labels'].get('job-id')
+      value = metadata['labels'].get('job-id')
     elif field == 'task-id':
-      return metadata['labels'].get('task-id')
+      value = metadata['labels'].get('task-id')
     elif field == 'user-id':
-      return metadata['labels'].get('user-id')
+      value = metadata['labels'].get('user-id')
     elif field == 'job-status':
-      return metadata['job-status']
+      value = metadata['job-status']
     elif field == 'inputs':
-      return metadata['request']['pipelineArgs']['inputs']
+      value = metadata['request']['pipelineArgs']['inputs']
+    elif field == 'outputs':
+      value = metadata['request']['pipelineArgs']['outputs']
     elif field == 'create-time':
-      return cls._localize_datestamp(metadata['createTime'])
+      value = cls._localize_datestamp(metadata['createTime'])
     elif field == 'end-time':
       if 'endTime' in metadata:
-        return cls._localize_datestamp(metadata['endTime'])
+        value = cls._localize_datestamp(metadata['endTime'])
+      else:
+        value = None
+    elif field == 'status':
+      status, last_update = cls.operation_status_message(operation)
+      value = status
+    elif field == 'last-update':
+      status, last_update = cls.operation_status_message(operation)
+      value = last_update
     else:
       raise ValueError('Unsupported display field: %s' % field)
+
+    return value if value else default
 
   @classmethod
   def cancel(cls, service, ops):
@@ -1022,25 +1036,25 @@ class GoogleJobProvider(object):
 
     return _Operations.cancel(self._service, ops)
 
-  def get_job_field(self, job, field):
-    return _Operations.get_operation_field(job, field)
+  def get_job_field(self, job, field, default=None):
+    return _Operations.get_operation_field(job, field, default)
 
-  def get_job_status_message(self, op):
+  def get_job_status_message(self, job):
     """Returns the most relevant status string and last updated date string.
 
     This string is meant for display only.
 
     Args:
-      op: task
+      job: the operation for which to get status.
 
     Returns:
       A printable status string and date string.
     """
-    return _Operations.operation_status_message(op)
+    return _Operations.operation_status_message(job)
 
-  def get_job_completion_messages(self, ops):
+  def get_job_completion_messages(self, jobs):
     error_messages = []
-    for op in ops:
+    for op in jobs:
       _Operations.append_operation_error(error_messages, op)
 
     return error_messages

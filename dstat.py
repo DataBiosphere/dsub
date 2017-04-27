@@ -19,15 +19,174 @@ Follows the model of bjobs, sinfo, qstat, etc.
 
 import argparse
 import collections
+import json
 import time
 
 from lib import dsub_util
 from providers import provider_base
 
 import tabulate
+import yaml
 
-MAX_ERROR_MESSAGE_LENGTH = 30
-MAX_INPUT_ARGS_LENGTH = 50
+
+class OutputFormatter(object):
+  """Base class for supported output formats."""
+
+  def __init__(self, full):
+    self._full = full
+
+  def prepare_output(self, row):
+    return row
+
+  def print_table(self, table):
+    """Function to be defined by the derived class to print output."""
+    raise NotImplementedError('print_table method not defined!')
+
+
+class TextOutput(OutputFormatter):
+  """Format output for text display."""
+
+  _MAX_ERROR_MESSAGE_LENGTH = 30
+
+  def __init__(self, full):
+    super(TextOutput, self).__init__(full)
+
+  def trim_display_field(self, value, max_length):
+    """Return a value for display; if longer than max length, use ellipsis."""
+    if len(value) > max_length:
+      return value[:max_length - 3] + '...'
+    return value
+
+  def format_status(self, status):
+    if self._full:
+      return status
+
+    return self.trim_display_field(status, self._MAX_ERROR_MESSAGE_LENGTH)
+
+  def format_inputs_outputs(self, values):
+    """Returns a string of comma-delimited key=value pairs."""
+    return ', '.join('%s=%s' % (key, value)
+                     for key, value in sorted(values.iteritems()))
+
+  def prepare_output(self, row):
+
+    # Define the ordering of fields for text output along with any
+    # transformations.
+    column_map = [
+        ('job-id', 'Job ID',),
+        ('job-name', 'Job Name',),
+        ('task-id', 'Task',),
+        ('status', 'Status', self.format_status),
+        ('last-update', 'Last Update',),
+        ('create-time', 'Created',),
+        ('end-time', 'Ended',),
+        ('user-id', 'User',),
+        ('internal-id', 'Internal ID',),
+        ('inputs', 'Inputs', self.format_inputs_outputs),
+        ('outputs', 'Outputs', self.format_inputs_outputs),
+    ]
+
+    new_row = collections.OrderedDict()
+    for col in column_map:
+      field_name = col[0]
+      if field_name not in row:
+        continue
+
+      text_label = col[1]
+
+      if len(col) == 2:
+        new_row[text_label] = row[field_name]
+      else:
+        format_fn = col[2]
+        new_row[text_label] = format_fn(row[field_name])
+
+    return new_row
+
+  def print_table(self, table):
+    print tabulate.tabulate(table, headers='keys')
+    print
+
+
+class YamlOutput(OutputFormatter):
+  """Format output for YAML display."""
+
+  def __init__(self, full):
+    super(YamlOutput, self).__init__(full)
+
+    yaml.add_representer(unicode, self.string_presenter)
+    yaml.add_representer(str, self.string_presenter)
+
+  def string_presenter(self, dumper, data):
+    """Presenter to force yaml.dump to use multi-line string style."""
+    if '\n' in data:
+      return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+    else:
+      return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+
+  def print_table(self, table):
+    print yaml.dump(table, default_flow_style=False)
+
+
+class JsonOutput(OutputFormatter):
+  """Format output for JSON display."""
+
+  def __init__(self, full):
+    super(JsonOutput, self).__init__(full)
+
+  def print_table(self, table):
+    print json.dumps(table, indent=2)
+
+
+def prepare_row(provider, job, full):
+  """return a dict with the job's info (more if "full" is set)."""
+
+  # Try to keep the default behavior rational based on real usage patterns.
+  # Most common usage:
+  # * User kicked off one or more single-operation jobs, or
+  # * User kicked off a single "array job".
+  # * User just wants to check on the status of their own running jobs.
+  #
+  # qstat and hence dstat.py defaults to listing jobs for the current user, so
+  # there is no need to include user information in the default output.
+
+  # Would like to include the Job ID in the default set of columns, but
+  # it is a long value and would leave little room for status and update time.
+
+  # pyformat: disable
+  default_columns = [
+      ('job-name', False),
+      ('task-id', True),
+      ('status', False),
+      ('last-update', False)
+  ]
+  full_columns = [
+      ('job-id',),
+      ('user-id',),
+      ('create-time',),
+      ('end-time', 'NA'),
+      ('internal-id',),
+      ('inputs', {}),
+      ('outputs', {}),
+  ]
+  # pyformat: enable
+
+  row = {}
+  for col in default_columns:
+    key = col[0]
+    optional = col[1]
+
+    value = provider.get_job_field(job, key)
+    if not optional or value:
+      row[key] = value
+
+  if full:
+    for col in full_columns:
+      key = col[0]
+      default = col[1] if len(col) > 1 else None
+
+      row[key] = provider.get_job_field(job, key, default)
+
+  return row
 
 
 def parse_arguments():
@@ -73,51 +232,31 @@ def parse_arguments():
       action='store_true',
       help='Toggle output with full operation identifiers'
       ' and input parameters.')
+  parser.add_argument(
+      '--format',
+      choices=['text', 'json', 'yaml'],
+      help='Set the output format.')
   return parser.parse_args()
 
 
-def trim_display_field(value, length):
-  if len(value) > length:
-    return value[:length - 3] + '...'
-  return value
-
-
-def prepare_row(provider, job, full):
-  """return ordered dict with the job's info (more if "full" is set)."""
-  job_name = provider.get_job_field(job, 'job-name')
-  job_id = provider.get_job_field(job, 'job-id')
-  task_id = provider.get_job_field(job, 'task-id')
-  status, last_update = provider.get_job_status_message(job)
-
-  row = collections.OrderedDict()
-  if job_name:
-    row['Job Name'] = job_name
-  if task_id:
-    row['Task'] = task_id
-
-  row['Status'] = trim_display_field(status, MAX_ERROR_MESSAGE_LENGTH)
-  row['Last Update'] = last_update
-
-  if full:
-    create_time = provider.get_job_field(job, 'create-time')
-    end_time = provider.get_job_field(job, 'end-time')
-    inputs = provider.get_job_field(job, 'inputs')
-    input_str = ','.join('%s=%s' % (key, value)
-                         for key, value in inputs.iteritems())
-    user_id = provider.get_job_field(job, 'user-id')
-    internal_id = provider.get_job_field(job, 'internal-id')
-    row['Created'] = create_time
-    row['Ended'] = end_time if end_time else 'NA'
-    row['User'] = user_id
-    row['Job ID'] = job_id
-    row['Internal ID'] = internal_id
-    row['Inputs'] = trim_display_field(input_str, MAX_INPUT_ARGS_LENGTH)
-  return row
-
-
 def main():
+
   # Parse args and validate
   args = parse_arguments()
+
+  if args.format == 'json':
+    output_formatter = JsonOutput(args.full)
+  elif args.format == 'text':
+    output_formatter = TextOutput(args.full)
+  elif args.format == 'yaml':
+    output_formatter = YamlOutput(args.full)
+  else:
+    # If --full is passed, then format defaults to yaml.
+    # Else format defaults to text
+    if args.full:
+      output_formatter = YamlOutput(args.full)
+    else:
+      output_formatter = TextOutput(args.full)
 
   # Set up the Genomics Pipelines service interface
   provider = provider_base.get_provider(args)
@@ -129,36 +268,19 @@ def main():
     jobs = provider.get_jobs(
         args.status, user_list=args.users, job_list=args.jobs)
 
-    # Try to keep the default behavior rational based on real usage patterns.
-    # Most common usage:
-    # * User kicked off one or more single-operation jobs, or
-    # * User kicked off a single "array job".
-    # * User just wants to check on the status of their own running jobs.
-    #
-    # qstat and hence dstat.py defaults to listing jobs for the current user, so
-    # there is no need to include user information in the default output.
-
-    # The information you want in that case is very different than other uses,
-    # such as:
-    # * I want to see all jobs currently pending/running
-    # * I want to see status for a particular job or set of jobs
-    #   (including the finished jobs)
-
-    # Job name is typically short
-    # Job ID is typically long
-    # Task ID is short
-
     table = []
 
     some_job_running = False
     for job in jobs:
-      table.append(prepare_row(provider, job, args.full))
+      row = prepare_row(provider, job, args.full)
+      row = output_formatter.prepare_output(row)
+
+      table.append(row)
       if provider.get_job_field(job, 'job-status') == 'RUNNING':
         some_job_running = True
 
     if table:
-      print tabulate.tabulate(table, headers='keys')
-      print
+      output_formatter.print_table(table)
 
     if args.wait and some_job_running:
       time.sleep(args.poll_interval)

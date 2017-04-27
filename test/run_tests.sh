@@ -53,7 +53,18 @@ done
 # For each pattern, generate a list of matching tests and run them
 declare -a TEST_LIST
 for TEST_TYPE in "${TESTS[@]}"; do
-  TEST_LIST=($(eval ls "${SCRIPT_DIR}/${TEST_TYPE}" || true))
+
+  if [[ "${TEST_TYPE}" == "unit_*.py" ]]; then
+    # for unit tests, also include the Python unit tests
+    if python -m unittest discover -s test/unit/; then
+      echo "Test test/unit/*: PASSED"
+    else
+      echo "Test test/unit/*: FAILED"
+      exit 1
+    fi
+  fi
+
+  TEST_LIST=($(eval ls "${SCRIPT_DIR}/${TEST_TYPE}" 2>/dev/null || true))
 
   if [[ -z "${TEST_LIST:-}" ]]; then
     continue

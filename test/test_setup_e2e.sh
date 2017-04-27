@@ -43,7 +43,7 @@ if [[ -n "${YOUR_PROJECT:-}" ]]; then
   PROJECT_ID="${YOUR_PROJECT}"
 else
   echo "Checking configured gcloud project"
-  PROJECT_ID="$(gcloud config list core/project --format='value(core.project)')"
+  PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
 fi
 
 if [[ -z "${PROJECT_ID}" ]]; then
@@ -65,8 +65,12 @@ echo "  Bucket detected as: ${DSUB_BUCKET}"
 
 echo "  Checking if bucket exists"
 if ! gsutil ls "gs://${DSUB_BUCKET}" 2>/dev/null; then
-  2>&1 echo "Bucket does not exist: ${DSUB_BUCKET}"
+  2>&1 echo "Bucket does not exist (or we have no access): ${DSUB_BUCKET}"
   2>&1 echo "Create the bucket with \"gsutil mb\"."
+  2>&1 echo "Current gcloud settings:"
+  2>&1 echo "  account: $(gcloud config get-value account 2>/dev/null)"
+  2>&1 echo "  project: $(gcloud config get-value project 2>/dev/null)"
+  2>&1 echo "  pass_credentials_to_gsutil: $(gcloud config get-value pass_credentials_to_gsutil 2>/dev/null)"
   exit 1
 fi
 

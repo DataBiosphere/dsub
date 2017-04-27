@@ -87,7 +87,7 @@ class OutputFileParam(FileParam):
   """Simple typed-derivative of a FileParam."""
 
   def __new__(cls, name, docker_path=None, remote_uri=None, recursive=False):
-    validate_param_name(name, 'Input parameter')
+    validate_param_name(name, 'Output parameter')
     return super(OutputFileParam, cls).__new__(cls, name, docker_path,
                                                remote_uri, recursive)
 
