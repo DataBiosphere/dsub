@@ -19,7 +19,6 @@ Follows the model of bsub, qsub, srun, etc.
 
 import argparse
 import collections
-from contextlib import contextmanager
 import os
 import sys
 import time
@@ -33,6 +32,19 @@ from providers import provider_base
 SLEEP_FUNCTION = time.sleep  # so we can replace it in tests
 
 DEFAULT_SCOPES = ['https://www.googleapis.com/auth/bigquery',]
+
+# When --skip is used, dsub will skip launching a new job if the outputs
+# already exist. In that case, dsub returns a special job-id ("NO_JOB")
+# such that callers using:
+#
+#   JOB_ID=$(dsub ... --skip)
+#
+# can safely call:
+#
+#   dsub ... --after $JOB_ID
+#
+# "NO_JOB" will be treated as having completed.
+NO_JOB = 'NO_JOB'
 
 # The job created by dsub will automatically include a data disk,
 # Each provider sets a different DATA_ROOT environment variable.
@@ -96,44 +108,6 @@ DEFAULT_SCOPES = ['https://www.googleapis.com/auth/bigquery',]
 
 DEFAULT_INPUT_LOCAL_PATH = 'input'
 DEFAULT_OUTPUT_LOCAL_PATH = 'output'
-
-
-class Printer(object):
-  """File-like stream object that redirects stdout to stderr.
-
-  Args:
-    object: parent object.
-  """
-
-  def __init__(self, args):
-    self._args = args
-    self._actual_stdout = sys.stdout
-
-  def write(self, buf):
-    sys.stderr.write(buf)
-
-
-@contextmanager
-def replace_print_with(printer):
-  """Sys.out replacer.
-
-  Use it like this:
-  with replace_print_with(fileobj):
-    print "hello"  # writes to the file
-  print "done"  # prints to stdout
-
-  Args:
-    printer: a file-like object that will replace stdout.
-
-  Yields:
-    The printer.
-  """
-  previous_stdout = sys.stdout
-  sys.stdout = printer
-  try:
-    yield printer
-  finally:
-    sys.stdout = previous_stdout
 
 
 class ListParamAction(argparse.Action):
@@ -300,6 +274,14 @@ def parse_arguments(prog, argv):
       '--script',
       help='Local path to a script to run inside the job\'s Docker container.',
       metavar='SCRIPT')
+  parser.add_argument(
+      '--skip',
+      default=False,
+      action='store_true',
+      help='Do not submit the job if all output specified using the --output '
+      'and --output-recursive parameters already exist. Note that wildcard '
+      'and recursive outputs cannot be strictly verified. See the '
+      'documentation for details.')
   return parser.parse_args(argv)
 
 
@@ -345,11 +327,6 @@ def get_job_metadata(args, script, provider):
   return job_metadata
 
 
-def tasks_to_job_ids(provider, task_list):
-  """Returns the set of job IDs for the given tasks."""
-  return set([provider.get_job_field(t, 'job-id') for t in task_list])
-
-
 def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
   """Print status info as we wait for those jobs.
 
@@ -373,7 +350,9 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
   # We exit the loop when:
   # * No jobs remain are running, OR
   # * stop_on_failure is TRUE AND at least one job returned an error
-  job_set = set(jobid_list)
+
+  # remove NO_JOB
+  job_set = set([j for j in jobid_list if j != NO_JOB])
   error_messages = []
   while job_set and (not error_messages or not stop_on_failure):
     print 'Waiting for: %s.' % (', '.join(job_set))
@@ -394,7 +373,7 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
     if len(dominant_job_tasks) != len(jobs_completed):
       # print info about the jobs we couldn't find
       # (should only occur for "--after" where the job ID is a typo).
-      jobs_found = tasks_to_job_ids(provider, dominant_job_tasks)
+      jobs_found = dsub_util.tasks_to_job_ids(provider, dominant_job_tasks)
       jobs_not_found = jobs_completed.difference(jobs_found)
       for j in jobs_not_found:
         error = '%s: not found' % (j)
@@ -501,6 +480,21 @@ def wait_for_any_job(provider, jobid_list, poll_interval):
     SLEEP_FUNCTION(poll_interval)
 
 
+def _job_outputs_are_present(job_data):
+  """True if each output contains at least one file."""
+  # See reference args_to_job_data in param_util.py for a description
+  # of what's in job_data.
+  outputs = job_data['outputs']
+  for o in outputs:
+    if o.recursive:
+      if not dsub_util.folder_exists(o.value):
+        return False
+    else:
+      if not dsub_util.simple_pattern_exists_in_gcs(o.value):
+        return False
+  return True
+
+
 def call(argv):
   return main('%s.call' % __name__, argv)
 
@@ -512,7 +506,7 @@ def main(prog, argv):
   # * dsub tightly controls the output to stdout.
   # * wrap the main body such that output goes to stderr.
   # * only emit the job-id to stdout (which can then be used programmatically).
-  with replace_print_with(Printer(args)):
+  with dsub_util.replace_print():
     launched_job = run_main(args)
   print launched_job.get('job-id', '')
   return launched_job
@@ -528,6 +522,9 @@ def run_main(args):
     raise ValueError('Cannot supply both command-line parameters '
                      '(--env/--input/--input-recursive/--output/'
                      '--output-recursive) and --table')
+  if args.table and args.skip:
+    raise ValueError('Output skipping (--skip) not supported for --table '
+                     'commands.')
 
   if args.command:
     if args.name:
@@ -565,6 +562,7 @@ def run_main(args):
   if not args.dry_run:
     print 'Job: %s' % job_metadata['job-id']
 
+  # Wait for predecessor jobs (if any)
   if args.after:
     if args.dry_run:
       print '(Pretend) waiting for: %s.' % (args.after)
@@ -578,6 +576,12 @@ def run_main(args):
         for msg in error_messages:
           print_error(msg)
         sys.exit(1)
+
+  # If requested, skip running this job if its outputs already exist
+  if args.skip and not args.dry_run:
+    if _job_outputs_are_present(all_job_data[0]):
+      print 'Job output already present, skipping new job submission.'
+      return {'job-id': NO_JOB}
 
   # Launch all the job tasks!
   launched_job = provider.submit_job(job_resources, job_metadata, all_job_data)

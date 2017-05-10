@@ -1,0 +1,5 @@
+--env SAMPLE_ID	--input VCF_FILE	--output-recursive OUTPUT_PATH
+sid-000	gs://inputs/sid-000.vcf	gs://outputs/results-000
+sid-001	gs://inputs/sid-001.vcf	gs://outputs/results-001
+sid-002	gs://inputs/sid-002.vcf	gs://outputs/results-002
+sid-003	gs://inputs/sid-003.vcf	gs://outputs/results-003

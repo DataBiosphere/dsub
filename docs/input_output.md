@@ -63,7 +63,7 @@ the path `/mnt/data/input/gs/bucket/path/`.
 The Docker container will receive the environment variable:
 
 ```
-INPUT_FILES=/mnt/data/input/gs/bucket/path/*.bam
+INPUT_FILES=/mnt/data/input/gs/bucket/path/
 ```
 
 to process a list of files like this in bash, a typical pattern is:

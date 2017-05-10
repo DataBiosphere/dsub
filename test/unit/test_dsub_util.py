@@ -26,5 +26,6 @@ class TestDsubUtil(unittest.TestCase):
     tsv_file = 'test/testdata/params_table.tsv'
     self.assertTrue(dsub_util.load_file(tsv_file))
 
+
 if __name__ == '__main__':
   unittest.main()

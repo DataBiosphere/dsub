@@ -288,18 +288,27 @@ Metadata can be used to cancel a job or individual tasks within a batch job.
 
 ### Cancelling a job
 
-The `ddel` command will cancel running jobs. To delete a running job:
+The `ddel` command will cancel running jobs.
+
+By default, only jobs submitted by the current user will be deleted.
+Use the `--users` flag to specify other users, or `"*"` for all users.
+
+To delete a running job:
 
     ./ddel --project my-cloud-project --jobs job-id
 
 If the job is a batch job, all tasks will be canceled.
 
-To cancel specific tasks, run:
+To cancel specific tasks:
 
     ./ddel \
         --project my-cloud-project \
         --jobs job-id \
         --tasks task-id1 task-id2
+
+To cancel all running jobs for the current user:
+
+    ./ddel --project my-cloud-project --jobs "*"
 
 ## What next?
 

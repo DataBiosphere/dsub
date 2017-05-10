@@ -101,3 +101,33 @@ If you'd like to be able to turn off your machine (perhaps it's a laptop and you
 a big job) then what you can do is put your dsub command itself into a script,
 and run that script using dsub itself.
 
+## Using `--skip` to bypass jobs that have already run
+
+With the `--skip` parameter, `dsub` will skip running a job if all the outputs
+for the job already exist. This useful when you are building and debugging a
+sequence of jobs, such as:
+
+```
+JOBID_A=$(./dsub ... --skip --output gs://${MYBUCKET}/a_file)
+JOBID_B=$(./dsub ... --skip --output gs://${MYBUCKET}/b_file)
+
+./dsub ... --after "${JOB_A}" "${JOB_B}"
+```
+
+If on your first run of this script, the first job, "job A" fails and the second
+job, "job B" succeeds, then when you fix "job A" and re-run the script, "job B"
+will be skipped. Only "job A" will be re-run. If it succeeds, then the third job
+will run.
+
+### The special `NO_JOB`  return value
+
+When a job is skipped because the output already exists, `dsub` will output a
+special job-id value, `NO_JOB`. When `NO_JOB` is passed to `--after`, `dsub`
+treats that job as completed successfully.
+
+### `--skip` caveats: wildcards and recursive output
+
+When wildcards are used for `--output` parameters or `--output-recursive`
+parameters are used, there is no way for `dsub` to verify that *all* output is
+present. The best that `dsub` can do is to verify that *some* output was created
+for each such parameter.

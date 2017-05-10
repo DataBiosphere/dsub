@@ -90,7 +90,7 @@ else
   readonly STDERR_LOG="$(dirname "${LOGGING}")/${TEST_NAME}-stderr.log"
 fi
 readonly INPUTS="${TEST_REMOTE_ROOT}/input"
-readonly OUTPUTS="${TEST_REMOTE_ROOT}//output"
+readonly OUTPUTS="${TEST_REMOTE_ROOT}/output"
 readonly DOCKER_INPUTS="${TEST_DOCKER_ROOT}/input"
 readonly DOCKER_OUTPUTS="${TEST_DOCKER_ROOT}/output"
 

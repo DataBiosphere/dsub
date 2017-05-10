@@ -13,6 +13,8 @@
 # limitations under the License.
 """Utility functions used by dsub, dstat, ddel."""
 
+from contextlib import contextmanager
+import fnmatch
 import io
 import os
 import pwd
@@ -20,8 +22,45 @@ from StringIO import StringIO
 import sys
 
 from apiclient import discovery
+from apiclient import errors
 from apiclient.http import MediaIoBaseDownload
 from oauth2client.client import GoogleCredentials
+
+
+class _Printer(object):
+  """File-like stream object that redirects stdout to a file object."""
+
+  def __init__(self, fileobj):
+    self._actual_stdout = sys.stdout
+    self._fileobj = fileobj
+
+  def write(self, buf):
+    self._fileobj.write(buf)
+
+
+@contextmanager
+def replace_print(fileobj=sys.stderr):
+  """Sys.out replacer, by default with stderr.
+
+  Use it like this:
+  with replace_print_with(fileobj):
+    print "hello"  # writes to the file
+  print "done"  # prints to stdout
+
+  Args:
+    fileobj: a file object to replace stdout.
+
+  Yields:
+    The printer.
+  """
+  printer = _Printer(fileobj)
+
+  previous_stdout = sys.stdout
+  sys.stdout = printer
+  try:
+    yield printer
+  finally:
+    sys.stdout = previous_stdout
 
 
 def print_error(msg):
@@ -31,6 +70,18 @@ def print_error(msg):
 
 def get_default_user():
   return pwd.getpwuid(os.getuid())[0]
+
+
+def tasks_to_job_ids(provider, task_list):
+  """Returns the set of job IDs for the given tasks."""
+  return set([provider.get_job_field(t, 'job-id') for t in task_list])
+
+
+def _get_storage_service(credentials):
+  """Get a storage client using the provided credentials or defaults."""
+  if credentials is None:
+    credentials = GoogleCredentials.get_application_default()
+  return discovery.build('storage', 'v1', credentials=credentials)
 
 
 def _load_file_from_gcs(gcs_file_path, credentials=None):
@@ -43,15 +94,14 @@ def _load_file_from_gcs(gcs_file_path, credentials=None):
   Returns:
     The content of the text file as a string.
   """
-  if credentials is None:
-    credentials = GoogleCredentials.get_application_default()
-  gcs_service = discovery.build('storage', 'v1', credentials=credentials)
+  gcs_service = _get_storage_service(credentials)
 
   bucket_name, object_name = gcs_file_path[len('gs://'):].split('/', 1)
-  req = gcs_service.objects().get_media(bucket=bucket_name, object=object_name)
+  request = gcs_service.objects().get_media(
+      bucket=bucket_name, object=object_name)
 
   file_handle = io.BytesIO()
-  downloader = MediaIoBaseDownload(file_handle, req, chunksize=1024 * 1024)
+  downloader = MediaIoBaseDownload(file_handle, request, chunksize=1024 * 1024)
   done = False
   while not done:
     _, done = downloader.next_chunk()
@@ -75,3 +125,114 @@ def load_file(file_path, credentials=None):
     return _load_file_from_gcs(file_path, credentials)
   else:
     return open(file_path, 'r')
+
+
+def _file_exists_in_gcs(gcs_file_path, credentials=None):
+  """Check whether the file exists, in GCS.
+
+  Args:
+    gcs_file_path: The target file path; should have the 'gs://' prefix.
+    credentials: Optional credential to be used to load the file from gcs.
+
+  Returns:
+    True if the file's there.
+  """
+  gcs_service = _get_storage_service(credentials)
+
+  bucket_name, object_name = gcs_file_path[len('gs://'):].split('/', 1)
+  request = gcs_service.objects().get(
+      bucket=bucket_name, object=object_name, projection='noAcl')
+  try:
+    request.execute()
+    return True
+  except errors.HttpError:
+    return False
+
+
+def file_exists(file_path, credentials=None):
+  """Check whether the file exists, on local disk or GCS.
+
+  Args:
+    file_path: The target file path; should have the 'gs://' prefix if in gcs.
+    credentials: Optional credential to be used to load the file from gcs.
+
+  Returns:
+    True if the file's there.
+  """
+  if file_path.startswith('gs://'):
+    return _file_exists_in_gcs(file_path, credentials)
+  else:
+    return os.path.isfile(file_path)
+
+
+def _prefix_exists_in_gcs(gcs_prefix, credentials=None):
+  """Check whether there is a GCS object whose name starts with the prefix.
+
+  Since GCS doesn't actually have folders, this is how we check instead.
+
+  Args:
+    gcs_prefix: The path; should start with 'gs://'.
+    credentials: Optional credential to be used to load the file from gcs.
+
+  Returns:
+    True if the prefix matches at least one object in GCS.
+
+  Raises:
+    errors.HttpError: if it can't talk to the server
+  """
+  gcs_service = _get_storage_service(credentials)
+
+  bucket_name, prefix = gcs_prefix[len('gs://'):].split('/', 1)
+  # documentation in
+  # https://cloud.google.com/storage/docs/json_api/v1/objects/list
+  request = gcs_service.objects().list(
+      bucket=bucket_name, prefix=prefix, maxResults=1)
+  response = request.execute()
+  return response.get('items', None)
+
+
+def folder_exists(folder_path, credentials=None):
+  if folder_path.startswith('gs://'):
+    return _prefix_exists_in_gcs(folder_path.rstrip('/') + '/', credentials)
+  else:
+    return os.path.isdir(folder_path)
+
+
+def simple_pattern_exists_in_gcs(file_pattern, credentials=None):
+  """True iff an object exists matching the input GCS pattern.
+
+  The GCS pattern must be a full object reference or a "simple pattern" that
+  conforms to the dsub input and output parameter restrictions:
+
+    * No support for **, ? wildcards or [] character ranges
+    * Wildcards may only appear in the file name
+
+  Args:
+    file_pattern: eg. 'gs://foo/ba*'
+    credentials: Optional credential to be used to load the file from gcs.
+
+  Raises:
+    ValueError: if file_pattern breaks the rules.
+
+  Returns:
+    True iff a file exists that matches that pattern.
+  """
+  if '*' not in file_pattern:
+    return _file_exists_in_gcs(file_pattern, credentials)
+  if not file_pattern.startswith('gs://'):
+    raise ValueError('file name must start with gs://')
+  gcs_service = _get_storage_service(credentials)
+  bucket_name, prefix = file_pattern[len('gs://'):].split('/', 1)
+  if '*' in bucket_name:
+    raise ValueError('Wildcards may not appear in the bucket name')
+  # There is a '*' in prefix because we checked there's one in file_pattern
+  # and there isn't one in bucket_name. Hence it must be in prefix.
+  assert '*' in prefix
+  prefix_no_wildcard = prefix[:prefix.index('*')]
+  request = gcs_service.objects().list(
+      bucket=bucket_name, prefix=prefix_no_wildcard)
+  response = request.execute()
+  if 'items' not in response:
+    return False
+  items_list = [i['name'] for i in response['items']]
+  return any(fnmatch.fnmatch(i, prefix) for i in items_list)
