@@ -60,7 +60,7 @@ foundation for use by the wider batch computing community.
     Cloud SDK. Now provide [credentials](https://developers.google.com/identity/protocols/application-default-credentials)
     so dsub can call Google APIs:
 
-        gcloud application-default login
+        gcloud auth application-default login
 
 1.  Create a [Google Cloud Storage](https://cloud.google.com/storage) bucket.
 
