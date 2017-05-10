@@ -79,7 +79,7 @@ if not PROJECT_ID:
 print "  Project ID detected as: %s" % PROJECT_ID
 
 if "YOUR_BUCKET" in os.environ:
-  DSUB_BUCKET = os.environ["YOUR-BUCKET"]
+  DSUB_BUCKET = os.environ["YOUR_BUCKET"]
 else:
   DSUB_BUCKET = "%s-dsub-test" % os.environ["USER"]
 

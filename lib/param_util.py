@@ -50,8 +50,9 @@ class EnvParam(collections.namedtuple('EnvParam', ['name', 'value'])):
 
 
 class FileParam(
-    collections.namedtuple('FileParam',
-                           ['name', 'docker_path', 'remote_uri', 'recursive'])):
+    collections.namedtuple('FileParam', [
+        'name', 'value', 'docker_path', 'remote_uri', 'recursive'
+    ])):
   """File parameter to be automatically localized or de-localized.
 
   Input files are automatically localized from GCS to the pipeline VM's
@@ -62,33 +63,50 @@ class FileParam(
 
   Attributes:
     name (str): the parameter and environment variable name.
+    value (str): the original value given by the user on the command line or
+                 in the TSV file
     docker_path (str): the on-VM location; also set as the environment variable
-        value.
+                       value.
     remote_uri (str): the GCS path.
     recursive (bool): Whether recursive copy is wanted.
   """
   __slots__ = ()
 
-  def __new__(cls, name, docker_path=None, remote_uri=None, recursive=False):
-    return super(FileParam, cls).__new__(cls, name, docker_path, remote_uri,
-                                         recursive)
+  def __new__(cls,
+              name,
+              value=None,
+              docker_path=None,
+              remote_uri=None,
+              recursive=False):
+    return super(FileParam, cls).__new__(cls, name, value, docker_path,
+                                         remote_uri, recursive)
 
 
 class InputFileParam(FileParam):
   """Simple typed-derivative of a FileParam."""
 
-  def __new__(cls, name, docker_path=None, remote_uri=None, recursive=False):
+  def __new__(cls,
+              name,
+              value=None,
+              docker_path=None,
+              remote_uri=None,
+              recursive=False):
     validate_param_name(name, 'Input parameter')
-    return super(InputFileParam, cls).__new__(cls, name, docker_path,
+    return super(InputFileParam, cls).__new__(cls, name, value, docker_path,
                                               remote_uri, recursive)
 
 
 class OutputFileParam(FileParam):
   """Simple typed-derivative of a FileParam."""
 
-  def __new__(cls, name, docker_path=None, remote_uri=None, recursive=False):
+  def __new__(cls,
+              name,
+              value=None,
+              docker_path=None,
+              remote_uri=None,
+              recursive=False):
     validate_param_name(name, 'Output parameter')
-    return super(OutputFileParam, cls).__new__(cls, name, docker_path,
+    return super(OutputFileParam, cls).__new__(cls, name, value, docker_path,
                                                remote_uri, recursive)
 
 
@@ -132,6 +150,18 @@ class FileParamUtil(object):
     # (potentially) producing a series of FileParams, instead of one.
     path = os.path.dirname(remote_uri)
     filename = os.path.basename(remote_uri)
+
+    # dsub could support character ranges ([0-9]) with some more work, but for
+    # now we assume that basic asterisk wildcards are sufficient. Reject any URI
+    # that includes square brackets or question marks, since we know that if
+    # they actually worked, it would be accidental.
+    if '[' in remote_uri or ']' in remote_uri:
+      raise ValueError('Square bracket (character ranges) are not supported: %s'
+                       % remote_uri)
+
+    if '?' in remote_uri:
+      raise ValueError(
+          'Question mark wildcards are not supported: %s' % remote_uri)
 
     if '*' in path:
       raise ValueError(
@@ -271,7 +301,7 @@ class OutputFileParamUtil(FileParamUtil):
     return docker_path, remote_uri
 
 
-def _split_pair(pair_string, separator, nullable_idx=1):
+def split_pair(pair_string, separator, nullable_idx=1):
   """Split a string into a pair, which can have one empty value.
 
   Args:
@@ -336,7 +366,7 @@ def parse_job_table_header(header, input_file_param_util,
     col_type = '--env'
     col_value = col
     if col.startswith('-'):
-      col_type, col_value = _split_pair(col, ' ', 1)
+      col_type, col_value = split_pair(col, ' ', 1)
 
     if col_type == '--env':
       job_params.append(EnvParam(col_value))
@@ -405,14 +435,14 @@ def table_to_job_data(path, input_file_param_util, output_file_param_util):
         docker_path, remote_uri = input_file_param_util.parse_uri(
             row[i], param.recursive)
         inputs.append(
-            InputFileParam(param.name, docker_path, remote_uri,
+            InputFileParam(param.name, row[i], docker_path, remote_uri,
                            param.recursive))
 
       elif isinstance(param, OutputFileParam):
         docker_path, remote_uri = output_file_param_util.parse_uri(
             row[i], param.recursive)
         outputs.append(
-            OutputFileParam(param.name, docker_path, remote_uri,
+            OutputFileParam(param.name, row[i], docker_path, remote_uri,
                             param.recursive))
 
     job_data.append({'envs': envs, 'inputs': inputs, 'outputs': outputs})
@@ -459,7 +489,7 @@ def args_to_job_data(envs, inputs, inputs_recursive, outputs, outputs_recursive,
   #   * Create the EnvParam object
   env_data = []
   for arg in envs:
-    name, value = _split_pair(arg, '=', nullable_idx=1)
+    name, value = split_pair(arg, '=', nullable_idx=1)
     env_data.append(EnvParam(name, value))
 
   # For input files, we need to:
@@ -469,13 +499,12 @@ def args_to_job_data(envs, inputs, inputs_recursive, outputs, outputs_recursive,
   input_data = []
   for (recursive, args) in ((False, inputs), (True, inputs_recursive)):
     for arg in args:
-      name, remote_uri = _split_pair(arg, '=', nullable_idx=0)
-
+      name, value = split_pair(arg, '=', nullable_idx=0)
       name = input_file_param_util.get_variable_name(name)
       docker_path, remote_uri = input_file_param_util.parse_uri(
-          remote_uri, recursive)
+          value, recursive)
       input_data.append(
-          InputFileParam(name, docker_path, remote_uri, recursive))
+          InputFileParam(name, value, docker_path, remote_uri, recursive))
 
   # For output files, we need to:
   #   * split the input into name=remote_uri pairs (name optional)
@@ -485,13 +514,13 @@ def args_to_job_data(envs, inputs, inputs_recursive, outputs, outputs_recursive,
   output_data = []
   for (recursive, args) in ((False, outputs), (True, outputs_recursive)):
     for arg in args:
-      name, remote_uri = _split_pair(arg, '=', 0)
+      name, value = split_pair(arg, '=', 0)
 
       name = output_file_param_util.get_variable_name(name)
       docker_path, remote_uri = output_file_param_util.parse_uri(
-          remote_uri, recursive)
+          value, recursive)
       output_data.append(
-          OutputFileParam(name, docker_path, remote_uri, recursive))
+          OutputFileParam(name, value, docker_path, remote_uri, recursive))
 
   return [{
       'envs': env_data,

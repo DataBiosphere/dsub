@@ -227,6 +227,10 @@ def parse_arguments():
   parser.add_argument(
       '--wait', action='store_true', help='Wait until jobs have all completed.')
   parser.add_argument(
+      '--limit',
+      type=int,
+      help='The maximum number of tasks to list. The default is unlimited.')
+  parser.add_argument(
       '-f',
       '--full',
       action='store_true',
@@ -266,7 +270,10 @@ def main():
   while some_job_running:
 
     jobs = provider.get_jobs(
-        args.status, user_list=args.users, job_list=args.jobs)
+        args.status,
+        user_list=args.users,
+        job_list=args.jobs,
+        max_jobs=args.limit)
 
     table = []
 
