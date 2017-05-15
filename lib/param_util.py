@@ -153,8 +153,8 @@ class FileParamUtil(object):
 
     # dsub could support character ranges ([0-9]) with some more work, but for
     # now we assume that basic asterisk wildcards are sufficient. Reject any URI
-    # that includes square brackets or question marks, since we know that if
-    # they actually worked, it would be accidental.
+    # that includes square brackets or question marks, since we know that
+    # if they actually worked, it would be accidental.
     if '[' in remote_uri or ']' in remote_uri:
       raise ValueError('Square bracket (character ranges) are not supported: %s'
                        % remote_uri)

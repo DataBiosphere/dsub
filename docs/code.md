@@ -41,6 +41,7 @@ as:**
 
     dsub \
         --project my-cloud-project \
+        --zones "us-central1-*" \
         --logging gs://my-bucket/logs \
         --env MESSAGE=hello \
         --command "echo ${MESSAGE}"

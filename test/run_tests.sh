@@ -17,22 +17,33 @@
 set -o errexit
 set -o nounset
 
+if [[ "${1:-}" == "--help" ]]; then
+  cat <<EOF
+USAGE:
+run_tests.sh [unit|e2e|pythonunit]
+
+This script runs all the tests (if unspecified),
+or the specified subset of the tests.
+
+The optional argument picks between:
+- unit: run test/integration/unit_*
+- e2e: run test/integration/e2e_*
+- pythonunit: run test/unit/*
+EOF
+  exit 0
+fi
+
 readonly SCRIPT_DIR="$(cd "$(dirname "${0}")"; pwd)"
 
 # Normalize the test execution environment to be the dsub root
 cd "${SCRIPT_DIR}/.."
 
-declare -a TEST_TYPES=(unit e2e)
+declare -a TEST_TYPES=(unit e2e pythonunit)
 declare -a TEST_LANGUAGES=(py sh)
 
 # User can specify test types on the command line as arg1
 if [[ $# -gt 0 ]]; then
   TEST_TYPES=(${1})
-fi
-
-# User can specify test languages on the command line as arg2
-if [[ $# -gt 1 ]]; then
-  TEST_LANGUAGES=(${2})
 fi
 
 # Build a list of file patterns for the tests, such a "e2e_*" and "unit_*"
@@ -54,7 +65,8 @@ done
 declare -a TEST_LIST
 for TEST_TYPE in "${TESTS[@]}"; do
 
-  if [[ "${TEST_TYPE}" == "unit_*.py" ]]; then
+  # Run tests in test/unit
+  if [[ "${TEST_TYPE}" == "pythonunit_*.py" ]]; then
     # for unit tests, also include the Python unit tests
     if python -m unittest discover -s test/unit/; then
       echo "Test test/unit/*: PASSED"
@@ -62,9 +74,11 @@ for TEST_TYPE in "${TESTS[@]}"; do
       echo "Test test/unit/*: FAILED"
       exit 1
     fi
+    continue
   fi
 
-  TEST_LIST=($(eval ls "${SCRIPT_DIR}/${TEST_TYPE}" 2>/dev/null || true))
+  # Run tests in test/integration
+  TEST_LIST=($(eval ls "${SCRIPT_DIR}/integration/${TEST_TYPE}" 2>/dev/null || true))
 
   if [[ -z "${TEST_LIST:-}" ]]; then
     continue
@@ -73,7 +87,7 @@ for TEST_TYPE in "${TESTS[@]}"; do
   for TEST in "${TEST_LIST[@]}"; do
     if [[ "${TEST}" == *.py ]]; then
       # Execute the test as a module, such as "python -m test.e2e_env_list"
-      python -m "test.$(basename "${TEST%.py}")"
+      python -m "test.integration.$(basename "${TEST%.py}")"
     else
       "${TEST}"
     fi
