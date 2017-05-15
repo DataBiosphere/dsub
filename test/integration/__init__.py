@@ -11,27 +11,4 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Interface for job providers."""
-
-from . import google
-from . import test_fails
-
-
-def get_provider(args):
-  """Returns a provider for job submission requests."""
-
-  provider = getattr(args, 'provider', 'google')
-
-  if provider == 'google':
-    return google.GoogleJobProvider(
-        getattr(args, 'verbose', False),
-        getattr(args, 'dry_run', False), args.project)
-  elif provider == 'test-fails':
-    return test_fails.FailsJobProvider()
-  else:
-    raise ValueError('Unknown provider: ' + provider)
-
-
-if __name__ == '__main__':
-  pass
+"""Package marker file."""

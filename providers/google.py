@@ -126,7 +126,7 @@ FAILED_PRECONDITION_STATUS = 'FAILED_PRECONDITION'
 #
 # To refresh this list:
 #   gcloud compute zones list --format='value(name)' \
-#     | sort | awk '{ printf "'\''%s'\'',\n", $1 }'
+#     | sort | awk '{ printf "    '\''%s'\'',\n", $1 }'
 _ZONES = [
     'asia-east1-a',
     'asia-east1-b',
@@ -146,6 +146,9 @@ _ZONES = [
     'us-east1-b',
     'us-east1-c',
     'us-east1-d',
+    'us-east4-a',
+    'us-east4-b',
+    'us-east4-c',
     'us-west1-a',
     'us-west1-b',
 ]

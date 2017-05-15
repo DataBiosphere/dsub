@@ -33,7 +33,7 @@ echo "Setting up test: ${TEST_NAME}"
 
 # Set up the path to dsub.py
 readonly TEST_DIR="${SCRIPT_DIR}"
-readonly DSUB_DIR="$(dirname "${SCRIPT_DIR}")"
+readonly DSUB_DIR="$(dirname "${SCRIPT_DIR}")/.."
 readonly DSUB="${DSUB_DIR}/dsub"
 
 if [[ "${TEST_NAME}" == *_table ]]; then

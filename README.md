@@ -37,6 +37,10 @@ foundation for use by the wider batch computing community.
 
         pip install --upgrade oauth2client==1.5.2 google-api-python-client python-dateutil pytz pyyaml tabulate
 
+1.  Set up Bash tab completion (optional).
+
+        source bash_tab_complete
+
 1.  Verify the installation by running:
 
         ./dsub --help
@@ -84,6 +88,7 @@ Here's the simplest example:
 
     dsub \
         --project my-cloud-project \
+        --zones "us-central1-*" \
         --logging gs://my-bucket/logs \
         --command 'echo hello'
 
@@ -104,6 +109,7 @@ You can also save your script to a file, like `hello.sh`. Then you can run:
 
     dsub \
         --project my-cloud-project \
+        --zones "us-central1-*" \
         --logging gs://my-bucket/logs \
         --script hello.sh
 
@@ -118,6 +124,7 @@ by passing the `--image` flag.
 
     dsub \
         --project my-cloud-project \
+        --zones "us-central1-*" \
         --logging gs://my-bucket/logs \
         --image ubuntu:16.04 \
         --script hello.sh
@@ -128,6 +135,7 @@ You can pass environment variables to your script using the `--env` flag.
 
     dsub \
         --project my-cloud-project \
+        --zones "us-central1-*" \
         --logging gs://my-bucket/logs \
         --env MESSAGE=hello \
         --command 'echo ${MESSAGE}'
@@ -189,6 +197,7 @@ To specify input and output files, use the `--input` and `--output` flags:
 
     dsub \
         --project my-cloud-project \
+        --zones "us-central1-*" \
         --logging gs://my-bucket/logs \
         --input INPUT_FILE=gs://my-bucket/my-input-file \
         --output OUTPUT_FILE=gs://my-bucket/my-output-file \
@@ -210,6 +219,7 @@ To copy folders rather than files, use the `--input-recursive` or
 
     dsub \
         --project my-cloud-project \
+        --zones "us-central1-*" \
         --logging gs://my-bucket/logs \
         --input-recursive FOLDER=gs://my-bucket/my-folder \
         --command 'find ${FOLDER} -name "foo*"'

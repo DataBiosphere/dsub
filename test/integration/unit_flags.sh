@@ -163,7 +163,9 @@ function test_zones_multi_regional() {
     # Check that the output contains expected values
     local idx=0
     for zone in us-central1-a us-central1-b us-central1-c us-central1-f \
-                us-east1-b us-east1-c us-east1-d us-west1-a us-west1-b; do
+                us-east1-b us-east1-c us-east1-d \
+                us-east4-a us-east4-b us-east4-c \
+                us-west1-a us-west1-b; do
       assert_err_value_equals \
         "[0].ephemeralPipeline.resources.zones.[${idx}]" ${zone}
 

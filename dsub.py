@@ -151,77 +151,49 @@ def parse_arguments(prog, argv):
   Returns:
     A Namespace of parsed arguments.
   """
+
+  provider_required_args = {
+      'google': ['project', 'zones', 'logging'],
+      'test-fails': []
+  }
+  epilog = 'Provider-required arguments:\n'
+  for provider in provider_required_args:
+    epilog += '  %s: %s\n' % (provider, provider_required_args[provider])
   parser = argparse.ArgumentParser(
-      prog=prog, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  parser.add_argument(
-      '--project',
-      required=True,
-      help='Cloud project ID in which to run the pipeline')
-  parser.add_argument(
-      '--logging',
-      required=True,
-      help='Cloud Storage path to send logging output')
+      prog=prog,
+      formatter_class=argparse.RawDescriptionHelpFormatter,
+      epilog=epilog)
+
+  # Add dsub core job submission arguments
   parser.add_argument(
       '--name',
-      help='Name for pipeline. Defaults to the script name or'
-      'first token of the --command if specified.')
-  parser.add_argument(
-      '--min-cores', default=1, type=int, help='Minimum CPU cores for each job')
-  parser.add_argument(
-      '--min-ram', default=3.75, type=float, help='Minimum RAM per job in GB')
-  parser.add_argument(
-      '--disk-size',
-      default=200,
-      type=int,
-      help='Size (in GB) of data disk to attach for each job')
-  parser.add_argument(
-      '--boot-disk-size',
-      default=10,
-      type=int,
-      help='Size (in GB) of the boot disk')
-  parser.add_argument(
-      '--preemptible',
-      default=False,
-      action='store_true',
-      help='Use a preemptible VM for the job')
-  parser.add_argument(
-      '--zones',
-      default=None,
-      required=True,
-      nargs='+',
-      help='List of Google Compute Engine zones.')
+      help="""Name for pipeline. Defaults to the script name or
+      first token of the --command if specified.""")
   parser.add_argument(
       '--table',
       default=None,
-      help='Path to TSV of job parameters. Each column'
-      ' specifies an environment variable to set in each'
-      ' jobs\'s parent shell, and each row specifies the values'
-      ' of those variables for each job.')
+      help="""Path to TSV of job parameters. Each column
+      specifies an environment variable to set in each
+      jobs's parent shell, and each row specifies the values
+      of those variables for each job.""")
   parser.add_argument(
       '--image',
       default='ubuntu:14.04',
-      help='Image name from Docker Hub, Google Container Repository, or other'
-      ' Docker image service. The pipeline must have READ access to the image.')
-  parser.add_argument(
-      '--scopes',
-      default=DEFAULT_SCOPES,
-      nargs='+',
-      help='Space-separated scopes for GCE instances.')
+      help="""Image name from Docker Hub, Google Container Repository, or other
+      Docker image service. The pipeline must have READ access to the image.""")
   parser.add_argument(
       '--dry-run',
       default=False,
       action='store_true',
       help='Print the pipeline(s) that would be run and then exit.')
   parser.add_argument(
-      '--wait',
-      action='store_true',
-      help='Wait for the job to finish all its tasks.')
+      '--command',
+      help='Command to run inside the job\'s Docker container',
+      metavar='COMMAND')
   parser.add_argument(
-      '--poll-interval',
-      default=10,
-      type=int,
-      help='Polling interval (in seconds) for checking job status '
-      'when --wait or --after are set.')
+      '--script',
+      help='Local path to a script to run inside the job\'s Docker container.',
+      metavar='SCRIPT')
   parser.add_argument(
       '--env',
       nargs='*',
@@ -234,55 +206,117 @@ def parse_arguments(prog, argv):
       nargs='*',
       action=ListParamAction,
       default=[],
-      help='Input path arguments to localize into the script\'s execution'
-      ' environment',
+      help="""Input path arguments to localize into the script's execution
+      environment""",
       metavar='KEY=REMOTE_PATH')
   parser.add_argument(
       '--input-recursive',
       nargs='*',
       action=ListParamAction,
       default=[],
-      help='Input path arguments to localize recursively into the script\'s'
-      ' execution environment',
+      help="""Input path arguments to localize recursively into the script's
+      execution environment""",
       metavar='KEY=REMOTE_PATH')
   parser.add_argument(
       '--output',
       nargs='*',
       action=ListParamAction,
       default=[],
-      help='Output path arguments to de-localize from the script\'s execution'
-      ' environment',
+      help="""Output path arguments to de-localize from the script's execution
+      environment""",
       metavar='KEY=REMOTE_PATH')
   parser.add_argument(
       '--output-recursive',
       nargs='*',
       action=ListParamAction,
       default=[],
-      help='Output path arguments to de-localize recursively from the script\'s'
-      ' execution environment',
+      help="""Output path arguments to de-localize recursively from the script's
+      execution environment""",
       metavar='KEY=REMOTE_PATH')
+
+  # Add dsub job management arguments
+  parser.add_argument(
+      '--wait',
+      action='store_true',
+      help='Wait for the job to finish all its tasks.')
+  parser.add_argument(
+      '--poll-interval',
+      default=10,
+      type=int,
+      help='Polling interval (in seconds) for checking job status '
+      'when --wait or --after are set.')
   parser.add_argument(
       '--after',
       nargs='+',
       default=[],
       help='Job ID(s) to wait for before starting this job.')
   parser.add_argument(
-      '--command',
-      help='Command to run inside the job\'s Docker container',
-      metavar='COMMAND')
-  parser.add_argument(
-      '--script',
-      help='Local path to a script to run inside the job\'s Docker container.',
-      metavar='SCRIPT')
-  parser.add_argument(
       '--skip',
       default=False,
       action='store_true',
-      help='Do not submit the job if all output specified using the --output '
-      'and --output-recursive parameters already exist. Note that wildcard '
-      'and recursive outputs cannot be strictly verified. See the '
-      'documentation for details.')
-  return parser.parse_args(argv)
+      help="""Do not submit the job if all output specified using the --output
+      and --output-recursive parameters already exist. Note that wildcard
+      and recursive outputs cannot be strictly verified. See the
+      documentation for details.""")
+
+  # Add dsub resource requirement arguments
+  parser.add_argument(
+      '--min-cores', default=1, type=int, help='Minimum CPU cores for each job')
+  parser.add_argument(
+      '--min-ram', default=3.75, type=float, help='Minimum RAM per job in GB')
+  parser.add_argument(
+      '--disk-size',
+      default=200,
+      type=int,
+      help='Size (in GB) of data disk to attach for each job')
+
+  # Add provider-specific arguments
+  parser.add_argument(
+      '--provider',
+      default='google',
+      choices=['google', 'test-fails'],
+      help="""Service to submit jobs to. Currently the only valid values are
+      "google" to submit to Google's Pipeline API, or "test-fails" for a
+      test provider that always fails.""",
+      metavar='PROVIDER')
+  google = parser.add_argument_group(
+      title='google',
+      description='Options for '
+      'the Google provider (Pipelines API)')
+  google.add_argument(
+      '--project',
+      default=None,
+      help='Cloud project ID in which to run the pipeline')
+  google.add_argument(
+      '--logging', help='Cloud Storage path to send logging output')
+  google.add_argument(
+      '--boot-disk-size',
+      default=10,
+      type=int,
+      help='Size (in GB) of the boot disk')
+  google.add_argument(
+      '--preemptible',
+      default=False,
+      action='store_true',
+      help='Use a preemptible VM for the job')
+  google.add_argument(
+      '--zones',
+      default=None,
+      nargs='+',
+      help='List of Google Compute Engine zones.')
+  google.add_argument(
+      '--scopes',
+      default=DEFAULT_SCOPES,
+      nargs='+',
+      help='Space-separated scopes for GCE instances.')
+
+  args = parser.parse_args(argv)
+
+  # check special flag rules
+  for arg in provider_required_args[args.provider]:
+    if not args.__getattribute__(arg):
+      parser.error('argument --%s is required' % arg)
+  return args
 
 
 def get_job_resources(args):

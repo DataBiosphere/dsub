@@ -6,10 +6,10 @@ set -o nounset
 if [[ "${1:-}" == "--help" ]]; then
   cat <<EOF
 USAGE:
-  $0 [unit|e2e]
+  $0 [unit|e2e|pythonunit]
 
 Sets up a virtualenv named dsub_libs in the current working directory and runs
-the (fast) unit and/or (slow) e2e tests (runs both if unspecified).
+the specified tests (or all if none is specified).
 If the virtualenv already exists, will install the dependent dsub libraries into it.
 EOF
   exit 0
