@@ -14,7 +14,7 @@
 
 """Test calling dsub from python with TSV-file inputs.
 
-This test is a copy of the e2e_io_table.sh test with additional checks
+This test is a copy of the e2e_io_tasks.sh test with additional checks
 on the objects returned by dsub.call().
 """
 
@@ -34,7 +34,7 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
       '--logging', test.LOGGING,
       '--zones', 'us-central1-*',
       '--script', '%s/script_io_test.sh' % test.TEST_DIR,
-      '--table', test.TABLE_FILE,
+      '--tasks', test.TASKS_FILE,
       '--wait'])
   # pyformat: enable
 
@@ -75,10 +75,9 @@ for i in range(len(INPUT_BAMS)):
   INPUT_BAM = INPUT_BAMS[i]
   RESULT_EXPECTED = RESULTS_EXPECTED[i]
 
-  OUTPUT_PATH = test_util.get_field_from_tsv(test.TABLE_FILE,
-                                             '--input INPUT_PATH',
-                                             r'^.*/%s$' % INPUT_BAM,
-                                             '--output OUTPUT_PATH')
+  OUTPUT_PATH = test_util.get_field_from_tsv(
+      test.TASKS_FILE, '--input INPUT_PATH', r'^.*/%s$' % INPUT_BAM,
+      '--output OUTPUT_PATH')
   OUTPUT_FILE = '%s/%s.md5' % (OUTPUT_PATH[:-len('/*.md5')], INPUT_BAM)
   RESULT = test_util.gsutil_cat(OUTPUT_FILE)
 

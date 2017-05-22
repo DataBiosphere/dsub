@@ -66,5 +66,5 @@ echo
   --disk-size 200 \
   --image "${IMAGE}" \
   --script "${SCRIPT}" \
-  --table "${SCRIPT_DIR}"/submit_list.tsv \
+  --tasks "${SCRIPT_DIR}"/submit_list.tsv \
   --wait

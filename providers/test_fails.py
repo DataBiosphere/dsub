@@ -57,8 +57,8 @@ class FailsJobProvider(object):
     del jobs  # doesn't matter either
     return ["Fail provider never completes a job"]
 
-  def get_job_metadata(self, script, pipeline_name, user_id, is_table):
-    del script, pipeline_name, user_id, is_table  # all the same
+  def get_job_metadata(self, script, pipeline_name, user_id):
+    del script, pipeline_name, user_id  # all the same
     return {"job-id": "DOOMED_JOB"}
 
 

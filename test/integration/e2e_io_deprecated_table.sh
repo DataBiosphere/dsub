@@ -22,8 +22,7 @@ set -o nounset
 # This test use the default stock image (ubuntu:14.04).
 #
 # This test is designed to verify that file input and output path
-# headers in a table file work correctly. The difference from e2e_io_table.sh
-# is this test loads the parameter table (tsv) from gcs.
+# headers in a table file work correctly.
 #
 # The actual operation performed here is to download a BAM and compute
 # the md5, writing it to <filename>.bam.md5.
@@ -34,16 +33,19 @@ set -o nounset
 # of the default data directory.
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
-readonly TABLE_FILE_TMPL_NAME="io_table"
 
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+readonly TABLE_FILE_TMPL="${TEST_DIR}/io_tasks.tsv.tmpl"
+readonly TABLE_FILE="${TEST_DIR}/${TEST_NAME}.tsv"
 
-  # Copy the TABLE_FILE to gcs to test loading table from gcs.
-  echo "Copying table file to ${DSUB_PARAMS}"
-  gsutil cp "${TABLE_FILE}" "${DSUB_PARAMS}/"
+echo "Setting up task file ${TABLE_FILE}"
+cat "${TABLE_FILE_TMPL}" \
+  | util::expand_tsv_fields \
+  > "${TABLE_FILE}"
+
+if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipelines..."
 
@@ -52,7 +54,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --logging "${LOGGING}" \
     --zones "us-central1-*" \
     --script "${SCRIPT_DIR}/script_io_test.sh" \
-    --table "${DSUB_PARAMS}/$(basename "${TABLE_FILE}")" \
+    --table "${TABLE_FILE}" \
     --wait
 
 fi
@@ -91,8 +93,5 @@ for ((i=0; i < ${#INPUT_BAMS[@]}; i++)); do
   echo "${RESULT}"
   echo "*****************************"
 done
-
-# Clean up what we uploaded after the test is done.
-gsutil rm "${DSUB_PARAMS}"/**
 
 echo "SUCCESS"

@@ -20,24 +20,24 @@ set -o nounset
 # unit_test_job_metadata.sh
 #
 # Simple unit tests to verify the labels that get set in the pipeline
-# for a table job, such as "job-name", "user-id", "job-id", and "task-id".
+# for a tasks job, such as "job-name", "user-id", "job-id", and "task-id".
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_unit.sh"
 
-# Define a utility routine for running the label + table test
+# Define a utility routine for running the label + tasks test
 
 function run_dsub() {
-  local table="${1}"
+  local tasks="${1}"
 
   "${DSUB}" \
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
     --zones "${ZONE}" \
     --script "${SCRIPT}" \
-    --table "${table}" \
+    --tasks "${tasks}" \
     --dry-run \
     1> "${TEST_STDOUT}" \
     2> "${TEST_STDERR}"

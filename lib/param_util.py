@@ -111,11 +111,11 @@ class OutputFileParam(FileParam):
 
 
 class FileParamUtil(object):
-  """Base class helper for producing FileParams from args or a table file.
+  """Base class helper for producing FileParams from args or a tasks file.
 
   InputFileParams and OutputFileParams can be produced from either arguments
-  passed on the command-line or as a combination of the definition in the table
-  header plus cell values in table records.
+  passed on the command-line or as a combination of the definition in the tasks
+  file header plus cell values in task records.
 
   This class encapsulates the generation of the FileParam name, if none is
   specified (get_variable_name()) as well as common path validation for
@@ -329,9 +329,9 @@ def split_pair(pair_string, separator, nullable_idx=1):
     return pair
 
 
-def parse_job_table_header(header, input_file_param_util,
-                           output_file_param_util):
-  """Parse the first row of the job table into env, input, output definitions.
+def parse_tasks_file_header(header, input_file_param_util,
+                            output_file_param_util):
+  """Parse the header from the tasks file into env, input, output definitions.
 
   Elements are formatted similar to their equivalent command-line arguments,
   but with associated values coming from the data rows.
@@ -344,7 +344,7 @@ def parse_job_table_header(header, input_file_param_util,
   equivalent to "--env var_name".
 
   Args:
-    header: The first row of the tab-delimited jobs table file.
+    header: Array of header fields
     input_file_param_util: Utility for producing InputFileParam objects.
     output_file_param_util: Utility for producing OutputFileParam objects.
 
@@ -357,9 +357,7 @@ def parse_job_table_header(header, input_file_param_util,
   """
   job_params = []
 
-  # Tokenize the header line and process each field
-  header_columns = header.split('\t')
-  for col in header_columns:
+  for col in header:
 
     # Reserve the "-" and "--" namespace.
     # If the column has no leading "-", treat it as an environment variable
@@ -387,11 +385,12 @@ def parse_job_table_header(header, input_file_param_util,
   return job_params
 
 
-def table_to_job_data(path, input_file_param_util, output_file_param_util):
-  """Parses a table of parameters from a TSV.
+def tasks_file_to_job_data(tasks, input_file_param_util,
+                           output_file_param_util):
+  """Parses task parameters from a TSV.
 
   Args:
-    path: Path to a TSV file with the first line specifying the environment
+    tasks: Dict containing the path to a TSV file and task numbers to run
     variables, input, and output parameters as column headings. Subsequent
     lines specify parameter values, one row per job.
     input_file_param_util: Utility for producing InputFileParam objects.
@@ -407,16 +406,29 @@ def table_to_job_data(path, input_file_param_util, output_file_param_util):
   """
   job_data = []
 
-  param_file = dsub_util.load_file(path)
+  path = tasks['path']
+  task_min = tasks.get('min')
+  task_max = tasks.get('max')
 
-  # Read the first line and extract the fieldnames
-  header = param_file.readline().rstrip()
-  job_params = parse_job_table_header(header, input_file_param_util,
-                                      output_file_param_util)
+  # Load the file and set up a Reader that tokenizes the fields
+  param_file = dsub_util.load_file(path)
   reader = csv.reader(param_file, delimiter='\t')
 
-  # Build a list of records from the parsed input table
+  # Read the first line and extract the parameters
+  header = reader.next()
+  job_params = parse_tasks_file_header(header, input_file_param_util,
+                                       output_file_param_util)
+
+  # Build a list of records from the parsed input file
   for row in reader:
+    # Tasks are numbered starting at 1 and since the first line of the TSV
+    # file is a header, the first task appears on line 2.
+    task_id = reader.line_num - 1
+    if task_min and task_id < task_min:
+      continue
+    if task_max and task_id > task_max:
+      continue
+
     if len(row) != len(job_params):
       dsub_util.print_error('Unexpected number of fields %s vs %s: line %s' %
                             (len(row), len(job_params), reader.line_num))
@@ -445,11 +457,16 @@ def table_to_job_data(path, input_file_param_util, output_file_param_util):
             OutputFileParam(param.name, row[i], docker_path, remote_uri,
                             param.recursive))
 
-    job_data.append({'envs': envs, 'inputs': inputs, 'outputs': outputs})
+    job_data.append({
+        'task_id': task_id,
+        'envs': envs,
+        'inputs': inputs,
+        'outputs': outputs
+    })
 
   # Ensure that there are jobs to execute (and not just a header)
   if not job_data:
-    raise ValueError('No jobs found in %s' % path)
+    raise ValueError('No tasks added from %s' % path)
 
   return job_data
 

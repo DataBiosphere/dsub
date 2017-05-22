@@ -42,7 +42,7 @@ readonly DSUB_DIR="${SCRIPT_DIR}/../.."
   --logging "${MY_BUCKET}/decompress_list/logging/" \
   --disk-size 200 \
   --image ubuntu:14.04 \
-  --table "${SCRIPT_DIR}"/submit_list.tsv \
+  --tasks "${SCRIPT_DIR}"/submit_list.tsv \
   --command 'gunzip ${INPUT_VCF} && \
              mv ${INPUT_VCF%.gz} $(dirname ${OUTPUT_VCF})' \
   --wait

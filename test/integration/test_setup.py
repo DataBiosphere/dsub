@@ -21,7 +21,7 @@
 #
 # * Set the TEST_NAME based on the name of the calling script.
 # * Set variables for TEST_DIR.
-# * For table tests, set TABLE_FILE and TABLE_FILE_TMPL.
+# * For task file tests, set TASKS_FILE and TASKS_FILE_TMPL.
 # * Set the TEST_TEMP variable for a temporary directory.
 
 import os
@@ -36,11 +36,11 @@ print 'Setting up test: %s' % TEST_NAME
 # Set up the path to dsub.py
 TEST_DIR = os.path.dirname(sys.argv[0])
 
-if TEST_NAME.endswith('_table'):
-  TABLE_FILE_TMPL = '%s/%s.tsv.tmpl' % (TEST_DIR, TEST_NAME)
-  TABLE_FILE = '%s/%s.tsv' % (TEST_DIR, TEST_NAME)
+if TEST_NAME.endswith('_tasks'):
+  TASKS_FILE_TMPL = '%s/%s.tsv.tmpl' % (TEST_DIR, TEST_NAME)
+  TASKS_FILE = '%s/%s.tsv' % (TEST_DIR, TEST_NAME)
 else:
-  TABLE_FILE_TMPL = None
-  TABLE_FILE = None
+  TASKS_FILE_TMPL = None
+  TASKS_FILE = None
 
 TEST_TEMP = '%s/%s' % (TEST_DIR, '_tmp')

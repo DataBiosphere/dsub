@@ -24,14 +24,14 @@
 #
 # * Automatically set environment variables:
 #   * LOGGING=gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/logging/
-#     (table tests)
+#     (task file tests)
 #   * LOGGING=gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/logging/${TEST_NAME}.log
-#     (non-table tests)
+#     (non-task file tests)
 #   * INPUTS=gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/input
 #   * OUTPUTS=gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/output
 #
 # * Check if LOGGING, INPUTS, and OUTPUTS are empty.
-# * For table tests, generate the file from TABLE_FILE_TMPL.
+# * For task file tests, generate the file from TASKS_FILE_TMPL.
 
 source "${SCRIPT_DIR}/test_util.sh"
 source "${SCRIPT_DIR}/test_setup.sh"
@@ -78,8 +78,8 @@ fi
 readonly TEST_REMOTE_ROOT="gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}"
 readonly TEST_DOCKER_ROOT="gs/${DSUB_BUCKET}/dsub/sh/${TEST_NAME}"
 
-if [[ -n "${TABLE_FILE:-}" ]]; then
-  # For table-based tests, the logging path is a directory.
+if [[ -n "${TASKS_FILE:-}" ]]; then
+  # For task file tests, the logging path is a directory.
   # Eventually each job should have its own sub-directory,
   # and named logging files but we need to add dsub support for that.
   readonly LOGGING="${TEST_REMOTE_ROOT}/${TEST_NAME}/logging"
@@ -113,11 +113,11 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
 fi
 
-if [[ -n "${TABLE_FILE:-}" ]]; then
-  # For a table test, set up the table file from its template
+if [[ -n "${TASKS_FILE:-}" ]]; then
+  # For a task file test, set up the task file from its template
   # This should really be a feature of dsub directly...
-  echo "Setting up table file ${TABLE_FILE}"
-  cat "${TABLE_FILE_TMPL}" \
+  echo "Setting up task file ${TASKS_FILE}"
+  cat "${TASKS_FILE_TMPL}" \
     | util::expand_tsv_fields \
-    > "${TABLE_FILE}"
+    > "${TASKS_FILE}"
 fi

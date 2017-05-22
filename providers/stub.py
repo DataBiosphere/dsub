@@ -55,8 +55,8 @@ class StubJobProvider(object):
   #    Meant to be called by the code under test, they rely on the fake
   #    state set via group (2) above.
 
-  def get_job_metadata(self, script, pipeline_name, user_id, is_table):
-    del script, pipeline_name, user_id, is_table  # pacify linter
+  def get_job_metadata(self, script, pipeline_name, user_id):
+    del script, pipeline_name, user_id  # pacify linter
     raise BaseException('Not implemented')
 
   def get_jobs(self,

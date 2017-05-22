@@ -258,7 +258,29 @@ the names of environment variables. This example is equivalent to the previous:
 
     SAMPLE_ID<tab>--input VCF_FILE<tab>--output OUTPUT_PATH
 
-Then pass this file to dsub using the `--table` parameter.
+Then pass this file to dsub using the `--tasks` parameter. This parameter
+accepts both a file name and optionally a range of tasks to process.
+
+For example, suppose `my-tasks.tsv` contains 101 lines: a one-line header and
+100 lines of parameters for tasks to run. Then:
+
+```
+dsub ... --tasks ./my-tasks.tsv
+```
+
+will create a job with 100 tasks, while:
+
+```
+dsub ... --tasks ./my-tasks.tsv 1-10
+```
+
+will create a job with 10 tasks, one for each of lines 2 through 11.
+
+The task range values can take any of the following forms:
+
+*   `m` indicates to submit task `m` (line m+1)
+*   `m-` indicates to submit all tasks starting with task `m`
+*   `m-n` indicates to submit all tasks from `m` to `n` (inclusive).
 
 ### Job control
 
@@ -284,15 +306,14 @@ Each job submitted by dsub is given a set of metadata values that can be
 used for job identification and job control. The metadata associated with
 each job includes:
 
-* `job-name`: defaults to the name of your script file or the first word of
-  your script command; it can be explicitly set
-  with the `--name` parameter.
-* `user-id`: the `USER` environment variable value.
-* `job-id`: takes the form `job-name--userid--timestamp` where the
-  `job-name` is truncated at 10 characters and the `timestamp` is of the form
-  `YYMMDD-HHMMSS-XX`, unique to hundredths of a second.
-* `task-id`: if the job is a "table job", each task gets a sequential value
-  of the form "task-*n*" where *n* is 1-based.
+*   `job-name`: defaults to the name of your script file or the first word of
+    your script command; it can be explicitly set with the `--name` parameter.
+*   `user-id`: the `USER` environment variable value.
+*   `job-id`: takes the form `job-name--userid--timestamp` where the `job-name`
+    is truncated at 10 characters and the `timestamp` is of the form
+    `YYMMDD-HHMMSS-XX`, unique to hundredths of a second.
+*   `task-id`: if the job is submitted with the `--tasks` parameter, each task
+    gets a sequential value of the form "task-*n*" where *n* is 1-based.
 
 Metadata can be used to cancel a job or individual tasks within a batch job.
 

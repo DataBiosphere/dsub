@@ -112,6 +112,9 @@ def main(json_string, field):
         print >> sys.stderr, 'Key: %s' % key
         print >> sys.stderr, 'Value: %s' % curr
 
+      if idx >= len(curr):
+        sys.exit(1)
+
       curr = curr[idx]
       continue
 

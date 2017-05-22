@@ -42,12 +42,12 @@ def diff(str1, str2):
   return same
 
 
-def expand_tsv_fields(newenv, tmpl_file, table_file):
-  """Write a table file, expanding environment variables in the template."""
+def expand_tsv_fields(newenv, tmpl_file, tsv_file):
+  """Write a TSV file, expanding environment variables in the template."""
   with open(tmpl_file, 'r') as f:
     input_lines = f.readlines()
 
-  with open(table_file, 'w') as f:
+  with open(tsv_file, 'w') as f:
     # Emit the header line unchanged
     f.write(input_lines[0])
 

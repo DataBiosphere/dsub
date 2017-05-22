@@ -23,14 +23,14 @@
 #
 # * Automatically set environment variables:
 #   * LOGGING=gs://${DSUB_BUCKET}/dsub/py/${TEST_NAME}/logging/
-#     (table tests)
+#     (task file tests)
 #   * LOGGING=gs://${DSUB_BUCKET}/dsub/py/${TEST_NAME}/logging/${TEST_NAME}.log
-#     (non-table tests)
+#     (non-task file tests)
 #   * INPUTS=gs://${DSUB_BUCKET}/dsub/py/${TEST_NAME}/input
 #   * OUTPUTS=gs://${DSUB_BUCKET}/dsub/py/${TEST_NAME}/output
 #
 # * Check if LOGGING, INPUTS, and OUTPUTS are empty.
-# * For table tests, generate the file from TABLE_FILE_TMPL.
+# * For task file tests, generate the file from TASKS_FILE_TMPL.
 
 import os
 import subprocess
@@ -39,8 +39,8 @@ import sys
 import test_setup
 import test_util
 
-TEST_VARS = ("TEST_NAME", "TEST_DIR", "TEST_TEMP", "TABLE_FILE",
-             "TABLE_FILE_TMPL",)
+TEST_VARS = ("TEST_NAME", "TEST_DIR", "TEST_TEMP", "TASKS_FILE",
+             "TASKS_FILE_TMPL",)
 TEST_E2E_VARS = ("PROJECT_ID", "DSUB_BUCKET", "LOGGING", "INPUTS", "OUTPUTS",
                  "DOCKER_INPUTS", "DOCKER_OUTPUTS",)
 
@@ -58,8 +58,8 @@ def _environ():
 TEST_NAME = test_setup.TEST_NAME
 TEST_DIR = test_setup.TEST_DIR
 TEST_TEMP = test_setup.TEST_TEMP
-TABLE_FILE = test_setup.TABLE_FILE
-TABLE_FILE_TMPL = test_setup.TABLE_FILE_TMPL
+TASKS_FILE = test_setup.TASKS_FILE
+TASKS_FILE_TMPL = test_setup.TASKS_FILE_TMPL
 
 print "Checking that required environment values are set:"
 
@@ -95,8 +95,8 @@ if not test_util.gsutil_ls_check("gs://%s" % DSUB_BUCKET):
 TEST_REMOTE_ROOT = "gs://%s/dsub/py/%s" % (DSUB_BUCKET, TEST_NAME)
 TEST_DOCKER_ROOT = "gs/%s/dsub/py/%s" % (DSUB_BUCKET, TEST_NAME)
 
-if TABLE_FILE:
-  # For table-based tests, the logging path is a directory.
+if TASKS_FILE:
+  # For task file tests, the logging path is a directory.
   # Eventually each job should have its own sub-directory,
   # and named logging files but we need to add dsub support for that.
   LOGGING = "%s/logging" % TEST_REMOTE_ROOT
@@ -125,8 +125,8 @@ if not os.environ.get("CHECK_RESULTS_ONLY"):
         TEST_REMOTE_ROOT)
     sys.exit(1)
 
-if TABLE_FILE:
-  # For a table test, set up the table file from its template
+if TASKS_FILE:
+  # For a task file test, set up the task file from its template
   # This should really be a feature of dsub directly...
-  print "Setting up table file %s" % TABLE_FILE
-  test_util.expand_tsv_fields(_environ(), TABLE_FILE_TMPL, TABLE_FILE)
+  print "Setting up task file %s" % TASKS_FILE
+  test_util.expand_tsv_fields(_environ(), TASKS_FILE_TMPL, TASKS_FILE)

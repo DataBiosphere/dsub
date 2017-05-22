@@ -124,7 +124,7 @@ output file name.
   --image ubuntu:14.04 \
   --command 'gunzip ${INPUT_VCF} && \
              mv ${INPUT_VCF%.gz} $(dirname ${OUTPUT_VCF})' \
-  --table submit_list.tsv \
+  --tasks submit_list.tsv \
   --wait
 ```
 

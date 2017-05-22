@@ -21,7 +21,7 @@
 #
 # * Set the TEST_NAME based on the name of the calling script.
 # * Set variables for TEST_DIR, DSUB_DIR, and DSUB.
-# * For table tests, set TABLE_FILE and TABLE_FILE_TMPL.
+# * For task file tests, set TASKS_FILE and TASKS_FILE_TMPL.
 # * Set the TEST_TEMP variable for a temporary directory.
 
 # Compute the name of the test from the calling script
@@ -36,9 +36,9 @@ readonly TEST_DIR="${SCRIPT_DIR}"
 readonly DSUB_DIR="$(dirname "${SCRIPT_DIR}")/.."
 readonly DSUB="${DSUB_DIR}/dsub"
 
-if [[ "${TEST_NAME}" == *_table ]]; then
-  readonly TABLE_FILE_TMPL="${TEST_DIR}/${TABLE_FILE_TMPL_NAME:-${TEST_NAME}}.tsv.tmpl"
-  readonly TABLE_FILE="${TEST_DIR}/${TEST_NAME}.tsv"
+if [[ "${TEST_NAME}" == *_tasks ]]; then
+  readonly TASKS_FILE_TMPL="${TEST_DIR}/${TASKS_FILE_TMPL_NAME:-${TEST_NAME}}.tsv.tmpl"
+  readonly TASKS_FILE="${TEST_DIR}/${TEST_NAME}.tsv"
 fi
 
 readonly TEST_TEMP=${TEST_DIR}/_tmp
