@@ -222,7 +222,7 @@ Run either of the following commands:
   --disk-size 200 \
   --image ubuntu:14.04 \
   --script ./examples/custom_scripts/get_vcf_sample_ids.sh \
-  --table submit_list.tsv \
+  --tasks submit_list.tsv \
   --wait
 ```
 
@@ -234,7 +234,7 @@ Run either of the following commands:
   --disk-size 200 \
   --image python:2.7 \
   --script ./examples/custom_scripts/get_vcf_sample_ids.py \
-  --table submit_list.tsv \
+  --tasks submit_list.tsv \
   --wait
 ```
 

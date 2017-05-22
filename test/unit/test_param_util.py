@@ -37,11 +37,12 @@ class ParamUtilTest(unittest.TestCase):
     self.assertEqual('my_remote_uri', file_param.remote_uri)
     self.assertTrue(file_param.recursive)
 
-  def testParseJobTableHeader(self):
+  def testParseTasksFileHeader(self):
     header = '--env SAMPLE_ID\t--input VCF_FILE\t--output-recursive OUTPUT_PATH'
+    header = header.split('\t')
     input_file_param_util = param_util.InputFileParamUtil('input')
     output_file_param_util = param_util.OutputFileParamUtil('output')
-    job_params = param_util.parse_job_table_header(
+    job_params = param_util.parse_tasks_file_header(
         header, input_file_param_util, output_file_param_util)
     self.assertEqual(3, len(job_params))
 
@@ -57,12 +58,13 @@ class ParamUtilTest(unittest.TestCase):
     self.assertEqual('OUTPUT_PATH', job_params[2].name)
     self.assertTrue(job_params[2].recursive)
 
-  def testTableToJobData(self):
-    expected_tsv_file = 'test/testdata/params_table.tsv'
+  def testTasksFileToJobData(self):
+    expected_tsv_file = 'test/testdata/params_tasks.tsv'
     input_file_param_util = param_util.InputFileParamUtil('input')
     output_file_param_util = param_util.OutputFileParamUtil('output')
-    all_job_data = param_util.table_to_job_data(
-        expected_tsv_file, input_file_param_util, output_file_param_util)
+    all_job_data = param_util.tasks_file_to_job_data({
+        'path': expected_tsv_file
+    }, input_file_param_util, output_file_param_util)
     self.assertEqual(4, len(all_job_data))
 
     for i in range(4):

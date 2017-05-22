@@ -23,7 +23,7 @@ from lib import dsub_util
 class TestDsubUtil(unittest.TestCase):
 
   def testLoadFile(self):
-    tsv_file = 'test/testdata/params_table.tsv'
+    tsv_file = 'test/testdata/params_tasks.tsv'
     self.assertTrue(dsub_util.load_file(tsv_file))
 
 

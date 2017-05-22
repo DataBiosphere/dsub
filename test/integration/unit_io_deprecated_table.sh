@@ -43,6 +43,15 @@ function run_dsub() {
 }
 readonly -f run_dsub
 
+function check_deprecation_warning() {
+  assert_err_contains \
+    "The --table flag is deprecated. Use the --tasks argument instead."
+
+  # Remove the deprecation warning from stderr for downstream output checks
+  sed -i '1 d' "${TEST_STDERR}"
+}
+readonly -f check_deprecation_warning
+
 # Define tests
 
 function test_input_file() {
@@ -59,6 +68,7 @@ gs://bucket2/path1\tgs://bucket2/path2
 '
 
   if run_dsub "${tsv_file}"; then
+    check_deprecation_warning
 
     # Check that the output contains expected paths
 
@@ -95,6 +105,7 @@ gs://bucket2/path1\tgs://bucket2/path2
 '
 
   if run_dsub "${tsv_file}"; then
+    check_deprecation_warning
 
     # Check that the output contains expected paths
 
@@ -131,6 +142,7 @@ gs://bucket2/path1\tgs://bucket2/path2
 '
 
   if run_dsub "${tsv_file}"; then
+    check_deprecation_warning
 
     # Check that the output contains expected paths
 
@@ -167,6 +179,7 @@ gs://bucket2/path1\tgs://bucket2/path2
 '
 
   if run_dsub "${tsv_file}"; then
+    check_deprecation_warning
 
     # Check that the output contains expected paths
 
@@ -203,6 +216,7 @@ gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
 '
 
   if run_dsub "${tsv_file}"; then
+    check_deprecation_warning
 
     # A direct export of an environment variable for INPUT_PATH_DEEP
     # should be created in the docker command instead of a pipelines
@@ -247,6 +261,7 @@ gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
 '
 
   if run_dsub "${tsv_file}"; then
+    check_deprecation_warning
 
     # A direct export of an environment variable for OUTPUT_PATH_DEEP
     # should be created in the docker command instead of a pipelines

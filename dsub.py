@@ -98,7 +98,7 @@ NO_JOB = 'NO_JOB'
 #
 #   --output gs://bucket/path/sample.bam.bai
 #
-# Similar functionality is available in the header row of a TSV table file:
+# Similar functionality is available in the header row of a TSV file:
 #
 #   --input
 #   --input VAR
@@ -140,6 +140,62 @@ class ListParamAction(argparse.Action):
     setattr(namespace, self.dest, params)
 
 
+class TaskParamAction(argparse.Action):
+  """Parse the task flag value into a dict."""
+
+  def __init__(self, option_strings, dest, **kwargs):
+    super(TaskParamAction, self).__init__(option_strings, dest, **kwargs)
+
+  def __call__(self, parser, namespace, values, option_string=None):
+    # Input should contain one or two space-separated tokens:
+    #
+    # * a file path (required)
+    # * a numeric range (optional)
+    #
+    # The numeric range can be any of:
+    #
+    #   m, m-, m-n
+    #
+    # There is no support for "-n" notation. If we were to add it, we'd need
+    # to define its meaning ("tasks 1 through n" or "last n tasks"?) and
+    # to require the entire parameter value to be quoted as the bare-word "-n"
+    # would be parsed by the argument parser as a new flag.
+    #
+    # Inputs are turned into a dict:
+    #   { 'path': path, 'task_min': m, 'task_max': n }
+    #
+    # We always set both min and max.
+    # If one of the values is not provided, set it to None.
+    # If a single value (not a range) is provided, then min == max
+
+    if len(values) > 2:
+      raise ValueError('More than 2 arguments passed to --%s' % self.dest)
+
+    tasks = {}
+    if len(values) == 2:
+      path = values[0]
+      task_range = values[1]
+    else:
+      path = values[0]
+      task_range = None
+
+    tasks['path'] = path
+
+    if task_range:
+      if '-' in task_range:
+        if task_range.startswith('-'):
+          raise ValueError('Task range minimum must be set')
+
+        tasks['min'], tasks['max'] = [
+            int(val) if val else None for val in task_range.split('-', 1)
+        ]
+      else:
+        tasks['min'] = int(task_range)
+        tasks['max'] = int(task_range)
+
+    setattr(namespace, self.dest, tasks)
+
+
 def parse_arguments(prog, argv):
   """Parses command line arguments.
 
@@ -168,19 +224,25 @@ def parse_arguments(prog, argv):
   parser.add_argument(
       '--name',
       help="""Name for pipeline. Defaults to the script name or
-      first token of the --command if specified.""")
+          first token of the --command if specified.""")
+  parser.add_argument('--table', help=argparse.SUPPRESS)
   parser.add_argument(
-      '--table',
-      default=None,
-      help="""Path to TSV of job parameters. Each column
-      specifies an environment variable to set in each
-      jobs's parent shell, and each row specifies the values
-      of those variables for each job.""")
+      '--tasks',
+      nargs='*',
+      action=TaskParamAction,
+      help="""Path to TSV of task parameters. Each column can specify an
+          --env, --input, or --output variable, and each line specifies the
+          values of those variables for a separate task.
+
+          Optionally specify tasks in the file to submit. Can take the form
+          "m", "m-", or "m-n" where m and n are task numbers.""",
+      metavar='FILE M-N')
   parser.add_argument(
       '--image',
       default='ubuntu:14.04',
       help="""Image name from Docker Hub, Google Container Repository, or other
-      Docker image service. The pipeline must have READ access to the image.""")
+          Docker image service. The pipeline must have READ access to the
+          image.""")
   parser.add_argument(
       '--dry-run',
       default=False,
@@ -207,23 +269,23 @@ def parse_arguments(prog, argv):
       action=ListParamAction,
       default=[],
       help="""Input path arguments to localize into the script's execution
-      environment""",
+          environment""",
       metavar='KEY=REMOTE_PATH')
   parser.add_argument(
       '--input-recursive',
       nargs='*',
       action=ListParamAction,
       default=[],
-      help="""Input path arguments to localize recursively into the script's
-      execution environment""",
+      help="""Input path arguments to localize recursively into the script\'s
+          execution environment""",
       metavar='KEY=REMOTE_PATH')
   parser.add_argument(
       '--output',
       nargs='*',
       action=ListParamAction,
       default=[],
-      help="""Output path arguments to de-localize from the script's execution
-      environment""",
+      help="""Output path arguments to de-localize from the script\'s execution
+          environment""",
       metavar='KEY=REMOTE_PATH')
   parser.add_argument(
       '--output-recursive',
@@ -231,7 +293,7 @@ def parse_arguments(prog, argv):
       action=ListParamAction,
       default=[],
       help="""Output path arguments to de-localize recursively from the script's
-      execution environment""",
+          execution environment""",
       metavar='KEY=REMOTE_PATH')
 
   # Add dsub job management arguments
@@ -255,9 +317,9 @@ def parse_arguments(prog, argv):
       default=False,
       action='store_true',
       help="""Do not submit the job if all output specified using the --output
-      and --output-recursive parameters already exist. Note that wildcard
-      and recursive outputs cannot be strictly verified. See the
-      documentation for details.""")
+          and --output-recursive parameters already exist. Note that wildcard
+          and recursive outputs cannot be strictly verified. See the
+          documentation for details.""")
 
   # Add dsub resource requirement arguments
   parser.add_argument(
@@ -276,13 +338,12 @@ def parse_arguments(prog, argv):
       default='google',
       choices=['google', 'test-fails'],
       help="""Service to submit jobs to. Currently the only valid values are
-      "google" to submit to Google's Pipeline API, or "test-fails" for a
-      test provider that always fails.""",
+          "google" to submit to Google's Pipeline API, or "test-fails" for a
+          test provider that always fails.""",
       metavar='PROVIDER')
   google = parser.add_argument_group(
       title='google',
-      description='Options for '
-      'the Google provider (Pipelines API)')
+      description='Options for the Google provider (Pipelines API)')
   google.add_argument(
       '--project',
       default=None,
@@ -354,8 +415,8 @@ def get_job_metadata(args, script, provider):
   """
 
   job_metadata = provider.get_job_metadata(script.name, args.name,
-                                           dsub_util.get_default_user(),
-                                           args.table is not None)
+                                           dsub_util.get_default_user())
+
   job_metadata['script'] = script
 
   return job_metadata
@@ -549,15 +610,25 @@ def main(prog, argv):
 def run_main(args):
   """Actual dsub body, post-stdout-redirection."""
   if args.command and args.script:
-    raise ValueError('Cannot supply both --command and a script name')
+    raise ValueError('Cannot supply both --command and a script name.')
+
+  if args.table:
+    print_error(
+        'The --table flag is deprecated. Use the --tasks argument instead.')
+
+    if args.tasks:
+      raise ValueError('Cannot specify both --table and --tasks.')
+
+    args.tasks = {'path': args.table}
 
   if (args.env or args.input or args.input_recursive or args.output or
-      args.output_recursive) and args.table:
+      args.output_recursive) and args.tasks:
     raise ValueError('Cannot supply both command-line parameters '
                      '(--env/--input/--input-recursive/--output/'
-                     '--output-recursive) and --table')
-  if args.table and args.skip:
-    raise ValueError('Output skipping (--skip) not supported for --table '
+                     '--output-recursive) and --tasks')
+
+  if args.tasks and args.skip:
+    raise ValueError('Output skipping (--skip) not supported for --task '
                      'commands.')
 
   if args.command:
@@ -580,14 +651,14 @@ def run_main(args):
   job_resources = get_job_resources(args)
   job_metadata = get_job_metadata(args, script, provider)
 
-  # Set up job parameters and job data from a table file or the command-line
+  # Set up job parameters and job data from a tasks file or the command-line
   input_file_param_util = param_util.InputFileParamUtil(
       DEFAULT_INPUT_LOCAL_PATH)
   output_file_param_util = param_util.OutputFileParamUtil(
       DEFAULT_OUTPUT_LOCAL_PATH)
-  if args.table:
-    all_job_data = param_util.table_to_job_data(
-        args.table, input_file_param_util, output_file_param_util)
+  if args.tasks:
+    all_job_data = param_util.tasks_file_to_job_data(
+        args.tasks, input_file_param_util, output_file_param_util)
   else:
     all_job_data = param_util.args_to_job_data(
         args.env, args.input, args.input_recursive, args.output,

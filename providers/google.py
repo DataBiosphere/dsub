@@ -827,7 +827,7 @@ class GoogleJobProvider(object):
       credentials = GoogleCredentials.get_application_default()
     return build('genomics', 'v1alpha2', credentials=credentials)
 
-  def get_job_metadata(self, script, pipeline_name, user_id, is_table):
+  def get_job_metadata(self, script, pipeline_name, user_id):
     """Returns a dictionary of metadata fields for the job."""
 
     # The name of the pipeline gets set into the ephemeralPipeline.name as-is.
@@ -859,7 +859,6 @@ class GoogleJobProvider(object):
                              datetime.now().strftime('%y%m%d-%H%M%S-%f')[:16])
 
     return {
-        'is_table': is_table,
         'pipeline-name': pipeline_name,
         'job-name': job_name,
         'job-id': job_id,
@@ -877,12 +876,12 @@ class GoogleJobProvider(object):
 
     return labels
 
-  def _build_pipeline_request(self, job_resources, job_metadata, job_data,
-                              task_id):
+  def _build_pipeline_request(self, job_resources, job_metadata, job_data):
     """Returns a Pipeline objects for the job."""
 
     script = job_metadata['script']
-    job_data['labels'] = self._build_pipeline_labels(job_metadata, task_id)
+    job_data['labels'] = self._build_pipeline_labels(job_metadata,
+                                                     job_data.get('task_id'))
 
     # Build the ephemeralPipeline for this job.
     # The ephemeralPipeline definition changes for each job because file
@@ -929,19 +928,18 @@ class GoogleJobProvider(object):
       A dictionary containing the 'job-id' and if there are tasks, a list
       of the task ids under the key 'task-id'.
     """
-
     launched_tasks = []
     requests = []
-    for job_index, job_data in enumerate(all_job_data):
+    for job_data in all_job_data:
       request = self._build_pipeline_request(job_resources, job_metadata,
-                                             job_data, job_index + 1 if
-                                             job_metadata['is_table'] else None)
+                                             job_data)
 
       if self._dry_run:
         requests.append(request)
       else:
         task = self._submit_pipeline(request)
-        launched_tasks.append(task)
+        if task:
+          launched_tasks.append(task)
 
     # If this is a dry-run, emit all the pipeline request objects
     if self._dry_run:
@@ -949,10 +947,10 @@ class GoogleJobProvider(object):
 
     launched_job = {
         'job-id': job_metadata['job-id'],
-        'user-id': job_metadata['user-id']
+        'user-id': job_metadata['user-id'],
+        'task-id': launched_tasks
     }
-    if job_metadata['is_table']:
-      launched_job['task-id'] = launched_tasks
+
     return launched_job
 
   def get_jobs(self,

@@ -17,13 +17,12 @@
 set -o errexit
 set -o nounset
 
-# Basic end to end test, driven by a --table file.
+# Basic end to end test, driven by a --tasks file.
 #
 # This test use the default stock image (ubuntu:14.04).
 #
 # This test is designed to verify that file input and output path
-# headers in a table file work correctly. The difference from e2e_io_table.sh
-# is this test loads the script from gcs.
+# headers in a tasks file work correctly.
 #
 # The actual operation performed here is to download a BAM and compute
 # the md5, writing it to <filename>.bam.md5.
@@ -34,15 +33,11 @@ set -o nounset
 # of the default data directory.
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
-readonly TABLE_FILE_TMPL_NAME="io_table"
 
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
-
-  echo "Copying script to ${DSUB_PARAMS}"
-  gsutil cp "${SCRIPT_DIR}/script_io_test.sh" "${DSUB_PARAMS}/"
 
   echo "Launching pipelines..."
 
@@ -50,8 +45,8 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
     --zones "us-central1-*" \
-    --script "${DSUB_PARAMS}/script_io_test.sh" \
-    --table "${TABLE_FILE}" \
+    --script "${SCRIPT_DIR}/script_io_test.sh" \
+    --tasks "${TASKS_FILE}" \
     --wait
 
 fi
@@ -75,7 +70,7 @@ for ((i=0; i < ${#INPUT_BAMS[@]}; i++)); do
   INPUT_BAM="${INPUT_BAMS[i]}"
   RESULT_EXPECTED="${RESULTS_EXPECTED[i]}"
 
-  OUTPUT_PATH="$(grep "${INPUT_BAM}" "${TABLE_FILE}" | cut -d $'\t' -f 3)"
+  OUTPUT_PATH="$(grep "${INPUT_BAM}" "${TASKS_FILE}" | cut -d $'\t' -f 3)"
   OUTPUT_FILE="${OUTPUT_PATH%/*.md5}/$(basename "${INPUT_BAM}").md5"
   RESULT="$(gsutil cat "${OUTPUT_FILE}")"
 
@@ -90,8 +85,5 @@ for ((i=0; i < ${#INPUT_BAMS[@]}; i++)); do
   echo "${RESULT}"
   echo "*****************************"
 done
-
-# Clean up what we uploaded after the test is done.
-gsutil rm "${DSUB_PARAMS}"/**
 
 echo "SUCCESS"

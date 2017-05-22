@@ -49,7 +49,7 @@ if [[ $(basename "${VIRTUAL_ENV:-}") != "dsub_libs" ]]; then
   return
 fi
 
-pip install --upgrade oauth2client==1.5.2 google-api-python-client python-dateutil pytz tabulate
+pip install --upgrade oauth2client==1.5.2 google-api-python-client python-dateutil pytz pyyaml tabulate
 
 echo "virtualenv should be correctly set up now. When you are done type"
 echo "'deactivate' to exit the virtualenv environment."

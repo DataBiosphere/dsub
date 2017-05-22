@@ -52,7 +52,7 @@ function util::write_tsv_file() {
   local file_name="${1}"
   local contents="${2}"
 
-  printf "${contents}" | grep -v '^$' > "${file_name}"
+  printf "${contents}" | grep -v '^$' | sed -e 's#^ *##' > "${file_name}"
 }
 readonly -f util::write_tsv_file
 
