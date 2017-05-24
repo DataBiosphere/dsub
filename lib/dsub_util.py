@@ -74,7 +74,7 @@ def get_default_user():
 
 def tasks_to_job_ids(provider, task_list):
   """Returns the set of job IDs for the given tasks."""
-  return set([provider.get_job_field(t, 'job-id') for t in task_list])
+  return set([provider.get_task_field(t, 'job-id') for t in task_list])
 
 
 def _get_storage_service(credentials):

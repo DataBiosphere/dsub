@@ -243,10 +243,19 @@ machine type will be selected from the best matching
 
 ### Submitting a batch job
 
-You can run a batch job consisting of an array of many tasks, rather than a
-single task as in all of the examples so far. To run a batch of tasks, create
-a tab-separated values (TSV) file containing the environment variables and
-input and output parameters for multiple tasks.
+Each of the examples above has demonstrated submitting a single task with
+a single set of variables, inputs, and outputs. If you have a batch of inputs
+and you want to run the same operation over them, `dsub` allows you
+to create a batch job.
+
+Instead of calling `dsub` repeatedly, you can create
+a tab-separated values (TSV) file containing the variables,
+inputs, and outputs for each task, and then call `dsub` once.
+The result will be a single `job-id` with multiple tasks. The tasks will
+be scheduled and run independently, but can be
+[monitored](#viewing-job-status) and [deleted](#deleting-a-job) as a group.
+
+#### Tasks file format
 
 The first line of the TSV file specifies the names and types of the
 parameters. For example:
@@ -258,8 +267,13 @@ the names of environment variables. This example is equivalent to the previous:
 
     SAMPLE_ID<tab>--input VCF_FILE<tab>--output OUTPUT_PATH
 
-Then pass this file to dsub using the `--tasks` parameter. This parameter
-accepts both a file name and optionally a range of tasks to process.
+Each addition line in the file should provide the variable, input, and output
+values for each task. Each line represents the values for a separate task.
+
+#### Tasks parameter
+
+Pass the TSV file to dsub using the `--tasks` parameter. This parameter
+accepts both the file path and optionally a range of tasks to process.
 
 For example, suppose `my-tasks.tsv` contains 101 lines: a one-line header and
 100 lines of parameters for tasks to run. Then:
@@ -317,9 +331,9 @@ each job includes:
 
 Metadata can be used to cancel a job or individual tasks within a batch job.
 
-### Cancelling a job
+### Deleting a job
 
-The `ddel` command will cancel running jobs.
+The `ddel` command will delete running jobs.
 
 By default, only jobs submitted by the current user will be deleted.
 Use the `--users` flag to specify other users, or `"*"` for all users.
@@ -328,22 +342,26 @@ To delete a running job:
 
     ./ddel --project my-cloud-project --jobs job-id
 
-If the job is a batch job, all tasks will be canceled.
+If the job is a batch job, all running tasks will be deleted.
 
-To cancel specific tasks:
+To delete specific tasks:
 
     ./ddel \
         --project my-cloud-project \
         --jobs job-id \
         --tasks task-id1 task-id2
 
-To cancel all running jobs for the current user:
+To delete all running jobs for the current user:
 
     ./ddel --project my-cloud-project --jobs "*"
 
 ## What next?
 
-* See the [examples](examples).
+* See the examples:
+  * [Custom scripts](examples/custom_scripts)
+  * [Decompress files](examples/decompress)
+  * [Samtools index](examples/samtools)
+
 * See more documentation for:
   * [Scripts, Commands, and Docker](docs/code.md)
   * [Input and Output File Handling](docs/input_output.md)

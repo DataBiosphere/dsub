@@ -25,7 +25,7 @@ class TestGetJob(unittest.TestCase):
     job_suc = {'job-id': 'job_suc', 'status': ('SUCCESS', '123')}
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
-    tasks = prov.get_jobs(['SUCCESS'])
+    tasks = prov.lookup_job_tasks(['SUCCESS'])
     self.assertEqual(tasks, [job_suc])
 
   def test_get_several(self):
@@ -34,7 +34,7 @@ class TestGetJob(unittest.TestCase):
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     job_run = {'job-id': 'job_run', 'status': ('RUNNING', '123')}
     prov.set_operations([job_suc, job_fail, job_run])
-    tasks = prov.get_jobs(['SUCCESS', 'FAILURE'])
+    tasks = prov.lookup_job_tasks(['SUCCESS', 'FAILURE'])
     self.assertEqual(tasks, [job_suc, job_fail])
 
   def test_get_star(self):
@@ -42,7 +42,7 @@ class TestGetJob(unittest.TestCase):
     job_suc = {'job-id': 'job_suc', 'status': ('SUCCESS', '123')}
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
-    tasks = prov.get_jobs('*')
+    tasks = prov.lookup_job_tasks('*')
     self.assertEqual(tasks, [job_suc, job_fail])
 
   def test_get_star_list(self):
@@ -50,7 +50,7 @@ class TestGetJob(unittest.TestCase):
     job_suc = {'job-id': 'job_suc', 'status': ('SUCCESS', '123')}
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
-    tasks = prov.get_jobs(['*'])
+    tasks = prov.lookup_job_tasks(['*'])
     self.assertEqual(tasks, [job_suc, job_fail])
 
   def test_get_none(self):
@@ -58,7 +58,7 @@ class TestGetJob(unittest.TestCase):
     job_suc = {'job-id': 'job_suc', 'status': ('SUCCESS', '123')}
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
-    tasks = prov.get_jobs(None)
+    tasks = prov.lookup_job_tasks(None)
     self.assertEqual(tasks, [job_suc, job_fail])
 
 

@@ -1,0 +1,4 @@
+--input INPUT_BAM	--output OUTPUT_BAI
+gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/pilot_data/data/NA12878/alignment/NA12878.chrom12.SOLID.corona.SRP000032.2009_08.bam	gs://MY-BUCKET/samtools/submit_list/output/*.bai
+gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/pilot_data/data/NA12878/alignment/NA12878.chrom10.SOLID.corona.SRP000032.2009_08.bam	gs://MY-BUCKET/samtools/submit_list/output/*.bai
+gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/pilot_data/data/NA12878/alignment/NA12878.chromX.SOLID.corona.SRP000032.2009_08.bam	gs://MY-BUCKET/samtools/submit_list/output/*.bai

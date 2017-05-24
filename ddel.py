@@ -86,7 +86,7 @@ def main():
   job_count = len(deleted_jobs)
 
   deleted_tasks = [
-      t for t in deleted_tasks if provider.get_job_field(t, 'task-id')
+      t for t in deleted_tasks if provider.get_task_field(t, 'task-id')
   ]
 
   tasks_msg = ''

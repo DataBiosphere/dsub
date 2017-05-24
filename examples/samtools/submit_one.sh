@@ -19,7 +19,7 @@
 # Usage:
 #   submit_one.sh PROJECT-ID BUCKET-PATH
 #
-# Wrapper script to decompress a single VCF file and copy it to a Cloud Storage
+# Launcher script to index a BAM file and copy the index to a Cloud Storage
 # bucket.
 
 set -o errexit
@@ -28,8 +28,10 @@ set -o nounset
 readonly MY_PROJECT=${1}
 readonly MY_BUCKET_PATH=${2}
 
-readonly INPUT_VCF="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/working/20130723_phase3_wg/cornell/ALL.ChrY.Cornell.20130502.SNPs.Genotypes.vcf.gz"
-readonly OUTPUT_VCF="${MY_BUCKET_PATH}/output/ALL.ChrY.Cornell.20130502.SNPs.Genotypes.vcf"
+readonly OUTPUT_ROOT="${MY_BUCKET_PATH}/samtools/submit_one"
+
+readonly INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/pilot_data/data/NA12878/alignment/NA12878.chrom11.SOLID.corona.SRP000032.2009_08.bam"
+readonly OUTPUT_BAI="${OUTPUT_ROOT}/output/*.bai"
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
@@ -40,11 +42,14 @@ readonly DSUB_DIR="${SCRIPT_DIR}/../.."
 "${DSUB_DIR}"/dsub \
   --project "${MY_PROJECT}" \
   --zones "us-central1-*" \
-  --logging "${MY_BUCKET_PATH}"/logging/ \
+  --logging "${OUTPUT_ROOT}"/logging \
   --disk-size 200 \
-  --image ubuntu:14.04 \
-  --input INPUT_VCF=${INPUT_VCF} \
-  --output OUTPUT_VCF="${OUTPUT_VCF}" \
-  --command 'gunzip ${INPUT_VCF} && \
-             mv ${INPUT_VCF%.gz} $(dirname ${OUTPUT_VCF})' \
+  --name "samtools index" \
+  --image quay.io/cancercollaboratory/dockstore-tool-samtools-index \
+  --input INPUT_BAM=${INPUT_BAM} \
+  --output OUTPUT_BAI="${OUTPUT_BAI}" \
+  --command 'export BAI_NAME="$(basename "${INPUT_BAM}").bai"
+             samtools index \
+               "${INPUT_BAM}" \
+               "$(dirname "${OUTPUT_BAI}")/${BAI_NAME}"' \
   --wait
