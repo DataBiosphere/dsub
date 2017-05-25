@@ -93,6 +93,10 @@ Output should look like:
 
 `dsub` allows you to define a batch of tasks to submit together using a
 tab-separated values (TSV) file listing the inputs and outputs.
+Each line lists the inputs and outputs for a separate task.
+
+More on dsub batch jobs can be found in the
+[README](../../README#submitting-a-batch-job).
 
 ### Create a TSV file
 

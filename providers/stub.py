@@ -13,8 +13,10 @@
 # limitations under the License.
 """Stub provider, for unit testing. Does not actually run anything."""
 
+from . import base
 
-class StubJobProvider(object):
+
+class StubJobProvider(base.JobProvider):
   """Stub provider, for unit testing. Does not actually run anything."""
 
   def __init__(self):
@@ -55,16 +57,16 @@ class StubJobProvider(object):
   #    Meant to be called by the code under test, they rely on the fake
   #    state set via group (2) above.
 
-  def get_job_metadata(self, script, pipeline_name, user_id):
-    del script, pipeline_name, user_id  # pacify linter
+  def prepare_job_metadata(self, script, job_name, user_id):
+    del script, job_name, user_id  # pacify linter
     raise BaseException('Not implemented')
 
-  def get_jobs(self,
-               status_list,
-               user_list='*',
-               job_list='*',
-               task_list='*',
-               max_jobs=0):
+  def lookup_job_tasks(self,
+                       status_list,
+                       user_list='*',
+                       job_list='*',
+                       task_list='*',
+                       max_jobs=0):
     """Return a list of operations based on the input criteria.
 
     If any of the filters are empty or "[*]", then no filtering is performed on
@@ -94,25 +96,25 @@ class StubJobProvider(object):
       operations = operations[:max_jobs]
     return operations
 
-  def get_job_field(self, job, field):
+  def get_task_field(self, task, field):
     if field == 'job-status':
-      return job['status'][0]
-    return job.get(field, None)
+      return task['status'][0]
+    return task.get(field, None)
 
-  def get_job_status_message(self, op):
+  def get_task_status_message(self, task):
     # Mimic the behavior of the Google one, which
     # will return "Success", or the error message if there's one.
-    ret = op.get('status', (None, None))
+    ret = task.get('status', (None, None))
     if ret[0] == 'SUCCESS':
       ret = ('Success', ret[1])
-    elif op.has_key('error-message'):
-      ret = (op['error-message'], ret[1])
+    elif task.has_key('error-message'):
+      ret = (task['error-message'], ret[1])
     return ret
 
-  def get_job_completion_messages(self, ops):
+  def get_tasks_completion_messages(self, tasks):
     error_messages = []
-    for op in ops:
-      error_messages += [op.get('error-message', '')]
+    for task in tasks:
+      error_messages += [task.get('error-message', '')]
 
     return error_messages
 

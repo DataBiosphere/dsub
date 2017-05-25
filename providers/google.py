@@ -29,6 +29,7 @@ import string
 import sys
 import textwrap
 import time
+from . import base
 
 from apiclient import errors
 from apiclient.discovery import build
@@ -36,6 +37,7 @@ from dateutil.tz import tzlocal
 
 from oauth2client.client import GoogleCredentials
 import pytz
+
 
 DATA_MOUNT_POINT = '/mnt/data'  # Mount point for the data disk on the VM
 
@@ -801,7 +803,7 @@ class _Operations(object):
     return (msg, cls._localize_datestamp(ds))
 
 
-class GoogleJobProvider(object):
+class GoogleJobProvider(base.JobProvider):
   """Interface to dsub and related tools for managing Google cloud jobs."""
 
   def __init__(self, verbose, dry_run, project, zones=None, credentials=None):
@@ -827,18 +829,20 @@ class GoogleJobProvider(object):
       credentials = GoogleCredentials.get_application_default()
     return build('genomics', 'v1alpha2', credentials=credentials)
 
-  def get_job_metadata(self, script, pipeline_name, user_id):
+  def prepare_job_metadata(self, script, job_name, user_id):
     """Returns a dictionary of metadata fields for the job."""
 
     # The name of the pipeline gets set into the ephemeralPipeline.name as-is.
     # The default name of the pipeline is the script name
-    # The name of the job is derived from the pipeline_name and gets set as a
+    # The name of the job is derived from the job_name and gets set as a
     # 'job-name' label (and so the value must be normalized).
-    if pipeline_name:
-      job_name = _Label.convert_to_label_chars(pipeline_name)
+    if job_name:
+      pipeline_name = job_name
+      job_name_value = _Label.convert_to_label_chars(job_name)
     else:
       pipeline_name = os.path.basename(script)
-      job_name = _Label.convert_to_label_chars(pipeline_name.split('.', 1)[0])
+      job_name_value = _Label.convert_to_label_chars(
+          pipeline_name.split('.', 1)[0])
 
     # The user-id will get set as a label
     user_id = _Label.convert_to_label_chars(user_id)
@@ -855,12 +859,12 @@ class GoogleJobProvider(object):
     #
     # The full job-id is:
     #   <job-name>--<user-id>--<timestamp>
-    job_id = '%s--%s--%s' % (job_name[:10], user_id,
+    job_id = '%s--%s--%s' % (job_name_value[:10], user_id,
                              datetime.now().strftime('%y%m%d-%H%M%S-%f')[:16])
 
     return {
         'pipeline-name': pipeline_name,
-        'job-name': job_name,
+        'job-name': job_name_value,
         'job-id': job_id,
         'user-id': user_id
     }
@@ -914,7 +918,7 @@ class GoogleJobProvider(object):
     if self._verbose:
       print 'Launched operation %s' % operation['name']
 
-    return self.get_job_field(operation, 'task-id')
+    return self.get_task_field(operation, 'task-id')
 
   def submit_job(self, job_resources, job_metadata, all_job_data):
     """Submit the job (or tasks) to be executed.
@@ -953,12 +957,12 @@ class GoogleJobProvider(object):
 
     return launched_job
 
-  def get_jobs(self,
-               status_list,
-               user_list=None,
-               job_list=None,
-               task_list=None,
-               max_jobs=0):
+  def lookup_job_tasks(self,
+                       status_list,
+                       user_list=None,
+                       job_list=None,
+                       task_list=None,
+                       max_jobs=0):
     """Return a list of operations based on the input criteria.
 
     If any of the filters are empty or ["*"], then no filtering is performed on
@@ -991,7 +995,7 @@ class GoogleJobProvider(object):
     if not task_list:
       task_list = ['*']
 
-    operations = []
+    tasks = []
     for status in status_list:
       for job_id in job_list:
         for user_id in user_list:
@@ -1008,13 +1012,13 @@ class GoogleJobProvider(object):
               o['metadata']['job-status'] = _Operations.operation_status(o)
 
             if ops:
-              operations.extend(ops)
+              tasks.extend(ops)
 
-            if max_jobs and len(operations) > max_jobs:
-              del operations[max_jobs:]
-              return operations
+            if max_jobs and len(tasks) > max_jobs:
+              del tasks[max_jobs:]
+              return tasks
 
-    return operations
+    return tasks
 
   def delete_jobs(self, user_list, job_list, task_list):
     """Kills the operations associated with the specified job or job.task.
@@ -1028,35 +1032,35 @@ class GoogleJobProvider(object):
       A list of jobs canceled and a list of error messages.
     """
     # Look up the job(s)
-    ops = self.get_jobs(
+    tasks = self.lookup_job_tasks(
         ['RUNNING'],
         max_jobs=0,
         user_list=user_list,
         job_list=job_list,
         task_list=task_list)
 
-    return _Operations.cancel(self._service, ops)
+    return _Operations.cancel(self._service, tasks)
 
-  def get_job_field(self, job, field, default=None):
-    return _Operations.get_operation_field(job, field, default)
+  def get_task_field(self, task, field, default=None):
+    return _Operations.get_operation_field(task, field, default)
 
-  def get_job_status_message(self, job):
+  def get_task_status_message(self, task):
     """Returns the most relevant status string and last updated date string.
 
     This string is meant for display only.
 
     Args:
-      job: the operation for which to get status.
+      task: the operation for which to get status.
 
     Returns:
       A printable status string and date string.
     """
-    return _Operations.operation_status_message(job)
+    return _Operations.operation_status_message(task)
 
-  def get_job_completion_messages(self, jobs):
+  def get_tasks_completion_messages(self, tasks):
     error_messages = []
-    for op in jobs:
-      _Operations.append_operation_error(error_messages, op)
+    for task in tasks:
+      _Operations.append_operation_error(error_messages, task)
 
     return error_messages
 

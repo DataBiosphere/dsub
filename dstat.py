@@ -17,6 +17,16 @@
 Follows the model of bjobs, sinfo, qstat, etc.
 """
 
+# Try to keep the default behavior rational based on real usage patterns.
+# Most common usage:
+# * User kicked off one or more single-operation jobs, or
+# * User kicked off a single "array job".
+# * User just wants to check on the status of their own running jobs.
+#
+# qstat and hence dstat.py defaults to listing jobs for the current user, so
+# there is no need to include user information in the default output.
+
+
 import argparse
 import collections
 import json
@@ -137,17 +147,8 @@ class JsonOutput(OutputFormatter):
     print json.dumps(table, indent=2)
 
 
-def prepare_row(provider, job, full):
-  """return a dict with the job's info (more if "full" is set)."""
-
-  # Try to keep the default behavior rational based on real usage patterns.
-  # Most common usage:
-  # * User kicked off one or more single-operation jobs, or
-  # * User kicked off a single "array job".
-  # * User just wants to check on the status of their own running jobs.
-  #
-  # qstat and hence dstat.py defaults to listing jobs for the current user, so
-  # there is no need to include user information in the default output.
+def prepare_row(provider, task, full):
+  """return a dict with the task's info (more if "full" is set)."""
 
   # Would like to include the Job ID in the default set of columns, but
   # it is a long value and would leave little room for status and update time.
@@ -175,7 +176,7 @@ def prepare_row(provider, job, full):
     key = col[0]
     optional = col[1]
 
-    value = provider.get_job_field(job, key)
+    value = provider.get_task_field(task, key)
     if not optional or value:
       row[key] = value
 
@@ -184,7 +185,7 @@ def prepare_row(provider, job, full):
       key = col[0]
       default = col[1] if len(col) > 1 else None
 
-      row[key] = provider.get_job_field(job, key, default)
+      row[key] = provider.get_task_field(task, key, default)
 
   return row
 
@@ -269,7 +270,7 @@ def main():
   some_job_running = True
   while some_job_running:
 
-    jobs = provider.get_jobs(
+    tasks = provider.lookup_job_tasks(
         args.status,
         user_list=args.users,
         job_list=args.jobs,
@@ -278,12 +279,12 @@ def main():
     table = []
 
     some_job_running = False
-    for job in jobs:
-      row = prepare_row(provider, job, args.full)
+    for task in tasks:
+      row = prepare_row(provider, task, args.full)
       row = output_formatter.prepare_output(row)
 
       table.append(row)
-      if provider.get_job_field(job, 'job-status') == 'RUNNING':
+      if provider.get_task_field(task, 'job-status') == 'RUNNING':
         some_job_running = True
 
     if table:
