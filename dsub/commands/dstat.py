@@ -32,8 +32,8 @@ import collections
 import json
 import time
 
-from lib import dsub_util
-from providers import provider_base
+from ..lib import dsub_util
+from ..providers import provider_base
 
 import tabulate
 import yaml

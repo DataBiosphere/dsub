@@ -76,6 +76,9 @@ done
 # Before exiting, emit the data directory details, such that the test
 # can verify the local files written
 echo "BEGIN: find"
-find "${DATA_ROOT}"
+find "${INPUT_PATH_SHALLOW%/*}" -type f
+find "${INPUT_PATH_DEEP}" -type f
+find "${OUTPUT_PATH_SHALLOW%/*}" -type f
+find "${OUTPUT_PATH_DEEP}" -type f
 echo "END: find"
 

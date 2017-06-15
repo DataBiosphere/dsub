@@ -41,49 +41,11 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipelines..."
 
-  "${DSUB}" \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING}" \
-    --zones "us-central1-*" \
+  run_dsub \
     --script "${SCRIPT_DIR}/script_io_test.sh" \
     --tasks "${TASKS_FILE}" \
     --wait
 
 fi
 
-echo
-echo "Checking output..."
-
-declare -a INPUT_BAMS=(
-NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam
-NA12878.chrom1.LS454.ssaha2.CEU.high_coverage.20100311.bam
-NA12878.chrom11.SOLID.corona.SRP000032.2009_08.bam
-)
-
-declare -a RESULTS_EXPECTED=(
-ef67e2b722761296c4905bb13e130674
-2f1048d8993a7c7ee2be3f40b7333a91
-63489aa4681bf661ec1541ac0a0565b4
-)
-
-for ((i=0; i < ${#INPUT_BAMS[@]}; i++)); do
-  INPUT_BAM="${INPUT_BAMS[i]}"
-  RESULT_EXPECTED="${RESULTS_EXPECTED[i]}"
-
-  OUTPUT_PATH="$(grep "${INPUT_BAM}" "${TASKS_FILE}" | cut -d $'\t' -f 3)"
-  OUTPUT_FILE="${OUTPUT_PATH%/*.md5}/$(basename "${INPUT_BAM}").md5"
-  RESULT="$(gsutil cat "${OUTPUT_FILE}")"
-
-  if ! diff <(echo "${RESULT_EXPECTED}") <(echo "${RESULT}"); then
-    echo "Output file does not match expected"
-    exit 1
-  fi
-
-  echo
-  echo "Output file matches expected:"
-  echo "*****************************"
-  echo "${RESULT}"
-  echo "*****************************"
-done
-
-echo "SUCCESS"
+source "${SCRIPT_DIR}/io_tasks_check_output.sh"

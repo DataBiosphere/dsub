@@ -28,7 +28,15 @@ env
 echo "END: env"
 
 echo "BEGIN: find"
-find "${DATA_ROOT}"
+# Emit the output directories (so we can verify they were created)
+for VAR in ${!OUTPUT_*}; do
+  find "$(dirname "${!VAR}")" -type d
+done
+
+# Emit the input files (so we can verify they were localized)
+for VAR in ${!INPUT_*}; do
+  find "$(dirname "${!VAR}")" -type f
+done
 echo "END: find"
 
 # Without files to de-localize, a pipeline that has output parameters

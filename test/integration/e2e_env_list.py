@@ -21,7 +21,7 @@ on the objects returned by dsub.call().
 import os
 import sys
 
-import dsub
+from dsub.commands import dsub as dsub_command
 import test_setup_e2e as test
 import test_util
 
@@ -29,7 +29,7 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
   print 'Launching pipeline...'
 
   # pyformat: disable
-  launched_job = dsub.call([
+  launched_job = dsub_command.call([
       '--project', test.PROJECT_ID,
       '--logging', test.LOGGING,
       '--image', 'ubuntu',

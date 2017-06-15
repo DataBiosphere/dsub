@@ -15,13 +15,13 @@
 """
 
 import unittest
-import providers.stub
+from dsub.providers import stub
 
 
 class TestGetJob(unittest.TestCase):
 
   def test_get_success(self):
-    prov = providers.stub.StubJobProvider()
+    prov = stub.StubJobProvider()
     job_suc = {'job-id': 'job_suc', 'status': ('SUCCESS', '123')}
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
@@ -29,7 +29,7 @@ class TestGetJob(unittest.TestCase):
     self.assertEqual(tasks, [job_suc])
 
   def test_get_several(self):
-    prov = providers.stub.StubJobProvider()
+    prov = stub.StubJobProvider()
     job_suc = {'job-id': 'job_suc', 'status': ('SUCCESS', '123')}
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     job_run = {'job-id': 'job_run', 'status': ('RUNNING', '123')}
@@ -38,7 +38,7 @@ class TestGetJob(unittest.TestCase):
     self.assertEqual(tasks, [job_suc, job_fail])
 
   def test_get_star(self):
-    prov = providers.stub.StubJobProvider()
+    prov = stub.StubJobProvider()
     job_suc = {'job-id': 'job_suc', 'status': ('SUCCESS', '123')}
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
@@ -46,7 +46,7 @@ class TestGetJob(unittest.TestCase):
     self.assertEqual(tasks, [job_suc, job_fail])
 
   def test_get_star_list(self):
-    prov = providers.stub.StubJobProvider()
+    prov = stub.StubJobProvider()
     job_suc = {'job-id': 'job_suc', 'status': ('SUCCESS', '123')}
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
@@ -54,7 +54,7 @@ class TestGetJob(unittest.TestCase):
     self.assertEqual(tasks, [job_suc, job_fail])
 
   def test_get_none(self):
-    prov = providers.stub.StubJobProvider()
+    prov = stub.StubJobProvider()
     job_suc = {'job-id': 'job_suc', 'status': ('SUCCESS', '123')}
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])

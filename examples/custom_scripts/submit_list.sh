@@ -51,15 +51,12 @@ readonly IMAGE
 readonly OUTPUT_ROOT="gs://${MY_BUCKET_PATH}/get_vcf_sample_ids"
 readonly LOGGING="${OUTPUT_ROOT}/logging"
 
-# Assume that we are in the "examples/<example_name>" directory
-readonly DSUB_DIR="${SCRIPT_DIR}/../.."
-
 echo "Logging will be written to:"
 echo "  ${LOGGING}"
 echo
 
 # Launch the task
-"${DSUB_DIR}"/dsub \
+dsub \
   --project "${MY_PROJECT}" \
   --zones "us-central1-*" \
   --logging "${LOGGING}" \

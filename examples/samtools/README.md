@@ -37,7 +37,7 @@ which contains [samtools](http://www.htslib.org/).
 To run a command to index the BAM file, type:
 
 ```
-./dsub \
+dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging gs://MY-BUCKET/samtools/submit_one/logging \
@@ -117,7 +117,7 @@ output file name.
 ### Submit the job
 
 ```
-./dsub \
+dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging gs://MY-BUCKET/samtools/submit_list/logging/ \

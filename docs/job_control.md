@@ -48,20 +48,20 @@ This can be done with `--after`, passing it the job-id from A and B.
 The first step is to capture the job-id for the job you want to wait for.
 
 ```
-JOBID_A=$(./dsub ...)
-JOBID_B=$(./dsub ...)
+JOBID_A=$(dsub ...)
+JOBID_B=$(dsub ...)
 ```
 
 Then pass these values to the `--after` flag for launching Job C
 
 ```
-./dsub ... --after "${JOB_A}" "${JOB_B}"
+dsub ... --after "${JOB_A}" "${JOB_B}"
 ```
 
 Here is the output of a sample run:
 
 ```
-$ JOBID_A=$(./dsub --project "${MYPROJECT}" --zones "us-central1-*" \
+$ JOBID_A=$(dsub --project "${MYPROJECT}" --zones "us-central1-*" \
 --logging "gs://${MYBUCKET}/logging/"   \
 --command 'echo "hello from job A"')
 Job: echo--<userid>--170328-093205-80
@@ -76,7 +76,7 @@ echo--<userid>--170328-093205-80
 
 $ JOBID_B=... (similar)
 
-$ JOBID_C=$(./dsub --project "${MYPROJECT}" --zones "us-central1-*" \
+$ JOBID_C=$(dsub --project "${MYPROJECT}" --zones "us-central1-*" \
 --logging "gs://${MYBUCKET}/logging/"   \
 --command 'echo "job C"' --after "${JOBID_A}" "${JOBID_B}")
 Job: echo--<userid>--170328-093415-23
@@ -108,10 +108,10 @@ for the job already exist. This useful when you are building and debugging a
 sequence of jobs, such as:
 
 ```
-JOBID_A=$(./dsub ... --skip --output gs://${MYBUCKET}/a_file)
-JOBID_B=$(./dsub ... --skip --output gs://${MYBUCKET}/b_file)
+JOBID_A=$(dsub ... --skip --output gs://${MYBUCKET}/a_file)
+JOBID_B=$(dsub ... --skip --output gs://${MYBUCKET}/b_file)
 
-./dsub ... --after "${JOB_A}" "${JOB_B}"
+dsub ... --after "${JOB_A}" "${JOB_B}"
 ```
 
 If on your first run of this script, the first job, "job A" fails and the second

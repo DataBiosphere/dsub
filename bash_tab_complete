@@ -4,8 +4,8 @@
 # Then you can use the "tab" key to auto-complete options in the
 # command line for dsub, dstat, or ddel.
 #
-# ./dsub --pro<TAB>
-# ./dsub --project
+#   dsub --pro<TAB>
+#   dsub --project
 #
 # If you update dsub or related tools, you can source this file again
 # to update the tab completion rules.

@@ -33,11 +33,8 @@ readonly OUTPUT_VCF="${MY_BUCKET_PATH}/output/ALL.ChrY.Cornell.20130502.SNPs.Gen
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
-# Assume that we are in the "examples/<example_name>" directory
-readonly DSUB_DIR="${SCRIPT_DIR}/../.."
-
 # Launch the task
-"${DSUB_DIR}"/dsub \
+dsub \
   --project "${MY_PROJECT}" \
   --zones "us-central1-*" \
   --logging "${MY_BUCKET_PATH}"/logging/ \

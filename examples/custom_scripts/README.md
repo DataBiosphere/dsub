@@ -54,7 +54,7 @@ a local file whose path is given by the `OUTPUT_FILE` environment variable
 To run a Bash script to decompress the VCF file, type:
 
 ```
-./dsub \
+dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging gs://MY-BUCKET/get_vcf_sample_ids.sh/logging \
@@ -132,7 +132,7 @@ To run a Python script to decompress the VCF file, type:
 
 
 ```
-./dsub \
+dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging gs://MY-BUCKET/get_vcf_sample_ids.py/logging \
@@ -218,7 +218,7 @@ Replace MY-BUCKET with a cloud bucket on which you have write privileges.
 Run either of the following commands:
 
 ```
-./dsub \
+dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging gs://MY-BUCKET/get_vcf_sample_ids/logging/ \
@@ -230,7 +230,7 @@ Run either of the following commands:
 ```
 
 ```
-./dsub \
+dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging gs://MY-BUCKET/get_vcf_sample_ids/logging/ \

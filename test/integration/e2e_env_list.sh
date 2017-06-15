@@ -33,14 +33,12 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
-  "${DSUB}" \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING}" \
+  # VAL4 tests spaces in variable values
+  run_dsub \
     --image "ubuntu" \
-    --zones "us-central1-*" \
     --script "${SCRIPT_DIR}/script_env_test.sh" \
     --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
-    --env VAR4="VAL4" \
+    --env VAR4="VAL4 (four)" \
     --env VAR5="VAL5" \
     --wait
 
@@ -54,7 +52,7 @@ readonly RESULT_EXPECTED=$(cat <<EOF
 VAR1=VAL1
 VAR2=VAL2
 VAR3=VAL3
-VAR4=VAL4
+VAR4=VAL4 (four)
 VAR5=VAL5
 EOF
 )

@@ -17,7 +17,7 @@ from __future__ import absolute_import
 
 import unittest
 
-from lib import job_util
+from dsub.lib import job_util
 
 
 class JobUtilTest(unittest.TestCase):
