@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-readonly SCRIPT_DIR="$(dirname "${0}")"
+set -o errexit
+set -o nounset
 
-python "${SCRIPT_DIR}"/ddel.py "${@}"
+readonly SCRIPT_DIR="$(dirname "${0}")"
+readonly DSUB_DIR="${SCRIPT_DIR}/.."
+
+cd "${DSUB_DIR}"
+python -m dsub.commands.dstat "${@}"

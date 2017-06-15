@@ -13,6 +13,7 @@
 # limitations under the License.
 """Setup module for end-to-end dsub tests."""
 
+# pylint: disable=line-too-long
 # test_setup_e2e.py
 #
 # Intended to be imported into a test.
@@ -22,15 +23,16 @@
 # * Automatically pick up a bucket name for tests.
 #
 # * Automatically set environment variables:
-#   * LOGGING=gs://${DSUB_BUCKET}/dsub/py/${TEST_NAME}/logging/
+#   * LOGGING=gs://${DSUB_BUCKET}/dsub/py/${DSUB_PROVIDER}/${TEST_NAME}/logging/
 #     (task file tests)
-#   * LOGGING=gs://${DSUB_BUCKET}/dsub/py/${TEST_NAME}/logging/${TEST_NAME}.log
+#   * LOGGING=gs://${DSUB_BUCKET}/dsub/py/${DSUB_PROVIDER}/${TEST_NAME}/logging/${TEST_NAME}.log
 #     (non-task file tests)
-#   * INPUTS=gs://${DSUB_BUCKET}/dsub/py/${TEST_NAME}/input
-#   * OUTPUTS=gs://${DSUB_BUCKET}/dsub/py/${TEST_NAME}/output
+#   * INPUTS=gs://${DSUB_BUCKET}/dsub/py/${DSUB_PROVIDER}/${TEST_NAME}/input
+#   * OUTPUTS=gs://${DSUB_BUCKET}/dsub/py/${DSUB_PROVIDER}/${TEST_NAME}/output
 #
 # * Check if LOGGING, INPUTS, and OUTPUTS are empty.
 # * For task file tests, generate the file from TASKS_FILE_TMPL.
+# pylint: enable=line-too-long
 
 import os
 import subprocess
@@ -63,6 +65,8 @@ TASKS_FILE_TMPL = test_setup.TASKS_FILE_TMPL
 
 print "Checking that required environment values are set:"
 
+DSUB_PROVIDER = os.getenv("DSUB_PROVIDER", "google")
+
 if "YOUR_PROJECT" in os.environ:
   PROJECT_ID = os.environ["YOUR_PROJECT"]
 else:
@@ -92,8 +96,10 @@ if not test_util.gsutil_ls_check("gs://%s" % DSUB_BUCKET):
   sys.exit(1)
 
 # Set standard LOGGING, INPUTS, and OUTPUTS values
-TEST_REMOTE_ROOT = "gs://%s/dsub/py/%s" % (DSUB_BUCKET, TEST_NAME)
-TEST_DOCKER_ROOT = "gs/%s/dsub/py/%s" % (DSUB_BUCKET, TEST_NAME)
+TEST_REMOTE_ROOT = "gs://%s/dsub/py/%s/%s" % (DSUB_BUCKET, DSUB_PROVIDER,
+                                              TEST_NAME)
+TEST_DOCKER_ROOT = "gs/%s/dsub/py/%s/%s" % (DSUB_BUCKET, DSUB_PROVIDER,
+                                            TEST_NAME)
 
 if TASKS_FILE:
   # For task file tests, the logging path is a directory.

@@ -15,7 +15,7 @@
 
 from __future__ import absolute_import
 import unittest
-from lib import param_util
+from dsub.lib import param_util
 
 
 class ParamUtilTest(unittest.TestCase):

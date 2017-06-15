@@ -20,7 +20,7 @@ When submitted with no filter arguments, `dstat` shows  information for all
 tasks in the `RUNNING` state belonging to the current user:
 
 ```
-$ ./dstat --project my-project
+$ dstat --project my-project
 Job Name        Task    Status            Last Update
 --------------  ------  ----------------  -------------------
 my-job-name     task-3  localizing-files  2017-04-06 16:03:34
@@ -40,7 +40,7 @@ them separately. To check on a specific job, pass the `--jobs` (or `-j`)
 flag. For example:
 
 ```
-$ ./dstat --project my-project --jobs my-job-id
+$ dstat --project my-project --jobs my-job-id
 Job Name        Status    Last Update
 --------------  --------  -------------------
 my-job-name     Pending   2017-04-11 16:05:35
@@ -54,7 +54,7 @@ To check a specific job independent of status, pass the
 value `*` to `dstat`:
 
 ```
-$ ./dstat --project my-project \
+$ dstat --project my-project \
   --jobs my-job-id \
   --status "*"
 Job Name        Status                          Last Update
@@ -69,7 +69,7 @@ Be sure to quote the `*` to prevent shell expansion.
 To view results for all jobs associated with your user id:
 
 ```
-./dstat --project my-project --status "*"
+dstat --project my-project --status "*"
 ```
 
 ## Monitoring
@@ -80,7 +80,7 @@ By default `dstat` will query job status and exit. However, you can use the
 The following examples shows minute-by-minute progression of 3 tasks
 
 ```
-$ ./dstat --project my-project \
+$ dstat --project my-project \
   --jobs my-job-id \
   --wait --poll-interval 60
 Job Name        Task    Status    Last Update
@@ -135,7 +135,7 @@ you want. `--format` supports the values `json`, `text`, and `yaml`.
 ### Full output (default format YAML)
 
 ```
-$ ./dstat --project my-project \
+$ dstat --project my-project \
   --jobs my-job-id \
   --full
 - create-time: '2017-04-11 16:47:06'
@@ -173,7 +173,7 @@ Note the `Internal ID` in this example provides the
 ### Full output as tabular text
 
 ```
-$ ./dstat --project my-project \
+$ dstat --project my-project \
   --jobs my-job-id \
   --format text \
   --full
@@ -194,7 +194,7 @@ done  OUTPUT_PATH=gs://my-bucket/path/output
 ### Full output as JSON
 
 ```
-$ ./dstat --project my-project \
+$ dstat --project my-project \
   --jobs my-job-id \
   --format json \
   --full

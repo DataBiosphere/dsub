@@ -23,12 +23,12 @@
 # * Automatically pick up a bucket name for tests.
 #
 # * Automatically set environment variables:
-#   * LOGGING=gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/logging/
+#   * LOGGING=gs://${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}/logging/
 #     (task file tests)
-#   * LOGGING=gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/logging/${TEST_NAME}.log
+#   * LOGGING=gs://${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}/logging/${TEST_NAME}.log
 #     (non-task file tests)
-#   * INPUTS=gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/input
-#   * OUTPUTS=gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/output
+#   * INPUTS=gs://${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}/input
+#   * OUTPUTS=gs://${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}/output
 #
 # * Check if LOGGING, INPUTS, and OUTPUTS are empty.
 # * For task file tests, generate the file from TASKS_FILE_TMPL.
@@ -37,6 +37,8 @@ source "${SCRIPT_DIR}/test_util.sh"
 source "${SCRIPT_DIR}/test_setup.sh"
 
 echo "Checking that required environment values are set:"
+
+declare DSUB_PROVIDER=${DSUB_PROVIDER:-google}
 
 declare PROJECT_ID
 if [[ -n "${YOUR_PROJECT:-}" ]]; then
@@ -75,8 +77,8 @@ if ! gsutil ls "gs://${DSUB_BUCKET}" 2>/dev/null; then
 fi
 
 # Set standard LOGGING, INPUTS, and OUTPUTS values
-readonly TEST_REMOTE_ROOT="gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}"
-readonly TEST_DOCKER_ROOT="gs/${DSUB_BUCKET}/dsub/sh/${TEST_NAME}"
+readonly TEST_REMOTE_ROOT="gs://${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}"
+readonly TEST_DOCKER_ROOT="gs/${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}"
 
 if [[ -n "${TASKS_FILE:-}" ]]; then
   # For task file tests, the logging path is a directory.
@@ -121,3 +123,32 @@ if [[ -n "${TASKS_FILE:-}" ]]; then
     | util::expand_tsv_fields \
     > "${TASKS_FILE}"
 fi
+
+# Functions for launching dsub
+#
+# Tests should generally just call "run_dsub" which will then invoke
+# the provider-specific function.
+
+function run_dsub() {
+  local provider=${DSUB_PROVIDER:-google}
+
+  dsub_"${provider}" "${@}"
+}
+
+function dsub_google() {
+  "${DSUB}" \
+    --provider google \
+    --project "${PROJECT_ID}" \
+    --logging "${LOGGING}" \
+    --zones "us-central1-*" \
+    "${DISK_SIZE:+--disk-size ${DISK_SIZE}}" \
+    "${BOOT_DISK_SIZE:+--boot-disk-size ${BOOT_DISK_SIZE}}" \
+    "${@}"
+}
+
+function dsub_local() {
+  "${DSUB}" \
+    --provider local \
+    --logging "${LOGGING}" \
+    "${@}"
+}

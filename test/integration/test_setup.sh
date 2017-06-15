@@ -20,7 +20,7 @@
 # The code here will:
 #
 # * Set the TEST_NAME based on the name of the calling script.
-# * Set variables for TEST_DIR, DSUB_DIR, and DSUB.
+# * Set variables for DSUB and TEST_DIR
 # * For task file tests, set TASKS_FILE and TASKS_FILE_TMPL.
 # * Set the TEST_TEMP variable for a temporary directory.
 
@@ -31,10 +31,10 @@ readonly TEST_NAME="$(basename "${0}" | \
 
 echo "Setting up test: ${TEST_NAME}"
 
-# Set up the path to dsub.py
+# dsub should be in the PATH, installed by setuptools (in a virtualenv)
+readonly DSUB="dsub"
+
 readonly TEST_DIR="${SCRIPT_DIR}"
-readonly DSUB_DIR="$(dirname "${SCRIPT_DIR}")/.."
-readonly DSUB="${DSUB_DIR}/dsub"
 
 if [[ "${TEST_NAME}" == *_tasks ]]; then
   readonly TASKS_FILE_TMPL="${TEST_DIR}/${TASKS_FILE_TMPL_NAME:-${TEST_NAME}}.tsv.tmpl"

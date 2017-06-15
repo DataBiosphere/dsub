@@ -21,7 +21,7 @@ on the objects returned by dsub.call().
 import os
 import sys
 
-import dsub
+from dsub.commands import dsub as dsub_command
 import test_setup_e2e as test
 import test_util
 
@@ -29,7 +29,7 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
   print 'Launching pipeline...'
 
   # pyformat: disable
-  launched_job = dsub.call([
+  launched_job = dsub_command.call([
       '--project', test.PROJECT_ID,
       '--logging', test.LOGGING,
       '--zones', 'us-central1-*',
@@ -63,13 +63,13 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
 print
 print 'Checking output...'
 
-INPUT_BAMS = ('NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam',
-              'NA12878.chrom1.LS454.ssaha2.CEU.high_coverage.20100311.bam',
-              'NA12878.chrom11.SOLID.corona.SRP000032.2009_08.bam')
+INPUT_BAMS = ('NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam',
+              'NA06986.chrom21.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam',
+              'NA06986.chrom18.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam')
 
-RESULTS_EXPECTED = ('ef67e2b722761296c4905bb13e130674',
-                    '2f1048d8993a7c7ee2be3f40b7333a91',
-                    '63489aa4681bf661ec1541ac0a0565b4')
+RESULTS_EXPECTED = ('4afb9b8908959dbd4e2d5c54bf254c93',
+                    '0dc006ed39ddad2790034ca497631234',
+                    '36e37a0dab5926dbf5a1b8afc0cdac8b')
 
 for i in range(len(INPUT_BAMS)):
   INPUT_BAM = INPUT_BAMS[i]

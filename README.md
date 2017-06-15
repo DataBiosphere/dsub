@@ -23,19 +23,20 @@ foundation for use by the wider batch computing community.
 
 ## Getting started
 
+1.  Create and activate a Python virtualenv (optional but strongly recommended).
+
+        # (You can do this in a directory of your choosing.)
+        virtualenv dsub_libs
+        source dsub_libs/bin/activate
+
 1.  Clone this repository.
 
         git clone https://github.com/googlegenomics/dsub
         cd dsub
 
-1.  Setup a Python virtualenv (optional but strongly recommended).
+1.  Install dsub (this will also install the dependencies)
 
-        virtualenv dsub_libs
-        source dsub_libs/bin/activate
-
-1.  Install dependent libraries.
-
-        pip install --upgrade oauth2client==1.5.2 google-api-python-client python-dateutil pytz pyyaml tabulate
+        python setup.py install
 
 1.  Set up Bash tab completion (optional).
 
@@ -43,11 +44,12 @@ foundation for use by the wider batch computing community.
 
 1.  Verify the installation by running:
 
-        ./dsub --help
+        dsub --help
 
-1.   (Optional) [Install Docker](https://docs.docker.com/engine/installation/).
+1.  (Optional) [Install Docker](https://docs.docker.com/engine/installation/).
 
-     This is necessary only if you're going to create your own Docker images.
+    This is necessary only if you're going to create your own Docker images or
+    use the `local` provider.
 
 ### Getting started on Google Cloud
 
@@ -305,14 +307,14 @@ control with dsub](docs/job_control.md).
 
 The `dstat` command displays the status of jobs:
 
-    ./dstat --project my-cloud-project
+    dstat --project my-cloud-project
 
 With no additional arguments, dstat will display a list of *running* jobs for
 the current `USER`.
 
 To display the status of a specific job, use the `--jobs` flag:
 
-    ./dstat --project my-cloud-project --jobs job-id
+    dstat --project my-cloud-project --jobs job-id
 
 For a batch job, the output will list all *running* tasks.
 
@@ -340,20 +342,20 @@ Use the `--users` flag to specify other users, or `"*"` for all users.
 
 To delete a running job:
 
-    ./ddel --project my-cloud-project --jobs job-id
+    ddel --project my-cloud-project --jobs job-id
 
 If the job is a batch job, all running tasks will be deleted.
 
 To delete specific tasks:
 
-    ./ddel \
+    ddel \
         --project my-cloud-project \
         --jobs job-id \
         --tasks task-id1 task-id2
 
 To delete all running jobs for the current user:
 
-    ./ddel --project my-cloud-project --jobs "*"
+    ddel --project my-cloud-project --jobs "*"
 
 ## What next?
 

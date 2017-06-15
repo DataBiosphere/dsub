@@ -15,13 +15,13 @@
 """
 
 import unittest
-import dsub
+from dsub.commands import dsub as dsub_command
+from dsub.providers import stub
 import fake_time
-import providers.stub
 
 
 def establish_chronology(chronology):
-  dsub.SLEEP_FUNCTION = fake_time.FakeTime(chronology).sleep
+  dsub_command.SLEEP_FUNCTION = fake_time.FakeTime(chronology).sleep
 
 
 def nothing_happens():
@@ -57,28 +57,28 @@ class TestWaitForAnyJob(unittest.TestCase):
     yield 1
 
   def test_already_succeeded(self):
-    prov = providers.stub.StubJobProvider()
+    prov = stub.StubJobProvider()
     prov.set_operations([{'job-id': 'myjob', 'status': 'SUCCESS'}])
     establish_chronology(nothing_happens())
-    ret = dsub.wait_for_any_job(prov, ['myjob'], 1)
+    ret = dsub_command.wait_for_any_job(prov, ['myjob'], 1)
     self.assertEqual(ret, set([]))
 
   def test_succeeds(self):
-    self.prov = providers.stub.StubJobProvider()
+    self.prov = stub.StubJobProvider()
     establish_chronology(self.progressive_chronology())
-    ret = dsub.wait_for_any_job(self.prov, ['job-1'], 1)
+    ret = dsub_command.wait_for_any_job(self.prov, ['job-1'], 1)
     self.assertEqual(ret, set([]))
 
   def test_fails(self):
-    self.prov = providers.stub.StubJobProvider()
+    self.prov = stub.StubJobProvider()
     establish_chronology(self.progressive_chronology())
-    ret = dsub.wait_for_any_job(self.prov, ['job-2'], 1)
+    ret = dsub_command.wait_for_any_job(self.prov, ['job-2'], 1)
     self.assertEqual(ret, set([]))
 
   def test_multiple_jobs(self):
-    self.prov = providers.stub.StubJobProvider()
+    self.prov = stub.StubJobProvider()
     establish_chronology(self.progressive_chronology())
-    ret = dsub.wait_for_any_job(self.prov, ['job-1', 'job-2'], 1)
+    ret = dsub_command.wait_for_any_job(self.prov, ['job-1', 'job-2'], 1)
     self.assertEqual(ret, set(['job-2']))
 
 
@@ -107,9 +107,9 @@ class TestWaitForAnyJobBatch(unittest.TestCase):
     yield 1
 
   def test_multiple_tasks(self):
-    self.prov = providers.stub.StubJobProvider()
+    self.prov = stub.StubJobProvider()
     establish_chronology(self.progressive_chronology())
-    ret = dsub.wait_for_any_job(self.prov, ['job-1'], 1)
+    ret = dsub_command.wait_for_any_job(self.prov, ['job-1'], 1)
     self.assertEqual(ret, set([]))
 
 
@@ -143,29 +143,29 @@ class TestWaitAfter(unittest.TestCase):
     yield 1
 
   def test_already_succeeded(self):
-    prov = providers.stub.StubJobProvider()
+    prov = stub.StubJobProvider()
     prov.set_operations([{'job-id': 'myjob', 'status': ('SUCCESS', '123')}])
     establish_chronology(nothing_happens())
-    ret = dsub.wait_after(prov, ['myjob'], 1, True)
+    ret = dsub_command.wait_after(prov, ['myjob'], 1, True)
     self.assertEqual(ret, [])
 
   def test_job_not_found(self):
-    prov = providers.stub.StubJobProvider()
+    prov = stub.StubJobProvider()
     prov.set_operations([{'job-id': 'myjob', 'status': ('SUCCESS', '123')}])
     establish_chronology(nothing_happens())
-    ret = dsub.wait_after(prov, ['some_other_job'], 1, True)
+    ret = dsub_command.wait_after(prov, ['some_other_job'], 1, True)
     self.assertTrue(ret)
 
   def test_job_1(self):
-    self.prov = providers.stub.StubJobProvider()
+    self.prov = stub.StubJobProvider()
     establish_chronology(self.progressive_chronology())
-    ret = dsub.wait_after(self.prov, ['job-1'], 1, True)
+    ret = dsub_command.wait_after(self.prov, ['job-1'], 1, True)
     self.assertEqual(ret, [])
 
   def test_job_2(self):
-    self.prov = providers.stub.StubJobProvider()
+    self.prov = stub.StubJobProvider()
     establish_chronology(self.progressive_chronology())
-    ret = dsub.wait_after(self.prov, ['job-2'], 1, True)
+    ret = dsub_command.wait_after(self.prov, ['job-2'], 1, True)
     self.assertEqual(ret, [['failed to frob']])
 
 
@@ -207,16 +207,16 @@ class TestWaitAfterBatch(unittest.TestCase):
     yield 1
 
   def test_job_2(self):
-    self.prov = providers.stub.StubJobProvider()
+    self.prov = stub.StubJobProvider()
     establish_chronology(self.fail_in_sequence())
-    ret = dsub.wait_after(self.prov, ['job-1'], 1, True)
+    ret = dsub_command.wait_after(self.prov, ['job-1'], 1, True)
     self.assertEqual(ret, [['failed to frob']])
 
 
 class TestDominantTask(unittest.TestCase):
 
   def test_earliest_failure(self):
-    prov = providers.stub.StubJobProvider()
+    prov = stub.StubJobProvider()
     ops = [{
         'job-id': 'job-1',
         'task-id': 'task-1',
@@ -243,7 +243,7 @@ class TestDominantTask(unittest.TestCase):
         'end-time': 5,
         'status': ('SUCCESS', '1')
     }]
-    ret = dsub.dominant_task_for_jobs(prov, ops)
+    ret = dsub_command.dominant_task_for_jobs(prov, ops)
     self.assertEqual(ret[0]['task-id'], 'task-3')
 
 

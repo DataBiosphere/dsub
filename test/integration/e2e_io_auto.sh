@@ -27,7 +27,7 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-readonly INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam"
+readonly INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam"
 
 readonly INPUT_BAMS="gs://genomics-public-data/test-data/dna/wgs/hiseq2500/NA12878/H06HDADXX130110.*.ATCACGAT.20k_reads.bam"
 
@@ -39,10 +39,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
-  "${DSUB}" \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING}" \
-    --zones "us-central1-*" \
+  run_dsub \
     --script "${SCRIPT_DIR}/script_io_auto.sh" \
     --env TEST_NAME="${TEST_NAME}" \
     --input "${INPUT_BAM}" "${INPUT_BAMS}" \
@@ -57,18 +54,17 @@ echo "Checking output..."
 readonly EXPECTED_IO_VARS=(
 OUTPUT_0=/mnt/data/output/"${DOCKER_OUTPUTS}"/output_file/file.txt
 OUTPUT_1=/mnt/data/output/"${DOCKER_OUTPUTS}"/output_files/*
+INPUT_0=/mnt/data/input/gs/genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
 INPUT_1=/mnt/data/input/gs/genomics-public-data/test-data/dna/wgs/hiseq2500/NA12878/
-INPUT_0=/mnt/data/input/gs/genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam
 )
 
 readonly EXPECTED_FS_INPUT_ENTRIES=(
 /mnt/data/input/gs/genomics-public-data/test-data/dna/wgs/hiseq2500/NA12878/H06HDADXX130110.1.ATCACGAT.20k_reads.bam
 /mnt/data/input/gs/genomics-public-data/test-data/dna/wgs/hiseq2500/NA12878/H06HDADXX130110.2.ATCACGAT.20k_reads.bam
-/mnt/data/input/gs/genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam
+/mnt/data/input/gs/genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
 )
 
 readonly EXPECTED_FS_OUTPUT_ENTRIES=(
-/mnt/data/output/"${DOCKER_OUTPUTS}"
 /mnt/data/output/"${DOCKER_OUTPUTS}"/output_files
 /mnt/data/output/"${DOCKER_OUTPUTS}"/output_file
 )

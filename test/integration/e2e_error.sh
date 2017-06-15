@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 Google Inc. All Rights Reserved.
+# Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -o errexit
+set -o nounset
+
+# Test that we detect failures
+
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
-python "${SCRIPT_DIR}"/dstat.py "${@}"
+# Do standard test setup
+source "${SCRIPT_DIR}/test_setup_e2e.sh"
+
+TGT_1="${OUTPUTS}/testfile_1.txt"
+TGT_2="${OUTPUTS}/testfile_2.txt"
+
+
+if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+
+  echo "Launching pipeline..."
+
+  if run_dsub \
+    --image 'ubuntu' \
+    --command 'idontknowhowtounix' \
+    --wait; then
+    echo "dsub did not report the failure as it should have."
+    exit 1
+  fi
+
+fi
+
+echo "SUCCESS"
+

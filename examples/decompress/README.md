@@ -32,7 +32,7 @@ you have write access to.
 To run a command to decompress the VCF file, type:
 
 ```
-./dsub \
+dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging gs://MY-BUCKET/decompress_one/logging/ \
@@ -120,7 +120,7 @@ output file name.
 ### Submit the job
 
 ```
-./dsub \
+dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging gs://MY-BUCKET/decompress_list/logging/ \

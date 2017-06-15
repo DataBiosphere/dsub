@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,26 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Interface for job providers."""
+set -o errexit
+set -o nounset
 
-from . import google
-from . import test_fails
+readonly SCRIPT_DIR="$(dirname "${0}")"
+readonly DSUB_DIR="${SCRIPT_DIR}/.."
 
-
-def get_provider(args):
-  """Returns a provider for job submission requests."""
-
-  provider = getattr(args, 'provider', 'google')
-
-  if provider == 'google':
-    return google.GoogleJobProvider(
-        getattr(args, 'verbose', False),
-        getattr(args, 'dry_run', False), args.project)
-  elif provider == 'test-fails':
-    return test_fails.FailsJobProvider()
-  else:
-    raise ValueError('Unknown provider: ' + provider)
-
-
-if __name__ == '__main__':
-  pass
+cd "${DSUB_DIR}"
+python -m dsub.commands.ddel "${@}"

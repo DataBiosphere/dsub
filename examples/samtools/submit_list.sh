@@ -34,11 +34,8 @@ readonly OUTPUT_ROOT="${MY_BUCKET_PATH}/samtools/submit_list"
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
-# Assume that we are in the "examples/<example_name>" directory
-readonly DSUB_DIR="${SCRIPT_DIR}/../.."
-
 # Launch the task
-"${DSUB_DIR}"/dsub \
+dsub \
   --project "${MY_PROJECT}" \
   --zones "us-central1-*" \
   --logging "${OUTPUT_ROOT}/logging/" \

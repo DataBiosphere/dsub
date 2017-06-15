@@ -89,11 +89,8 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
-  "${DSUB}" \
-    --project "${PROJECT_ID}" \
+  run_dsub \
     --image "debian" \
-    --logging "${LOGGING}" \
-    --zones "us-central1-*" \
     --script "${SCRIPT_DIR}/script_io_recursive.sh" \
     --env FILE_CONTENTS="${FILE_CONTENTS}" \
     --input INPUT_PATH_SHALLOW="${INPUTS}/shallow/*" \
@@ -110,71 +107,47 @@ echo "Checking output..."
 # Check the results
 
 readonly EXPECTED_FS_INPUT_ENTRIES=(
-/mnt/data/input/"${DOCKER_INPUTS}"
-/mnt/data/input/"${DOCKER_INPUTS}"/deep
-/mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_1
-/mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_1/dir_a
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_1/dir_a/file1.txt
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_1/dir_a/file2.txt
-/mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_1/dir_b
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_1/dir_b/file1.txt
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_1/dir_b/file2.txt
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_1/file1.txt
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_1/file2.txt
-/mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_2
-/mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_2/dir_a
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_2/dir_a/file1.txt
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_2/dir_a/file2.txt
-/mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_2/dir_b
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_2/dir_b/file1.txt
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_2/dir_b/file2.txt
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_2/file1.txt
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/dir_2/file2.txt
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/file1.txt
 /mnt/data/input/"${DOCKER_INPUTS}"/deep/file2.txt
-/mnt/data/input/"${DOCKER_INPUTS}"/shallow
 /mnt/data/input/"${DOCKER_INPUTS}"/shallow/file1.txt
 /mnt/data/input/"${DOCKER_INPUTS}"/shallow/file2.txt
 )
 
 readonly EXPECTED_FS_OUTPUT_ENTRIES=(
-/mnt/data/output/"${DOCKER_OUTPUTS}"
-/mnt/data/output/"${DOCKER_OUTPUTS}"/deep
-/mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_1
-/mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_1/dir_a
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_1/dir_a/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_1/dir_a/file2.txt
-/mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_1/dir_b
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_1/dir_b/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_1/dir_b/file2.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_1/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_1/file2.txt
-/mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_2
-/mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_2/dir_a
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_2/dir_a/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_2/dir_a/file2.txt
-/mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_2/dir_b
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_2/dir_b/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_2/dir_b/file2.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_2/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/dir_2/file2.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/deep/file2.txt
-/mnt/data/output/"${DOCKER_OUTPUTS}"/shallow
-/mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_1
-/mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_1/dir_a
 /mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_1/dir_a/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_1/dir_a/file2.txt
-/mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_1/dir_b
 /mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_1/dir_b/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_1/dir_b/file2.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_1/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_1/file2.txt
-/mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_2
-/mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_2/dir_a
 /mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_2/dir_a/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_2/dir_a/file2.txt
-/mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_2/dir_b
 /mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_2/dir_b/file1.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_2/dir_b/file2.txt
 /mnt/data/output/"${DOCKER_OUTPUTS}"/shallow/dir_2/file1.txt

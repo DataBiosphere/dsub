@@ -32,11 +32,8 @@ readonly MY_BUCKET=${2}
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
-# Assume that we are in the "examples/<example_name>" directory
-readonly DSUB_DIR="${SCRIPT_DIR}/../.."
-
 # Launch the task
-"${DSUB_DIR}"/dsub \
+dsub \
   --project "${MY_PROJECT}" \
   --zones "us-central1-*" \
   --logging "${MY_BUCKET}/decompress_list/logging/" \

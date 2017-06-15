@@ -52,9 +52,6 @@ readonly INPUT_VCF="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes
 readonly OUTPUT_FILE="${OUTPUT_ROOT}/output/sample_ids.txt"
 readonly LOGGING="${OUTPUT_ROOT}/logging"
 
-# Assume that we are in the "examples/<example_name>" directory
-readonly DSUB_DIR="${SCRIPT_DIR}/../.."
-
 echo "Output will be written to:"
 echo "  ${OUTPUT_FILE}"
 echo "Logging will be written to:"
@@ -62,7 +59,7 @@ echo "  ${LOGGING}"
 echo
 
 # Launch the task
-"${DSUB_DIR}"/dsub \
+dsub \
   --project "${MY_PROJECT}" \
   --zones "us-central1-*" \
   --logging "${LOGGING}" \

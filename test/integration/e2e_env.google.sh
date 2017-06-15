@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 Google Inc. All Rights Reserved.
+# Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,31 +17,37 @@
 set -o errexit
 set -o nounset
 
-# Basic test of the "--command" flag.
-#
-# This test use a stock image (ubuntu).
-# No input files.
-# No output files.
-# The stdout file is checked for expected output.
-
-readonly SCRIPT_DIR="$(dirname "${0}")"
+# Test the google provider sets up the environment as expected.
 
 # Do standard test setup
+readonly SCRIPT_DIR="$(dirname "${0}")"
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
+
+readonly COMMAND='\
+  echo "Working directory:"
+  pwd
+
+  echo "Data directory:"
+  ls /mnt/data
+
+  echo "Script directory:"
+  ls /mnt/data/script
+
+  echo "TMPDIR:"
+  echo "${TMPDIR}"
+'
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
-  BOOT_DISK_SIZE=20 \
-  run_dsub \
+  "${DSUB}" \
+    --project "${PROJECT_ID}" \
+    --logging "${LOGGING}" \
     --image "ubuntu" \
-    --min-cores "1" \
-    --min-ram "3.75" \
-    --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
-    --env VAR4="VAL4" \
-    --env VAR5="VAL5" \
-    --command "env | grep ^VAR | sort" \
+    --zones "us-central1-*" \
+    --name "google_env.sh" \
+    --command "${COMMAND}" \
     --wait
 
 fi
@@ -51,11 +57,17 @@ echo "Checking output..."
 
 # Check the results
 readonly RESULT_EXPECTED=$(cat <<EOF
-VAR1=VAL1
-VAR2=VAL2
-VAR3=VAL3
-VAR4=VAL4
-VAR5=VAL5
+Working directory:
+/mnt/data/workingdir
+Data directory:
+lost+found
+script
+tmp
+workingdir
+Script directory:
+google_env.sh
+TMPDIR:
+/mnt/data/tmp
 EOF
 )
 

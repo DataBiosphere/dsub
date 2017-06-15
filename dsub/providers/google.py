@@ -39,46 +39,82 @@ from oauth2client.client import GoogleCredentials
 import pytz
 
 
-DATA_MOUNT_POINT = '/mnt/data'  # Mount point for the data disk on the VM
+# Environment variable name for the script body
+SCRIPT_VARNAME = '_SCRIPT'
 
-SCRIPT_VARNAME = '_SCRIPT'  # Environment variable name for the script body
-SCRIPT_PATH = '/src'  # Location inside docker container for the user script
+# Mount point for the data disk on the VM and in the Docker container
+DATA_MOUNT_POINT = '/mnt/data'
+
+# Special dsub directories within the Docker container
+#
+# Attempt to keep the dsub runtime environment sane by being very prescriptive.
+# Assume a single disk for everything that needs to be written by the dsub
+# runtime environment or the user.
+#
+# Backends like the Google Pipelines API, allow for the user to set both
+# a boot-disk-size and a disk-size. But the boot-disk-size is not something
+# that users should have to worry about, so don't put anything extra there.
+#
+# Put everything meaningful on the data disk:
+#
+#   input: files localized from object storage
+#   output: files to de-localize to object storage
+#
+#   script: any code that dsub writes (like the user script)
+#   tmp: set TMPDIR in the environment to point here
+#
+#   workingdir: A workspace directory for user code.
+#               This is also the explicit working directory set before the
+#               user script runs.
+
+SCRIPT_DIR = '%s/script' % DATA_MOUNT_POINT
+TMP_DIR = '%s/tmp' % DATA_MOUNT_POINT
+WORKING_DIR = '%s/workingdir' % DATA_MOUNT_POINT
+
+MK_RUNTIME_DIRS_COMMAND = '\n'.join(
+    'mkdir --mode=777 -p "%s" ' % dir
+    for dir in [SCRIPT_DIR, TMP_DIR, WORKING_DIR])
 
 DOCKER_COMMAND = textwrap.dedent("""\
   set -o errexit
   set -o nounset
 
-  readonly SCRIPT_PATH="%s/%s"
+  # Create runtime directories
+  {mk_runtime_dirs}
 
   # Write the script to a file and make it executable
-  mkdir -p $(dirname "${SCRIPT_PATH}")
-  echo "${%s}" > "${SCRIPT_PATH}"
-  chmod u+x "${SCRIPT_PATH}"
+  echo "${{_SCRIPT}}" > "{script_path}"
+  chmod u+x "{script_path}"
 
   # Install gsutil if there are recursive copies to do
-  %s
+  {install_cloud_sdk}
 
   # Set environment variables for recursive input directories
-  %s
+  {export_input_dirs}
 
   # Recursive copy input directories
-  %s
+  {copy_input_dirs}
 
   # Create the output directories
-  %s
+  {mk_output_dirs}
 
   # Set environment variables for recursive output directories
-  %s
+  {export_output_dirs}
 
-  # Make the DATA_ROOT directory available to the user script
+  # Set TMPDIR
+  export TMPDIR="{tmpdir}"
+
+  # DEPRECATED: do not use DATA_ROOT
   export DATA_ROOT=/mnt/data
-  cd "${DATA_ROOT}"
+
+  # Set the working directory
+  cd "{working_dir}"
 
   # Run the user script
-  "${SCRIPT_PATH}"
+  "{script_path}"
 
   # Recursive copy output directories
-  %s
+  {copy_output_dirs}
 """)
 
 # If an output directory is marked as "recursive", then dsub takes over the
@@ -313,7 +349,7 @@ class _Pipelines(object):
     """Return a multi-line string containg the full pipeline docker command."""
 
     # We upload the user script as an environment argument
-    # and write it to /src (preserving its local file name).
+    # and write it to SCRIPT_DIR (preserving its local file name).
     #
     # The docker_command:
     # * writes the script body to a file
@@ -387,10 +423,17 @@ class _Pipelines(object):
         for var in outputs
     ])
 
-    return DOCKER_COMMAND % (SCRIPT_PATH, script_name, SCRIPT_VARNAME,
-                             install_cloud_sdk, export_input_dirs,
-                             copy_input_dirs, mkdirs, export_output_dirs,
-                             copy_output_dirs)
+    return DOCKER_COMMAND.format(
+        mk_runtime_dirs=MK_RUNTIME_DIRS_COMMAND,
+        script_path='%s/%s' % (SCRIPT_DIR, script_name),
+        install_cloud_sdk=install_cloud_sdk,
+        export_input_dirs=export_input_dirs,
+        copy_input_dirs=copy_input_dirs,
+        mk_output_dirs=mkdirs,
+        export_output_dirs=export_output_dirs,
+        tmpdir=TMP_DIR,
+        working_dir=WORKING_DIR,
+        copy_output_dirs=copy_output_dirs)
 
   @classmethod
   def build_pipeline(cls, project, min_cores, min_ram, disk_size,

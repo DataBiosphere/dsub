@@ -23,11 +23,11 @@ import os
 import sys
 import time
 
-from lib import dsub_util
-from lib import job_util
-from lib import param_util
-from lib.dsub_util import print_error
-from providers import provider_base
+from ..lib import dsub_util
+from ..lib import job_util
+from ..lib import param_util
+from ..lib.dsub_util import print_error
+from ..providers import provider_base
 
 SLEEP_FUNCTION = time.sleep  # so we can replace it in tests
 
@@ -210,7 +210,8 @@ def parse_arguments(prog, argv):
 
   provider_required_args = {
       'google': ['project', 'zones', 'logging'],
-      'test-fails': []
+      'test-fails': [],
+      'local': ['logging'],
   }
   epilog = 'Provider-required arguments:\n'
   for provider in provider_required_args:
@@ -336,7 +337,7 @@ def parse_arguments(prog, argv):
   parser.add_argument(
       '--provider',
       default='google',
-      choices=['google', 'test-fails'],
+      choices=['local', 'google', 'test-fails'],
       help="""Service to submit jobs to. Currently the only valid values are
           "google" to submit to Google's Pipeline API, or "test-fails" for a
           test provider that always fails.""",
@@ -590,11 +591,7 @@ def _job_outputs_are_present(job_data):
   return True
 
 
-def call(argv):
-  return main('%s.call' % __name__, argv)
-
-
-def main(prog, argv):
+def dsub_main(prog, argv):
   # Parse args and validate
   args = parse_arguments(prog, argv)
   # intent:
@@ -605,6 +602,15 @@ def main(prog, argv):
     launched_job = run_main(args)
   print launched_job.get('job-id', '')
   return launched_job
+
+
+def call(argv):
+  return dsub_main('%s.call' % __name__, argv)
+
+
+def main(prog=sys.argv[0], argv=sys.argv[1:]):
+  dsub_main(prog, argv)
+  return 0
 
 
 def run_main(args):
@@ -714,7 +720,6 @@ def run_main(args):
       sys.exit(1)
 
   return launched_job
-
 
 if __name__ == '__main__':
   main(sys.argv[0], sys.argv[1:])

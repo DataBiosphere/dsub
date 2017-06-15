@@ -18,8 +18,8 @@ Follows the model of qdel.
 """
 import argparse
 
-from lib import dsub_util
-from providers import provider_base
+from ..lib import dsub_util
+from ..providers import provider_base
 
 
 def parse_arguments():
