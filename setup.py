@@ -77,8 +77,8 @@ setup(
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
-        'oauth2client==1.5.2', 'google-api-python-client', 'python-dateutil',
-        'pytz', 'pyyaml', 'tabulate'
+        'oauth2client', 'google-api-python-client', 'python-dateutil', 'pytz',
+        'pyyaml', 'tabulate'
     ],
 
     # List additional groups of dependencies here (e.g. development
