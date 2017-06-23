@@ -21,7 +21,6 @@ on the objects returned by dsub.call().
 import os
 import sys
 
-from dsub.commands import dsub as dsub_command
 import test_setup_e2e as test
 import test_util
 
@@ -29,10 +28,7 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
   print 'Launching pipeline...'
 
   # pyformat: disable
-  launched_job = dsub_command.call([
-      '--project', test.PROJECT_ID,
-      '--logging', test.LOGGING,
-      '--zones', 'us-central1-*',
+  launched_job = test.run_dsub([
       '--script', '%s/script_io_test.sh' % test.TEST_DIR,
       '--tasks', test.TASKS_FILE,
       '--wait'])

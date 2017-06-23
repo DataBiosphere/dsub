@@ -38,6 +38,8 @@ import os
 import subprocess
 import sys
 
+from dsub.commands import dsub as dsub_command
+
 import test_setup
 import test_util
 
@@ -136,3 +138,49 @@ if TASKS_FILE:
   # This should really be a feature of dsub directly...
   print "Setting up task file %s" % TASKS_FILE
   test_util.expand_tsv_fields(_environ(), TASKS_FILE_TMPL, TASKS_FILE)
+
+
+# Functions for launching dsub
+#
+# Tests should generally just call "run_dsub" which will then invoke
+# the provider-specific function.
+
+
+def run_dsub(dsub_args):
+  # Execute the appropriate dsub_<provider> function
+  return globals()["dsub_%s" % DSUB_PROVIDER](dsub_args)
+
+
+def dsub_google(dsub_args):
+  """Call dsub appending google-provider required arguments."""
+  # pyformat: disable
+  google_opt_args = [
+      ("BOOT_DISK_SIZE", "--boot-disk-size"),
+      ("DISK_SIZE", "--disk-size")
+  ]
+  # pyformat: enable
+
+  opt_args = []
+  for var in google_opt_args:
+    val = globals().get(var[0])
+    if val:
+      opt_args.append(var[1], val)
+
+  # pyformat: disable
+  return dsub_command.call([
+      "--provider", "google",
+      "--project", PROJECT_ID,
+      "--logging", LOGGING,
+      "--zones", "us-central1-*"
+      ] + opt_args + dsub_args)
+  # pyformat: enable
+
+
+def dsub_local(dsub_args):
+  """Call dsub appending local-provider required arguments."""
+
+  # pyformat: disable
+  return dsub_command.call([
+      "--provider", "local",
+      "--logging", LOGGING,
+      ] + dsub_args)

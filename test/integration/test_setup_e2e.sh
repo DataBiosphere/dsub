@@ -103,7 +103,8 @@ echo "Output path: ${OUTPUTS}"
 # For tests that exercise remote dsub parameters (like TSV file)
 readonly DSUB_PARAMS="gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/params"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]] && \
+   [[ "${ALLOW_DIRTY_TESTS:-0}" -eq 0 ]]; then
 
   echo "  Checking if remote test files already exists"
   if gsutil ls "${TEST_REMOTE_ROOT}/**" 2>/dev/null; then
@@ -130,9 +131,7 @@ fi
 # the provider-specific function.
 
 function run_dsub() {
-  local provider=${DSUB_PROVIDER:-google}
-
-  dsub_"${provider}" "${@}"
+  dsub_"${DSUB_PROVIDER}" "${@}"
 }
 
 function dsub_google() {
@@ -152,3 +151,40 @@ function dsub_local() {
     --logging "${LOGGING}" \
     "${@}"
 }
+
+function run_dstat() {
+  dstat_"${DSUB_PROVIDER}" "${@}"
+}
+
+function dstat_google() {
+  dstat \
+    --provider google \
+    --project "${PROJECT_ID}" \
+    "${@}"
+}
+
+function dstat_local() {
+  dstat \
+    --provider local \
+    "${@}"
+}
+
+function run_ddel() {
+  local provider=${DSUB_PROVIDER:-google}
+
+  ddel_"${provider}" "${@}"
+}
+
+function ddel_google() {
+  ddel \
+    --provider google \
+    --project "${PROJECT_ID}" \
+    "${@}"
+}
+
+function ddel_local() {
+  ddel \
+    --provider local \
+    "${@}"
+}
+

@@ -19,8 +19,6 @@ set -o nounset
 
 # Test recursive copying features of dsub.
 #
-# This test use the default stock image (ubuntu:14.04).
-#
 # This test is designed to verify that:
 #  * gsutil can be installed automatically if not present in the image.
 #  * recursive inputs are copied from GCS to the VM recursively.

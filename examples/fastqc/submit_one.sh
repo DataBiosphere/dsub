@@ -28,25 +28,26 @@ set -o nounset
 readonly MY_PROJECT=${1}
 readonly MY_BUCKET_PATH=${2}
 
-readonly OUTPUT_ROOT="${MY_BUCKET_PATH}/samtools/submit_one"
-
-readonly INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chrom19.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam"
-readonly OUTPUT_BAI="${OUTPUT_ROOT}/output/*.bai"
-
+readonly CONTAINER_PROJECT="$(echo "${MY_PROJECT}" | sed 's_:_/_')"
+readonly OUTPUT_ROOT="${MY_BUCKET_PATH}/fastqc/submit_one"
 readonly SCRIPT_DIR="$(dirname "${0}")"
+
+readonly OUTPUT_FILES="${OUTPUT_ROOT}/output/*"
+readonly INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chrom19.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam"
+
+# Build the docker image
+gcloud container builds submit "${SCRIPT_DIR}" \
+  --tag="gcr.io/${CONTAINER_PROJECT}/fastqc"
 
 # Launch the task
 dsub \
   --project "${MY_PROJECT}" \
   --zones "us-central1-*" \
-  --logging "${OUTPUT_ROOT}"/logging \
+  --logging "${OUTPUT_ROOT}/logging" \
   --disk-size 200 \
-  --name "samtools index" \
-  --image quay.io/cancercollaboratory/dockstore-tool-samtools-index \
-  --input INPUT_BAM=${INPUT_BAM} \
-  --output OUTPUT_BAI="${OUTPUT_BAI}" \
-  --command 'export BAI_NAME="$(basename "${INPUT_BAM}").bai"
-             samtools index \
-               "${INPUT_BAM}" \
-               "$(dirname "${OUTPUT_BAI}")/${BAI_NAME}"' \
+  --name "fastqc" \
+  --image "gcr.io/${CONTAINER_PROJECT}/fastqc" \
+  --output OUTPUT_FILES="${OUTPUT_FILES}" \
+  --input INPUT_BAM="${INPUT_BAM}" \
+  --command 'fastqc ${INPUT_BAM} --outdir=$(dirname ${OUTPUT_FILES})' \
   --wait

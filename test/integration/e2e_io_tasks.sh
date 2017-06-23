@@ -19,8 +19,6 @@ set -o nounset
 
 # Basic end to end test, driven by a --tasks file.
 #
-# This test use the default stock image (ubuntu:14.04).
-#
 # This test is designed to verify that file input and output path
 # headers in a tasks file work correctly.
 #

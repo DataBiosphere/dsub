@@ -10,14 +10,14 @@ binary Sequence Alignment/Map format (BAM) file from the
 example demonstrates processing multiple files, using a small list of BAMs.
 
 All of the source BAM files are stored in a public bucket at
-[gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/pilot_data/data/NA12878/alignment](https://console.cloud.google.com/storage/browser/genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/pilot_data/data/NA12878/alignment/):
+[gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment](https://console.cloud.google.com/storage/browser/genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/):
 
-* NA12878.chrom11.SOLID.corona.SRP000032.2009_08.bam
-* NA12878.chrom12.SOLID.corona.SRP000032.2009_08.bam
-* NA12878.chrom10.SOLID.corona.SRP000032.2009_08.bam
-* NA12878.chromX.SOLID.corona.SRP000032.2009_08.bam
+* NA06986.chrom19.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
+* NA06986.chrom20.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
+* NA06986.chrom21.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
+* NA06986.chrom22.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
 
-## Set up
+## Setup
 
 * Follow the [dsub geting started](../../README.md#getting-started)
 instructions.
@@ -40,12 +40,12 @@ To run a command to index the BAM file, type:
 dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
-  --logging gs://MY-BUCKET/samtools/submit_one/logging \
+  --logging "gs://MY-BUCKET/samtools/submit_one/logging" \
   --disk-size 200 \
   --name "samtools index" \
   --image quay.io/cancercollaboratory/dockstore-tool-samtools-index \
-  --input INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/pilot_data/data/NA12878/alignment/NA12878.chrom11.SOLID.corona.SRP000032.2009_08.bam" \
-  --output OUTPUT_BAI=gs://MY-BUCKET/samtools/submit_one/output/*.bai \
+  --input INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chrom19.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam" \
+  --output OUTPUT_BAI="gs://MY-BUCKET/samtools/submit_one/output/*.bai" \
   --command 'export BAI_NAME="$(basename "${INPUT_BAM}").bai"
              samtools index \
                "${INPUT_BAM}" \
@@ -82,8 +82,8 @@ gsutil ls -l gs://MY-BUCKET/samtools/submit_one/output
 Output should look like:
 
 ```
-    396680  2017-05-22T22:43:15Z  gs://MY-BUCKET/samtools/submit_one/output/NA12878.chrom11.SOLID.corona.SRP000032.2009_08.bam.bai
-TOTAL: 1 objects, 396680 bytes (387.38 KiB)
+    111784  2017-06-20T21:06:53Z  gs://MY-BUCKET/samtools/submit_one/output/NA06986.chrom19.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam.bai
+TOTAL: 1 objects, 111784 bytes (109.16 KiB)
 ```
 
 ## Index multiple files
@@ -100,10 +100,10 @@ More on dsub batch jobs can be found in the
 Open an editor and create a file `submit_list.tsv`:
 
 <pre>
---input INPUT_BAM&#9;--output OUTPUT_BAI
-gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/pilot_data/data/NA12878/alignment/NA12878.chrom12.SOLID.corona.SRP000032.2009_08.bam&#9;gs://MY-BUCKET/samtools/submit_list/output/*.bai
-gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/pilot_data/data/NA12878/alignment/NA12878.chrom10.SOLID.corona.SRP000032.2009_08.bam&#9;gs://MY-BUCKET/samtools/submit_list/output/*.bai
-gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/pilot_data/data/NA12878/alignment/NA12878.chromX.SOLID.corona.SRP000032.2009_08.bam&#9;gs://MY-BUCKET/samtools/submit_list/output/*.bai
+--output OUTPUT_BAI&#9;--input INPUT_BAM
+gs://MY-BUCKET/samtools/submit_list/output/*.bai&#9;gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chrom20.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
+gs://MY-BUCKET/samtools/submit_list/output/*.bai&#9;gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chrom21.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
+gs://MY-BUCKET/samtools/submit_list/output/*.bai&#9;gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chrom22.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
 </pre>
 
 The first line of the file lists the input and output parameter names.
@@ -120,7 +120,7 @@ output file name.
 dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
-  --logging gs://MY-BUCKET/samtools/submit_list/logging/ \
+  --logging "gs://MY-BUCKET/samtools/submit_list/logging/" \
   --disk-size 200 \
   --name "samtools index" \
   --image quay.io/cancercollaboratory/dockstore-tool-samtools-index \
@@ -159,9 +159,9 @@ gsutil ls -l gs://MY-BUCKET/samtools/submit_list/output
 Output should look like:
 
 ```
-    395600  2017-05-22T22:55:26Z  gs://MY-BUCKET/samtools/submit_list/output/NA12878.chrom10.SOLID.corona.SRP000032.2009_08.bam.bai
-    393640  2017-05-22T22:54:35Z  gs://MY-BUCKET/samtools/submit_list/output/NA12878.chrom12.SOLID.corona.SRP000032.2009_08.bam.bai
-    454096  2017-05-22T22:55:10Z  gs://MY-BUCKET/samtools/submit_list/output/NA12878.chromX.SOLID.corona.SRP000032.2009_08.bam.bai
-TOTAL: 3 objects, 1243336 bytes (1.19 MiB)
+    111240  2017-06-20T18:21:20Z  gs://MY-BUCKET/samtools/submit_list/output/NA06986.chrom20.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam.bai
+     69984  2017-06-20T18:22:22Z  gs://MY-BUCKET/samtools/submit_list/output/NA06986.chrom21.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam.bai
+     76216  2017-06-20T18:21:51Z  gs://MY-BUCKET/samtools/submit_list/output/NA06986.chrom22.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam.bai
+TOTAL: 3 objects, 257440 bytes (251.41 KiB)
 ```
 

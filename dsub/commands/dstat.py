@@ -63,6 +63,8 @@ class TextOutput(OutputFormatter):
 
   def trim_display_field(self, value, max_length):
     """Return a value for display; if longer than max length, use ellipsis."""
+    if not value:
+      return ''
     if len(value) > max_length:
       return value[:max_length - 3] + '...'
     return value
@@ -168,6 +170,7 @@ def prepare_row(provider, task, full):
       ('internal-id',),
       ('inputs', {}),
       ('outputs', {}),
+      ('envs', {}),
   ]
   # pyformat: enable
 
@@ -196,11 +199,18 @@ def parse_arguments():
   Returns:
     A Namespace of parsed arguments.
   """
+  provider_required_args = {
+      'google': ['project'],
+      'test-fails': [],
+      'local': [],
+  }
+  epilog = 'Provider-required arguments:\n'
+  for provider in provider_required_args:
+    epilog += '  %s: %s\n' % (provider, provider_required_args[provider])
   parser = argparse.ArgumentParser(
-      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter, epilog=epilog)
   parser.add_argument(
       '--project',
-      required=True,
       help='Cloud project ID in which to query pipeline operations')
   parser.add_argument(
       '-j', '--jobs', nargs='*', help='A list of jobs on which to check status')
@@ -241,7 +251,16 @@ def parse_arguments():
       '--format',
       choices=['text', 'json', 'yaml'],
       help='Set the output format.')
-  return parser.parse_args()
+  # Add provider-specific arguments
+  provider_base.add_provider_argument(parser)
+
+  args = parser.parse_args()
+
+  # check special flag rules
+  for arg in provider_required_args[args.provider]:
+    if not args.__getattribute__(arg):
+      parser.error('argument --%s is required' % arg)
+  return args
 
 
 def main():

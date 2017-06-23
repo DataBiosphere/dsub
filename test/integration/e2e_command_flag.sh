@@ -19,7 +19,6 @@ set -o nounset
 
 # Basic test of the "--command" flag.
 #
-# This test use a stock image (ubuntu).
 # No input files.
 # No output files.
 # The stdout file is checked for expected output.

@@ -36,5 +36,35 @@ def get_provider(args):
     raise ValueError('Unknown provider: ' + provider)
 
 
+def add_provider_argument(parser):
+  parser.add_argument(
+      '--provider',
+      default='google',
+      choices=['local', 'google', 'test-fails'],
+      help="""Job service provider. Valid values are "google" (Google's
+        Pipeline API) and "local" (local Docker execution). "test-*" providers
+        are for testing purposes only.""",
+      metavar='PROVIDER')
+
+
+def get_dstat_provider_args(args):
+  """A string with the arguments to point dstat to the same provider+project."""
+  if args.provider == 'google':
+    return ' --project %s' % args.project
+  elif args.provider == 'local':
+    return ' --provider local'
+  elif args.provider == 'test-fails':
+    return ''
+  # New providers should add their dstat required arguments here.
+  assert False
+  return ''
+
+
+def get_ddel_provider_args(args):
+  """A string with the arguments to point ddel to the same provider+project."""
+  # Change this if the two ever diverge.
+  return get_dstat_provider_args(args)
+
+
 if __name__ == '__main__':
   pass

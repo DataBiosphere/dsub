@@ -1,0 +1,4 @@
+--output OUTPUT_FILES	--input INPUT_BAM
+gs://evanpdev/fastqc/submit_list/output/*	gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chrom20.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
+gs://evanpdev/fastqc/submit_list/output/*	gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chrom21.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
+gs://evanpdev/fastqc/submit_list/output/*	gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chrom22.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam

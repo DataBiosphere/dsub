@@ -21,4 +21,10 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 readonly DSUB_DIR="${SCRIPT_DIR}/.."
 
 cd "${DSUB_DIR}"
-python -m dsub.commands.dsub "${@}"
+
+# Handle the no-arg case to avoid "unbound variable" of "$@" on MacOS
+if [[ $# -eq 0 ]]; then
+  python -m dsub.commands.dsub
+else
+  python -m dsub.commands.dsub "${@}"
+fi
