@@ -226,7 +226,6 @@ def parse_arguments(prog, argv):
       '--name',
       help="""Name for pipeline. Defaults to the script name or
           first token of the --command if specified.""")
-  parser.add_argument('--table', help=argparse.SUPPRESS)
   parser.add_argument(
       '--tasks',
       nargs='*',
@@ -334,14 +333,7 @@ def parse_arguments(prog, argv):
       help='Size (in GB) of data disk to attach for each job')
 
   # Add provider-specific arguments
-  parser.add_argument(
-      '--provider',
-      default='google',
-      choices=['local', 'google', 'test-fails'],
-      help="""Service to submit jobs to. Currently the only valid values are
-          "google" to submit to Google's Pipeline API, or "test-fails" for a
-          test provider that always fails.""",
-      metavar='PROVIDER')
+  provider_base.add_provider_argument(parser)
   google = parser.add_argument_group(
       title='google',
       description='Options for the Google provider (Pipelines API)')
@@ -618,15 +610,6 @@ def run_main(args):
   if args.command and args.script:
     raise ValueError('Cannot supply both --command and a script name.')
 
-  if args.table:
-    print_error(
-        'The --table flag is deprecated. Use the --tasks argument instead.')
-
-    if args.tasks:
-      raise ValueError('Cannot specify both --table and --tasks.')
-
-    args.tasks = {'path': args.table}
-
   if (args.env or args.input or args.input_recursive or args.output or
       args.output_recursive) and args.tasks:
     raise ValueError('Cannot supply both command-line parameters '
@@ -663,10 +646,10 @@ def run_main(args):
   output_file_param_util = param_util.OutputFileParamUtil(
       DEFAULT_OUTPUT_LOCAL_PATH)
   if args.tasks:
-    all_job_data = param_util.tasks_file_to_job_data(
+    all_task_data = param_util.tasks_file_to_job_data(
         args.tasks, input_file_param_util, output_file_param_util)
   else:
-    all_job_data = param_util.args_to_job_data(
+    all_task_data = param_util.args_to_job_data(
         args.env, args.input, args.input_recursive, args.output,
         args.output_recursive, input_file_param_util, output_file_param_util)
 
@@ -690,23 +673,23 @@ def run_main(args):
 
   # If requested, skip running this job if its outputs already exist
   if args.skip and not args.dry_run:
-    if _job_outputs_are_present(all_job_data[0]):
+    if _job_outputs_are_present(all_task_data[0]):
       print 'Job output already present, skipping new job submission.'
       return {'job-id': NO_JOB}
 
   # Launch all the job tasks!
-  launched_job = provider.submit_job(job_resources, job_metadata, all_job_data)
+  launched_job = provider.submit_job(job_resources, job_metadata, all_task_data)
 
   if not args.dry_run:
     print 'Launched job-id: %s' % launched_job['job-id']
     if launched_job.get('task-id'):
       print '%s task(s)' % len(launched_job['task-id'])
     print 'To check the status, run:'
-    print '  dstat --project %s --jobs %s --status \'*\'' % (
-        args.project, launched_job['job-id'])
+    print '  dstat%s --jobs %s --status \'*\'' % (
+        provider_base.get_dstat_provider_args(args), launched_job['job-id'])
     print 'To cancel the job, run:'
-    print '  ddel --project %s --jobs %s' % (args.project,
-                                             launched_job['job-id'])
+    print '  ddel%s --jobs %s' % (provider_base.get_ddel_provider_args(args),
+                                  launched_job['job-id'])
 
   # Poll for job completion
   if args.wait:

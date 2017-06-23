@@ -16,7 +16,7 @@ All of the source VCF files are stored in a public bucket at
 *   20140708_previous_phase3/v1_vcfs/ALL.chr21.phase3_shapeit2_mvncall_integrated.20130502.genotype.vcf.gz
 *   20110721_exome_call_sets/bcm/ALL.BCM_Illumina_Mosaik_ontarget_plus50bp_822.20110521.snp.exome.genotypes.vcf.gz
 
-## Set up
+## Setup
 
 * Follow the [dsub geting started](../../README.md#getting-started)
 instructions.

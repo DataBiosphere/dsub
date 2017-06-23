@@ -362,6 +362,7 @@ To delete all running jobs for the current user:
 * See the examples:
   * [Custom scripts](examples/custom_scripts)
   * [Decompress files](examples/decompress)
+  * [FastQC](examples/fastqc)
   * [Samtools index](examples/samtools)
 
 * See more documentation for:

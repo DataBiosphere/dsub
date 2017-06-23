@@ -84,38 +84,34 @@ script, see the [Custom Scripts example](../examples/custom_scripts).
 
 ## --image "Docker image"
 
-Many software packages are already available in public Docker images at
-sites such as [Docker Hub](https://hub.docker.com/). If you find a Docker
-image with the software you need, you can use it directly in your `dsub` job
-with the `--image` flag.
+The `--image` flag allows you to specify the Docker image to be used for running
+a job. Many software packages are already available in public Docker images at
+sites such as [Docker Hub](https://hub.docker.com/). Images can be pulled
+from Docker Hub or any container registry:
+
+```
+--image debian:jessie           # pull image implicitly from Docker hub.
+--image gcr.io/PROJECT/IMAGE    # pull from GCR registry.
+--image quay.io/quay/ubuntu     # pull from Quay.io.
+```
 
 When you have more than a single custom script to run or you have dependent
 files, you need a way to get them into your Docker container at execution time.
+For portability, the recommended way to do this is to build a custom image and
+store it in a container registry.
 
-For portability, the recommended way to do this is to build your own Docker
-image and store it in a location, such as
-[Google Container Registry](https://cloud.google.com/container-registry/docs/).
+A quick way to start using custom Docker images is to use Google Container
+Builder which will build an image remotely and store it in the [Google Container
+Registry](https://cloud.google.com/container-registry/docs/). Alternatively you
+can build a Docker image locally and push it to a registry. See the
+[FastQC example](../examples/fastqc) for a demonstration of both strategies.
 
 For information on building Docker images, see the Docker documentation:
 
 * [Build your own image](https://docs.docker.com/engine/getstarted/step_four/)
 * [Best practices for writing Dockerfiles](https://docs.docker.com/engine/userguide/eng-image/dockerfile_best-practices/)
+* [Google Cloud Container Builder](https://cloud.google.com/container-builder/docs/)
 
-When you have built your Docker image, you can make it available to your dsub
-jobs by pushing the image into Google Container Registry:
-
-```
-docker tag ${USER}/MY-IMAGE gcr.io/MY-PROJECT/MY-IMAGE
-gcloud docker -- push gcr.io/MY-PROJECT/MY-IMAGE
-```
-
-Replace MY-PROJECT with your project ID.
-
-In your `dsub` command-line, add the `--image` flag:
-
-```
---image gcr.io/MY-PROJECT/MY-IMAGE
-```
 
 ## --input "path to file in cloud storage"
 

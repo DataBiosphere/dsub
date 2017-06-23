@@ -69,6 +69,7 @@ def print_error(msg):
 
 
 def get_default_user():
+  """Returns the current user."""
   return pwd.getpwuid(os.getuid())[0]
 
 

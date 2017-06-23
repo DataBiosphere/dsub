@@ -19,8 +19,6 @@ set -o nounset
 
 # Test copying input files and output files where input and output
 # parameter names are completely omitted.
-#
-# This test use the default stock image (ubuntu:14.04).
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 

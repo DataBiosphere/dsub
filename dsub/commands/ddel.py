@@ -28,11 +28,22 @@ def parse_arguments():
   Returns:
     A Namespace of parsed arguments.
   """
+  provider_required_args = {
+      'google': ['project'],
+      'test-fails': [],
+      'local': [],
+  }
+  epilog = 'Provider-required arguments:\n'
+  for provider in provider_required_args:
+    epilog += '  %s: %s\n' % (provider, provider_required_args[provider])
   parser = argparse.ArgumentParser(
-      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  parser.add_argument(
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter, epilog=epilog)
+  provider_base.add_provider_argument(parser)
+  google = parser.add_argument_group(
+      title='google',
+      description='Options for the Google provider (Pipelines API)')
+  google.add_argument(
       '--project',
-      required=True,
       help='Cloud project ID in which to find and delete the job(s)')
   parser.add_argument(
       '-j',

@@ -17,37 +17,32 @@
 set -o errexit
 set -o nounset
 
-# Test the google provider sets up the environment as expected.
+# Test for the --after and --wait flags
+
+readonly SCRIPT_DIR="$(dirname "${0}")"
 
 # Do standard test setup
-readonly SCRIPT_DIR="$(dirname "${0}")"
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-readonly COMMAND='\
-  echo "Working directory:"
-  pwd
+TGT_1="${OUTPUTS}/testfile_1.txt"
+TGT_2="${OUTPUTS}/testfile_2.txt"
 
-  echo "Data directory:"
-  ls /mnt/data
-
-  echo "Script directory:"
-  ls /mnt/data/script
-
-  echo "TMPDIR:"
-  echo "${TMPDIR}"
-'
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
-  "${DSUB}" \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING}" \
-    --image "ubuntu" \
-    --zones "us-central1-*" \
-    --name "google_env.sh" \
-    --command "${COMMAND}" \
+  JOBID=$(run_dsub \
+    --image 'ubuntu' \
+    --command 'sleep 5s; echo hi > $OUT' \
+    --output OUT="${TGT_1}")
+
+  run_dsub \
+    --image 'ubuntu' \
+    --command 'cat $IN > $OUT' \
+    --input  IN="${TGT_1}" \
+    --output OUT="${TGT_2}" \
+    --after "${JOBID}" \
     --wait
 
 fi
@@ -55,33 +50,16 @@ fi
 echo
 echo "Checking output..."
 
-# Check the results
-readonly RESULT_EXPECTED=$(cat <<EOF
-Working directory:
-/mnt/data/workingdir
-Data directory:
-lost+found
-script
-tmp
-workingdir
-Script directory:
-google_env.sh
-TMPDIR:
-/mnt/data/tmp
-EOF
-)
-
-readonly RESULT="$(gsutil cat "${STDOUT_LOG}")"
-if ! diff <(echo "${RESULT_EXPECTED}") <(echo "${RESULT}"); then
+readonly RESULT="$(gsutil cat "${TGT_2}")"
+if [[ "${RESULT}" != "hi" ]]; then
   echo "Output file does not match expected"
+  echo "Expected: hi"
+  echo "Got: ${RESULT}"
   exit 1
 fi
 
 echo
-echo "Output file matches expected:"
-echo "*****************************"
-echo "${RESULT}"
+echo "Output file matches expected."
 echo "*****************************"
 
 echo "SUCCESS"
-

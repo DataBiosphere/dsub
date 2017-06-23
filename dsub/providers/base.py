@@ -75,13 +75,13 @@ class JobProvider(object):
     raise NotImplementedError()
 
   @abstractmethod
-  def submit_job(self, job_resources, job_metadata, task_parameters):
+  def submit_job(self, job_resources, job_metadata, all_task_data):
     """Submit the job to be executed.
 
     Args:
       job_resources: resource parameters required by each job.
       job_metadata: job parameters such as job-id, user-id, script.
-      task_parameters: list of parameters to launch each job task.
+      all_task_data: list of parameters to launch each job task.
 
     job_resources contains settings related to how many resources to give each
     task. Its fields include: min_cores, min_ram, disk_size, boot_disk_size,
@@ -94,8 +94,8 @@ class JobProvider(object):
     Each contains the following fields: 'envs', 'inputs', 'outputs'.
 
     Returns:
-      A dictionary containing the 'job-id' and if there are tasks, a list
-      of the task ids under the key 'task-id'.
+      A dictionary containing the 'user-id', 'job-id', and 'task-id' list.
+      For jobs that are not task array jobs, the task-id list should be empty.
     """
     raise NotImplementedError()
 
@@ -113,7 +113,9 @@ class JobProvider(object):
 
     Returns:
       (list of tasks canceled,
-       for each task that couldn't be canceled, the error message)
+       for each task that couldn't be canceled, the error message).
+
+      Only tasks that were running are included in the return value.
     """
     raise NotImplementedError()
 

@@ -129,7 +129,7 @@ DOCKER_COMMAND = textwrap.dedent("""\
 INSTALL_CLOUD_SDK = textwrap.dedent("""\
   if ! type gsutil; then
     apt-get update
-    apt-get --yes install gcc python-dev python-setuptools ca-certificates
+    apt-get --yes install ca-certificates gcc gnupg2 python-dev python-setuptools
     easy_install -U pip
     pip install -U crcmod
 
@@ -681,6 +681,34 @@ class _Operations(object):
                              operation['error']['message']))
 
   @classmethod
+  def _get_operation_input_field_values(cls, metadata, file_input):
+    """Returns a dictionary of envs or file inputs for an operation.
+
+    Args:
+      metadata: operation metadata field
+      file_input: True to return a dict of file inputs, False to return envs.
+
+    Returns:
+      A dictionary of input field name value pairs
+    """
+
+    # To determine input parameter type, we iterate through the
+    # pipeline inputParameters.
+    # The values come from the pipelineArgs inputs.
+    input_args = metadata['request']['ephemeralPipeline']['inputParameters']
+    vals_dict = metadata['request']['pipelineArgs']['inputs']
+
+    # Get the names for files or envs
+    names = [
+        arg['name'] for arg in input_args if ('localCopy' in arg) == file_input
+    ]
+
+    # Build the return dict
+    values = {name: vals_dict[name] for name in names if name in vals_dict}
+
+    return values
+
+  @classmethod
   def get_operation_field(cls, operation, field, default=None):
     """Returns a value from the operation for a specific set of field names.
 
@@ -710,8 +738,10 @@ class _Operations(object):
       value = metadata['labels'].get('user-id')
     elif field == 'job-status':
       value = metadata['job-status']
+    elif field == 'envs':
+      value = cls._get_operation_input_field_values(metadata, False)
     elif field == 'inputs':
-      value = metadata['request']['pipelineArgs']['inputs']
+      value = cls._get_operation_input_field_values(metadata, True)
     elif field == 'outputs':
       value = metadata['request']['pipelineArgs']['outputs']
     elif field == 'create-time':
@@ -728,7 +758,7 @@ class _Operations(object):
       status, last_update = cls.operation_status_message(operation)
       value = last_update
     else:
-      raise ValueError('Unsupported display field: %s' % field)
+      raise ValueError('Unsupported display field: "%s"' % field)
 
     return value if value else default
 
@@ -963,21 +993,21 @@ class GoogleJobProvider(base.JobProvider):
 
     return self.get_task_field(operation, 'task-id')
 
-  def submit_job(self, job_resources, job_metadata, all_job_data):
+  def submit_job(self, job_resources, job_metadata, all_task_data):
     """Submit the job (or tasks) to be executed.
 
     Args:
       job_resources: resource parameters required by each job.
       job_metadata: job parameters such as job-id, user-id, script
-      all_job_data: list of job (or task) arguments
+      all_task_data: list of task arguments
 
     Returns:
-      A dictionary containing the 'job-id' and if there are tasks, a list
-      of the task ids under the key 'task-id'.
+      A dictionary containing the 'user-id', 'job-id', and 'task-id' list.
+      For jobs that are not task array jobs, the task-id list should be empty.
     """
     launched_tasks = []
     requests = []
-    for job_data in all_job_data:
+    for job_data in all_task_data:
       request = self._build_pipeline_request(job_resources, job_metadata,
                                              job_data)
 
@@ -992,13 +1022,11 @@ class GoogleJobProvider(base.JobProvider):
     if self._dry_run:
       print json.dumps(requests, indent=2, sort_keys=True)
 
-    launched_job = {
+    return {
         'job-id': job_metadata['job-id'],
         'user-id': job_metadata['user-id'],
         'task-id': launched_tasks
     }
-
-    return launched_job
 
   def lookup_job_tasks(self,
                        status_list,

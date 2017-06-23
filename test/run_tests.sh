@@ -33,41 +33,35 @@ readonly -f end_test
 
 # Functions that checks whether a test can be run for all providers
 
-function should_test_with_all_providers() {
+function get_test_providers() {
   local test_file="$(basename "${1}")"
+
+  local default_provider_list="google"
+  local all_provider_list="local google"
 
   # We use a naming convention on files that are provider-specific
   if [[ ${test_file} == e2e_*.local.sh ]] || \
      [[ ${test_file} == e2e_*.google.sh ]]; then
-    return 1
-  fi
-
-  # The local provider does not support "--tasks" jobs
-  if [[ ${test_file} == e2e_gcs_script_io_tasks.sh ]] || \
-     [[ ${test_file} == e2e_io_deprecated_table.sh ]] || \
-     [[ ${test_file} == e2e_io_gcs_tasks.sh ]] || \
-     [[ ${test_file} == e2e_io_tasks.sh ]]; then
-    return 1
+    # Return the last token before the ".sh"
+    echo "${test_file}" | awk -F . '{ print $(NF-1) }'
+    return
   fi
 
   # The local provider does not support --input-recursive or --output-recursive
   if [[ ${test_file} == e2e_io_recursive.sh ]]; then
-    return 1
+    echo "${default_provider_list}"
+    return
   fi
 
   # The local provider does not support gcr.io images
   if [[ ${test_file} == e2e_non_root.sh ]]; then
-    return 1
+    echo "${default_provider_list}"
+    return
   fi
 
-  # Python tests do not support the local provider
-  if [[ ${test_file} == e2e_*.py ]]; then
-    return 1
-  fi
-
-  return 0
+  echo "${all_provider_list}"
 }
-readonly -f should_test_with_all_providers
+readonly -f get_test_providers
 
 # Begin execution
 readonly RUN_TESTS_STARTSEC=$(date +'%s')
@@ -147,10 +141,7 @@ for TEST_TYPE in "${TESTS[@]}"; do
   fi
 
   for TEST in "${TEST_LIST[@]}"; do
-    PROVIDER_LIST=(google)
-    if should_test_with_all_providers "${TEST}"; then
-      PROVIDER_LIST=(local google)
-    fi
+    PROVIDER_LIST=($(get_test_providers "${TEST}"))
 
     for PROVIDER in "${PROVIDER_LIST[@]}"; do
 
@@ -159,15 +150,16 @@ for TEST_TYPE in "${TESTS[@]}"; do
 
       if [[ "${TEST}" == *.py ]]; then
         # Execute the test as a module, such as "python -m test.e2e_env_list"
-        python -m "test.integration.$(basename "${TEST%.py}")"
+        DSUB_PROVIDER="${PROVIDER}" \
+          python -m "test.integration.$(basename "${TEST%.py}")"
       else
         DSUB_PROVIDER="${PROVIDER}" "${TEST}"
       fi
 
-    done
+      end_test "${TEST_LABEL}"
+      echo
 
-    end_test "${TEST_LABEL}"
-    echo
+    done
   done
 done
 

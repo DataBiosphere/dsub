@@ -19,8 +19,6 @@ set -o nounset
 
 # Test copying input files to and output files from directories.
 #
-# This test use the default stock image (ubuntu:14.04).
-#
 # This test is designed to verify that named file input and output path
 # command-line parameters work correctly.
 #

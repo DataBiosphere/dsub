@@ -37,6 +37,9 @@ ${TMPDIR}/dsub-local/job-id/task-id/output_mnt/.
 Task status files are staged to ${TMPDIR}/tmp/dsub-local/job-id/task-id/.
 The task status files include logs and scripts to drive the task.
 
+task-id is the task index, or "task" for a job that didn't specify a list
+of tasks.
+
 Thus using the local runner requires:
 
 * Docker Engine to be installed.
@@ -57,11 +60,14 @@ dstat and ddel do not currently work with the local runner.
 from collections import namedtuple
 from datetime import datetime
 import os
+import signal
 import subprocess
 import tempfile
 import textwrap
 from . import base
+from ..lib import dsub_util
 from ..lib import param_util
+import yaml
 
 # The local runner allocates space on the host under
 #   ${TMPDIR}/dsub-local/
@@ -99,7 +105,10 @@ WORKING_DIR = 'workingdir'
 DATA_MOUNT_POINT = '/mnt/data'
 
 # The task object for this provider. "job_status" is really task status.
-Task = namedtuple('Task', ['job_id', 'task_id', 'job_status', 'status_message'])
+Task = namedtuple('Task', [
+    'job_id', 'task_id', 'job_status', 'status_message', 'job_name',
+    'create_time', 'last_update', 'inputs', 'outputs', 'envs', 'user_id', 'pid'
+])
 
 
 class LocalJobProvider(base.JobProvider):
@@ -114,32 +123,39 @@ class LocalJobProvider(base.JobProvider):
     return {
         'job-id': self._make_job_id(job_name_value, user_id),
         'job-name': job_name_value,
+        'user-id': user_id,
     }
 
-  def submit_job(self, job_resources, job_metadata, task_parameters):
+  def submit_job(self, job_resources, job_metadata, all_task_data):
     script = job_metadata['script']
-    ret = {'job-id': job_metadata['job-id'], 'task-id': []}
-    for task_id in range(len(task_parameters)):
+
+    launched_tasks = []
+    for task_data in all_task_data:
+      task_id = task_data.get('task_id')
 
       # Set up directories
       task_dir = self._task_directory(job_metadata['job-id'], task_id)
       print 'dsub task directory: ' + task_dir
-      print('WARNING: dstat and ddel not yet implemented for the local '
-            'provider.')
-      task_io = task_parameters[task_id]
-      self._mkdir_outputs(task_dir, task_io)
+      self._mkdir_outputs(task_dir, task_data)
 
       self._stage_script(task_dir, script.name, script.value)
 
       # Start the task
-      env = self._make_environment(task_io)
+      env = self._make_environment(task_data)
       self._run_docker_via_script(task_dir, env, job_resources, job_metadata,
-                                  task_io)
-      ret['task-id'].append(str(task_id))
-    return ret
+                                  task_data, task_id)
+      self._write_task_metadata(job_metadata, task_data, task_id)
+      if task_id is not None:
+        launched_tasks.append(str(task_id))
+
+    return {
+        'job-id': job_metadata['job-id'],
+        'user-id': job_metadata['user-id'],
+        'task-id': launched_tasks
+    }
 
   def _run_docker_via_script(self, task_dir, env, job_resources, job_metadata,
-                             task_io):
+                             task_data, task_id):
     script_header = textwrap.dedent("""\
       #!/bin/bash
 
@@ -224,9 +240,6 @@ class LocalJobProvider(base.JobProvider):
 
       # execution
       log_info "running docker image"
-      # we are using :- with ENVIRONMENTS because in the case where there is
-      # neither input, output, or explicit environment variable, bash
-      # (erronously?) claims that ENVIRONMENTS is unset and fails at this point.
       docker run \
          --name "${NAME}" \
          -w "${DATA_MOUNT_POINT}/${WORKING_DIR}" \
@@ -259,7 +272,7 @@ class LocalJobProvider(base.JobProvider):
                                       job_metadata['job-id'])
     script = script_header.format(
         volumes=volumes,
-        name=job_metadata['job-id'],
+        name=self._get_docker_name(job_metadata['job-id'], task_id),
         image=job_resources.image,
         script=DATA_MOUNT_POINT + '/' + SCRIPT_DIR + '/' +
         job_metadata['script'].name,
@@ -269,9 +282,9 @@ class LocalJobProvider(base.JobProvider):
         logging=logging,
         date_format='+%Y/%m/%d %H:%M:%S',
         workingdir=WORKING_DIR,
-        stage_command=self._stage_inputs_command(task_dir, task_io),
+        stage_command=self._stage_inputs_command(task_dir, task_data),
         unstage_command=self._unstage_outputs_commands(task_dir,
-                                                       task_io)) + script_body
+                                                       task_data)) + script_body
 
     # Write the local runner script
     script_fname = task_dir + '/runner.sh'
@@ -281,28 +294,95 @@ class LocalJobProvider(base.JobProvider):
     os.chmod(script_fname, 0500)
 
     # Write the environment variables
-    env_vars = env.items() + task_io['envs'] + [
+    env_vars = env.items() + task_data['envs'] + [
         param_util.EnvParam('DATA_ROOT', DATA_MOUNT_POINT),
-        param_util.EnvParam('TMPDIR', DATA_MOUNT_POINT + '/tmp/')
+        param_util.EnvParam('TMPDIR', DATA_MOUNT_POINT + '/tmp')
     ]
     env_fname = task_dir + '/docker.env'
     with open(env_fname, 'wt') as f:
       for e in env_vars:
         f.write(e[0] + '=' + e[1] + '\n')
 
-    # Execute the local runner script
-    pid = subprocess.Popen([script_fname]).pid
+    # Execute the local runner script.
+    # Redirecting the output to a file ensures that
+    # JOBID=$(dsub ...) doesn't block until docker returns.
+    runner_log = open(task_dir + '/runner-log.txt', 'wt')
+    runner = subprocess.Popen(
+        [script_fname], stderr=runner_log, stdout=runner_log)
+    pid = runner.pid
     f = open(task_dir + '/task.pid', 'wt')
     f.write(str(pid) + '\n')
     f.close()
     return pid
 
   def delete_jobs(self, user_list, job_list, task_list):
-    del user_list, job_list, task_list
-    raise NotImplementedError()
+    # As per the spec, we ignore anything not running.
+    tasks = self.lookup_job_tasks(['RUNNING'], user_list, job_list, task_list)
+    canceled = []
+    cancel_errors = []
+    for task in tasks:
+      job_id = self.get_task_field(task, 'job-id')
+      task_id = self.get_task_field(task, 'task-id')
+      task_name = '%s/%s' % (job_id, task_id) if task_id is not None else job_id
+
+      # try to cancel it for real. First, docker
+      docker_name = self._get_docker_name_for_task(task)
+      try:
+        subprocess.check_output(['docker', 'kill', docker_name])
+      except subprocess.CalledProcessError as cpe:
+        cancel_errors += [
+            'Unable to cancel %s: docker error %s:\n%s' %
+            (task_name, cpe.returncode, cpe.output)
+        ]
+        continue
+
+      # The script should have quit in response. If it hasn't, kill it.
+      pid = self.get_task_field(task, 'pid', 0)
+      if pid <= 0:
+        cancel_errors += ['Unable to cancel %s: missing pid.' % task_name]
+        continue
+      try:
+        os.kill(pid, signal.SIGTERM)
+      except OSError as err:
+        cancel_errors += [
+            'Error while canceling %s: kill(%s) failed (%s).' % (task_name, pid,
+                                                                 str(err))
+        ]
+      canceled += [task]
+
+      # Mark the job as 'CANCELED' for the benefit of dstat
+      task_dir = self._task_directory(
+          self.get_task_field(task, 'job-id'),
+          self.get_task_field(task, 'task-id'))
+      with open(task_dir + '/status.txt', 'wt') as f:
+        f.write('CANCELED\n')
+      today = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+      msg = 'Operation canceled at %s\n' % today
+      with open(task_dir + '/status_message.txt', 'wt') as f:
+        f.write(msg)
+      with open(task_dir + '/log.txt', 'a') as f:
+        f.write(msg)
+
+    return (canceled, cancel_errors)
 
   def get_task_field(self, task, field, default=None):
-    return task._asdict().get(field.replace('-', '_'), default)
+    # Convert the incoming Task object to a dict.
+    # With the exception of "status', the dsub "field" names map directly to the
+    # Task members where "-" in the field name is "_" in the Task member name.
+    tad = {
+        key.replace('_', '-'): value
+        for key, value in task._asdict().iteritems()
+    }
+
+    # dstat expects to find a field called "status" that contains
+    # status if SUCCESS, status-message otherwise
+    if field == 'status':
+      if tad.get('job-status', '') == 'SUCCESS':
+        return 'Success'
+      else:
+        return tad.get('status-message', None)
+
+    return tad.get(field, default)
 
   def lookup_job_tasks(self,
                        status_list,
@@ -320,19 +400,26 @@ class LocalJobProvider(base.JobProvider):
       task_list = None
 
     if user_list:
-      raise NotImplementedError(
-          'Filtering by user is not yet implemented for the local provider.')
-    if not job_list:
-      raise NotImplementedError('Local provider currently requires a job list.')
+      user = dsub_util.get_default_user()
+      # We only allow no filtering or filtering by current user.
+      if any([u for u in user_list if u != user]):
+        raise NotImplementedError(
+            'Filtering by user is not implemented for the local provider'
+            ' (%s)' % str(user_list))
     ret = []
+    if not job_list:
+      # default to every job we know about
+      job_list = os.listdir(self._provider_root())
     for j in job_list:
       path = self._provider_root() + '/' + j
       if not os.path.isdir(path):
         continue
       for task_id in os.listdir(path):
+        if task_id == 'task':
+          task_id = None
         if task_list and task_id not in task_list:
           continue
-        ret.append(self._get_task(j, task_id))
+        ret.append(self._get_task_from_task_dir(j, task_id))
         if max_jobs > 0 and len(ret) > max_jobs:
           break
     return ret
@@ -348,32 +435,93 @@ class LocalJobProvider(base.JobProvider):
 
   # private methods
 
-  def _get_task(self, job_id, task_id):
+  def _write_task_metadata(self, job_metadata, task_data, task_id):
+    """Write a file with the data needed for dstat."""
+
+    # Build up a dict to dump a YAML file with relevant task details:
+    #   job-id: <id>
+    #   task-id: <id>
+    #   job-name: <name>
+    #   inputs:
+    #     name: value
+    #   outputs:
+    #     name: value
+    #   envs:
+    #     name: value
+    data = {
+        'job-id': job_metadata['job-id'],
+        'task-id': task_id,
+        'job-name': job_metadata['job-name'],
+    }
+    for key in ['inputs', 'outputs', 'envs']:
+      if task_data.has_key(key):
+        data[key] = {}
+        for param in task_data[key]:
+          data[key][param.name] = param.value
+
+    task_dir = self._task_directory(job_metadata['job-id'], task_id)
+    with open(task_dir + '/meta.yaml', 'wt') as f:
+      f.write(yaml.dump(data))
+
+  def _get_task_from_task_dir(self, job_id, task_id):
     """Return a Task object with this task's info."""
     path = self._task_directory(job_id, task_id)
+    status = 'uninitialized'
+    meta = {}
+    last_update = 0
+    create_time = 0
+    user_id = -1
+    pid = -1
     try:
       status_message = ''
       with open(path + '/status.txt', 'r') as f:
         status = f.readline().strip()
       with open(path + '/status_message.txt', 'r') as f:
         status_message = ''.join(f.readlines())
+      with open(path + '/meta.yaml', 'r') as f:
+        meta = yaml.load('\n'.join(f.readlines()))
+      last_update = max([
+          os.path.getmtime(path + filename)
+          for filename in ['/status.txt', '/status_message.txt', '/meta.yaml']
+      ])
+      create_time = os.path.getmtime(path + '/task.pid')
+      user_id = os.stat(path + '/task.pid').st_uid
     except IOError:
       # Files are not there yet.
       # It's a bit of a misnomer, but there is no PENDING status.
       status = 'RUNNING'
+      status_message = 'Process not found yet'
 
     if status == 'RUNNING':
       # double-check running jobs, because it may have been killed but unable to
       # update status (kill -9).
-      with open(path + '/task.pid', 'r') as f:
-        pid = int(f.readline().strip())
       try:
-        os.kill(pid, 0)
-      except OSError:
-        # process is not running
+        with open(path + '/task.pid', 'r') as f:
+          pid = int(f.readline().strip())
+        try:
+          os.kill(pid, 0)
+        except OSError:
+          # process is not running
+          status = 'CANCELED'
+          status_message = 'Process was killed.'
+      except IOError:
+        # pid file does not exist, may be from an old version of dsub
         status = 'CANCELED'
-        status_message = 'Process was killed.'
-    return Task(job_id, task_id, status, status_message)
+        status_message = 'task.pid missing'
+    return Task(
+        job_id,
+        task_id,
+        status,
+        status_message,
+        meta.get('job-name', None),
+        datetime.fromtimestamp(create_time),
+        datetime.fromtimestamp(last_update) if last_update > 0 else None,
+        meta.get('inputs', None),
+        meta.get('outputs', None),
+        meta.get('envs', None),
+        # it's called default_user but actually returns the current user
+        dsub_util.get_default_user() if user_id >= 0 else None,
+        pid)
 
   def _provider_root(self):
     if not self.provider_root_cache:
@@ -422,24 +570,25 @@ class LocalJobProvider(base.JobProvider):
     return '%s--%s--%s' % (job_name_value[:10], user_id,
                            datetime.now().strftime('%y%m%d-%H%M%S-%f'))
 
-  def _task_directory(self, job_id, task_index):
+  def _task_directory(self, job_id, task_id):
     """The local dir for staging files for that particular task."""
-    return self._provider_root() + '/' + job_id + '/' + str(task_index)
+    dir_name = 'task' if task_id is None else str(task_id)
+    return self._provider_root() + '/' + job_id + '/' + dir_name
 
-  def _make_environment(self, task_io):
+  def _make_environment(self, task_data):
     """Return a dictionary of environment variables for the VM."""
     ret = {}
-    ins = task_io.get('inputs', [])
+    ins = task_data.get('inputs', [])
     for i in ins:
       ret[i.name] = DATA_MOUNT_POINT + '/' + i.docker_path
-    outs = task_io.get('outputs', [])
+    outs = task_data.get('outputs', [])
     for o in outs:
       ret[o.name] = DATA_MOUNT_POINT + '/' + o.docker_path
     return ret
 
-  def _stage_inputs_command(self, task_dir, task_io):
+  def _stage_inputs_command(self, task_dir, task_data):
     """Returns a command that will stage inputs."""
-    ins = task_io.get('inputs', [])
+    ins = task_data.get('inputs', [])
     commands = []
     for i in ins:
       if i.recursive:
@@ -451,10 +600,10 @@ class LocalJobProvider(base.JobProvider):
       commands.append('gsutil -q cp %s %s' % (gcs_file_path, local_file_path))
     return '\n'.join(commands)
 
-  def _mkdir_outputs(self, task_dir, task_io):
+  def _mkdir_outputs(self, task_dir, task_data):
     os.makedirs(task_dir + '/' + DATA_SUBDIR + '/' + WORKING_DIR)
     os.makedirs(task_dir + '/' + DATA_SUBDIR + '/tmp')
-    outs = task_io.get('outputs', [])
+    outs = task_data.get('outputs', [])
     for o in outs:
       if o.recursive:
         raise NotImplementedError(
@@ -462,9 +611,9 @@ class LocalJobProvider(base.JobProvider):
       local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + o.docker_path
       os.makedirs(os.path.dirname(local_file_path))
 
-  def _unstage_outputs_commands(self, task_dir, task_io):
+  def _unstage_outputs_commands(self, task_dir, task_data):
     """copy outputs from local disk to GCS."""
-    outs = task_io.get('outputs', [])
+    outs = task_data.get('outputs', [])
     commands = []
     for o in outs:
       local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + o.docker_path
@@ -481,6 +630,21 @@ class LocalJobProvider(base.JobProvider):
     f.close()
     st = os.stat(path)
     os.chmod(path, st.st_mode | 0111)
+
+  def _get_docker_name_for_task(self, task):
+    return self._get_docker_name(
+        self.get_task_field(task, 'job-id'),
+        self.get_task_field(task, 'task-id'))
+
+  def _get_docker_name(self, job_id, task_id):
+    # The name of the docker container is formatted as either:
+    #  <job-id>.<task-id>
+    # for "task" jobs, or just <job-id> for non-task jobs
+    # (those have "None" as the task ID).
+    if task_id is None:
+      return job_id
+    else:
+      return '%s.%s' % (job_id, task_id)
 
 
 if __name__ == '__main__':
