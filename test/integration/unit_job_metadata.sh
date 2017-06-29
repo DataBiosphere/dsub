@@ -191,7 +191,7 @@ readonly -f test_long_name
 # Run the tests
 trap "exit_handler" EXIT
 
-mkdir -p "${TEST_TEMP}"
+mkdir -p "${TEST_TMP}"
 
 echo
 test_default_name_from_script

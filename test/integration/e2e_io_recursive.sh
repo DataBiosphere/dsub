@@ -46,11 +46,11 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
-trap "util::exit_handler ${TEST_TEMP}" EXIT
+trap "util::exit_handler ${TEST_TMP}" EXIT
 
 readonly FILE_CONTENTS="Test file contents"
 
-readonly INPUT_ROOT="${TEST_TEMP}/inputs"
+readonly INPUT_ROOT="${TEST_TMP}/inputs"
 readonly INPUT_DEEP="${INPUT_ROOT}/deep"
 readonly INPUT_SHALLOW="${INPUT_ROOT}/shallow"
 
@@ -65,7 +65,7 @@ readonly DIR_LIST=(
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
-  mkdir -p "${TEST_TEMP}"
+  mkdir -p "${TEST_TMP}"
 
   echo "Setting up pipeline input..."
 

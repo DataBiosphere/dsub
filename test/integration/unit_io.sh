@@ -267,7 +267,7 @@ readonly -f test_output_recursive
 # Run the tests
 trap "exit_handler" EXIT
 
-mkdir -p "${TEST_TEMP}"
+mkdir -p "${TEST_TMP}"
 
 echo
 test_input_file

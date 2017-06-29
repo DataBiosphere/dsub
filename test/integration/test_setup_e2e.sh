@@ -101,7 +101,7 @@ echo "Input path: ${INPUTS}"
 echo "Output path: ${OUTPUTS}"
 
 # For tests that exercise remote dsub parameters (like TSV file)
-readonly DSUB_PARAMS="gs://${DSUB_BUCKET}/dsub/sh/${TEST_NAME}/params"
+readonly DSUB_PARAMS="${TEST_REMOTE_ROOT}/params"
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]] && \
    [[ "${ALLOW_DIRTY_TESTS:-0}" -eq 0 ]]; then
@@ -120,6 +120,7 @@ if [[ -n "${TASKS_FILE:-}" ]]; then
   # For a task file test, set up the task file from its template
   # This should really be a feature of dsub directly...
   echo "Setting up task file ${TASKS_FILE}"
+  mkdir -p "$(dirname "${TASKS_FILE}")"
   cat "${TASKS_FILE_TMPL}" \
     | util::expand_tsv_fields \
     > "${TASKS_FILE}"

@@ -14,8 +14,10 @@
 """Tests for dsub.lib.param_util."""
 
 from __future__ import absolute_import
+import os
 import unittest
 from dsub.lib import param_util
+import parameterized
 
 
 class ParamUtilTest(unittest.TestCase):
@@ -77,6 +79,66 @@ class ParamUtilTest(unittest.TestCase):
       self.assertEqual('OUTPUT_PATH', job_data['outputs'][0].name)
       self.assertEqual('output/gs/outputs/results-00%d/' % i,
                        job_data['outputs'][0].docker_path)
+
+
+class InputParamUtilTestFixture(param_util.InputFileParamUtil):
+  pass
+
+
+class OutputParamUtilTestFixture(param_util.OutputFileParamUtil):
+  pass
+
+
+class FileParamUtilTest(unittest.TestCase):
+
+  @parameterized.parameterized.expand([
+      ('gf', False, 'gs://tmp/myfile', 'gs/tmp/myfile'),
+      ('gf', False, 'gs://tmp/myfile', 'gs/tmp/myfile'),
+      ('gf', False, 'gs://bucket/../myfile', 'gs/bucket/../myfile'),
+      # Recursive tests for local and google
+      ('gr', True, 'gs://tmp/myfile/', 'gs/tmp/myfile/'),
+      ('gr', True, 'gs://tmp/myfile', 'gs/tmp/myfile/'),
+      ('gr', True, 'gs://bucket/../myfile', 'gs/bucket/../myfile/'),
+      # wildcard tests for local and google.
+      ('wc', False, 'gs://bucket/f/*.txt', 'gs/bucket/f/'),
+      ('wc', False, 'gs://bucket/f/*', 'gs/bucket/f/'),
+  ])
+  def test_input_file_docker_rewrite(self, unused_name, recursive, uri, docker):
+    expected_path = os.path.join('input', docker)
+    file_param_util = InputParamUtilTestFixture('input')
+    found_docker_path, _ = file_param_util.parse_uri(uri, recursive)
+    self.assertEqual(expected_path, found_docker_path)
+
+  @parameterized.parameterized.expand([
+      # Non-recursive tests for local and google
+      ('gf', False, 'gs://tmp/myfile', 'gs/tmp/myfile'),
+      ('gf', False, 'gs://tmp/myfile', 'gs/tmp/myfile'),
+      ('gf', False, 'gs://bucket/../myfile', 'gs/bucket/../myfile'),
+      # Recursive tests for local and google
+      ('gr', True, 'gs://tmp/myfile/', 'gs/tmp/myfile/'),
+      ('gr', True, 'gs://tmp/myfile', 'gs/tmp/myfile/'),
+      ('gr', True, 'gs://bucket/../myfile', 'gs/bucket/../myfile/'),
+      # wildcard tests for local and google.
+      ('wc', False, 'gs://bucket/f/*.txt', 'gs/bucket/f/*.txt'),
+      ('wc', False, 'gs://bucket/f/*', 'gs/bucket/f/*'),
+  ])
+  def test_out_file_docker_rewrite(self, unused_name, recursive, uri, docker):
+    expected_path = os.path.join('output', docker)
+    file_param_util = OutputParamUtilTestFixture('output')
+    found_docker_path, _ = file_param_util.parse_uri(uri, recursive)
+    self.assertEqual(expected_path, found_docker_path)
+
+  @parameterized.parameterized.expand([
+      ('gf', True, 'gs://tmp/myfile/*', 'recursive must not contain wildcards'),
+      ('gf', False, '/tmp/myfile/*', 'Only Cloud Storage URIs'),
+      ('gf', False, 'gs://myfile/*/*', 'only supported for files'),
+      ('gf', False, 'gs://myfile/?', 'Question mark'),
+      ('gf', False, 'gs://myfile/**', 'Recursive'),
+  ])
+  def test_output_val_err(self, unused_name, recursive, uri, regex):
+    file_param_util = OutputParamUtilTestFixture('output')
+    with self.assertRaisesRegexp(ValueError, regex):
+      file_param_util.parse_uri(uri, recursive)
 
 
 if __name__ == '__main__':

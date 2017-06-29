@@ -27,7 +27,7 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
 readonly INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam"
 
-readonly BUILD_DIR="${TEST_TEMP}/${TEST_NAME}"
+readonly BUILD_DIR="${TEST_TMP}/${TEST_NAME}"
 readonly DOCKERFILE="${BUILD_DIR}/Dockerfile"
 readonly IMAGE=gcr.io/${PROJECT_ID}/dsub_usertest:$(date +%Y-%m-%d)_${RANDOM}
 

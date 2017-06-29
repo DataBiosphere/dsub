@@ -225,7 +225,7 @@ readonly -f test_preemptible
 # Run the tests
 trap "exit_handler" EXIT
 
-mkdir -p "${TEST_TEMP}"
+mkdir -p "${TEST_TMP}"
 
 echo
 test_with_command

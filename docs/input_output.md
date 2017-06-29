@@ -180,7 +180,7 @@ command exits with success.
 The Docker container will receive the environment variable:
 
 ```
-OUTPUT_PATH=/mnt/data/output/gs/bucket/path/
+OUTPUT_PATH=/mnt/data/output/gs/bucket/path
 ```
 
 ## Notice
