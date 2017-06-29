@@ -48,7 +48,7 @@ readonly -f run_dsub
 function test_input_file() {
   local subtest="${FUNCNAME[0]}"
 
-  local tsv_file="${TEST_TEMP}/${subtest}.tsv"
+  local tsv_file="${TEST_TMP}/${subtest}.tsv"
 
   # Create a simple TSV file
   util::write_tsv_file "${tsv_file}" \
@@ -84,7 +84,7 @@ readonly -f test_input_file
 function test_input_auto() {
   local subtest="${FUNCNAME[0]}"
 
-  local tsv_file="${TEST_TEMP}/${subtest}.tsv"
+  local tsv_file="${TEST_TMP}/${subtest}.tsv"
 
   # Create a simple TSV file
   util::write_tsv_file "${tsv_file}" \
@@ -120,7 +120,7 @@ readonly -f test_input_auto
 function test_output_file() {
   local subtest="${FUNCNAME[0]}"
 
-  local tsv_file="${TEST_TEMP}/${subtest}.tsv"
+  local tsv_file="${TEST_TMP}/${subtest}.tsv"
 
   # Create a simple TSV file
   util::write_tsv_file "${tsv_file}" \
@@ -156,7 +156,7 @@ readonly -f test_output_file
 function test_output_auto() {
   local subtest="${FUNCNAME[0]}"
 
-  local tsv_file="${TEST_TEMP}/${subtest}.tsv"
+  local tsv_file="${TEST_TMP}/${subtest}.tsv"
 
   # Create a simple TSV file
   util::write_tsv_file "${tsv_file}" \
@@ -193,7 +193,7 @@ readonly -f test_output_auto
 function test_input_recursive() {
   local subtest="${FUNCNAME[0]}"
 
-  local tsv_file="${TEST_TEMP}/${subtest}.tsv"
+  local tsv_file="${TEST_TMP}/${subtest}.tsv"
 
   # Create a simple TSV file
   util::write_tsv_file "${tsv_file}" \
@@ -237,7 +237,7 @@ readonly -f test_input_recursive
 function test_output_recursive() {
   local subtest="${FUNCNAME[0]}"
 
-  local tsv_file="${TEST_TEMP}/${subtest}.tsv"
+  local tsv_file="${TEST_TMP}/${subtest}.tsv"
 
   # Create a simple TSV file
   util::write_tsv_file "${tsv_file}" \
@@ -281,7 +281,7 @@ readonly -f test_output_recursive
 # Run the tests
 trap "exit_handler" EXIT
 
-mkdir -p "${TEST_TEMP}"
+mkdir -p "${TEST_TMP}"
 
 echo
 test_input_file

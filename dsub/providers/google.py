@@ -35,6 +35,7 @@ from apiclient import errors
 from apiclient.discovery import build
 from dateutil.tz import tzlocal
 
+from ..lib import providers_util
 from oauth2client.client import GoogleCredentials
 import pytz
 
@@ -372,49 +373,18 @@ class _Pipelines(object):
     export_input_dirs = ''
     copy_input_dirs = ''
     if recursive_input_dirs:
-      export_input_dirs = '\n'.join([
-          'export {0}={1}/{2}'.format(var.name, DATA_MOUNT_POINT,
-                                      var.docker_path.rstrip('/'))
-          for var in recursive_input_dirs
-      ])
-
-      copy_input_dirs = '\n'.join([
-          textwrap.dedent("""
-          mkdir -p {1}/{2}
-          for ((i = 0; i < 3; i++)); do
-            if gsutil -m rsync -r {0} {1}/{2}; then
-              break
-            elif ((i == 2)); then
-              2>&1 echo "Recursive localization failed."
-              exit 1
-            fi
-          done
-          """).format(var.remote_uri, DATA_MOUNT_POINT, var.docker_path)
-          for var in recursive_input_dirs
-      ])
+      export_input_dirs = providers_util.build_recursive_localize_env(
+          DATA_MOUNT_POINT, inputs)
+      copy_input_dirs = providers_util.build_recursive_gcs_localize_command(
+          DATA_MOUNT_POINT, inputs)
 
     export_output_dirs = ''
     copy_output_dirs = ''
     if recursive_output_dirs:
-      export_output_dirs = '\n'.join([
-          'export {0}={1}/{2}'.format(var.name, DATA_MOUNT_POINT,
-                                      var.docker_path.rstrip('/'))
-          for var in recursive_output_dirs
-      ])
-
-      copy_output_dirs = '\n'.join([
-          textwrap.dedent("""
-          for ((i = 0; i < 3; i++)); do
-            if gsutil -m rsync -r {0}/{1} {2}; then
-              break
-            elif ((i == 2)); then
-              2>&1 echo "Recursive de-localization failed."
-              exit 1
-            fi
-          done
-          """).format(DATA_MOUNT_POINT, var.docker_path, var.remote_uri)
-          for var in recursive_output_dirs
-      ])
+      export_output_dirs = providers_util.build_recursive_gcs_delocalize_env(
+          DATA_MOUNT_POINT, outputs)
+      copy_output_dirs = providers_util.build_recursive_gcs_delocalize_command(
+          DATA_MOUNT_POINT, outputs)
 
     mkdirs = '\n'.join([
         'mkdir -p {0}/{1}'.format(DATA_MOUNT_POINT, var.docker_path if

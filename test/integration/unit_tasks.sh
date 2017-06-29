@@ -151,10 +151,10 @@ readonly -f test_task_range
 # Set up for running the tests
 trap "exit_handler" EXIT
 
-mkdir -p "${TEST_TEMP}"
+mkdir -p "${TEST_TMP}"
 
 # Create a simple TSV file
-readonly TSV_FILE="${TEST_TEMP}/${TEST_NAME}.tsv"
+readonly TSV_FILE="${TEST_TMP}/${TEST_NAME}.tsv"
 util::write_tsv_file "${TSV_FILE}" \
 '
   --input INPUT_PATH

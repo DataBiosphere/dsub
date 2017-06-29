@@ -27,6 +27,6 @@ readonly LOGGING=gs://bucket/path/logging
 readonly SCRIPT="${SCRIPT_DIR}/dummy.sh"
 readonly ZONE="us-central1-f"
 
-readonly TEST_STDOUT=${TEST_TEMP}/stdout.txt
-readonly TEST_STDERR=${TEST_TEMP}/stderr.txt
+readonly TEST_STDOUT=${TEST_TMP}/stdout.txt
+readonly TEST_STDERR=${TEST_TMP}/stderr.txt
 

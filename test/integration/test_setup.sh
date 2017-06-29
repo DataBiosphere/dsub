@@ -20,9 +20,10 @@
 # The code here will:
 #
 # * Set the TEST_NAME based on the name of the calling script.
-# * Set variables for DSUB and TEST_DIR
+# * Set a DSUB variable to point to the dsub executable.
+# * Set the TEST_DIR to the directory the test file is in.
 # * For task file tests, set TASKS_FILE and TASKS_FILE_TMPL.
-# * Set the TEST_TEMP variable for a temporary directory.
+# * Set the TEST_TMP variable for a temporary directory.
 
 # Compute the name of the test from the calling script
 readonly TEST_NAME="$(basename "${0}" | \
@@ -36,9 +37,9 @@ readonly DSUB="dsub"
 
 readonly TEST_DIR="${SCRIPT_DIR}"
 
+readonly TEST_TMP="${TEST_TMP:-/tmp/dub_test/sh/${TEST_NAME}}/tmp"
+
 if [[ "${TEST_NAME}" == *_tasks ]]; then
   readonly TASKS_FILE_TMPL="${TEST_DIR}/${TASKS_FILE_TMPL_NAME:-${TEST_NAME}}.tsv.tmpl"
-  readonly TASKS_FILE="${TEST_DIR}/${TEST_NAME}.tsv"
+  readonly TASKS_FILE="${TEST_TMP}/${TEST_NAME}.tsv"
 fi
-
-readonly TEST_TEMP=${TEST_DIR}/_tmp

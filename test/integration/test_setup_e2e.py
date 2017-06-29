@@ -43,7 +43,7 @@ from dsub.commands import dsub as dsub_command
 import test_setup
 import test_util
 
-TEST_VARS = ("TEST_NAME", "TEST_DIR", "TEST_TEMP", "TASKS_FILE",
+TEST_VARS = ("TEST_NAME", "TEST_DIR", "TEST_TMP", "TASKS_FILE",
              "TASKS_FILE_TMPL",)
 TEST_E2E_VARS = ("PROJECT_ID", "DSUB_BUCKET", "LOGGING", "INPUTS", "OUTPUTS",
                  "DOCKER_INPUTS", "DOCKER_OUTPUTS",)
@@ -61,7 +61,7 @@ def _environ():
 # Copy test_setup variables
 TEST_NAME = test_setup.TEST_NAME
 TEST_DIR = test_setup.TEST_DIR
-TEST_TEMP = test_setup.TEST_TEMP
+TEST_TMP = test_setup.TEST_TMP
 TASKS_FILE = test_setup.TASKS_FILE
 TASKS_FILE_TMPL = test_setup.TASKS_FILE_TMPL
 
@@ -137,6 +137,7 @@ if TASKS_FILE:
   # For a task file test, set up the task file from its template
   # This should really be a feature of dsub directly...
   print "Setting up task file %s" % TASKS_FILE
+  os.makedirs(os.path.dirname(TASKS_FILE))
   test_util.expand_tsv_fields(_environ(), TASKS_FILE_TMPL, TASKS_FILE)
 
 

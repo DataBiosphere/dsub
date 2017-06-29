@@ -22,7 +22,7 @@ function exit_handler() {
 
   if [[ "${code}" -eq 0 ]]; then
     # Only clean-up the temp dir if all tests pass
-    rm -rf "${TEST_TEMP}"
+    rm -rf "${TEST_TMP}"
 
     echo
     echo "$(basename "${0}") exiting with SUCCESS"

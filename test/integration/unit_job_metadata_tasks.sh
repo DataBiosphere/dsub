@@ -49,7 +49,7 @@ readonly -f run_dsub
 function test_default_name() {
   local subtest="${FUNCNAME[0]}"
 
-  local tsv_file="${TEST_TEMP}/${subtest}.tsv"
+  local tsv_file="${TEST_TMP}/${subtest}.tsv"
 
   # Create a simple TSV file
   util::write_tsv_file "${tsv_file}" \
@@ -89,7 +89,7 @@ readonly -f test_default_name
 # Run the tests
 trap "exit_handler" EXIT
 
-mkdir -p "${TEST_TEMP}"
+mkdir -p "${TEST_TMP}"
 
 echo
 test_default_name

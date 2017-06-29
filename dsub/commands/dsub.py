@@ -20,6 +20,7 @@ Follows the model of bsub, qsub, srun, etc.
 import argparse
 import collections
 import os
+import re
 import sys
 import time
 
@@ -332,6 +333,11 @@ def parse_arguments(prog, argv):
       type=int,
       help='Size (in GB) of data disk to attach for each job')
 
+  parser.add_argument(
+      '--logging',
+      help='Cloud Storage path to send logging output'
+      ' (either a folder, or file ending in ".log")')
+
   # Add provider-specific arguments
   provider_base.add_provider_argument(parser)
   google = parser.add_argument_group(
@@ -341,8 +347,6 @@ def parse_arguments(prog, argv):
       '--project',
       default=None,
       help='Cloud project ID in which to run the pipeline')
-  google.add_argument(
-      '--logging', help='Cloud Storage path to send logging output')
   google.add_argument(
       '--boot-disk-size',
       default=10,
@@ -624,7 +628,8 @@ def run_main(args):
     if args.name:
       command_name = args.name
     else:
-      command_name = args.command.split(' ', 1)[0]
+      command_name = _name_for_command(args.command)
+
     script = job_util.Script(command_name, args.command)
   elif args.script:
     # Read the script file
@@ -703,6 +708,24 @@ def run_main(args):
       sys.exit(1)
 
   return launched_job
+
+
+def _name_for_command(command):
+  """Craft a simple command name from the command."""
+  #
+  # The best command strings for this are going to be those where a simple
+  # command was given:
+  #
+  # samtools index "${BAM}"
+  # /usr/bin/sort "${INFILE}" > "${OUTFILE}"
+  #
+  # For those, we set the job name to "samtools" and "sort" respectively.
+  #
+  # For commands like "export VAR=val\necho ${VAR}", the user may want to pass
+  # --name to specify a more informative name.
+
+  # strip() to eliminate any leading whitespace from the token:
+  return os.path.basename(re.split(r'\s', command.strip())[0])
 
 if __name__ == '__main__':
   main(sys.argv[0], sys.argv[1:])

@@ -48,13 +48,6 @@ Thus using the local runner requires:
 
 Note that the local runner supports the `--tasks` parameter. All tasks
 submitted will run concurrently.
-
-## Limitations
-
-The local runner does not currently support the `--input-recursive` and
-`--output-recursive` flags.
-
-dstat and ddel do not currently work with the local runner.
 """
 
 from collections import namedtuple
@@ -64,9 +57,11 @@ import signal
 import subprocess
 import tempfile
 import textwrap
+import time
 from . import base
 from ..lib import dsub_util
 from ..lib import param_util
+from ..lib import providers_util
 import yaml
 
 # The local runner allocates space on the host under
@@ -182,22 +177,49 @@ class LocalJobProvider(base.JobProvider):
       readonly DATE_FORMAT='{date_format}'
       # Absolute path to this script's directory.
       readonly TASK_DIR="$(dirname $0)"
+      # User to run as (by default)
+      readonly MY_UID='{uid}'
+      # Set environment variables for recursive input directories
+      {export_input_dirs}
+      # Set environment variables for recursive output directories
+      {export_output_dirs}
 
-      stage_data() {{
+      recursive_localize_data() {{
         true # ensure body is not empty, to avoid error.
-        {stage_command}
+        {recursive_localize_command}
       }}
 
-      unstage_data() {{
+      localize_data() {{
         true # ensure body is not empty, to avoid error.
-        {unstage_command}
+        {localize_command}
+      }}
+
+      recursive_delocalize_data() {{
+        true # ensure body is not empty, to avoid error.
+        {recursive_delocalize_command}
+      }}
+
+      delocalize_data() {{
+        true # ensure body is not empty, to avoid error.
+        {delocalize_command}
       }}
       """)
     script_body = textwrap.dedent("""\
-
       # delete local files
       cleanup() {
-        rm -rf "${DATA_DIR}"
+        # not putting it in status_message because we don't want that to be the
+        # last line in case of error.
+        echo "cleaning up ${DATA_DIR}"
+        # clean up files written from inside Docker
+        2>&1 docker run \
+         --name "${NAME}-cleanup" \
+         -w "${DATA_MOUNT_POINT}/${WORKING_DIR}" \
+         "${VOLUMES[@]}" \
+         --env-file "${ENV_FILE}" \
+         "${IMAGE}" \
+         rm -rf "${DATA_MOUNT_POINT}" | tee -a log.txt
+        # clean up files staged from outside Docker
+        rm -rf "${DATA_DIR}" || echo "sorry, unable to delete ${DATA_DIR}."
       }
 
       log_info() {
@@ -236,7 +258,7 @@ class LocalJobProvider(base.JobProvider):
       cd "${TASK_DIR}"
       echo "RUNNING" > status.txt
       log_info "staging inputs"
-      stage_data
+      localize_data
 
       # execution
       log_info "running docker image"
@@ -254,7 +276,7 @@ class LocalJobProvider(base.JobProvider):
       gsutil -q cp stderr.txt ${LOGGING}-stderr.log
       gsutil -q cp log.txt ${LOGGING}.log
       log_info "unstaging outputs"
-      unstage_data
+      delocalize_data
 
       # cleanup
       log_info "cleanup"
@@ -277,14 +299,23 @@ class LocalJobProvider(base.JobProvider):
         script=DATA_MOUNT_POINT + '/' + SCRIPT_DIR + '/' +
         job_metadata['script'].name,
         env_file=task_dir + '/' + 'docker.env',
+        uid=os.getuid(),
         data_mount_point=DATA_MOUNT_POINT,
         data_dir=task_dir + '/' + DATA_SUBDIR,
         logging=logging,
         date_format='+%Y/%m/%d %H:%M:%S',
         workingdir=WORKING_DIR,
-        stage_command=self._stage_inputs_command(task_dir, task_data),
-        unstage_command=self._unstage_outputs_commands(task_dir,
-                                                       task_data)) + script_body
+        export_input_dirs=providers_util.build_recursive_localize_env(
+            task_dir, task_data.get('inputs', [])),
+        recursive_localize_command=self._localize_inputs_recursive_command(
+            task_dir, task_data),
+        localize_command=self._stage_inputs_command(task_dir, task_data),
+        export_output_dirs=providers_util.build_recursive_gcs_delocalize_env(
+            task_dir, task_data.get('outputs', [])),
+        recursive_delocalize_command=self._delocalize_outputs_recursive_command(
+            task_dir, task_data),
+        delocalize_command=self._delocalize_outputs_commands(
+            task_dir, task_data)) + script_body
 
     # Write the local runner script
     script_fname = task_dir + '/runner.sh'
@@ -488,9 +519,20 @@ class LocalJobProvider(base.JobProvider):
       user_id = os.stat(path + '/task.pid').st_uid
     except IOError:
       # Files are not there yet.
-      # It's a bit of a misnomer, but there is no PENDING status.
+      # RUNNING is a misnomer, but there is no PENDING status.
       status = 'RUNNING'
       status_message = 'Process not found yet'
+      # or perhaps they crashed before being able to write those files?
+      # Check the time.
+      try:
+        create_time = os.path.getmtime(path + '/task.pid')
+        if time.time() - create_time > 60:
+          # time out
+          status = 'CANCELED'
+          status_message = 'Process failed to start.'
+      except IOError:
+        # pid file not there, let's say it's still pending.
+        pass
 
     if status == 'RUNNING':
       # double-check running jobs, because it may have been killed but unable to
@@ -586,18 +628,29 @@ class LocalJobProvider(base.JobProvider):
       ret[o.name] = DATA_MOUNT_POINT + '/' + o.docker_path
     return ret
 
+  def _localize_inputs_recursive_command(self, task_dir, task_data):
+    """Returns a command that will stage recursive inputs."""
+    ins = task_data.get('inputs', [])
+    return providers_util.build_recursive_gcs_localize_command(
+        task_dir + '/' + DATA_SUBDIR, ins)
+
   def _stage_inputs_command(self, task_dir, task_data):
     """Returns a command that will stage inputs."""
     ins = task_data.get('inputs', [])
     commands = []
     for i in ins:
       if i.recursive:
-        raise NotImplementedError(
-            'input-recursive not yet supported for local execution')
+        continue
       gcs_file_path = i.value
       local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + i.docker_path
       commands.append('mkdir -p ' + os.path.dirname(local_file_path))
       commands.append('gsutil -q cp %s %s' % (gcs_file_path, local_file_path))
+    commands.append(
+        textwrap.dedent("""\
+    if ! recursive_localize_data; then
+      log_error "Recursive localization failed."
+      exit 1
+    fi"""))
     return '\n'.join(commands)
 
   def _mkdir_outputs(self, task_dir, task_data):
@@ -605,13 +658,17 @@ class LocalJobProvider(base.JobProvider):
     os.makedirs(task_dir + '/' + DATA_SUBDIR + '/tmp')
     outs = task_data.get('outputs', [])
     for o in outs:
-      if o.recursive:
-        raise NotImplementedError(
-            'output-recursive not yet supported for local execution')
       local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + o.docker_path
-      os.makedirs(os.path.dirname(local_file_path))
+      # makedirs errors out if the folder already exists, so check.
+      if not os.path.isdir(os.path.dirname(local_file_path)):
+        os.makedirs(os.path.dirname(local_file_path))
 
-  def _unstage_outputs_commands(self, task_dir, task_data):
+  def _delocalize_outputs_recursive_command(self, task_dir, task_data):
+    outs = task_data.get('outputs', [])
+    return providers_util.build_recursive_gcs_delocalize_command(
+        task_dir + '/' + DATA_SUBDIR, outs)
+
+  def _delocalize_outputs_commands(self, task_dir, task_data):
     """copy outputs from local disk to GCS."""
     outs = task_data.get('outputs', [])
     commands = []
@@ -619,6 +676,12 @@ class LocalJobProvider(base.JobProvider):
       local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + o.docker_path
       gcs_file_path = o.remote_uri
       commands.append('gsutil -q cp %s %s' % (local_file_path, gcs_file_path))
+    commands.append(
+        textwrap.dedent("""\
+    if ! recursive_delocalize_data; then
+      log_error "Recursive delocalization failed."
+      exit 1
+    fi"""))
     return '\n'.join(commands)
 
   def _stage_script(self, task_dir, script_name, script_text):

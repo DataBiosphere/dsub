@@ -17,6 +17,149 @@
 set -o errexit
 set -o nounset
 
+# Global variables for running tests in parallel
+
+# Set up a local directory for tests to write intermediate files
+readonly TEST_OUTPUT_DIR=/tmp/dsub_test
+
+# We allow for the integration tests to run concurrently.
+# By default, we run all of them at the same time, but MAX_CONCURRENCY
+# can be toggled to rate limit that if necessary.
+#
+# For example, on systems with low GCE quota, the tests would run, but our
+# timing of each test would be off (as they would sit in the Pipelines API
+# queue waiting for GCE quota).
+#
+# Also possible that launching many local provider tests concurrently on a
+# machine with limited memory could lead to failures.
+
+# Set to a positive integer for specific concurrency
+readonly MAX_CONCURRENCY=-1
+
+# While integration tests are running in the background, we record the process
+# pid and the test-specific output directory. The output directory stores
+# the stderr+stdout (output.txt) along with the test exit code (exit.txt)
+declare TEST_PIDS=()
+declare TEST_DIRS=()
+
+# Functions for running integration tests
+
+function get_test_output_dir() {
+  local provider="${1}"
+  local test_file="${2}"
+
+  echo "${TEST_OUTPUT_DIR}/${provider}/$(basename "${test_file}")"
+}
+
+function run_integration_test() {
+  local provider="${1}"
+  local test="${2}"
+
+  # Create a label "test (provider)" for the start/end messages
+  local test_label="$(basename "${test}") (${provider})"
+
+  # Set up a directory for test-specific output
+  local test_dir="$(get_test_output_dir "${provider}" "${test}")"
+  local test_output_file="${test_dir}/output.txt"
+  local test_exit_file="${test_dir}/exit.txt"
+
+  mkdir -p "${test_dir}"
+
+  # Execute the command in a background shell and:
+  #   * send all output to output.txt
+  #   * capture the exit code to exit.txt
+  (
+  start_test "${test_label}"
+
+  export TEST_TMP="${test_dir}"
+  export DSUB_PROVIDER="${provider}"
+
+  # Disable errexit so we can record the test exit code
+  set +o errexit
+  if [[ "${test}" == *.py ]]; then
+    # Execute the test as a module, such as "python -m test.e2e_env_list"
+    python -m "test.integration.$(basename "${test%.py}")"
+  else
+    "${test}"
+  fi
+  echo "$?" > "${test_exit_file}"
+  set -o errexit
+
+  end_test "${test_label}"
+  ) &>"${test_output_file}" &
+
+  # Record the pid and test directory
+  TEST_PIDS+=($!)
+  TEST_DIRS+=("${test_dir}")
+}
+readonly -f run_integration_test
+
+# check_wait_for_integration_tests
+#
+# If we have NOT reached maximum concurrency, then just return.
+# If we have reached maximum concurrency then:
+#   * wait for tests to complete
+#   * emit the results of the tests
+#
+# This function takes an optional argument that if non-empty forces the
+# the function to wait on any running tests.
+function check_wait_for_integration_tests() {
+  local force_wait="${1:-}"
+
+  if [[ -z "${force_wait}" ]]; then
+    if [[ "${MAX_CONCURRENCY}" -lt 0 ]]; then
+      return
+    fi
+    if [[ "${#TEST_PIDS[@]}" -lt "${MAX_CONCURRENCY}" ]]; then
+      return
+    fi
+  fi
+
+  if [[ "${#TEST_PIDS[@]}" == 0 ]]; then
+    return
+  fi
+
+  echo "Waiting on " "${TEST_PIDS[@]}"
+  wait "${TEST_PIDS[@]}"
+
+  # Emit successful tests first
+  for test_dir in "${TEST_DIRS[@]}"; do
+    exit_code="$(<"${test_dir}"/exit.txt)"
+    if [[ "${exit_code}" -ne 0 ]]; then
+      continue
+    fi
+
+    cat "${test_dir}/output.txt"
+    echo
+  done
+
+  # Emit failed tests last
+  local -i failures=0
+  for test_dir in "${TEST_DIRS[@]}"; do
+    exit_code="$(<"${test_dir}"/exit.txt)"
+    if [[ "${exit_code}" -eq 0 ]]; then
+      continue
+    fi
+    failures+=1
+
+    cat "${test_dir}/output.txt"
+    echo
+
+    echo "FAILED: Test failed with exit code ${exit_code}"
+    echo
+  done
+
+  if [[ "${failures}" -gt 0 ]]; then
+    echo "*** FAILED: ${failures} tests failed"
+    exit 1
+  fi
+
+  # Empty the pid and dir arrays
+  TEST_PIDS=()
+  TEST_DIRS=()
+}
+readonly -f check_wait_for_integration_tests
+
 # Functions for timing tests...
 declare -i TEST_STARTSEC
 function start_test() {
@@ -31,7 +174,7 @@ function end_test() {
 }
 readonly -f end_test
 
-# Functions that checks whether a test can be run for all providers
+# Function that checks whether a test can be run for all providers
 
 function get_test_providers() {
   local test_file="$(basename "${1}")"
@@ -39,17 +182,16 @@ function get_test_providers() {
   local default_provider_list="google"
   local all_provider_list="local google"
 
+  # Unit tests presently hard-code their provider
+  if [[ ${test_file} == unit_*.sh ]]; then
+    return
+  fi
+
   # We use a naming convention on files that are provider-specific
   if [[ ${test_file} == e2e_*.local.sh ]] || \
      [[ ${test_file} == e2e_*.google.sh ]]; then
     # Return the last token before the ".sh"
     echo "${test_file}" | awk -F . '{ print $(NF-1) }'
-    return
-  fi
-
-  # The local provider does not support --input-recursive or --output-recursive
-  if [[ ${test_file} == e2e_io_recursive.sh ]]; then
-    echo "${default_provider_list}"
     return
   fi
 
@@ -112,6 +254,9 @@ for TEST_LANGUAGE in "${TEST_LANGUAGES[@]}"; do
   TESTS+=("${TEST_PATTERNS[@]/%/.${TEST_LANGUAGE}}")
 done
 
+echo "Removing ${TEST_OUTPUT_DIR}"
+rm -rf "${TEST_OUTPUT_DIR}"
+
 # For each pattern, generate a list of matching tests and run them
 declare -a TEST_LIST
 for TEST_TYPE in "${TESTS[@]}"; do
@@ -143,25 +288,15 @@ for TEST_TYPE in "${TESTS[@]}"; do
   for TEST in "${TEST_LIST[@]}"; do
     PROVIDER_LIST=($(get_test_providers "${TEST}"))
 
-    for PROVIDER in "${PROVIDER_LIST[@]}"; do
-
-      TEST_LABEL="$(basename "${TEST}") (${PROVIDER})"
-      start_test "${TEST_LABEL}"
-
-      if [[ "${TEST}" == *.py ]]; then
-        # Execute the test as a module, such as "python -m test.e2e_env_list"
-        DSUB_PROVIDER="${PROVIDER}" \
-          python -m "test.integration.$(basename "${TEST%.py}")"
-      else
-        DSUB_PROVIDER="${PROVIDER}" "${TEST}"
-      fi
-
-      end_test "${TEST_LABEL}"
-      echo
-
+    for PROVIDER in "${PROVIDER_LIST[@]:-}"; do
+      run_integration_test "${PROVIDER}" "${TEST}"
+      check_wait_for_integration_tests
     done
   done
+
 done
+
+check_wait_for_integration_tests "force_wait"
 
 readonly RUN_TESTS_ENDSEC=$(date +'%s')
 echo "*** $(basename "${0}") completed in $((RUN_TESTS_ENDSEC - RUN_TESTS_STARTSEC)) seconds ***"

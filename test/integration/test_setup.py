@@ -20,9 +20,9 @@
 # The code here will:
 #
 # * Set the TEST_NAME based on the name of the calling script.
-# * Set variables for TEST_DIR.
+# * Set the TEST_DIR to the directory the test file is in.
 # * For task file tests, set TASKS_FILE and TASKS_FILE_TMPL.
-# * Set the TEST_TEMP variable for a temporary directory.
+# * Set the TEST_TMP variable for a temporary directory.
 
 import os
 import sys
@@ -33,14 +33,13 @@ TEST_NAME = os.path.splitext(os.path.basename(sys.argv[0]).split('_', 1)[1])[0]
 
 print 'Setting up test: %s' % TEST_NAME
 
-# Set up the path to dsub.py
 TEST_DIR = os.path.dirname(sys.argv[0])
+
+TEST_TMP = '%s/tmp' % os.getenv('TEST_TMP', '/tmp/dub_test/py/%s' % TEST_NAME)
 
 if TEST_NAME.endswith('_tasks'):
   TASKS_FILE_TMPL = '%s/%s.tsv.tmpl' % (TEST_DIR, TEST_NAME)
-  TASKS_FILE = '%s/%s.tsv' % (TEST_DIR, TEST_NAME)
+  TASKS_FILE = '%s/%s.tsv' % (TEST_TMP, TEST_NAME)
 else:
   TASKS_FILE_TMPL = None
   TASKS_FILE = None
-
-TEST_TEMP = '%s/%s' % (TEST_DIR, '_tmp')
