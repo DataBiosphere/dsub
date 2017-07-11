@@ -296,6 +296,12 @@ def parse_arguments(prog, argv):
       help="""Output path arguments to de-localize recursively from the script's
           execution environment""",
       metavar='KEY=REMOTE_PATH')
+  parser.add_argument(
+      '--vars-include-wildcards',
+      default=False,
+      action='store_true',
+      help="""Enable new behavior for --input parameters that include wildcard
+        patterns. This will become the default.""")
 
   # Add dsub job management arguments
   parser.add_argument(
@@ -415,6 +421,10 @@ def get_job_metadata(args, script, provider):
                                                dsub_util.get_default_user())
 
   job_metadata['script'] = script
+
+  # vars_include_wildcards is around just for a short time.
+  # Putting it in the metadata allows for touching less code.
+  job_metadata['vars_include_wildcards'] = args.vars_include_wildcards
 
   return job_metadata
 
@@ -587,6 +597,27 @@ def _job_outputs_are_present(job_data):
   return True
 
 
+def _check_wildcard_inputs(vars_include_wildcards, all_task_data):
+  if vars_include_wildcards:
+    return
+
+  inputs = all_task_data[0]['inputs']
+  inputs_with_wildcards = [
+      var for var in inputs
+      if not var.recursive and '*' in os.path.basename(var.docker_path)
+  ]
+  if inputs_with_wildcards:
+    print 'WARNING: The behavior of docker environment variables for input'
+    print '         parameters with wildcard (*) values is changing.'
+    print '         Set --vars-include-wildcards to enable the new behavior so'
+    print '         you can change your code before it becomes the default.'
+    print '         The following input parameters include wildcards:'
+    print '\n'.join([
+        '           {0}={1}'.format(var.name, var.remote_uri)
+        for var in inputs_with_wildcards
+    ])
+
+
 def dsub_main(prog, argv):
   # Parse args and validate
   args = parse_arguments(prog, argv)
@@ -630,7 +661,8 @@ def run_main(args):
     else:
       command_name = _name_for_command(args.command)
 
-    script = job_util.Script(command_name, args.command)
+    # add the shebang line to ensure the script's run.
+    script = job_util.Script(command_name, '#!/bin/bash\n' + args.command)
   elif args.script:
     # Read the script file
     script_file = dsub_util.load_file(args.script)
@@ -657,6 +689,8 @@ def run_main(args):
     all_task_data = param_util.args_to_job_data(
         args.env, args.input, args.input_recursive, args.output,
         args.output_recursive, input_file_param_util, output_file_param_util)
+
+  _check_wildcard_inputs(args.vars_include_wildcards, all_task_data)
 
   if not args.dry_run:
     print 'Job: %s' % job_metadata['job-id']
@@ -711,18 +745,24 @@ def run_main(args):
 
 
 def _name_for_command(command):
-  """Craft a simple command name from the command."""
-  #
-  # The best command strings for this are going to be those where a simple
-  # command was given:
-  #
-  # samtools index "${BAM}"
-  # /usr/bin/sort "${INFILE}" > "${OUTFILE}"
-  #
-  # For those, we set the job name to "samtools" and "sort" respectively.
-  #
-  # For commands like "export VAR=val\necho ${VAR}", the user may want to pass
-  # --name to specify a more informative name.
+  r"""Craft a simple command name from the command.
+
+  The best command strings for this are going to be those where a simple
+  command was given:
+
+  >>> _name_for_command('samtools index "${BAM}"')
+  'samtools'
+  >>> _name_for_command('/usr/bin/sort "${INFILE}" > "${OUTFILE}"')
+  'sort'
+
+  For commands like "export VAR=val\necho ${VAR}", the user may want to pass
+  --name to specify a more informative name.
+
+  Arguments:
+    command: the user-provided command
+  Returns:
+    a proposed name for the task.
+  """
 
   # strip() to eliminate any leading whitespace from the token:
   return os.path.basename(re.split(r'\s', command.strip())[0])

@@ -182,22 +182,10 @@ function get_test_providers() {
   local default_provider_list="google"
   local all_provider_list="local google"
 
-  # Unit tests presently hard-code their provider
-  if [[ ${test_file} == unit_*.sh ]]; then
-    return
-  fi
-
   # We use a naming convention on files that are provider-specific
-  if [[ ${test_file} == e2e_*.local.sh ]] || \
-     [[ ${test_file} == e2e_*.google.sh ]]; then
+  if [[ ${test_file} == *.*.sh ]]; then
     # Return the last token before the ".sh"
     echo "${test_file}" | awk -F . '{ print $(NF-1) }'
-    return
-  fi
-
-  # The local provider does not support gcr.io images
-  if [[ ${test_file} == e2e_non_root.sh ]]; then
-    echo "${default_provider_list}"
     return
   fi
 

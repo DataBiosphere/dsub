@@ -100,8 +100,8 @@ class FileParamUtilTest(unittest.TestCase):
       ('gr', True, 'gs://tmp/myfile', 'gs/tmp/myfile/'),
       ('gr', True, 'gs://bucket/../myfile', 'gs/bucket/../myfile/'),
       # wildcard tests for local and google.
-      ('wc', False, 'gs://bucket/f/*.txt', 'gs/bucket/f/'),
-      ('wc', False, 'gs://bucket/f/*', 'gs/bucket/f/'),
+      ('wc', False, 'gs://bucket/f/*.txt', 'gs/bucket/f/*.txt'),
+      ('wc', False, 'gs://bucket/f/*', 'gs/bucket/f/*'),
   ])
   def test_input_file_docker_rewrite(self, unused_name, recursive, uri, docker):
     expected_path = os.path.join('input', docker)

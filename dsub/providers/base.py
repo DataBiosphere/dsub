@@ -124,23 +124,29 @@ class JobProvider(object):
                        status_list,
                        user_list=None,
                        job_list=None,
+                       job_name_list=None,
                        task_list=None,
                        max_jobs=0):
     """Return a list of tasks based on the search criteria.
 
     If any of the filters are empty or "[*]", then no filtering is performed on
-    that field.
+    that field. Filtering by both a job id list and job name list is
+    unsupported.
 
     Args:
       status_list: ['*'], or a list of job status strings to return. Valid
         status strings are 'RUNNING', 'SUCCESS', 'FAILURE', or 'CANCELED'.
       user_list: a list of ids for the user(s) who launched the job.
       job_list: a list of job ids to return.
+      job_name_list: a list of job names to return.
       task_list: a list of specific tasks within the specified job(s) to return.
       max_jobs: the maximum number of jobs to return or 0 for no limit.
 
     Returns:
       A list of provider-specific objects, each representing a submitted task.
+
+    Raises:
+      ValueError: if both a job id list and a job name list are provided
     """
     raise NotImplementedError()
 

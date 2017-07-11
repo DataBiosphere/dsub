@@ -130,6 +130,22 @@ function assert_err_contains() {
 }
 readonly -f assert_err_contains
 
+function assert_err_not_contains() {
+  local expected="${1}"
+
+  if grep --quiet --fixed-strings "${expected}" "${TEST_STDERR}"; then
+    2>&1 echo "Assert: stderr does contains unexpected output:"
+    2>&1 echo "UNEXPECTED:"
+    2>&1 echo "${expected}"
+    2>&1 echo "ACTUAL:"
+    2>&1 echo "$(<$"${TEST_STDERR}")"
+
+    exit 1
+  fi
+}
+readonly -f assert_err_not_contains
+
+
 function assert_output_empty() {
   [[ ! -s "${TEST_STDOUT}" ]] || "Assert: stdout is not empty"
 }

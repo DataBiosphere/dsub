@@ -1,0 +1,7 @@
+*.py[cod]
+*$py.class
+
+build/
+dist/
+dsub_libs/
+dsub.egg-info/

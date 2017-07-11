@@ -188,7 +188,7 @@ class InputFileParamUtil(FileParamUtil):
 
     # Validate and then tokenize the remote URI in order to build the
     # docker_path and remote_uri.
-    path, filename = self._validate_paths(remote_uri)
+    _, filename = self._validate_paths(remote_uri)
 
     if recursive:
       # For recursive copies, the remote_uri must be a directory path, with
@@ -205,12 +205,13 @@ class InputFileParamUtil(FileParamUtil):
       docker_path = '%s/%s' % (self._relative_path,
                                self._uri_to_localpath(remote_uri))
     else:
-      # The translation for inputs of the remote_uri into the docker_path is
-      # fairly straight forward.
+      # The translation for inputs of the remote_uri into the docker_path
+      # requires some care.
       #
       # If the "filename" portion is a wildcard, then the docker_path must
       # explicitly be a directory, with a trailing slash, otherwise there can
-      # be ambiguity based on the runtime inputs.
+      # be ambiguity depending on how many objects the pattern matches.
+      # The command:
       #
       #   gsutil cp gs://bucket/path/*.bam <mnt>/input/gs/bucket/path
       #
@@ -224,13 +225,12 @@ class InputFileParamUtil(FileParamUtil):
       #   gsutil cp gs://bucket/path/*.bam <mnt>/input/gs/bucket/path/
       #
       # is consistent: a directory called "path" with one or more files.
-      docker_path = '%s/%s/' % (self._relative_path,
-                                self._uri_to_localpath(path))
-
-      # If the file portion of the path is not a wildcard, then the local target
-      # is a filename.
-      if '*' not in filename:
-        docker_path += filename
+      #
+      # So the target of "gsutil cp" must be a directory. From dsub core
+      # perspective, the docker_path includes the wildcard and it is up to the
+      # provider to handle this correctly.
+      docker_path = '%s/%s' % (self._relative_path,
+                               self._uri_to_localpath(remote_uri))
 
     # The docker path is a relative path to the provider-specific mount point
     docker_path = docker_path.lstrip('/')

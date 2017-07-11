@@ -17,7 +17,7 @@
 set -o errexit
 set -o nounset
 
-# unit_test_job_metadata.sh
+# unit_metadata_tasks.sh
 #
 # Simple unit tests to verify the labels that get set in the pipeline
 # for a tasks job, such as "job-name", "user-id", "job-id", and "task-id".
@@ -29,20 +29,17 @@ source "${SCRIPT_DIR}/test_setup_unit.sh"
 
 # Define a utility routine for running the label + tasks test
 
-function run_dsub() {
+function call_dsub() {
   local tasks="${1}"
 
-  "${DSUB}" \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING}" \
-    --zones "${ZONE}" \
+  run_dsub \
     --script "${SCRIPT}" \
     --tasks "${tasks}" \
     --dry-run \
     1> "${TEST_STDOUT}" \
     2> "${TEST_STDERR}"
 }
-readonly -f run_dsub
+readonly -f call_dsub
 
 # Define tests
 
@@ -59,7 +56,7 @@ na12878
 na12879
 '
 
-  if run_dsub "${tsv_file}"; then
+  if call_dsub "${tsv_file}"; then
 
     # Check that the output contains expected labels
     #   "labels": {

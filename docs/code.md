@@ -15,7 +15,7 @@ The following explains each option and how to choose which to use.
 
 By default a `dsub` job runs in the context of an Ubuntu Docker container.
 In its simplest form, a dsub call with a `--command` string will execute
-the shell command in an Ubuntu container.
+the specified Bash command in an Ubuntu container.
 
 For example:
 

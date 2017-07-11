@@ -17,7 +17,7 @@
 set -o errexit
 set -o nounset
 
-# unit_test_io.sh
+# unit_io_tasks.google.sh
 #
 # Simple unit tests of input and output tasks arguments
 
@@ -26,22 +26,37 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_unit.sh"
 
-# Define a utility routine for running the IO test
+# Define a utility routine for running the tests
 
-function run_dsub() {
+function call_dsub() {
   local tasks="${1}"
+  local vars_include_wildcards="${2:-}"
 
-  "${DSUB}" \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING}" \
-    --zones "${ZONE}" \
+  run_dsub \
     --script "${SCRIPT}" \
     --tasks "${tasks}" \
+    ${vars_include_wildcards:+--vars-include-wildcards} \
     --dry-run \
     1> "${TEST_STDOUT}" \
     2> "${TEST_STDERR}"
 }
-readonly -f run_dsub
+readonly -f call_dsub
+
+function check_deprecation_warning() {
+  local expected_var="${1}"
+  assert_err_contains \
+    "\
+WARNING: The behavior of docker environment variables for input
+         parameters with wildcard (*) values is changing.
+         Set --vars-include-wildcards to enable the new behavior so
+         you can change your code before it becomes the default.
+         The following input parameters include wildcards:
+           ${expected_var}"
+
+  # Remove the deprecation warning from stderr for downstream output checks
+  sed -i '1,6 d' "${TEST_STDERR}"
+}
+readonly -f check_deprecation_warning
 
 # Define tests
 
@@ -58,7 +73,7 @@ gs://bucket1/path1\tgs://bucket1/path2
 gs://bucket2/path1\tgs://bucket2/path2
 '
 
-  if run_dsub "${tsv_file}"; then
+  if call_dsub "${tsv_file}"; then
 
     # Check that the output contains expected paths
 
@@ -94,7 +109,7 @@ gs://bucket1/path1\tgs://bucket1/path2
 gs://bucket2/path1\tgs://bucket2/path2
 '
 
-  if run_dsub "${tsv_file}"; then
+  if call_dsub "${tsv_file}"; then
 
     # Check that the output contains expected paths
 
@@ -130,7 +145,7 @@ gs://bucket1/path1\tgs://bucket1/path2
 gs://bucket2/path1\tgs://bucket2/path2
 '
 
-  if run_dsub "${tsv_file}"; then
+  if call_dsub "${tsv_file}"; then
 
     # Check that the output contains expected paths
 
@@ -166,7 +181,7 @@ gs://bucket1/path1\tgs://bucket1/path2
 gs://bucket2/path1\tgs://bucket2/path2
 '
 
-  if run_dsub "${tsv_file}"; then
+  if call_dsub "${tsv_file}"; then
 
     # Check that the output contains expected paths
 
@@ -190,7 +205,7 @@ gs://bucket2/path1\tgs://bucket2/path2
 readonly -f test_output_auto
 
 
-function test_input_recursive() {
+function test_input_wildcard_deprecated() {
   local subtest="${FUNCNAME[0]}"
 
   local tsv_file="${TEST_TMP}/${subtest}.tsv"
@@ -202,7 +217,39 @@ function test_input_recursive() {
 gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
 '
 
-  if run_dsub "${tsv_file}"; then
+  if call_dsub "${tsv_file}"; then
+    check_deprecation_warning \
+      "INPUT_PATH_SHALLOW=gs://bucket1/path1/shallow/*"
+
+    # Ensure the INPUT_PATH_SHALLOW parameter is set properly
+    assert_pipeline_input_parameter_equals \
+      0 "INPUT_PATH_SHALLOW" \
+      "input/gs/bucket1/path1/shallow/" "gs://bucket1/path1/shallow/*"
+
+    # Ensure the docker command does not include setting INPUT_PATH_SHALLOW
+    assert_err_not_contains \
+      "INPUT_PATH_SHALLOW="
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_input_wildcard_deprecated
+
+function test_input_wildcard_and_recursive() {
+  local subtest="${FUNCNAME[0]}"
+
+  local tsv_file="${TEST_TMP}/${subtest}.tsv"
+
+  # Create a simple TSV file
+  util::write_tsv_file "${tsv_file}" \
+'
+--input-recursive INPUT_PATH_DEEP\t--input INPUT_PATH_SHALLOW
+gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
+'
+
+  if call_dsub "${tsv_file}" "true"; then
 
     # A direct export of an environment variable for INPUT_PATH_DEEP
     # should be created in the docker command instead of a pipelines
@@ -217,12 +264,17 @@ gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
       0 "INPUT_PATH_SHALLOW" \
       "input/gs/bucket1/path1/shallow/" "gs://bucket1/path1/shallow/*"
 
-    # The docker command should include an export of the OUTPUT_PATH
+    # The docker command should include an export of INPUT_PATH_SHALLOW
+    assert_err_value_matches \
+      "[0].ephemeralPipeline.docker.cmd" \
+      '^export INPUT_PATH_SHALLOW="/mnt/data/input/gs/bucket1/path1/shallow/\*"$'
+
+    # The docker command should include an export of OUTPUT_PATH
     assert_err_value_matches \
       "[0].ephemeralPipeline.docker.cmd" \
       "^export INPUT_PATH_DEEP=/mnt/data/input/gs/bucket1/path1/deep$"
 
-    # The docker command should include an rsync of the INPUT_PATH_DEEP
+    # The docker command should include an rsync of INPUT_PATH_DEEP
     assert_err_value_matches \
       "[0].ephemeralPipeline.docker.cmd" \
       "gsutil -m rsync -r gs://bucket1/path1/deep/ /mnt/data/input/gs/bucket1/path1/deep/"
@@ -232,9 +284,9 @@ gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
     test_failed "${subtest}"
   fi
 }
-readonly -f test_input_recursive
+readonly -f test_input_wildcard_and_recursive
 
-function test_output_recursive() {
+function test_output_wildcard_and_recursive() {
   local subtest="${FUNCNAME[0]}"
 
   local tsv_file="${TEST_TMP}/${subtest}.tsv"
@@ -246,7 +298,7 @@ function test_output_recursive() {
 gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
 '
 
-  if run_dsub "${tsv_file}"; then
+  if call_dsub "${tsv_file}"; then
 
     # A direct export of an environment variable for OUTPUT_PATH_DEEP
     # should be created in the docker command instead of a pipelines
@@ -276,7 +328,7 @@ gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
     test_failed "${subtest}"
   fi
 }
-readonly -f test_output_recursive
+readonly -f test_output_wildcard_and_recursive
 
 # Run the tests
 trap "exit_handler" EXIT
@@ -292,5 +344,6 @@ test_output_file
 test_output_auto
 
 echo
-test_input_recursive
-test_output_recursive
+test_input_wildcard_deprecated
+test_input_wildcard_and_recursive
+test_output_wildcard_and_recursive

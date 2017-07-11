@@ -58,25 +58,100 @@ the `dsub` command-line:
 ```
 
 The object(s) at the Cloud Storage path will be copied and made available at
-the path `/mnt/data/input/gs/bucket/path/`.
+the path `/mnt/data/input/gs/bucket/path`.
 
-The Docker container will receive the environment variable:
+---
+Note: *The behavior of dsub for input file patterns is changing slightly.
+Please read this section carefully if you use input file patterns.*
+
+---
+
+`dsub` originally made available to the Docker container the environment
+variable:
 
 ```
 INPUT_FILES=/mnt/data/input/gs/bucket/path/
 ```
 
-to process a list of files like this in bash, a typical pattern is:
+This is still true, *but will change*.
+
+The file pattern in this example (`*.bam`) is not available to the Docker
+container in the environment variable. The new behavior for `dsub` will be to
+set the environment variable value to:
 
 ```
-for INPUT_FILE in "$(ls "${INPUT_FILES}")"; do
+INPUT_FILES=/mnt/data/input/gs/bucket/path/*.bam
+```
+
+To help users transition, there will be a short period in which both behaviors
+are available and the new behavior is explicitly enabled with a command-line
+flag. Once the new behavior is the default, the command-line flag will go away.
+
+During the transition period, to enable the new behavior, set
+`--vars-include-wildcards` on the `dsub` command-line.
+
+`dsub` script code will typically want to tokenize the environment variable
+into its constituent path and pattern components. To tokenize the `INPUT_FILES`
+variable, the following code:
+
+```
+INPUT_FILES_PATH="$(dirname "${INPUT_FILES}")"
+INPUT_FILES_PATTERN="$(basename "${INPUT_FILES}")"
+```
+
+will set:
+
+```
+INPUT_FILES_PATH=/mnt/data/input/gs/bucket/path
+INPUT_FILES_PATTERN=*.bam
+```
+
+---
+Note: If you are only interested in the path, the following notation will
+work with both the old and new behavior (it trims the final slash and anything
+that follows):
+
+```
+INPUT_FILES_PATH="${INPUT_FILES%/*}"
+```
+---
+
+To process a list of files from a path + wildcard pattern in Bash, a typical
+coding pattern is to create an array and iterate over the array.
+
+If you know you don't have spaces in your paths, this can simply be:
+
+```
+readonly INPUT_FILE_LIST=( $(ls "${INPUT_FILES_PATH}"/${INPUT_FILES_PATTERN}) )
+```
+
+If you might have spaces in your file paths, then you need to take a bit more
+care. Here we create a list of files and force Bash to tokenize the list
+by newlines (instead of by whitespace):
+
+```
+declare INPUT_FILE_LIST="$(ls -1 "${INPUT_FILES_PATH}"/${INPUT_FILES_PATTERN})"
+IFS=$'\n' INPUT_FILE_LIST=(${INPUT_FILE_LIST})
+readonly INPUT_FILE_LIST
+```
+
+---
+Note: in all cases, do not quote `${INPUT_FILES_PATTERN}` as that will
+suppress wildcard expansion.
+
+---
+
+The following code shows how to iterate over the list of files in the array:
+
+```
+for INPUT_FILE in "${INPUT_FILE_LIST[@]}"; do
   # INPUT_FILE will be the full path including the filename
   # If you need the filename alone, use basename:
   INPUT_FILE_NAME="$(basename "${INPUT_FILE}")"
 
-  # If you further want to trim off the ".bam" extension, perhaps to construct
+  # If you further want to trim off the file extension, perhaps to construct
   # a new output file name, then use bash suffix subsititution:
-  INPUT_FILE_ROOTNAME="${INPUT_FILE_NAME%.bam}"
+  INPUT_FILE_ROOTNAME="${INPUT_FILE_NAME%.*}"
 
   # Do stuff with the INPUT_FILE environment variables you now have
   ...

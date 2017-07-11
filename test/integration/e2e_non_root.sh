@@ -40,6 +40,23 @@ function exit_handler() {
 }
 readonly -f exit_handler
 
+function check_jobid {
+  local job_id="$1"
+  local task_dir="${TMPDIR:-/tmp}/dsub-local/${job_id}/task"
+
+  echo "Checking task directory: ${task_dir}"
+  if ! [[ -d "${task_dir}" ]]; then
+    echo "Directory missing: ${task_dir}"
+    exit 1
+  fi
+
+  if [[ -d "${task_dir}/data" ]]; then
+    echo "Directory not deleted: ${task_dir}/data"
+    exit 1
+  fi
+}
+readonly -f check_jobid
+
 trap "exit_handler" EXIT
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
@@ -63,12 +80,18 @@ EOF
 
   echo "Launching pipeline..."
 
-  run_dsub \
+  JOB_ID=$(run_dsub \
     --image "${IMAGE}" \
     --script "${SCRIPT_DIR}/script_io_test.sh" \
     --input INPUT_PATH="${INPUT_BAM}" \
     --output OUTPUT_PATH="${OUTPUTS}/*.md5" \
-    --wait
+    --wait)
+
+  if [[ "${DSUB_PROVIDER}" == "local" ]]; then
+    # Cleanup is more challenging when the Docker user isn't root,
+    # so let's make sure it worked right.
+    check_jobid "${JOB_ID}"
+  fi
 
 fi
 
