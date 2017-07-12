@@ -19,6 +19,7 @@
 # Intended to be imported into a test.
 # The code here will:
 #
+# * Ensure the DSUB_PROVIDER is set (default: local)
 # * Set the TEST_NAME based on the name of the calling script.
 # * Set the TEST_DIR to the directory the test file is in.
 # * For task file tests, set TASKS_FILE and TASKS_FILE_TMPL.
@@ -27,15 +28,37 @@
 import os
 import sys
 
+# If the DSUB_PROVIDER is not set, figure it out from the name of the script.
+#   If the script name is <test>.<provider>.sh, pull out the provider.
+#   If the script name is <test>.sh, use "local".
+# If the DSUB_PROVIDER is set, make sure it is correct for a provider test.
+
+SCRIPT_NAME = os.path.basename(sys.argv[0])
+SCRIPT_DEFAULT_PROVIDER = SCRIPT_NAME.split('.')[1] if SCRIPT_NAME.count(
+    '.') == 2 else None
+
+DSUB_PROVIDER = os.getenv('DSUB_PROVIDER')
+if not DSUB_PROVIDER:
+  if SCRIPT_DEFAULT_PROVIDER:
+    DSUB_PROVIDER = SCRIPT_DEFAULT_PROVIDER
+  else:
+    DSUB_PROVIDER = 'local'
+elif SCRIPT_DEFAULT_PROVIDER:
+  if DSUB_PROVIDER != SCRIPT_DEFAULT_PROVIDER:
+    print >> sys.stderr, "DSUB_PROVIDER is '%s' not '%s'" % (
+        DSUB_PROVIDER, SCRIPT_DEFAULT_PROVIDER)
+    sys.exit(1)
+
 # Compute the name of the test from the calling script
 # (trim the e2e_ or unit_ prefix, along with the .py extension)
-TEST_NAME = os.path.splitext(os.path.basename(sys.argv[0]).split('_', 1)[1])[0]
+TEST_NAME = os.path.splitext(SCRIPT_NAME.split('_', 1)[1])[0]
 
 print 'Setting up test: %s' % TEST_NAME
 
 TEST_DIR = os.path.dirname(sys.argv[0])
 
-TEST_TMP = '%s/tmp' % os.getenv('TEST_TMP', '/tmp/dub_test/py/%s' % TEST_NAME)
+TEST_TMP = '%s/tmp' % os.getenv('TEST_TMP', '/tmp/dub_test/py/%s/%s' %
+                                (DSUB_PROVIDER, TEST_NAME))
 
 if TEST_NAME.endswith('_tasks'):
   TASKS_FILE_TMPL = '%s/%s.tsv.tmpl' % (TEST_DIR, TEST_NAME)

@@ -17,7 +17,7 @@
 set -o errexit
 set -o nounset
 
-# unit_test_job_metadata.sh
+# unit_job_metadata.google.sh
 #
 # Simple unit tests to verify the labels that get set in the pipeline
 # such as "job-name", "user-id", "job-id", and "task-id".
@@ -29,43 +29,37 @@ source "${SCRIPT_DIR}/test_setup_unit.sh"
 
 # Define a utility routine for running the IO test
 
-function run_dsub_with_script() {
+function call_dsub() {
   local name="${1}"
 
-  "${DSUB}" \
-    --dry-run \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING}" \
-    --zones "${ZONE}" \
-    --script "${SCRIPT}" \
+  run_dsub \
     --name "${name}" \
+    --script "${SCRIPT}" \
+    --dry-run \
     1> "${TEST_STDOUT}" \
     2> "${TEST_STDERR}"
 }
-readonly -f run_dsub_with_script
+readonly -f call_dsub
 
-function run_dsub_with_command() {
+function call_dsub_with_command() {
   local command="${1}"
   local name="${2:-}"
 
-  "${DSUB}" \
-    --dry-run \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING}" \
-    --zones "${ZONE}" \
+  run_dsub \
     --name "${name}" \
     --command "${command}" \
+    --dry-run \
     1> "${TEST_STDOUT}" \
     2> "${TEST_STDERR}"
 }
-readonly -f run_dsub_with_command
+readonly -f call_dsub_with_command
 
 # Define tests
 
 function test_default_name_from_script() {
   local subtest="${FUNCNAME[0]}"
 
-  if run_dsub_with_script ""; then
+  if call_dsub ""; then
 
     # Check that the output contains expected labels:
     #   "labels": {
@@ -89,7 +83,7 @@ readonly -f test_default_name_from_script
 function test_explicit_name_override_script() {
   local subtest="${FUNCNAME[0]}"
 
-  if run_dsub_with_script "my-job"; then
+  if call_dsub "my-job"; then
 
     # Check that the output contains expected labels
     #   "labels": {
@@ -114,7 +108,7 @@ readonly -f test_explicit_name_override_script
 function test_default_name_from_command() {
   local subtest="${FUNCNAME[0]}"
 
-  if run_dsub_with_command \
+  if call_dsub_with_command \
     "/in/my/docker/analysis.py"; then
 
     # Check that the output contains expected labels:
@@ -139,7 +133,7 @@ readonly -f test_default_name_from_command
 function test_explicit_name_override_command() {
   local subtest="${FUNCNAME[0]}"
 
-  if run_dsub_with_command \
+  if call_dsub_with_command \
     "/in/my/docker/analysis.py"\
     "my-job"; then
 
@@ -166,7 +160,7 @@ readonly -f test_explicit_name_override_command
 function test_long_name() {
   local subtest="${FUNCNAME[0]}"
 
-  if run_dsub_with_script "my-job-which-has-a-long-name"; then
+  if call_dsub "my-job-which-has-a-long-name"; then
 
     # Check that the output contains expected labels
     #   "labels": {

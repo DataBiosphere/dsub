@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 Google Inc. All Rights Reserved.
+# Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,18 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# test_setup_unit.sh
-#
-# Set up basic variables for unit tests
+set -o errexit
+set -o nounset
 
-source "${SCRIPT_DIR}/test_util.sh"
-source "${SCRIPT_DIR}/test_unit_util.sh"
-source "${SCRIPT_DIR}/test_setup.sh"
+# Test running a Python script
 
-readonly PROJECT_ID=fake-project
-readonly LOGGING=gs://bucket/path/logging
-readonly SCRIPT="${SCRIPT_DIR}/dummy.sh"
+readonly SCRIPT_DIR="$(dirname "${0}")"
 
-readonly TEST_STDOUT=${TEST_TMP}/stdout.txt
-readonly TEST_STDERR=${TEST_TMP}/stderr.txt
+# Do standard test setup
+source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
+if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+
+  echo "Launching pipeline..."
+
+  run_dsub \
+    --image python \
+    --script "${SCRIPT_DIR}/script_python.py" \
+    --wait
+
+  echo "SUCCESS"
+
+fi

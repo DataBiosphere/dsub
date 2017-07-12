@@ -14,6 +14,7 @@
 """Unit tests for dsub.
 """
 
+import doctest
 import unittest
 from dsub.commands import dsub as dsub_command
 from dsub.providers import stub
@@ -263,6 +264,13 @@ class TestNameCommand(unittest.TestCase):
     }
     for t in test_cases:
       self.assertEqual(t[1], dsub_command._name_for_command(t[0]))
+
+
+class TestExamplesInDocstrings(unittest.TestCase):
+
+  def test_doctest(self):
+    result = doctest.testmod(dsub_command, report=True)
+    self.assertEqual(0, result.failed)
 
 
 if __name__ == '__main__':

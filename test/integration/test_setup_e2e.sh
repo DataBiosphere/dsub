@@ -38,8 +38,6 @@ source "${SCRIPT_DIR}/test_setup.sh"
 
 echo "Checking that required environment values are set:"
 
-declare DSUB_PROVIDER=${DSUB_PROVIDER:-google}
-
 declare PROJECT_ID
 if [[ -n "${YOUR_PROJECT:-}" ]]; then
   PROJECT_ID="${YOUR_PROJECT}"
@@ -125,67 +123,3 @@ if [[ -n "${TASKS_FILE:-}" ]]; then
     | util::expand_tsv_fields \
     > "${TASKS_FILE}"
 fi
-
-# Functions for launching dsub
-#
-# Tests should generally just call "run_dsub" which will then invoke
-# the provider-specific function.
-
-function run_dsub() {
-  dsub_"${DSUB_PROVIDER}" "${@}"
-}
-
-function dsub_google() {
-  "${DSUB}" \
-    --provider google \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING}" \
-    --zones "us-central1-*" \
-    "${DISK_SIZE:+--disk-size ${DISK_SIZE}}" \
-    "${BOOT_DISK_SIZE:+--boot-disk-size ${BOOT_DISK_SIZE}}" \
-    "${@}"
-}
-
-function dsub_local() {
-  "${DSUB}" \
-    --provider local \
-    --logging "${LOGGING}" \
-    "${@}"
-}
-
-function run_dstat() {
-  dstat_"${DSUB_PROVIDER}" "${@}"
-}
-
-function dstat_google() {
-  dstat \
-    --provider google \
-    --project "${PROJECT_ID}" \
-    "${@}"
-}
-
-function dstat_local() {
-  dstat \
-    --provider local \
-    "${@}"
-}
-
-function run_ddel() {
-  local provider=${DSUB_PROVIDER:-google}
-
-  ddel_"${provider}" "${@}"
-}
-
-function ddel_google() {
-  ddel \
-    --provider google \
-    --project "${PROJECT_ID}" \
-    "${@}"
-}
-
-function ddel_local() {
-  ddel \
-    --provider local \
-    "${@}"
-}
-

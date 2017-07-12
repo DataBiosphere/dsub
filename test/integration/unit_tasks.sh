@@ -28,89 +28,25 @@ source "${SCRIPT_DIR}/test_setup_unit.sh"
 
 # Define a utility routine for running the IO test
 
-function run_dsub() {
+function call_dsub() {
   local task_path="${1}"
   local task_range="${2:-}"
 
-  "${DSUB}" \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING}" \
-    --zones "${ZONE}" \
+  run_dsub \
     --tasks "${task_path}" "${task_range}" \
     --command 'echo hello' \
     --dry-run \
     1> "${TEST_STDOUT}" \
     2> "${TEST_STDERR}"
 }
-readonly -f run_dsub
+readonly -f call_dsub
 
 # Define tests
-
-function test_no_range() {
-  local subtest="${FUNCNAME[0]}"
-
-  if run_dsub "${TSV_FILE}"; then
-
-    # Check that the output contains expected paths
-    for ((i=1; i <= 5; i++)); do
-      assert_pipeline_input_parameter_equals \
-        $((i-1)) "INPUT_PATH" "input/gs/bucket${i}/path" "gs://bucket${i}/path"
-    done
-
-    assert_pipeline_input_parameter_equals \
-      5 "INPUT_PATH" "" ""
-
-    test_passed "${subtest}"
-  else
-    test_failed "${subtest}"
-  fi
-}
-readonly -f test_no_range
-
-function test_one_task() {
-  local subtest="${FUNCNAME[0]}"
-
-  if run_dsub "${TSV_FILE}" "3"; then
-
-    # Check that the output contains expected paths
-    assert_pipeline_input_parameter_equals \
-      0 "INPUT_PATH" "input/gs/bucket3/path" "gs://bucket3/path"
-
-    assert_pipeline_input_parameter_equals \
-      1 "INPUT_PATH" "" ""
-
-    test_passed "${subtest}"
-  else
-    test_failed "${subtest}"
-  fi
-}
-readonly -f test_one_task
-
-function test_task_min() {
-  local subtest="${FUNCNAME[0]}"
-
-  if run_dsub "${TSV_FILE}" "4-"; then
-
-    # Check that the output contains expected paths
-    assert_pipeline_input_parameter_equals \
-      0 "INPUT_PATH" "input/gs/bucket4/path" "gs://bucket4/path"
-    assert_pipeline_input_parameter_equals \
-      1 "INPUT_PATH" "input/gs/bucket5/path" "gs://bucket5/path"
-
-    assert_pipeline_input_parameter_equals \
-      2 "INPUT_PATH" "" ""
-
-    test_passed "${subtest}"
-  else
-    test_failed "${subtest}"
-  fi
-}
-readonly -f test_task_min
 
 function test_task_max() {
   local subtest="${FUNCNAME[0]}"
 
-  if run_dsub "${TSV_FILE}" "-3"; then
+  if call_dsub "${TSV_FILE}" "-3"; then
     2>&1 echo "Invalid tasks lines range specified, but not detected"
 
     test_failed "${subtest}"
@@ -124,29 +60,6 @@ function test_task_max() {
   fi
 }
 readonly -f test_task_max
-
-function test_task_range() {
-  local subtest="${FUNCNAME[0]}"
-
-  if run_dsub "${TSV_FILE}" "3-5"; then
-
-    # Check that the output contains expected paths
-    assert_pipeline_input_parameter_equals \
-      0 "INPUT_PATH" "input/gs/bucket3/path" "gs://bucket3/path"
-    assert_pipeline_input_parameter_equals \
-      1 "INPUT_PATH" "input/gs/bucket4/path" "gs://bucket4/path"
-    assert_pipeline_input_parameter_equals \
-      2 "INPUT_PATH" "input/gs/bucket5/path" "gs://bucket5/path"
-
-    assert_pipeline_input_parameter_equals \
-      3 "INPUT_PATH" "" ""
-
-    test_passed "${subtest}"
-  else
-    test_failed "${subtest}"
-  fi
-}
-readonly -f test_task_range
 
 # Set up for running the tests
 trap "exit_handler" EXIT
@@ -167,8 +80,4 @@ util::write_tsv_file "${TSV_FILE}" \
 
 # Run the tests
 echo
-test_no_range
-test_one_task
-test_task_min
 test_task_max
-test_task_range

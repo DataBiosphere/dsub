@@ -59,6 +59,7 @@ def _environ():
 
 
 # Copy test_setup variables
+DSUB_PROVIDER = test_setup.DSUB_PROVIDER
 TEST_NAME = test_setup.TEST_NAME
 TEST_DIR = test_setup.TEST_DIR
 TEST_TMP = test_setup.TEST_TMP
@@ -66,8 +67,6 @@ TASKS_FILE = test_setup.TASKS_FILE
 TASKS_FILE_TMPL = test_setup.TASKS_FILE_TMPL
 
 print "Checking that required environment values are set:"
-
-DSUB_PROVIDER = os.getenv("DSUB_PROVIDER", "google")
 
 if "YOUR_PROJECT" in os.environ:
   PROJECT_ID = os.environ["YOUR_PROJECT"]
@@ -129,8 +128,7 @@ if not os.environ.get("CHECK_RESULTS_ONLY"):
   if test_util.gsutil_ls_check("%s/**" % TEST_REMOTE_ROOT):
     print >> sys.stderr, "Test files exist: %s" % TEST_REMOTE_ROOT
     print >> sys.stderr, "Remove contents:"
-    print >> sys.stderr, "  gsutil -m rm %s/**" % os.path.dirname(
-        TEST_REMOTE_ROOT)
+    print >> sys.stderr, "  gsutil -m rm %s/**" % TEST_REMOTE_ROOT
     sys.exit(1)
 
 if TASKS_FILE:

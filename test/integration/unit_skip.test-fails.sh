@@ -32,28 +32,26 @@ set -o nounset
 # Despite using this provider, dsub will only fail when it tries to
 # submit a job, not in the cases where it skips submission.
 
-
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-# create pre-existing output
-EXISTING="${OUTPUTS}/exists"
-EXISTING_2="${OUTPUTS}/exists_too"
-EXISTING_PATTERN_1="${OUTPUTS}/exist*"
-EXISTING_PATTERN_2="${OUTPUTS}/ex*ts"
-NEWFILE="${OUTPUTS}/newfile"
-OUT_FOLDER_2="${OUTPUTS}/newfolder"
+readonly EXISTING="${OUTPUTS}/exists"
+readonly EXISTING_2="${OUTPUTS}/exists_too"
+readonly EXISTING_PATTERN_1="${OUTPUTS}/exist*"
+readonly EXISTING_PATTERN_2="${OUTPUTS}/ex*ts"
+readonly NEWFILE="${OUTPUTS}/newfile"
+readonly OUT_FOLDER_2="${OUTPUTS}/newfolder"
+
+# Create pre-existing output
 echo "test output" | gsutil cp - "${EXISTING}"
 echo "test output" | gsutil cp - "${EXISTING_2}"
-
 
 echo "Job 1 ..."
 
 # Skip because --output file exists.
-SKIP_JOBID=$("${DSUB}" \
-  --provider test-fails \
+SKIP_JOBID=$(run_dsub \
   --command 'echo "Job 1"' \
   --output "${EXISTING}" \
   --skip)
@@ -68,8 +66,7 @@ fi
 echo "Job 2 ..."
 
 # Skip because --output file exists (VAR=PATH syntax)
-SKIP_JOBID=$("${DSUB}" \
-  --provider test-fails \
+SKIP_JOBID=$(run_dsub \
   --command 'echo "Job 2" > ${OUTPUT_FILE}' \
   --output OUTPUT_FILE="${EXISTING}" \
   --skip \
@@ -85,8 +82,7 @@ fi
 echo "Job 3 ..."
 
 # Skip because --output file matches pattern
-SKIP_JOBID=$("${DSUB}" \
-  --provider test-fails \
+SKIP_JOBID=$(run_dsub \
   --command 'echo "Job 3"' \
   --output OUTPUT_FILES="${EXISTING_PATTERN_1}" \
   --skip \
@@ -102,8 +98,7 @@ fi
 echo "Job 4 ..."
 
 # Skip because --output file matches pattern
-SKIP_JOBID=$("${DSUB}" \
-  --provider test-fails \
+SKIP_JOBID=$(run_dsub \
   --command 'echo "Job 4"' \
   --output OUTPUT_FILES="${EXISTING_PATTERN_2}" \
   --skip \
@@ -119,8 +114,7 @@ fi
 echo "Job 5 ..."
 
 # Skip existing file in --output-recursive
-SKIP_JOBID=$("${DSUB}" \
-  --provider test-fails \
+SKIP_JOBID=$(run_dsub \
   --command 'echo "Job 5" > ${OUTPUTS_PATH}/job_5' \
   --output-recursive OUTPUTS_PATH="${OUTPUTS}" \
   --skip \
@@ -136,8 +130,7 @@ fi
 echo "Job 6 (should run)..."
 
 # Do not skip because --output file isn't there
-SKIP_JOBID=$("${DSUB}" \
-  --provider test-fails \
+SKIP_JOBID=$(run_dsub \
   --command 'echo "Job 6" > ${OUTPUT_FILE}' \
   --output OUTPUT_FILE="${NEWFILE}" \
   --skip \
@@ -153,8 +146,7 @@ fi
 echo "Job 7 (should run)..."
 
 # Do not skip because --output-recursive folder is empty
-SKIP_JOBID=$("${DSUB}" \
-  --provider test-fails \
+SKIP_JOBID=$(run_dsub \
   --command 'echo "Job 7" > ${OUTPUT_PATH}/job_7' \
   --output-recursive OUTPUT_PATH="${OUT_FOLDER_2}" \
   --skip \
@@ -170,8 +162,7 @@ fi
 echo "Job 8 ..."
 
 # Skip because both --output files exist
-SKIP_JOBID=$("${DSUB}" \
-  --provider test-fails \
+SKIP_JOBID=$(run_dsub \
   --command 'echo "Job 8" > ${OUTPUT_FILE_1}' \
   --output OUTPUT_FILE_1="${EXISTING}" \
   --output OUTPUT_FILE_2="${EXISTING_2}" \
