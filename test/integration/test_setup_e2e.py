@@ -46,7 +46,7 @@ import test_util
 TEST_VARS = ("TEST_NAME", "TEST_DIR", "TEST_TMP", "TASKS_FILE",
              "TASKS_FILE_TMPL",)
 TEST_E2E_VARS = ("PROJECT_ID", "DSUB_BUCKET", "LOGGING", "INPUTS", "OUTPUTS",
-                 "DOCKER_INPUTS", "DOCKER_OUTPUTS",)
+                 "DOCKER_GCS_INPUTS", "DOCKER_GCS_OUTPUTS",)
 
 
 def _environ():
@@ -97,26 +97,26 @@ if not test_util.gsutil_ls_check("gs://%s" % DSUB_BUCKET):
   sys.exit(1)
 
 # Set standard LOGGING, INPUTS, and OUTPUTS values
-TEST_REMOTE_ROOT = "gs://%s/dsub/py/%s/%s" % (DSUB_BUCKET, DSUB_PROVIDER,
-                                              TEST_NAME)
-TEST_DOCKER_ROOT = "gs/%s/dsub/py/%s/%s" % (DSUB_BUCKET, DSUB_PROVIDER,
-                                            TEST_NAME)
+TEST_GCS_ROOT = "gs://%s/dsub/py/%s/%s" % (DSUB_BUCKET, DSUB_PROVIDER,
+                                           TEST_NAME)
+TEST_GCS_DOCKER_ROOT = "gs/%s/dsub/py/%s/%s" % (DSUB_BUCKET, DSUB_PROVIDER,
+                                                TEST_NAME)
 
 if TASKS_FILE:
   # For task file tests, the logging path is a directory.
   # Eventually each job should have its own sub-directory,
   # and named logging files but we need to add dsub support for that.
-  LOGGING = "%s/logging" % TEST_REMOTE_ROOT
+  LOGGING = "%s/logging" % TEST_GCS_ROOT
 else:
   # For regular tests, the logging path is a named file.
-  LOGGING = TEST_REMOTE_ROOT + "/%s/logging/%s.log" % (TEST_NAME, TEST_NAME)
+  LOGGING = TEST_GCS_ROOT + "/%s/logging/%s.log" % (TEST_NAME, TEST_NAME)
   STDOUT_LOG = "%s/%s-stdout.log" % (os.path.dirname(LOGGING), TEST_NAME)
   STDERR_LOG = "%s/%s-stderr.log" % (os.path.dirname(LOGGING), TEST_NAME)
 
-INPUTS = "%s/input" % TEST_REMOTE_ROOT
-OUTPUTS = "%s/output" % TEST_REMOTE_ROOT
-DOCKER_INPUTS = "%s/input" % TEST_DOCKER_ROOT
-DOCKER_OUTPUTS = "%s/output" % TEST_DOCKER_ROOT
+INPUTS = "%s/input" % TEST_GCS_ROOT
+OUTPUTS = "%s/output" % TEST_GCS_ROOT
+DOCKER_GCS_INPUTS = "%s/input" % TEST_GCS_DOCKER_ROOT
+DOCKER_GCS_OUTPUTS = "%s/output" % TEST_GCS_DOCKER_ROOT
 
 print "Logging path: %s" % LOGGING
 print "Input path: %s" % INPUTS
@@ -125,10 +125,10 @@ print "Output path: %s" % OUTPUTS
 if not os.environ.get("CHECK_RESULTS_ONLY"):
 
   print "  Checking if remote test files already exists"
-  if test_util.gsutil_ls_check("%s/**" % TEST_REMOTE_ROOT):
-    print >> sys.stderr, "Test files exist: %s" % TEST_REMOTE_ROOT
+  if test_util.gsutil_ls_check("%s/**" % TEST_GCS_ROOT):
+    print >> sys.stderr, "Test files exist: %s" % TEST_GCS_ROOT
     print >> sys.stderr, "Remove contents:"
-    print >> sys.stderr, "  gsutil -m rm %s/**" % TEST_REMOTE_ROOT
+    print >> sys.stderr, "  gsutil -m rm %s/**" % TEST_GCS_ROOT
     sys.exit(1)
 
 if TASKS_FILE:

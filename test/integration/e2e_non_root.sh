@@ -29,7 +29,8 @@ readonly INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes
 
 readonly BUILD_DIR="${TEST_TMP}/${TEST_NAME}"
 readonly DOCKERFILE="${BUILD_DIR}/Dockerfile"
-readonly IMAGE=gcr.io/${PROJECT_ID}/dsub_usertest:$(date +%Y-%m-%d)_${RANDOM}
+readonly IMAGE_PROJECT_ID="$(echo "${PROJECT_ID}" | sed s#:#/#)"
+readonly IMAGE=gcr.io/${IMAGE_PROJECT_ID}/dsub_usertest:$(date +%Y-%m-%d)_${RANDOM}
 
 function exit_handler() {
   local code="${?}"

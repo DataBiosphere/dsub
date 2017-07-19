@@ -77,12 +77,15 @@ setup(
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
-        'oauth2client',
+        # dependencies for dsub, ddel, dstat
         'google-api-python-client',
+        'oauth2client',
         'python-dateutil',
         'pytz',
         'pyyaml',
         'tabulate',
+
+        # dependencies for test code
         'parameterized',
     ],
 

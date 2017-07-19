@@ -70,6 +70,7 @@ for OUTPUT_PATH_VAR in ${!OUTPUT_PATH_*}; do
 
     echo "${FILE_CONTENTS}" > "${DIR}/file1.txt"
     echo "${FILE_CONTENTS}" > "${DIR}/file2.txt"
+    chmod o-rwx "${DIR}"/file*
   done
 done
 

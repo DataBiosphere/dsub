@@ -36,10 +36,19 @@ from apiclient import errors
 from apiclient.discovery import build
 from dateutil.tz import tzlocal
 
+from ..lib import param_util
 from ..lib import providers_util
 from oauth2client.client import GoogleCredentials
 import pytz
 
+
+_PROVIDER_NAME = 'google'
+
+# Create file provider whitelist.
+_SUPPORTED_FILE_PROVIDERS = frozenset([param_util.P_GCS])
+_SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
+_SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
+_SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 
 # Environment variable name for the script body
 SCRIPT_VARNAME = '_SCRIPT'
@@ -262,33 +271,8 @@ class _Label(collections.namedtuple('_Label', ['name', 'value'])):
   __slots__ = ()
 
   def __new__(cls, name, value=None):
-    cls.validate_name(name)
-    cls.validate_value(value)
+    param_util.LabelParam.validate_label(name, value)
     return super(_Label, cls).__new__(cls, name, value)
-
-  @staticmethod
-  def validate_name(name):
-    """Check that the name conforms to Google label restrictions."""
-
-    # The name must conform to RFC1035 (domain names):
-    #   * must be 1-63 characters long
-    #   * match the regular expression [a-z]([-a-z0-9]*[a-z0-9])?
-
-    if len(name) < 1 or len(name) > 63:
-      raise ValueError('Label name must be 1-63 characters long: %s' % name)
-    if not re.match(r'^[a-z]([-a-z0-9]*[a-z0-9])?$', name):
-      raise ValueError('Invalid name for label: %s' % name)
-
-  @staticmethod
-  def validate_value(value, label_type='label'):
-    """Check that the value conforms to Google label restrictions."""
-
-    # The value can be empty.
-    # If not empty, must conform to RFC1035 (domain names).
-    #   * match the regular expression [a-z]([-a-z0-9]*[a-z0-9])?
-
-    if value and not re.match(r'^[a-z]([-a-z0-9]*[a-z0-9])?$', value):
-      raise ValueError('Invalid value for %s: %s' % (label_type, value))
 
   @staticmethod
   def convert_to_label_chars(s):
@@ -406,16 +390,16 @@ class _Pipelines(object):
     if recursive_input_dirs:
       export_input_dirs = providers_util.build_recursive_localize_env(
           DATA_MOUNT_POINT, inputs)
-      copy_input_dirs = providers_util.build_recursive_gcs_localize_command(
-          DATA_MOUNT_POINT, inputs)
+      copy_input_dirs = providers_util.build_recursive_localize_command(
+          DATA_MOUNT_POINT, inputs, param_util.P_GCS)
 
     export_output_dirs = ''
     copy_output_dirs = ''
     if recursive_output_dirs:
       export_output_dirs = providers_util.build_recursive_gcs_delocalize_env(
           DATA_MOUNT_POINT, outputs)
-      copy_output_dirs = providers_util.build_recursive_gcs_delocalize_command(
-          DATA_MOUNT_POINT, outputs)
+      copy_output_dirs = providers_util.build_recursive_delocalize_command(
+          DATA_MOUNT_POINT, outputs, param_util.P_GCS)
 
     mkdirs = '\n'.join([
         'mkdir -p {0}/{1}'.format(DATA_MOUNT_POINT, var.docker_path if
@@ -576,16 +560,14 @@ class _Pipelines(object):
     inputs = {}
     inputs.update({SCRIPT_VARNAME: script})
     inputs.update({var.name: var.value for var in job_data['envs']})
-    inputs.update({
-        var.name: var.remote_uri
-        for var in job_data['inputs'] if not var.recursive
-    })
+    inputs.update(
+        {var.name: var.uri
+         for var in job_data['inputs'] if not var.recursive})
 
     outputs = {}
-    outputs.update({
-        var.name: var.remote_uri
-        for var in job_data['outputs'] if not var.recursive
-    })
+    outputs.update(
+        {var.name: var.uri
+         for var in job_data['outputs'] if not var.recursive})
 
     labels = {}
     labels.update({
@@ -765,6 +747,8 @@ class _Operations(object):
       value = metadata['job-status']
     elif field == 'envs':
       value = cls._get_operation_input_field_values(metadata, False)
+    elif field == 'labels':
+      return {}
     elif field == 'inputs':
       value = cls._get_operation_input_field_values(metadata, True)
     elif field == 'outputs':
@@ -777,6 +761,8 @@ class _Operations(object):
       else:
         value = None
     elif field == 'status':
+      value = cls.operation_status(operation)
+    elif field in ['status-message', 'status-detail']:
       status, last_update = cls.operation_status_message(operation)
       value = status
     elif field == 'last-update':
@@ -788,32 +774,110 @@ class _Operations(object):
     return value if value else default
 
   @classmethod
+  def _get_operation_full_job_id(cls, op):
+    """Returns the job-id or job-id.task-id for the operation."""
+    job_id = cls.get_operation_field(op, 'job-id')
+    task_id = cls.get_operation_field(op, 'task-id')
+    if task_id:
+      return '%s.%s' % (job_id, task_id)
+    else:
+      return job_id
+
+  @classmethod
+  def _cancel_batch(cls, service, ops):
+    """Cancel a batch of operations.
+
+    Args:
+      service: Google Genomics API service object.
+      ops: A list of operations to cancel.
+
+    Returns:
+      A list of operations canceled and a list of error messages.
+    """
+
+    # We define an inline callback which will populate a list of
+    # successfully canceled operations as well as a list of operations
+    # which were not successfully canceled.
+
+    canceled = []
+    failed = []
+
+    def handle_cancel(request_id, response, exception):
+      """Callback for the cancel response."""
+      del response  # unused
+
+      if exception:
+        # We don't generally expect any failures here, except possibly trying
+        # to cancel an operation that is already canceled or finished.
+        #
+        # If the operation is already finished, provide a clearer message than
+        # "error 400: Bad Request".
+
+        msg = 'error %s: %s' % (exception.resp.status, exception.resp.reason)
+        if exception.resp.status == FAILED_PRECONDITION_CODE:
+          detail = json.loads(exception.content)
+          status = detail.get('error', {}).get('status')
+          if status == FAILED_PRECONDITION_STATUS:
+            msg = 'Not running'
+
+        failed.append({'name': request_id, 'msg': msg})
+      else:
+        canceled.append({'name': request_id})
+
+      return
+
+    # Set up the batch object
+    batch = service.new_batch_http_request(callback=handle_cancel)
+
+    # The callback gets a "request_id" which is the operation name.
+    # Build a dict such that after the callback, we can lookup the operation
+    # objects by name
+    ops_by_name = {}
+    for op in ops:
+      ops_by_name[op['name']] = op
+      batch.add(
+          service.operations().cancel(name=op['name'], body={}),
+          request_id=op['name'])
+
+    # Cancel the operations
+    batch.execute()
+
+    # Iterate through the canceled and failed lists to build our return lists
+    canceled_ops = [ops_by_name[op['name']] for op in canceled]
+    error_messages = [
+        "Error canceling '%s': %s" %
+        (cls._get_operation_full_job_id(ops_by_name[op['name']]), op['msg'])
+        for op in failed
+    ]
+
+    return canceled_ops, error_messages
+
+  @classmethod
   def cancel(cls, service, ops):
-    """Cancel the operation."""
+    """Cancel operations.
+
+    Args:
+      service: Google Genomics API service object.
+      ops: A list of operations to cancel.
+
+    Returns:
+      A list of operations canceled and a list of error messages.
+    """
+
+    # Canceling many operations one-by-one can be slow.
+    # The Pipelines API doesn't directly support a list of operations to cancel,
+    # but the requests can be performed in batch.
 
     canceled_ops = []
     error_messages = []
-    for op in ops:
-      try:
-        _Api.execute(service.operations().cancel(name=op['name'], body={}))
-        canceled_ops.append(op)
-      except errors.HttpError as e:
-        # If the operation is already finished, quietly continue
-        if e.resp.status == FAILED_PRECONDITION_CODE:
-          detail = json.loads(e.content)
-          if 'error' in detail and 'status' in detail['error']['status']:
-            if detail['error']['status'] == FAILED_PRECONDITION_STATUS:
-              continue
 
-        job_id = cls.get_operation_field(op, 'job-id')
-        task_id = cls.get_operation_field(op, 'task-id')
-        if task_id:
-          res_id = '%s.%s' % (job_id, task_id)
-        else:
-          res_id = job_id
-
-        error_messages.append('Error canceling job %s - code %s: %s' %
-                              (res_id, e.resp.status, e.resp.reason))
+    max_batch = 256
+    total_ops = len(ops)
+    for first_op in range(0, total_ops, max_batch):
+      batch_canceled, batch_messages = cls._cancel_batch(
+          service, ops[first_op:first_op + max_batch])
+      canceled_ops.extend(batch_canceled)
+      error_messages.extend(batch_messages)
 
     return canceled_ops, error_messages
 
@@ -1008,7 +1072,7 @@ class GoogleJobProvider(base.JobProvider):
     pipeline.update(
         _Pipelines.build_pipeline_args(
             self._project, script.value, job_data, job_resources.preemptible,
-            job_resources.logging, job_resources.scopes))
+            job_resources.logging.uri, job_resources.scopes))
 
     return pipeline
 
@@ -1030,7 +1094,19 @@ class GoogleJobProvider(base.JobProvider):
     Returns:
       A dictionary containing the 'user-id', 'job-id', and 'task-id' list.
       For jobs that are not task array jobs, the task-id list should be empty.
+
+    Raises:
+      ValueError: if job resources or task data contain illegal values.
     """
+    # Validate task data and resources.
+    param_util.validate_submit_args_or_fail(
+        job_resources,
+        all_task_data,
+        provider_name=_PROVIDER_NAME,
+        input_providers=_SUPPORTED_INPUT_PROVIDERS,
+        output_providers=_SUPPORTED_OUTPUT_PROVIDERS,
+        logging_providers=_SUPPORTED_LOGGING_PROVIDERS)
+    # Prepare and submit jobs.
     launched_tasks = []
     requests = []
     for job_data in all_task_data:
@@ -1132,15 +1208,16 @@ class GoogleJobProvider(base.JobProvider):
       task_list: List of task-ids to cancel.
 
     Returns:
-      A list of jobs canceled and a list of error messages.
+      A list of tasks canceled and a list of error messages.
     """
     # Look up the job(s)
     tasks = self.lookup_job_tasks(
         ['RUNNING'],
-        max_jobs=0,
         user_list=user_list,
         job_list=job_list,
         task_list=task_list)
+
+    print 'Found %d tasks to delete.' % len(tasks)
 
     return _Operations.cancel(self._service, tasks)
 

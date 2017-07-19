@@ -265,6 +265,13 @@ def parse_arguments(prog, argv):
       help='Environment variables for the script\'s execution environment',
       metavar='KEY=VALUE')
   parser.add_argument(
+      '--label',
+      nargs='*',
+      action=ListParamAction,
+      default=[],
+      help='Labels to associate to the job.',
+      metavar='KEY=VALUE')
+  parser.add_argument(
       '--input',
       nargs='*',
       action=ListParamAction,
@@ -392,7 +399,7 @@ def get_job_resources(args):
   Returns:
     JobResources object containing the requested resources for the job
   """
-
+  logging = param_util.build_logging_param(args.logging)
   return job_util.JobResources(
       min_cores=args.min_cores,
       min_ram=args.min_ram,
@@ -401,7 +408,7 @@ def get_job_resources(args):
       preemptible=args.preemptible,
       image=args.image,
       zones=args.zones,
-      logging=args.logging,
+      logging=logging,
       scopes=args.scopes)
 
 
@@ -613,7 +620,7 @@ def _check_wildcard_inputs(vars_include_wildcards, all_task_data):
     print '         you can change your code before it becomes the default.'
     print '         The following input parameters include wildcards:'
     print '\n'.join([
-        '           {0}={1}'.format(var.name, var.remote_uri)
+        '           {0}={1}'.format(var.name, var.uri)
         for var in inputs_with_wildcards
     ])
 
@@ -655,6 +662,8 @@ def run_main(args):
     raise ValueError('Output skipping (--skip) not supported for --task '
                      'commands.')
 
+  provider_base.check_for_unsupported_flag(args)
+
   if args.command:
     if args.name:
       command_name = args.name
@@ -687,7 +696,7 @@ def run_main(args):
         args.tasks, input_file_param_util, output_file_param_util)
   else:
     all_task_data = param_util.args_to_job_data(
-        args.env, args.input, args.input_recursive, args.output,
+        args.env, args.label, args.input, args.input_recursive, args.output,
         args.output_recursive, input_file_param_util, output_file_param_util)
 
   _check_wildcard_inputs(args.vars_include_wildcards, all_task_data)

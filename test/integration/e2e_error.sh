@@ -24,10 +24,6 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-TGT_1="${OUTPUTS}/testfile_1.txt"
-TGT_2="${OUTPUTS}/testfile_2.txt"
-
-
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."

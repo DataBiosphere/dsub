@@ -66,5 +66,12 @@ def get_ddel_provider_args(args):
   return get_dstat_provider_args(args)
 
 
+def check_for_unsupported_flag(args):
+  """Raise an error if the provider doesn't support a provided flag."""
+  if args.label and args.provider not in ['test-fails', 'local']:
+    raise ValueError(
+        '--label is not supported by the "%s" provider.' % args.provider)
+
+
 if __name__ == '__main__':
   pass

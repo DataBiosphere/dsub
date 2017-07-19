@@ -31,7 +31,7 @@ class JobResources(
     boot_disk_size (int): size of the boot disk (in GB)
     preemptible (bool): use a preemptible VM for the job
     image (str): Docker image name
-    logging (str): path to location for jobs to write logs
+    logging (param_util.LoggingParam): path to location for jobs to write logs
     zones (str): location in which to run the job
     scopes (list): OAuth2 scopes for the job
   """

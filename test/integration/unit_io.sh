@@ -67,7 +67,7 @@ function test_input_bad_wildcard() {
     assert_output_empty
 
     assert_err_contains \
-      "ValueError: Wildcards in remote paths only supported for files: gs://bucket/*/file.bam"
+      "ValueError: Path wildcard (*) are only supported for files: gs://bucket/*/file.bam"
 
     test_passed "${subtest}"
   fi
@@ -111,7 +111,7 @@ function test_output_bad_path() {
     assert_output_empty
 
     assert_err_contains \
-      "ValueError: Output variables that are not recursive must reference a filename or wildcard: gs://bucket/path/"
+      "ValueError: Input or output values that are not recursive must reference a filename or wildcard: gs://bucket/path/"
 
     test_passed "${subtest}"
   fi

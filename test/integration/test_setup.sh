@@ -59,7 +59,7 @@ echo "Setting up test: ${TEST_NAME}"
 
 readonly TEST_DIR="${SCRIPT_DIR}"
 
-readonly TEST_TMP="${TEST_TMP:-/tmp/dub_test/sh/${DSUB_PROVIDER}/${TEST_NAME}}/tmp"
+readonly TEST_TMP="${TEST_TMP:-/tmp/dsub_test/sh/${DSUB_PROVIDER}/${TEST_NAME}}/tmp"
 
 if [[ "${TEST_NAME}" == *_tasks ]]; then
   readonly TASKS_FILE_TMPL="${TEST_DIR}/${TASKS_FILE_TMPL_NAME:-${TEST_NAME}}.tsv.tmpl"

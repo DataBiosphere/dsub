@@ -23,6 +23,7 @@ source "${SCRIPT_DIR}/test_unit_util.sh"
 source "${SCRIPT_DIR}/test_setup.sh"
 
 readonly PROJECT_ID=fake-project
+readonly IMAGE_PROJECT_ID="${PROJECT_ID}"
 readonly LOGGING=gs://bucket/path/logging
 readonly SCRIPT="${SCRIPT_DIR}/dummy.sh"
 
