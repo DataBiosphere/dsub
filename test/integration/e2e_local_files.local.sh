@@ -20,26 +20,14 @@ set -o nounset
 # Test recursive copying features of dsub.
 #
 # This test is designed to verify that:
-#  * recursive inputs are copied from GCS to the VM recursively.
-#  * non-recursive inputs are processed non-recursively.
-#  * script-populated output directories are recursively copied.
-#  * non-recursive output directories are processed non-recursively.
+#  * The local runner can;
+#     - accept local inputs
+#     - write to a local output
+#     - save logs to a local directory
+#  * non-recursive and recursive I/O should work for the local
+#    runner no differently than the remote runner.
 #
-# This script will populate GCS with a two identical sets of directories and
-# files, named both "deep" and "shallow".
-# The "deep" GCS path will be copied recursively as input.
-# The "shallow" GCS path will be copied non-recursively as input.
-#
-# Similarly the pipeline script will generate output locally to both
-# a "deep" and "shallow" directory.
-# The "deep" local path will be copied recursively as output.
-# The "shallow" local path will be copied non-recursively as output.
-#
-# The structure of the data generated for the deep and shallow copying is:
-#
-#   file{1,2}.txt
-#   dir_{1,2}/file{1,2}.txt
-#   dir_{1,2}/dir_{a,b}/file{1,2}.txt
+# For a detailed description of what this test does, see e2e_io_recursive.sh.
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
@@ -58,6 +46,10 @@ readonly FILE_CONTENTS="Test file contents"
 readonly INPUT_DEEP="${LOCAL_INPUTS}/deep"
 readonly INPUT_SHALLOW="${LOCAL_INPUTS}/shallow"
 
+# Output setup
+readonly OUTPUT_DEEP="${LOCAL_OUTPUTS}/deep"
+readonly OUTPUT_SHALLOW="${LOCAL_OUTPUTS}/shallow"
+readonly LOCAL_LOGGING="${TEST_TMP}/output_logs"
 
 echo "Setting up test inputs"
 
@@ -66,7 +58,10 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Setting up pipeline input..."
   build_recursive_files "${INPUT_DEEP}" "${INPUT_SHALLOW}"
 
-  gsutil -m rsync -r "${LOCAL_INPUTS}" "${INPUTS}/"
+  # Setup output
+  mkdir -p "${OUTPUT_DEEP}"
+  mkdir -p "${OUTPUT_SHALLOW}"
+  mkdir -p "${LOCAL_LOGGING}"
 
   echo "Launching pipeline..."
 
@@ -74,10 +69,10 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --image "google/cloud-sdk:latest" \
     --script "${SCRIPT_DIR}/script_io_recursive.sh" \
     --env FILE_CONTENTS="${FILE_CONTENTS}" \
-    --input INPUT_PATH_SHALLOW="${INPUTS}/shallow/*" \
-    --input-recursive INPUT_PATH_DEEP="${INPUTS}/deep/" \
-    --output OUTPUT_PATH_SHALLOW="${OUTPUTS}/shallow/*" \
-    --output-recursive OUTPUT_PATH_DEEP="${OUTPUTS}/deep/" \
+    --input INPUT_PATH_SHALLOW="${INPUT_SHALLOW}/*" \
+    --input-recursive INPUT_PATH_DEEP="${INPUT_DEEP}/" \
+    --output OUTPUT_PATH_SHALLOW="${OUTPUT_SHALLOW}/*" \
+    --output-recursive OUTPUT_PATH_DEEP="${OUTPUT_DEEP}/" \
     --wait
 
 fi
@@ -86,15 +81,15 @@ echo
 echo "Checking output..."
 
 # Setup variables used in result checking.
-setup_expected_fs_input_entries "${DOCKER_GCS_INPUTS}"
-setup_expected_fs_output_entries "${DOCKER_GCS_OUTPUTS}"
-setup_expected_remote_output_entries "${OUTPUTS}"
+setup_expected_fs_input_entries "${DOCKER_LOCAL_INPUTS}"
+setup_expected_fs_output_entries "${DOCKER_LOCAL_OUTPUTS}"
+setup_expected_remote_output_entries "${LOCAL_OUTPUTS}"
 
 # Verify in the stdout file that the expected directories were written
 readonly RESULT=$(gsutil cat "${STDOUT_LOG}")
 
 readonly FS_FIND_IN=$(echo "${RESULT}" | sed -n '/^BEGIN: find$/,/^END: find$/p' \
-  | grep --fixed-strings /mnt/data/input/"${DOCKER_GCS_INPUTS}")
+  | grep --fixed-strings "${DOCKER_LOCAL_INPUTS}")
 
 for REC in "${EXPECTED_FS_INPUT_ENTRIES[@]}"; do
   if ! echo "${FS_FIND_IN}" | grep --quiet --fixed-strings "${REC}"; then
@@ -115,8 +110,9 @@ fi
 echo
 echo "On-disk input file list matches expected"
 
+
 readonly FS_FIND_OUT=$(echo "${RESULT}" | sed -n '/^BEGIN: find$/,/^END: find$/p' \
-  | grep --fixed-strings "${DOCKER_GCS_OUTPUTS}")
+  | grep --fixed-strings "${DOCKER_LOCAL_OUTPUTS}")
 
 for REC in "${EXPECTED_FS_OUTPUT_ENTRIES[@]}"; do
   if ! echo "${FS_FIND_OUT}" | grep --quiet --fixed-strings "${REC}"; then
@@ -138,22 +134,19 @@ echo
 echo "On-disk output file list matches expected"
 
 # Verify in GCS that the DEEP directory is deep and the SHALLOW directory
-# is shallow. Gsutil prints directories with a trailing "/:" marker that is
-# stripped using sed in order to match the output format of the `find` utility.
-readonly GCS_FIND="$(gsutil ls -r "${OUTPUTS}" \
-                     | grep -v '^ *$' \
-                     | sed -e 's#/:$##')"
+# is shallow.
+readonly LOCAL_FIND="$(find "${LOCAL_OUTPUTS}" | grep -v '^ *$')"
 
 for REC in "${EXPECTED_REMOTE_OUTPUT_ENTRIES[@]}"; do
-  if ! echo "${GCS_FIND}" | grep --quiet --fixed-strings "${REC}"; then
+  if ! echo "${LOCAL_FIND}" | grep --quiet --fixed-strings "${REC}"; then
     2>&1 echo "Output does not match expected"
     2>&1 echo "Did not find ${REC} in:"
-    2>&1 echo "${GCS_FIND}"
+    2>&1 echo "${LOCAL_FIND}"
     exit 1
   fi
 done
 
-GCS_REC_COUNT=$(echo "${GCS_FIND}" | wc -l)
+GCS_REC_COUNT=$(echo "${LOCAL_FIND}" | wc -l)
 if [[ "${GCS_REC_COUNT}" -ne "${#EXPECTED_REMOTE_OUTPUT_ENTRIES[@]}" ]]; then
   2>&1 echo "Number of records in ${OUTPUTS} does not match expected"
   2>&1 echo "${GCS_REC_COUNT} != ${#EXPECTED_REMOTE_OUTPUT_ENTRIES[@]}"
@@ -161,6 +154,6 @@ if [[ "${GCS_REC_COUNT}" -ne "${#EXPECTED_REMOTE_OUTPUT_ENTRIES[@]}" ]]; then
 fi
 
 echo
-echo "GCS output file list matches expected"
+echo "Local output file list matches expected"
 
 echo "SUCCESS"

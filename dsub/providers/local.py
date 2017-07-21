@@ -92,6 +92,8 @@ import yaml
 #               This is also the explicit working directory set before the
 #               user script runs.
 
+_PROVIDER_NAME = 'local'
+
 DATA_SUBDIR = 'data'
 
 SCRIPT_DIR = 'script'
@@ -99,10 +101,27 @@ WORKING_DIR = 'workingdir'
 
 DATA_MOUNT_POINT = '/mnt/data'
 
+# Set file provider whitelist.
+_SUPPORTED_FILE_PROVIDERS = frozenset([param_util.P_GCS, param_util.P_LOCAL])
+_SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
+_SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
+_SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
+
 # The task object for this provider. "job_status" is really task status.
 Task = namedtuple('Task', [
-    'job_id', 'task_id', 'job_status', 'status_message', 'job_name',
-    'create_time', 'last_update', 'inputs', 'outputs', 'envs', 'user_id', 'pid'
+    'job_id',
+    'task_id',
+    'job_status',
+    'status_message',
+    'job_name',
+    'create_time',
+    'last_update',
+    'envs',
+    'labels',
+    'inputs',
+    'outputs',
+    'user_id',
+    'pid',
 ])
 
 
@@ -122,15 +141,25 @@ class LocalJobProvider(base.JobProvider):
     }
 
   def submit_job(self, job_resources, job_metadata, all_task_data):
+    # Validate inputs.
+    param_util.validate_submit_args_or_fail(
+        job_resources,
+        all_task_data,
+        provider_name=_PROVIDER_NAME,
+        input_providers=_SUPPORTED_FILE_PROVIDERS,
+        output_providers=_SUPPORTED_FILE_PROVIDERS,
+        logging_providers=_SUPPORTED_LOGGING_PROVIDERS)
+
+    # Get script.
     script = job_metadata['script']
 
+    # Launch tasks!
     launched_tasks = []
     for task_data in all_task_data:
       task_id = task_data.get('task_id')
 
       # Set up directories
       task_dir = self._task_directory(job_metadata['job-id'], task_id)
-      print 'dsub task directory: ' + task_dir
       self._mkdir_outputs(task_dir, task_data)
 
       self._stage_script(task_dir, script.name, script.value)
@@ -172,8 +201,7 @@ class LocalJobProvider(base.JobProvider):
       readonly WORKING_DIR='{workingdir}'
       # Absolute path to the env config file
       readonly ENV_FILE='{env_file}'
-      # Cloud path prefix for log files.
-      readonly LOGGING='{logging}'
+      # Date format used in the logging message prefix.
       readonly DATE_FORMAT='{date_format}'
       # Absolute path to this script's directory.
       readonly TASK_DIR="$(dirname $0)"
@@ -202,6 +230,11 @@ class LocalJobProvider(base.JobProvider):
       delocalize_data() {{
         true # ensure body is not empty, to avoid error.
         {delocalize_command}
+      }}
+
+      delocalize_logs() {{
+        true # ensure body is not empty, to avoid error.
+        {delocalize_logs_command}
       }}
       """)
     script_body = textwrap.dedent("""\
@@ -309,11 +342,6 @@ class LocalJobProvider(base.JobProvider):
           chown -R "${usergroup}" "${docker_directory}" >> stdout.txt 2>> stderr.txt
       }
 
-      delocalize_logs() {
-        [[ -f stdout.txt ]] && gsutil -q cp stdout.txt "${LOGGING}-stdout.log"
-        [[ -f stderr.txt ]] && gsutil -q cp stderr.txt "${LOGGING}-stderr.log"
-        [[ -f log.txt ]] && gsutil -q cp log.txt "${LOGGING}.log"
-      }
 
       exit_if_canceled() {
         if [[ -f die ]]; then
@@ -341,10 +369,10 @@ class LocalJobProvider(base.JobProvider):
       fetch_image_if_necessary "${IMAGE}"
 
       log_info "Checking image userid."
-      USERGROUP="$(get_docker_user)"
-      if [[ "${USERGROUP}" != "0:0" ]]; then
-        log_info "Ensuring ${USERGROUP} can access ${DATA_MOUNT_POINT}."
-        docker_recursive_chown "${USERGROUP}" "${DATA_MOUNT_POINT}"
+      DOCKER_USERGROUP="$(get_docker_user)"
+      if [[ "${DOCKER_USERGROUP}" != "0:0" ]]; then
+        log_info "Ensuring docker user (${DOCKER_USERGROUP} can access ${DATA_MOUNT_POINT}."
+        docker_recursive_chown "${DOCKER_USERGROUP}" "${DATA_MOUNT_POINT}"
       fi
 
       # Begin execution of user script
@@ -362,30 +390,29 @@ class LocalJobProvider(base.JobProvider):
          "${SCRIPT_FILE}"
       exit_if_canceled
       DOCKER_EXITCODE=$(docker wait "${NAME}")
-      log_info "Docker returned with status ${DOCKER_EXITCODE}."
+      log_info "Docker exit code ${DOCKER_EXITCODE}."
       if [[ "${DOCKER_EXITCODE}" != 0 ]]; then
-        FAILURE_MESSAGE="Docker returned with status ${DOCKER_EXITCODE} (check stderr)."
+        FAILURE_MESSAGE="Docker exit code ${DOCKER_EXITCODE} (check stderr)."
       fi
       docker logs "${NAME}" >> stdout.txt 2>> stderr.txt
       # Re-enable trap
       trap 'error ${LINENO} $? Error' ERR
 
-      # Delocalize data
-      if [[ $USERGROUP != "0:0" ]]; then
-        HOST_USERGROUP="$(id -u):$(id -g)"
-        log_info "ensure host user (${HOST_USERGROUP}) can access Docker-written data"
-        # Disable ERR trap, we want to copy the logs even if Docker fails.
-        trap ERR
-        docker_recursive_chown "${HOST_USERGROUP}" "${DATA_MOUNT_POINT}"
-        DOCKER_EXITCODE_2=$?
-        # Re-enable trap
-        trap 'error ${LINENO} $? Error' ERR
-        if [[ "${DOCKER_EXITCODE_2}" != 0 ]]; then
-          # Ensure we report failure at the end of the execution
-          FAILURE_MESSAGE="chown failed, Docker returned ${DOCKER_EXITCODE_2}."
-          log_error "${FAILURE_MESSAGE}"
-        fi
+      # Prepare data for delocalization.
+      HOST_USERGROUP="$(id -u):$(id -g)"
+      log_info "Ensure host user (${HOST_USERGROUP}) owns Docker-written data"
+      # Disable ERR trap, we want to copy the logs even if Docker fails.
+      trap ERR
+      docker_recursive_chown "${HOST_USERGROUP}" "${DATA_MOUNT_POINT}"
+      DOCKER_EXITCODE_2=$?
+      # Re-enable trap
+      trap 'error ${LINENO} $? Error' ERR
+      if [[ "${DOCKER_EXITCODE_2}" != 0 ]]; then
+        # Ensure we report failure at the end of the execution
+        FAILURE_MESSAGE="chown failed, Docker returned ${DOCKER_EXITCODE_2}."
+        log_error "${FAILURE_MESSAGE}"
       fi
+
       log_info "Copying outputs."
       delocalize_data
 
@@ -394,7 +421,7 @@ class LocalJobProvider(base.JobProvider):
       # Disable further traps (if cleanup fails we don't want to call it
       # recursively)
       trap EXIT
-      log_info "Copy logs to ${LOGGING}, and cleanup."
+      log_info "Delocalize logs and cleanup."
       cleanup
       if [[ -z "${FAILURE_MESSAGE}" ]]; then
         echo "SUCCESS" > status.txt
@@ -407,14 +434,16 @@ class LocalJobProvider(base.JobProvider):
       fi
       """)
 
+    job_id = job_metadata['job-id']
+
     # Build the local runner script
     volumes = ('-v ' + task_dir + '/' + DATA_SUBDIR + '/'
                ':' + DATA_MOUNT_POINT)
-    logging = self._make_logging_path(job_resources.logging,
-                                      job_metadata['job-id'])
+    logging = job_resources.logging
+
     script = script_header.format(
         volumes=volumes,
-        name=self._get_docker_name(job_metadata['job-id'], task_id),
+        name=self._get_docker_name(job_id, task_id),
         image=job_resources.image,
         script=DATA_MOUNT_POINT + '/' + SCRIPT_DIR + '/' +
         job_metadata['script'].name,
@@ -422,7 +451,6 @@ class LocalJobProvider(base.JobProvider):
         uid=os.getuid(),
         data_mount_point=DATA_MOUNT_POINT,
         data_dir=task_dir + '/' + DATA_SUBDIR,
-        logging=logging,
         date_format='+%Y/%m/%d %H:%M:%S',
         workingdir=WORKING_DIR,
         export_input_dirs=providers_util.build_recursive_localize_env(
@@ -435,7 +463,9 @@ class LocalJobProvider(base.JobProvider):
         recursive_delocalize_command=self._delocalize_outputs_recursive_command(
             task_dir, task_data),
         delocalize_command=self._delocalize_outputs_commands(
-            task_dir, task_data)) + script_body
+            task_dir, task_data),
+        delocalize_logs_command=self._delocalize_logging_command(
+            logging.uri, logging.file_provider, job_id, task_id),) + script_body
 
     # Write the local runner script
     script_fname = task_dir + '/runner.sh'
@@ -469,15 +499,12 @@ class LocalJobProvider(base.JobProvider):
   def delete_jobs(self, user_list, job_list, task_list):
     # As per the spec, we ignore anything not running.
     tasks = self.lookup_job_tasks(['RUNNING'], user_list, job_list, task_list)
+
     canceled = []
     cancel_errors = []
     for task in tasks:
-      job_id = self.get_task_field(task, 'job-id')
-      task_id = self.get_task_field(task, 'task-id')
-      task_name = '%s/%s' % (job_id, task_id) if task_id is not None else job_id
-
       # Try to cancel it for real.
-      # First, tell it not to start Docker if it hasn't yet.
+      # First, tell the runner script to skip delocalization
       task_dir = self._task_directory(
           self.get_task_field(task, 'job-id'),
           self.get_task_field(task, 'task-id'))
@@ -487,26 +514,27 @@ class LocalJobProvider(base.JobProvider):
 
       # Next, kill Docker if it's running.
       docker_name = self._get_docker_name_for_task(task)
+
       try:
         subprocess.check_output(['docker', 'kill', docker_name])
       except subprocess.CalledProcessError as cpe:
         cancel_errors += [
             'Unable to cancel %s: docker error %s:\n%s' %
-            (task_name, cpe.returncode, cpe.output)
+            (docker_name, cpe.returncode, cpe.output)
         ]
         continue
 
       # The script should have quit in response. If it hasn't, kill it.
       pid = self.get_task_field(task, 'pid', 0)
       if pid <= 0:
-        cancel_errors += ['Unable to cancel %s: missing pid.' % task_name]
+        cancel_errors += ['Unable to cancel %s: missing pid.' % docker_name]
         continue
       try:
         os.kill(pid, signal.SIGTERM)
       except OSError as err:
         cancel_errors += [
-            'Error while canceling %s: kill(%s) failed (%s).' % (task_name, pid,
-                                                                 str(err))
+            'Error while canceling %s: kill(%s) failed (%s).' % (docker_name,
+                                                                 pid, str(err))
         ]
       canceled += [task]
 
@@ -531,13 +559,17 @@ class LocalJobProvider(base.JobProvider):
         for key, value in task._asdict().iteritems()
     }
 
-    # dstat expects to find a field called "status" that contains
-    # status if SUCCESS, status-message otherwise
     if field == 'status':
+      return tad.get('job-status', None)
+    # dstat expects to find a field called "status-message" that contains
+    # status if SUCCESS, status-message otherwise
+    if field == 'status-message':
       if tad.get('job-status', '') == 'SUCCESS':
         return 'Success'
       else:
-        return tad.get('status-message', None)
+        return self._last_line(tad.get('status-message', None))
+    if field == 'status-detail':
+      return tad.get('status-message', None)
 
     return tad.get(field, default)
 
@@ -610,12 +642,14 @@ class LocalJobProvider(base.JobProvider):
     #     name: value
     #   envs:
     #     name: value
+    #   labels:
+    #     name: value
     data = {
         'job-id': job_metadata['job-id'],
         'task-id': task_id,
         'job-name': job_metadata['job-name'],
     }
-    for key in ['inputs', 'outputs', 'envs']:
+    for key in ['inputs', 'outputs', 'envs', 'labels']:
       if task_data.has_key(key):
         data[key] = {}
         for param in task_data[key]:
@@ -682,26 +716,29 @@ class LocalJobProvider(base.JobProvider):
         status = 'CANCELED'
         status_message = 'task.pid missing'
     return Task(
-        job_id,
-        task_id,
-        status,
-        status_message,
-        meta.get('job-name', None),
-        datetime.fromtimestamp(create_time),
-        datetime.fromtimestamp(last_update) if last_update > 0 else None,
-        meta.get('inputs', None),
-        meta.get('outputs', None),
-        meta.get('envs', None),
+        job_id=job_id,
+        task_id=task_id,
+        job_status=status,
+        status_message=status_message,
+        job_name=meta.get('job-name', None),
+        create_time=datetime.fromtimestamp(create_time),
+        last_update=datetime.fromtimestamp(last_update)
+        if last_update > 0 else None,
+        envs=meta.get('envs', None),
+        labels=meta.get('labels', None),
+        inputs=meta.get('inputs', None),
+        outputs=meta.get('outputs', None),
         # It's called default_user but actually returns the current user
-        dsub_util.get_default_user() if user_id >= 0 else None,
-        pid)
+        user_id=dsub_util.get_default_user() if user_id >= 0 else None,
+        pid=pid)
 
   def _provider_root(self):
     if not self.provider_root_cache:
       self.provider_root_cache = tempfile.gettempdir() + '/dsub-local'
     return self.provider_root_cache
 
-  def _make_logging_path(self, gcs_folder_or_file, job_id):
+  @staticmethod
+  def _make_logging_path(gcs_folder_or_file, job_id, task_id):
     """Return "gcs_folder/job_id" or "gcs_file" (without .log).
 
     Matches the Pipelines API behavior: if the user specifies a file
@@ -712,18 +749,44 @@ class LocalJobProvider(base.JobProvider):
     Args:
       gcs_folder_or_file: eg. 'gs://bucket/path/myfile.log' or 'gs://bucket/'
       job_id: eg. 'script--foobar-12'
+      task_id: The id of the job task (if any)
 
     Returns:
       eg. 'gs://bucket/path/myfile' or 'gs://bucket/script-foobar-12'
     """
+    suffix = '%s.%s' % (job_id, task_id) if task_id else job_id
+
     ret = gcs_folder_or_file
     if ret.endswith('.log'):
       ret = ret[:-4]
     elif ret.endswith('/'):
-      ret += job_id
+      ret += suffix
     else:
-      ret += '/' + job_id
+      ret += '/' + suffix
     return ret
+
+  def _delocalize_logging_command(self, logpath, file_provider, job_id,
+                                  task_id):
+    """Returns a command to delocalize logs.
+
+    Args:
+      logpath: eg. 'gs://bucket/path/myfile.log' or 'gs://bucket/'
+      file_provider: a file provider from param_util.
+      job_id: eg. 'script--foobar-12'
+      task_id: The id of the job task (if any)
+
+    Returns:
+      eg. 'gs://bucket/path/myfile' or 'gs://bucket/script-foobar-12'
+    """
+    logpath = self._make_logging_path(logpath, job_id, task_id)
+    command = 'gsutil -q cp' if file_provider == param_util.P_GCS else 'cp'
+
+    body = textwrap.dedent("""\
+    [[ -f stdout.txt ]] && {0} stdout.txt {1}-stdout.log
+    [[ -f stderr.txt ]] && {0} stderr.txt {1}-stderr.log
+    [[ -f log.txt ]] && {0} log.txt {1}.log
+    """)
+    return body.format(command, logpath)
 
   def _make_job_id(self, job_name_value, user_id):
     """Return a job-id string."""
@@ -762,8 +825,13 @@ class LocalJobProvider(base.JobProvider):
   def _localize_inputs_recursive_command(self, task_dir, task_data):
     """Returns a command that will stage recursive inputs."""
     ins = task_data.get('inputs', [])
-    return providers_util.build_recursive_gcs_localize_command(
-        task_dir + '/' + DATA_SUBDIR, ins)
+    data_dir = os.path.join(task_dir, DATA_SUBDIR)
+    provider_commands = [
+        providers_util.build_recursive_localize_command(data_dir, ins,
+                                                        file_provider)
+        for file_provider in _SUPPORTED_INPUT_PROVIDERS
+    ]
+    return '\n'.join(provider_commands)
 
   def _get_input_target_path(self, local_file_path):
     """Returns a directory or file path to be the target for "gsutil cp".
@@ -821,8 +889,11 @@ class LocalJobProvider(base.JobProvider):
 
   def _delocalize_outputs_recursive_command(self, task_dir, task_data):
     outs = task_data.get('outputs', [])
-    return providers_util.build_recursive_gcs_delocalize_command(
-        task_dir + '/' + DATA_SUBDIR, outs)
+    gcs = providers_util.build_recursive_delocalize_command(
+        os.path.join(task_dir, DATA_SUBDIR), outs, param_util.P_GCS)
+    local = providers_util.build_recursive_delocalize_command(
+        os.path.join(task_dir, DATA_SUBDIR), outs, param_util.P_LOCAL)
+    return gcs + '\n' + local
 
   def _delocalize_outputs_commands(self, task_dir, task_data):
     """Copy outputs from local disk to GCS."""
@@ -830,9 +901,13 @@ class LocalJobProvider(base.JobProvider):
     commands = []
     for o in outs:
       local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + o.docker_path
-      gcs_file_path = o.remote_uri
-      commands.append('gsutil -q cp "%s" "%s"' % (local_file_path,
-                                                  gcs_file_path))
+      if o.recursive:
+        continue
+      if o.file_provider == param_util.P_GCS:
+        commands.append('gsutil -q cp "%s" "%s"' % (local_file_path, o.uri))
+      if o.file_provider == param_util.P_LOCAL:
+        commands.append('cp %s %s' % (local_file_path, o.uri))
+
     commands.append(
         textwrap.dedent("""\
     if ! recursive_delocalize_data; then
@@ -867,6 +942,13 @@ class LocalJobProvider(base.JobProvider):
     else:
       return '%s.%s' % (job_id, task_id)
 
+  def _last_line(self, value):
+    """Return the last line."""
+    if not value:
+      return value
+    if value.endswith('\n'):
+      return value.split('\n')[-2]
+    return value.split('\n')[-1]
 
 if __name__ == '__main__':
   pass

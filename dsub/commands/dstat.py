@@ -72,7 +72,6 @@ class TextOutput(OutputFormatter):
   def format_status(self, status):
     if self._full:
       return status
-
     return self.trim_display_field(status, self._MAX_ERROR_MESSAGE_LENGTH)
 
   def format_inputs_outputs(self, values):
@@ -88,7 +87,8 @@ class TextOutput(OutputFormatter):
         ('job-id', 'Job ID',),
         ('job-name', 'Job Name',),
         ('task-id', 'Task',),
-        ('status', 'Status', self.format_status),
+        ('status-message', 'Status', self.format_status),
+        ('status-detail', 'Status-details',),
         ('last-update', 'Last Update',),
         ('create-time', 'Created',),
         ('end-time', 'Ended',),
@@ -155,40 +155,42 @@ def prepare_row(provider, task, full):
   # Would like to include the Job ID in the default set of columns, but
   # it is a long value and would leave little room for status and update time.
 
+  row_spec = collections.namedtuple('row_spec',
+                                    ['key', 'optional', 'default_value'])
+
   # pyformat: disable
   default_columns = [
-      ('job-name', False),
-      ('task-id', True),
-      ('status', False),
-      ('last-update', False)
+      row_spec('job-name', False, None),
+      row_spec('task-id', True, None),
+      row_spec('last-update', False, None)
   ]
-  full_columns = [
-      ('job-id',),
-      ('user-id',),
-      ('create-time',),
-      ('end-time', 'NA'),
-      ('internal-id',),
-      ('inputs', {}),
-      ('outputs', {}),
-      ('envs', {}),
+  short_columns = default_columns + [
+      row_spec('status-message', False, None),
+  ]
+  full_columns = default_columns + [
+      row_spec('job-id', False, None),
+      row_spec('user-id', False, None),
+      row_spec('status', False, None),
+      row_spec('status-detail', False, None),
+      row_spec('create-time', False, None),
+      row_spec('end-time', False, 'NA'),
+      row_spec('internal-id', False, None),
+      row_spec('inputs', False, {}),
+      row_spec('outputs', False, {}),
+      row_spec('envs', False, {}),
+      row_spec('labels', False, {}),
   ]
   # pyformat: enable
 
-  row = {}
-  for col in default_columns:
-    key = col[0]
-    optional = col[1]
+  columns = full_columns if full else short_columns
 
-    value = provider.get_task_field(task, key)
+  row = {}
+  for col in columns:
+    key, optional, default = col
+
+    value = provider.get_task_field(task, key, default)
     if not optional or value:
       row[key] = value
-
-  if full:
-    for col in full_columns:
-      key = col[0]
-      default = col[1] if len(col) > 1 else None
-
-      row[key] = provider.get_task_field(task, key, default)
 
   return row
 

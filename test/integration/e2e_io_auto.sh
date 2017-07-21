@@ -50,8 +50,8 @@ echo
 echo "Checking output..."
 
 readonly EXPECTED_IO_VARS=(
-OUTPUT_0=/mnt/data/output/"${DOCKER_OUTPUTS}"/output_file/file.txt
-OUTPUT_1=/mnt/data/output/"${DOCKER_OUTPUTS}"/output_files/*
+OUTPUT_0=/mnt/data/output/"${DOCKER_GCS_OUTPUTS}"/output_file/file.txt
+OUTPUT_1=/mnt/data/output/"${DOCKER_GCS_OUTPUTS}"/output_files/*
 INPUT_0=/mnt/data/input/gs/genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam
 INPUT_1=/mnt/data/input/gs/genomics-public-data/test-data/dna/wgs/hiseq2500/NA12878/
 )
@@ -63,8 +63,8 @@ readonly EXPECTED_FS_INPUT_ENTRIES=(
 )
 
 readonly EXPECTED_FS_OUTPUT_ENTRIES=(
-/mnt/data/output/"${DOCKER_OUTPUTS}"/output_files
-/mnt/data/output/"${DOCKER_OUTPUTS}"/output_file
+/mnt/data/output/"${DOCKER_GCS_OUTPUTS}"/output_files
+/mnt/data/output/"${DOCKER_GCS_OUTPUTS}"/output_file
 )
 
 # Get the results- "env" and "find" output is bounded by "BEGIN" and "END"

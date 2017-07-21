@@ -96,6 +96,11 @@ class JobProvider(object):
     Returns:
       A dictionary containing the 'user-id', 'job-id', and 'task-id' list.
       For jobs that are not task array jobs, the task-id list should be empty.
+
+    Raises:
+      ValueError: submit job may validate any of the parameters and raise
+        a value error if any parameter (or specific combination of parameters)
+        is not supported by the provider.
     """
     raise NotImplementedError()
 
@@ -160,6 +165,19 @@ class JobProvider(object):
     'job-name', 'job-id', 'task-id', 'user-id',
     'job-status', 'error-message', 'create-time', 'end-time'
     'inputs', 'outputs'
+
+    The following are needed by dstat:
+    - status: The task status ('RUNNING', 'CANCELED', 'FAILED', 'SUCCESS')
+    - status-message: A short message that is displayed in the default
+                      dstat output. This should be as concise and useful as
+                      possible ("Pending", "Running", "Error: invalid...")
+    - status-detail: A longer status message that is displayed in full dstat
+                     output. Ideally, this is the last few lines of a log which
+                     gives the user enough information that they do not need
+                     to go to the log files.
+
+    dstat's short output shows status-message.
+    dstat's full output shows status and status-detail
 
     Args:
       task: object returned by lookup_job_tasks

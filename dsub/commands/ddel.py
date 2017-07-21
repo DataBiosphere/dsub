@@ -46,19 +46,19 @@ def parse_arguments():
       '--project',
       help='Cloud project ID in which to find and delete the job(s)')
   parser.add_argument(
-      '-j',
       '--jobs',
+      '-j',
       required=True,
       nargs='*',
       help='List of job-ids to delete. Use "*" to delete all running jobs.')
   parser.add_argument(
-      '-t',
       '--tasks',
+      '-t',
       nargs='*',
       help='List of tasks in an array job to delete.')
   parser.add_argument(
-      '-u',
       '--users',
+      '-u',
       nargs='*',
       default=[dsub_util.get_default_user()],
       help="""Deletes only those jobs which were submitted by the list of users.
@@ -88,22 +88,27 @@ def main():
   with dsub_util.replace_print():
     emit_search_criteria(args.users, args.jobs, args.tasks)
 
-  # Delete the requested jobs
-  deleted_tasks, _ = provider.delete_jobs(args.users, args.jobs, args.tasks)
+    # Delete the requested jobs
+    deleted_tasks, error_messages = provider.delete_jobs(
+        args.users, args.jobs, args.tasks)
 
-  # Emit the count of deleted jobs.
-  # Only emit anything about tasks if any of the jobs contains a task-id value.
-  deleted_jobs = dsub_util.tasks_to_job_ids(provider, deleted_tasks)
-  job_count = len(deleted_jobs)
+    # Emit any errors canceling jobs
+    for msg in error_messages:
+      print msg
 
-  deleted_tasks = [
-      t for t in deleted_tasks if provider.get_task_field(t, 'task-id')
-  ]
+    # Emit the count of deleted jobs.
+    # Only emit anything about tasks if any of the jobs contains a task-id.
+    deleted_jobs = dsub_util.tasks_to_job_ids(provider, deleted_tasks)
+    job_count = len(deleted_jobs)
 
-  tasks_msg = ''
-  if deleted_tasks:
-    task_count = len(deleted_tasks)
-    tasks_msg = ' (%d task%s)' % (task_count, '' if task_count == 1 else 's')
+    deleted_tasks = [
+        t for t in deleted_tasks if provider.get_task_field(t, 'task-id')
+    ]
+
+    tasks_msg = ''
+    if deleted_tasks:
+      task_count = len(deleted_tasks)
+      tasks_msg = ' (%d task%s)' % (task_count, '' if task_count == 1 else 's')
 
   print '%d job%s deleted%s' % (job_count, ''
                                 if job_count == 1 else 's', tasks_msg)

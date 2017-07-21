@@ -85,17 +85,17 @@ echo "Checking output..."
 
 # Check the results
 readonly RESULT_EXPECTED=$(cat <<EOF
-FILE_PATH=/mnt/data/input/${DOCKER_INPUTS}/basic
+FILE_PATH=/mnt/data/input/${DOCKER_GCS_INPUTS}/basic
 FILE_NAME=file.1.txt
-FILE_PATH=/mnt/data/input/${DOCKER_INPUTS}/basic
+FILE_PATH=/mnt/data/input/${DOCKER_GCS_INPUTS}/basic
 FILE_NAME=file.2.txt
-FILE_PATH=/mnt/data/input/${DOCKER_INPUTS}/basic
+FILE_PATH=/mnt/data/input/${DOCKER_GCS_INPUTS}/basic
 FILE_NAME=file.3.txt
-FILE_PATH=/mnt/data/input/${DOCKER_INPUTS}/with space
+FILE_PATH=/mnt/data/input/${DOCKER_GCS_INPUTS}/with space
 FILE_NAME=file.1.txt
-FILE_PATH=/mnt/data/input/${DOCKER_INPUTS}/with space
+FILE_PATH=/mnt/data/input/${DOCKER_GCS_INPUTS}/with space
 FILE_NAME=file.2.txt
-FILE_PATH=/mnt/data/input/${DOCKER_INPUTS}/with space
+FILE_PATH=/mnt/data/input/${DOCKER_GCS_INPUTS}/with space
 FILE_NAME=file.3.txt
 EOF
 )

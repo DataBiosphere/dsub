@@ -22,13 +22,21 @@ class TestLoggingPath(unittest.TestCase):
 
   def test_logging_path(self):
     jobid = 'job--id'
+    taskid = 'task--id'
     test_cases = {
-        # (--logging , jobid) , expected log prefix
-        (('gs://bucket/file.log', jobid), 'gs://bucket/file'),
-        (('gs://bucket/', jobid), 'gs://bucket/' + jobid),
-        (('gs://bucket/folder', jobid), 'gs://bucket/folder/' + jobid),
-        (('gs://bucket/isitafile.txt', jobid),
+        # (--logging , jobid, taskid) , expected log prefix
+        (('gs://bucket/file.log', jobid, None), 'gs://bucket/file'),
+        (('gs://bucket/', jobid, None), 'gs://bucket/' + jobid),
+        (('gs://bucket/folder', jobid, None), 'gs://bucket/folder/' + jobid),
+        (('gs://bucket/isitafile.txt', jobid, None),
          'gs://bucket/isitafile.txt/' + jobid),
+        (('gs://bucket/file.log', jobid, taskid), 'gs://bucket/file'),
+        (('gs://bucket/', jobid, taskid), 'gs://bucket/%s.%s' % (jobid,
+                                                                 taskid)),
+        (('gs://bucket/folder', jobid, taskid),
+         'gs://bucket/folder/%s.%s' % (jobid, taskid)),
+        (('gs://bucket/isitafile.txt', jobid, taskid),
+         'gs://bucket/isitafile.txt/%s.%s' % (jobid, taskid)),
     }
     prov = local.LocalJobProvider()
     for t in test_cases:

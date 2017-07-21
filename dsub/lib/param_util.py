@@ -15,6 +15,7 @@
 
 import collections
 import csv
+import glob
 import os
 import re
 
@@ -22,6 +23,10 @@ import dsub_util
 
 AUTO_PREFIX_INPUT = 'INPUT_'  # Prefix for auto-generated input names
 AUTO_PREFIX_OUTPUT = 'OUTPUT_'  # Prefix for auto-generated output names
+
+P_LOCAL = 'local'
+P_GCS = 'google-cloud-storage'
+FILE_PROVIDERS = frozenset([P_LOCAL, P_GCS])
 
 
 def validate_param_name(name, param_type):
@@ -49,17 +54,79 @@ class EnvParam(collections.namedtuple('EnvParam', ['name', 'value'])):
     return super(EnvParam, cls).__new__(cls, name, value)
 
 
+class LoggingParam(
+    collections.namedtuple('LoggingParam', ['uri', 'file_provider'])):
+  """File parameter used for logging.
+
+  Attributes:
+    uri (str): A uri or local file path.
+    file_provider (enum): Service or infrastructure hosting the file.
+  """
+  pass
+
+
+class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
+  """Name/value label parameter to a pipeline.
+
+  Attributes:
+    name (str): the label name.
+    value (str): the label value (optional).
+  """
+  __slots__ = ()
+
+  def __new__(cls, name, value=None):
+    cls.validate_label(name, value)
+    return super(LabelParam, cls).__new__(cls, name, value)
+
+  @staticmethod
+  def validate_label(name, value):
+    """Raise ValueError if the label is invalid."""
+    # Rules for labels are described in:
+    # https://www.google.com/url?sa=D&q=https%3A%2F%2Fcloud.google.com%2Fcompute%2Fdocs%2Flabeling-resources%23restrictions
+
+    # * Keys and values cannot be longer than 63 characters each.
+    # * Keys and values can only contain lowercase letters, numeric characters,
+    #   underscores, and dashes.
+    # * International characters are allowed.
+    # * Label keys must start with a lowercase letter and international
+    #   characters are allowed.
+    # * Label keys cannot be empty.
+
+    LabelParam._check_label_rule(name, 'name')
+
+    # The value can be empty.
+    # If not empty, must conform to the same rules as the name.
+
+    if value:
+      LabelParam._check_label_rule(value, 'value')
+
+  @staticmethod
+  def _check_label_rule(param_value, param_type):
+    if len(param_value) < 1 or len(param_value) > 63:
+      raise ValueError('Label %s must be 1-63 characters long: "%s"' %
+                       (param_type, param_value))
+    if not re.match(r'^[a-z]([-_a-z0-9]*)?$', param_value):
+      raise ValueError(
+          'Invalid %s for label: "%s". Must start with a lowercase letter and '
+          'contain only lowercase letters, numeric characters, underscores, '
+          'and dashes.' % (param_type, param_value))
+
+
 class FileParam(
     collections.namedtuple('FileParam', [
-        'name', 'value', 'docker_path', 'remote_uri', 'recursive'
+        'name',
+        'value',
+        'docker_path',
+        'uri',
+        'recursive',
+        'file_provider',
     ])):
   """File parameter to be automatically localized or de-localized.
 
-  Input files are automatically localized from GCS to the pipeline VM's
-  local block disk(s).
+  Input files are automatically localized to the pipeline VM's local disk.
 
-  Output files are automatically de-localized to GCS from the pipeline VM's
-  local block disk(s).
+  Output files are automatically de-localized to a remote URI from the
+  pipeline VM's local disk.
 
   Attributes:
     name (str): the parameter and environment variable name.
@@ -67,8 +134,9 @@ class FileParam(
                  in the TSV file
     docker_path (str): the on-VM location; also set as the environment variable
                        value.
-    remote_uri (str): the GCS path.
+    uri (str): A uri or local file path.
     recursive (bool): Whether recursive copy is wanted.
+    file_provider (enum): Service or infrastructure hosting the file.
   """
   __slots__ = ()
 
@@ -76,10 +144,11 @@ class FileParam(
               name,
               value=None,
               docker_path=None,
-              remote_uri=None,
-              recursive=False):
-    return super(FileParam, cls).__new__(cls, name, value, docker_path,
-                                         remote_uri, recursive)
+              uri=None,
+              recursive=False,
+              file_provider=None):
+    return super(FileParam, cls).__new__(cls, name, value, docker_path, uri,
+                                         recursive, file_provider)
 
 
 class InputFileParam(FileParam):
@@ -89,11 +158,12 @@ class InputFileParam(FileParam):
               name,
               value=None,
               docker_path=None,
-              remote_uri=None,
-              recursive=False):
+              uri=None,
+              recursive=False,
+              file_provider=None):
     validate_param_name(name, 'Input parameter')
     return super(InputFileParam, cls).__new__(cls, name, value, docker_path,
-                                              remote_uri, recursive)
+                                              uri, recursive, file_provider)
 
 
 class OutputFileParam(FileParam):
@@ -103,11 +173,12 @@ class OutputFileParam(FileParam):
               name,
               value=None,
               docker_path=None,
-              remote_uri=None,
-              recursive=False):
+              uri=None,
+              recursive=False,
+              file_provider=None):
     validate_param_name(name, 'Output parameter')
     return super(OutputFileParam, cls).__new__(cls, name, value, docker_path,
-                                               remote_uri, recursive)
+                                               uri, recursive, file_provider)
 
 
 class FileParamUtil(object):
@@ -123,6 +194,7 @@ class FileParamUtil(object):
   """
 
   def __init__(self, auto_prefix, relative_path):
+    self.param_class = FileParam
     self._auto_prefix = auto_prefix
     self._auto_index = 0
     self._relative_path = relative_path
@@ -132,173 +204,286 @@ class FileParamUtil(object):
     if not name:
       name = '%s%s' % (self._auto_prefix, self._auto_index)
       self._auto_index += 1
-
     return name
 
+  def rewrite_uris(self, raw_uri, file_provider):
+    """Accept a raw uri and return rewritten versions.
+
+    This function returns a normalized URI and a docker path. The normalized
+    URI may have minor alterations meant to disambiguate and prepare for use
+    by shell utilities that may require a specific format.
+
+    The docker rewriter makes substantial modifications to the raw URI when
+    constructing a docker path, but modifications must follow these rules:
+      1) System specific characters are not allowed (ex. indirect paths).
+      2) The path, if it is a directory, must end in a forward slash.
+      3) The path will begin with the value set in self._relative_path.
+      4) The path will have an additional prefix (after self._relative_path) set
+         by the file provider-specific rewriter.
+
+    Rewrite output for the docker path:
+      >>> out_util = FileParamUtil('AUTO_', 'output')
+      >>> out_util.rewrite_uris('gs://mybucket/myfile.txt', P_GCS)[1]
+      'output/gs/mybucket/myfile.txt'
+      >>> out_util.rewrite_uris('./data/myfolder/', P_LOCAL)[1]
+      'output/file/data/myfolder/'
+
+    When normalizing the URI for cloud buckets, no rewrites are done. For local
+    files, the user directory will be expanded and relative paths will be
+    converted to absolute:
+      >>> in_util = FileParamUtil('AUTO_', 'input')
+      >>> in_util.rewrite_uris('gs://mybucket/gcs_dir/', P_GCS)[0]
+      'gs://mybucket/gcs_dir/'
+      >>> in_util.rewrite_uris('/data/./dir_a/../myfile.txt', P_LOCAL)[0]
+      '/data/myfile.txt'
+      >>> in_util.rewrite_uris('file:///tmp/data/*.bam', P_LOCAL)[0]
+      '/tmp/data/*.bam'
+
+    Args:
+      raw_uri: (str) the path component of the raw URI.
+      file_provider: a valid provider (contained in FILE_PROVIDERS).
+
+    Returns:
+      normalized: a cleaned version of the uri provided by command line.
+      docker_path: the uri rewritten in the format required for mounting inside
+                   a docker worker.
+
+    Raises:
+      ValueError: if file_provider is not valid.
+    """
+    if file_provider == P_GCS:
+      normalized, docker_path = self._gcs_uri_rewriter(raw_uri)
+    elif file_provider == P_LOCAL:
+      normalized, docker_path = self._local_uri_rewriter(raw_uri)
+    else:
+      raise ValueError('File provider not supported: %r' % file_provider)
+    return normalized, os.path.join(self._relative_path, docker_path)
+
   @staticmethod
-  def _validate_paths(remote_uri):
-    """Do basic validation of the remote_uri, return the path and filename."""
+  def _local_uri_rewriter(raw_uri):
+    """Rewrite local file URIs as required by the rewrite_uris method.
 
-    # Only GCS paths are currently supported
-    if not remote_uri.startswith('gs://'):
-      raise ValueError('Only Cloud Storage URIs (gs://) supported: %s' %
-                       remote_uri)
+    Local file paths, unlike GCS paths, may have their raw URI simplified by
+    os.path.normpath which collapses extraneous indirect characters.
 
-    # Only support file URLs and *filename* wildcards
-    # Wildcards at the directory level or "**" syntax would require better
-    # support from the Pipelines API *or* doing expansion here and
-    # (potentially) producing a series of FileParams, instead of one.
-    path = os.path.dirname(remote_uri)
-    filename = os.path.basename(remote_uri)
+    >>> FileParamUtil._local_uri_rewriter('/tmp/a_path/../B_PATH/file.txt')
+    ('/tmp/B_PATH/file.txt', 'file/tmp/B_PATH/file.txt')
+    >>> FileParamUtil._local_uri_rewriter('/myhome/./mydir/')
+    ('/myhome/mydir/', 'file/myhome/mydir/')
+
+    The local path rewriter will also work to preserve relative paths even
+    when creating the docker path. This prevents leaking of information on the
+    invoker's system to the remote system. Doing this requires a number of path
+    substitutions denoted with the _<rewrite>_ convention.
+
+    >>> FileParamUtil._local_uri_rewriter('./../upper_dir/')[1]
+    'file/_dotdot_/upper_dir/'
+    >>> FileParamUtil._local_uri_rewriter('~/localdata/*.bam')[1]
+    'file/_home_/localdata/*.bam'
+
+    Args:
+      raw_uri: (str) the raw file or directory path.
+
+    Returns:
+      normalized: a simplified and/or expanded version of the uri.
+      docker_path: the uri rewritten in the format required for mounting inside
+                   a docker worker.
+
+    """
+    # The path is split into components so that the filename is not rewritten
+    # and in order to preserve the trailing '/' for the cases that require it.
+    raw_path, filename = os.path.split(raw_uri)
+    # Generate the local path that can be resolved by filesystem operations,
+    # this removes special shell characters, condenses indirects and replaces
+    # any unnecessary prefix.
+    prefix_replacements = [('file:///', '/'), ('~/', os.getenv('HOME')),
+                           ('./', ''), ('file:/', '/')]
+    normed_path = raw_path
+    for prefix, replacement in prefix_replacements:
+      if normed_path.startswith(prefix):
+        normed_path = os.path.join(replacement, normed_path[len(prefix):])
+    # Because abspath strips the trailing '/' from bare directory references
+    # other than root, this ensures that all directory references end with '/'.
+    normed_uri = os.path.abspath(normed_path).rstrip('/') + '/'
+    normed_uri = os.path.join(normed_uri, filename)
+
+    # Generate the path used inside the docker image;
+    #  1) Get rid of extra indirects: /this/./that -> /this/that
+    #  2) Rewrite required indirects as synthetic characters.
+    #  3) Strip relative or absolute path leading character.
+    #  4) Add 'file/' prefix.
+    docker_rewrites = [(r'/\.\.', '/_dotdot_'), (r'^\.\.', '_dotdot_'),
+                       (r'^~/', '_home_/'), (r'^file:/', '')]
+    docker_path = os.path.normpath(raw_path)
+    for pattern, replacement in docker_rewrites:
+      docker_path = re.sub(pattern, replacement, docker_path)
+    docker_path = docker_path.lstrip('./')  # Strips any of '.' './' '/'.
+    docker_path = ('file/' + docker_path).rstrip('/')
+    # Like the normalized URI, ensure that bare directories terminate with '/'.
+    docker_path += '/' + filename
+    return normed_uri, docker_path
+
+  @staticmethod
+  def _gcs_uri_rewriter(raw_uri):
+    """Rewrite GCS file paths as required by the rewrite_uris method.
+
+    The GCS rewriter performs no operations on the raw_path and simply returns
+    it as the normalized URI. The docker path has the gs:// prefix replaced
+    with gs/ so that it can be mounted inside a docker image.
+
+    Args:
+      raw_uri: (str) the raw GCS URI, prefix, or pattern.
+
+    Returns:
+      normalized: a cleaned version of the uri provided by command line.
+      docker_path: the uri rewritten in the format required for mounting inside
+                   a docker worker.
+    """
+    docker_path = raw_uri.replace('gs://', 'gs/', 1)
+    return raw_uri, docker_path
+
+  @staticmethod
+  def local_file_is_accessible(uri, readonly=False):
+    """Check that a local directory or pattern exists and is accessible."""
+    accesslevel = os.R_OK if readonly else os.W_OK
+    files = glob.glob(uri)
+    if not files:
+      return False
+    for filename in files:
+      if not os.access(filename, accesslevel):
+        return False
+    return True
+
+  @staticmethod
+  def parse_file_provider(uri):
+    """Find the file provider for a URI."""
+    providers = {'gs': P_GCS, 'file': P_LOCAL}
+    # URI scheme detector uses a range up to 30 since none of the IANA
+    # registered schemes are longer than this.
+    provider_found = re.match(r'^([A-Za-z][A-Za-z0-9+.-]{0,29})://', uri)
+    if provider_found:
+      prefix = provider_found.group(1).lower()
+    else:
+      # If no provider is specified in the URI, assume that the local
+      # filesystem is being used. Availability and validity of the local
+      # file/directory will be checked later.
+      prefix = 'file'
+    if prefix in providers:
+      return providers[prefix]
+    else:
+      raise ValueError('File prefix not supported: %s://' % prefix)
+
+  @staticmethod
+  def _validate_paths_or_fail(uri, recursive):
+    """Do basic validation of the uri, return the path and filename."""
+    path, filename = os.path.split(uri)
 
     # dsub could support character ranges ([0-9]) with some more work, but for
     # now we assume that basic asterisk wildcards are sufficient. Reject any URI
     # that includes square brackets or question marks, since we know that
     # if they actually worked, it would be accidental.
-    if '[' in remote_uri or ']' in remote_uri:
-      raise ValueError('Square bracket (character ranges) are not supported: %s'
-                       % remote_uri)
-
-    if '?' in remote_uri:
+    if '[' in uri or ']' in uri:
       raise ValueError(
-          'Question mark wildcards are not supported: %s' % remote_uri)
+          'Square bracket (character ranges) are not supported: %s' % uri)
+    if '?' in uri:
+      raise ValueError('Question mark wildcards are not supported: %s' % uri)
 
+    # Only support file URIs and *filename* wildcards
+    # Wildcards at the directory level or "**" syntax would require better
+    # support from the Pipelines API *or* doing expansion here and
+    # (potentially) producing a series of FileParams, instead of one.
     if '*' in path:
       raise ValueError(
-          'Wildcards in remote paths only supported for files: %s' % remote_uri)
-
+          'Path wildcard (*) are only supported for files: %s' % uri)
     if '**' in filename:
-      raise ValueError('Recursive wildcards ("**") not supported: %s' %
-                       remote_uri)
+      raise ValueError('Recursive wildcards ("**") not supported: %s' % uri)
+    if filename in ('..', '.'):
+      raise ValueError('Path characters ".." and "." not supported '
+                       'for file names: %s' % uri)
 
-    return path, filename
+    # Do not allow non-recurssive IO to reference directories.
+    if not recursive and not filename:
+      raise ValueError('Input or output values that are not recursive must '
+                       'reference a filename or wildcard: %s' % uri)
 
-  @staticmethod
-  def _uri_to_localpath(uri):
-    return uri.replace('gs://', 'gs/')
+  def parse_uri(self, raw_uri, recursive):
+    raise NotImplementedError('parse_uri must be implemented by a child class')
+
+  def make_param(self, name, raw_uri, recursive):
+    """Return a *FileParam given an input uri."""
+    docker_path, final_uri, file_provider = self.parse_uri(raw_uri, recursive)
+    # Checks specific to the local file provider.
+    if file_provider == P_LOCAL:
+      if not self.local_file_is_accessible(final_uri, readonly=False):
+        raise ValueError('Output directory must exist: %s' % final_uri)
+    return self.param_class(name, raw_uri, docker_path, final_uri, recursive,
+                            file_provider)
 
 
 class InputFileParamUtil(FileParamUtil):
 
   def __init__(self, docker_path):
     super(InputFileParamUtil, self).__init__(AUTO_PREFIX_INPUT, docker_path)
+    self.param_class = InputFileParam
 
-  def parse_uri(self, remote_uri, recursive):
-    """Return a valid docker_path and remote_uri from the remote_uri."""
-
-    # Validate and then tokenize the remote URI in order to build the
-    # docker_path and remote_uri.
-    _, filename = self._validate_paths(remote_uri)
-
+  def parse_uri(self, raw_uri, recursive):
+    """Return a valid docker_path and uri from the uri."""
+    # Recursive URI's must be a directory path. The directory format is forced
+    # by adding a trailing slash. If the user added a wildcard, instead of a
+    # directory, validation will fail.
     if recursive:
-      # For recursive copies, the remote_uri must be a directory path, with
-      # or without the trailing slash; the remote_uri cannot contain wildcards.
-      if '*' in filename:
-        raise ValueError(
-            'Input variables that are recursive must not contain wildcards: %s'
-            % remote_uri)
-
-      # Non-recursive parameters explicitly set the target path to include
-      # a trailing slash when the target path is a directory; be consistent
-      # here and normalize the path to always have a single trailing slash
-      remote_uri = remote_uri.rstrip('/') + '/'
-      docker_path = '%s/%s' % (self._relative_path,
-                               self._uri_to_localpath(remote_uri))
-    else:
-      # The translation for inputs of the remote_uri into the docker_path
-      # requires some care.
-      #
-      # If the "filename" portion is a wildcard, then the docker_path must
-      # explicitly be a directory, with a trailing slash, otherwise there can
-      # be ambiguity depending on how many objects the pattern matches.
-      # The command:
-      #
-      #   gsutil cp gs://bucket/path/*.bam <mnt>/input/gs/bucket/path
-      #
-      # produces different results depending on whether *.bam matches a single
-      # file or multiple. In the first case, it produces a single file called
-      # "path". In the second case it produces a directory called "path" with
-      # multiple files.
-      #
-      # The result of:
-      #
-      #   gsutil cp gs://bucket/path/*.bam <mnt>/input/gs/bucket/path/
-      #
-      # is consistent: a directory called "path" with one or more files.
-      #
-      # So the target of "gsutil cp" must be a directory. From dsub core
-      # perspective, the docker_path includes the wildcard and it is up to the
-      # provider to handle this correctly.
-      docker_path = '%s/%s' % (self._relative_path,
-                               self._uri_to_localpath(remote_uri))
-
-    # The docker path is a relative path to the provider-specific mount point
-    docker_path = docker_path.lstrip('/')
-
-    return docker_path, remote_uri
+      raw_uri = raw_uri.rstrip('/') + '/'
+    # Get the file provider, validate the raw URI, and rewrite the path
+    # component of the URI for docker and remote.
+    file_provider = self.parse_file_provider(raw_uri)
+    self._validate_paths_or_fail(raw_uri, recursive)
+    remote_uri, docker_uri = self.rewrite_uris(raw_uri, file_provider)
+    return docker_uri, remote_uri, file_provider
 
 
 class OutputFileParamUtil(FileParamUtil):
 
   def __init__(self, docker_path):
     super(OutputFileParamUtil, self).__init__(AUTO_PREFIX_OUTPUT, docker_path)
+    self.param_class = OutputFileParam
 
-  def parse_uri(self, remote_uri, recursive):
-    """Return a valid docker_path and remote_uri from the remote_uri."""
-
-    # Validate and then tokenize the remote URI in order to build the
-    # docker_path and remote_uri.
-    #
-    # For output variables, the "file" portion of the remote URI indicates
-    # what to copy from the pipeline's docker path to the remote destination:
-    #   gs://bucket/path/filename
-    # turns into:
-    #   gsutil cp <mnt>/output/gs/bucket/path/filename gs://bucket/path/
-    #
-    # In the above example, we would create:
-    #   docker_path = output/gs/bucket/path/filename
-    #   remote_uri = gs://bucket/path/
-    path, filename = self._validate_paths(remote_uri)
-
+  def parse_uri(self, raw_uri, recursive):
+    """Return a valid uri and docker_path generated from the raw uri."""
+    # Recursive URI's must be a directory path. The directory format is forced
+    # by adding a trailing slash. If the user added a wildcard, instead of a
+    # directory, validation will fail.
     if recursive:
-      # For recursive copies, the remote_uri must be a directory path, with
-      # or without the trailing slash; the remote_uri cannot contain wildcards.
-      if '*' in filename:
-        raise ValueError(
-            'Output variables that are recursive must not contain wildcards: %s'
-            % remote_uri)
+      raw_uri = raw_uri.rstrip('/') + '/'
+    # Get the file provider, validate the raw URI, and rewrite the path
+    # component of the URI for docker and remote.
+    file_provider = self.parse_file_provider(raw_uri)
+    self._validate_paths_or_fail(raw_uri, recursive)
+    uri, docker_uri = self.rewrite_uris(raw_uri, file_provider)
 
-      # Non-recursive parameters explicitly set the target path to include
-      # a trailing slash when the target path is a directory; be consistent
-      # here and normalize the path to always have a single trailing slash
-      remote_uri = remote_uri.rstrip('/') + '/'
-      docker_path = '%s/%s' % (self._relative_path,
-                               self._uri_to_localpath(remote_uri))
-    else:
-      # The remote_uri for a non-recursive output variable must be a filename
-      # or a wildcard
-      if remote_uri.endswith('/'):
-        raise ValueError(
-            'Output variables that are not recursive must reference a '
-            'filename or wildcard: %s' % remote_uri)
-
-      # Put the docker path together as:
-      #  [output]/[gs/bucket/path/filename]
-      docker_path = '%s/%s' % (self._relative_path,
-                               self._uri_to_localpath(remote_uri))
-
-      # If the filename contains a wildcard, make sure the remote_uri target
+    if not recursive:
+      # If the filename contains a wildcard, make sure the uri target
       # is clearly a directory path. Otherwise if the local wildcard ends up
-      # matching a single file, the remote_uri will be a file, rather than a
+      # matching a single file, the uri will be a file, rather than a
       # directory containing a file.
-      #
-      # gsutil cp <mnt>/output/gs/bucket/path/*.bam gs://bucket/path
-      #
-      # produces different results if *.bam matches a single file vs. multiple.
+      path, filename = os.path.split(uri)
       if '*' in filename:
-        remote_uri = '%s/' % path
+        uri = path.rstrip('/') + '/'
 
-    return docker_path, remote_uri
+    return docker_uri, uri, file_provider
+
+
+def build_logging_param(logging_uri, util_class=OutputFileParamUtil):
+  """Convenience function simplifies construction of the logging uri."""
+  if not logging_uri:
+    return LoggingParam(None, None)
+  oututil = util_class('')
+  provider = oututil.parse_file_provider(logging_uri)
+  uri, _ = oututil.rewrite_uris(logging_uri, provider)
+  if '*' in uri:
+    raise ValueError('Wildcards not allowed in logging URI: %s' % uri)
+  if provider == P_LOCAL and not oututil.local_file_is_accessible(uri):
+    raise ValueError('Logging location must be writable')
+  return LoggingParam(uri, provider)
 
 
 def split_pair(pair_string, separator, nullable_idx=1):
@@ -350,7 +535,7 @@ def parse_tasks_file_header(header, input_file_param_util,
 
   Returns:
     job_params: A list of EnvParams and FileParams for the environment
-    variables, input file parameters, and output file parameters.
+    variables, LabelParams, input file parameters, and output file parameters.
 
   Raises:
     ValueError: If a header contains a ":" and the prefix is not supported.
@@ -369,15 +554,24 @@ def parse_tasks_file_header(header, input_file_param_util,
     if col_type == '--env':
       job_params.append(EnvParam(col_value))
 
+    elif col_type == '--label':
+      job_params.append(LabelParam(col_value))
+
     elif col_type == '--input' or col_type == '--input-recursive':
       name = input_file_param_util.get_variable_name(col_value)
       job_params.append(
-          InputFileParam(name, recursive=(col_type.endswith('recursive'))))
+          InputFileParam(
+              name,
+              recursive=(col_type.endswith('recursive')),
+              file_provider=P_GCS))
 
     elif col_type == '--output' or col_type == '--output-recursive':
       name = output_file_param_util.get_variable_name(col_value)
       job_params.append(
-          OutputFileParam(name, recursive=(col_type.endswith('recursive'))))
+          OutputFileParam(
+              name,
+              recursive=(col_type.endswith('recursive')),
+              file_provider=P_GCS))
 
     else:
       raise ValueError('Unrecognized column header: %s' % col)
@@ -398,8 +592,8 @@ def tasks_file_to_job_data(tasks, input_file_param_util,
 
   Returns:
     job_data: an array of records, each containing a dictionary of
-    'envs', 'inputs', and 'outputs' that defines the set of parameters and data
-    for each job.
+    'envs', 'inputs', 'outputs', 'labels' that defines the set of parameters
+    and data for each job.
 
   Raises:
     ValueError: If no job records were provided
@@ -437,28 +631,28 @@ def tasks_file_to_job_data(tasks, input_file_param_util,
     envs = []
     inputs = []
     outputs = []
+    labels = []
 
     for i in range(0, len(job_params)):
       param = job_params[i]
+      name = param.name
       if isinstance(param, EnvParam):
-        envs.append(EnvParam(param.name, row[i]))
+        envs.append(EnvParam(name, row[i]))
+
+      elif isinstance(param, LabelParam):
+        labels.append(LabelParam(param.name, row[i]))
 
       elif isinstance(param, InputFileParam):
-        docker_path, remote_uri = input_file_param_util.parse_uri(
-            row[i], param.recursive)
         inputs.append(
-            InputFileParam(param.name, row[i], docker_path, remote_uri,
-                           param.recursive))
+            input_file_param_util.make_param(name, row[i], param.recursive))
 
       elif isinstance(param, OutputFileParam):
-        docker_path, remote_uri = output_file_param_util.parse_uri(
-            row[i], param.recursive)
         outputs.append(
-            OutputFileParam(param.name, row[i], docker_path, remote_uri,
-                            param.recursive))
+            output_file_param_util.make_param(name, row[i], param.recursive))
 
     job_data.append({
         'task_id': task_id,
+        'labels': labels,
         'envs': envs,
         'inputs': inputs,
         'outputs': outputs
@@ -471,8 +665,9 @@ def tasks_file_to_job_data(tasks, input_file_param_util,
   return job_data
 
 
-def args_to_job_data(envs, inputs, inputs_recursive, outputs, outputs_recursive,
-                     input_file_param_util, output_file_param_util):
+def args_to_job_data(envs, labels, inputs, inputs_recursive, outputs,
+                     outputs_recursive, input_file_param_util,
+                     output_file_param_util):
   """Parse env, input, and output parameters into a job parameters and data.
 
   Passing arguments on the command-line allows for launching a single job.
@@ -483,11 +678,12 @@ def args_to_job_data(envs, inputs, inputs_recursive, outputs, outputs_recursive,
   Input and output file arguments can contain name=value pairs or just values.
   Either of the following is valid:
 
-    remote_uri
-    myfile=remote_uri
+    uri
+    myfile=uri
 
   Args:
     envs: list of environment variable job parameters
+    labels: list of labels to attach to the tasks
     inputs: list of file input parameters
     inputs_recursive: list of recursive directory input parameters
     outputs: list of file output parameters
@@ -509,38 +705,104 @@ def args_to_job_data(envs, inputs, inputs_recursive, outputs, outputs_recursive,
     name, value = split_pair(arg, '=', nullable_idx=1)
     env_data.append(EnvParam(name, value))
 
+  # Labels are processed identically to environment variables
+  label_data = []
+  for arg in labels:
+    name, value = split_pair(arg, '=', nullable_idx=1)
+    label_data.append(LabelParam(name, value))
+
   # For input files, we need to:
-  #   * split the input into name=remote_uri pairs (name optional)
-  #   * validate the remote uri
-  #   * generate a docker_path
+  #   * split the input into name=uri pairs (name optional)
+  #   * get the environmental variable name, or automatically set if null.
+  #   * create the input file param
   input_data = []
   for (recursive, args) in ((False, inputs), (True, inputs_recursive)):
     for arg in args:
       name, value = split_pair(arg, '=', nullable_idx=0)
       name = input_file_param_util.get_variable_name(name)
-      docker_path, remote_uri = input_file_param_util.parse_uri(
-          value, recursive)
       input_data.append(
-          InputFileParam(name, value, docker_path, remote_uri, recursive))
+          input_file_param_util.make_param(name, value, recursive))
 
   # For output files, we need to:
-  #   * split the input into name=remote_uri pairs (name optional)
-  #   * validate the remote uri
-  #   * generate the remote uri
-  #   * generate a docker_path
+  #   * split the input into name=uri pairs (name optional)
+  #   * get the environmental variable name, or automatically set if null.
+  #   * create the output file param
   output_data = []
   for (recursive, args) in ((False, outputs), (True, outputs_recursive)):
     for arg in args:
       name, value = split_pair(arg, '=', 0)
-
       name = output_file_param_util.get_variable_name(name)
-      docker_path, remote_uri = output_file_param_util.parse_uri(
-          value, recursive)
       output_data.append(
-          OutputFileParam(name, value, docker_path, remote_uri, recursive))
+          output_file_param_util.make_param(name, value, recursive))
 
   return [{
       'envs': env_data,
       'inputs': input_data,
       'outputs': output_data,
+      'labels': label_data,
   }]
+
+
+def validate_submit_args_or_fail(job_resources, all_task_data, provider_name,
+                                 input_providers, output_providers,
+                                 logging_providers):
+  """Validate that arguments passed to submit_job have valid file providers.
+
+  This utility function takes resources and task data args from `submit_job`
+  in the base provider. This function will fail with a value error if any of the
+  parameters are not valid. See the following example;
+
+  >>> res = type('', (object,),
+  ...            {"logging": LoggingParam('gs://logtemp', P_GCS)})()
+  >>> task_data = [
+  ...    {'inputs': [FileParam('IN', uri='gs://in/*', file_provider=P_GCS)]},
+  ...    {'outputs': [FileParam('OUT', uri='gs://out/*', file_provider=P_GCS)]}]
+  ...
+  >>> validate_submit_args_or_fail(job_resources=res,
+  ...                              all_task_data=task_data,
+  ...                              provider_name='MYPROVIDER',
+  ...                              input_providers=[P_GCS],
+  ...                              output_providers=[P_GCS],
+  ...                              logging_providers=[P_GCS])
+  ...
+  >>> validate_submit_args_or_fail(job_resources=res,
+  ...                              all_task_data=task_data,
+  ...                              provider_name='MYPROVIDER',
+  ...                              input_providers=[P_GCS],
+  ...                              output_providers=[P_LOCAL],
+  ...                              logging_providers=[P_GCS])
+  Traceback (most recent call last):
+       ...
+  ValueError: Unsupported output path (gs://out/*) for provider 'MYPROVIDER'.
+
+  Args:
+    job_resources: instance of job_util.JobResources.
+    all_task_data: ([]dicts) the task data list to be validated.
+    provider_name: (str) the name of the execution provider.
+    input_providers: (string collection) whitelist of file providers for input.
+    output_providers: (string collection) whitelist of providers for output.
+    logging_providers: (string collection) whitelist of providers for logging.
+
+  Raises:
+    ValueError: if any file providers do not match the whitelists.
+  """
+  error_message = ('Unsupported {argname} path ({path}) for '
+                   'provider {provider!r}.')
+  # Validate logging file provider.
+  logging = job_resources.logging
+  if logging.file_provider not in logging_providers:
+    raise ValueError(
+        error_message.format(
+            argname='logging', path=logging.uri, provider=provider_name))
+
+  # Validate input file provider.
+  for task in all_task_data:
+    for argtype, whitelist in [('inputs', input_providers), ('outputs',
+                                                             output_providers)]:
+      argname = argtype.rstrip('s')
+      for fileparam in task.get(argtype, []):
+
+        if fileparam.file_provider not in whitelist:
+          raise ValueError(
+              error_message.format(
+                  argname=argname, path=fileparam.uri, provider=provider_name))

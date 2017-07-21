@@ -75,40 +75,48 @@ if ! gsutil ls "gs://${DSUB_BUCKET}" 2>/dev/null; then
 fi
 
 # Set standard LOGGING, INPUTS, and OUTPUTS values
-readonly TEST_REMOTE_ROOT="gs://${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}"
-readonly TEST_DOCKER_ROOT="gs/${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}"
+readonly TEST_GCS_ROOT="gs://${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}"
+readonly TEST_GCS_DOCKER_ROOT="gs/${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}"
+readonly TEST_LOCAL_ROOT="${TEST_TMP}"
+readonly TEST_LOCAL_DOCKER_ROOT="file${TEST_LOCAL_ROOT}"
+
 
 if [[ -n "${TASKS_FILE:-}" ]]; then
   # For task file tests, the logging path is a directory.
   # Eventually each job should have its own sub-directory,
   # and named logging files but we need to add dsub support for that.
-  readonly LOGGING="${TEST_REMOTE_ROOT}/${TEST_NAME}/logging"
+  readonly LOGGING="${TEST_GCS_ROOT}/${TEST_NAME}/logging"
 else
   # For regular tests, the logging path is a named file.
-  readonly LOGGING="${TEST_REMOTE_ROOT}/logging/${TEST_NAME}.log"
+  readonly LOGGING="${TEST_GCS_ROOT}/logging/${TEST_NAME}.log"
   readonly STDOUT_LOG="$(dirname "${LOGGING}")/${TEST_NAME}-stdout.log"
   readonly STDERR_LOG="$(dirname "${LOGGING}")/${TEST_NAME}-stderr.log"
 fi
-readonly INPUTS="${TEST_REMOTE_ROOT}/input"
-readonly OUTPUTS="${TEST_REMOTE_ROOT}/output"
-readonly DOCKER_INPUTS="${TEST_DOCKER_ROOT}/input"
-readonly DOCKER_OUTPUTS="${TEST_DOCKER_ROOT}/output"
+
+readonly INPUTS="${TEST_GCS_ROOT}/input"
+readonly OUTPUTS="${TEST_GCS_ROOT}/output"
+readonly DOCKER_GCS_INPUTS="${TEST_GCS_DOCKER_ROOT}/input"
+readonly DOCKER_GCS_OUTPUTS="${TEST_GCS_DOCKER_ROOT}/output"
+readonly LOCAL_INPUTS="${TEST_LOCAL_ROOT}/input"
+readonly LOCAL_OUTPUTS="${TEST_LOCAL_ROOT}/output"
+readonly DOCKER_LOCAL_INPUTS="${TEST_LOCAL_DOCKER_ROOT}/input"
+readonly DOCKER_LOCAL_OUTPUTS="${TEST_LOCAL_DOCKER_ROOT}/output"
 
 echo "Logging path: ${LOGGING}"
 echo "Input path: ${INPUTS}"
 echo "Output path: ${OUTPUTS}"
 
 # For tests that exercise remote dsub parameters (like TSV file)
-readonly DSUB_PARAMS="${TEST_REMOTE_ROOT}/params"
+readonly DSUB_PARAMS="${TEST_GCS_ROOT}/params"
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]] && \
    [[ "${ALLOW_DIRTY_TESTS:-0}" -eq 0 ]]; then
 
   echo "  Checking if remote test files already exists"
-  if gsutil ls "${TEST_REMOTE_ROOT}/**" 2>/dev/null; then
-    2>&1 echo "Test files exist: ${TEST_REMOTE_ROOT}"
+  if gsutil ls "${TEST_GCS_ROOT}/**" 2>/dev/null; then
+    2>&1 echo "Test files exist: ${TEST_GCS_ROOT}"
     2>&1 echo "Remove contents:"
-    2>&1 echo "  gsutil -m rm ${TEST_REMOTE_ROOT}/**"
+    2>&1 echo "  gsutil -m rm ${TEST_GCS_ROOT}/**"
     exit 1
   fi
 

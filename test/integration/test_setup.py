@@ -57,7 +57,7 @@ print 'Setting up test: %s' % TEST_NAME
 
 TEST_DIR = os.path.dirname(sys.argv[0])
 
-TEST_TMP = '%s/tmp' % os.getenv('TEST_TMP', '/tmp/dub_test/py/%s/%s' %
+TEST_TMP = '%s/tmp' % os.getenv('TEST_TMP', '/tmp/dsub_test/py/%s/%s' %
                                 (DSUB_PROVIDER, TEST_NAME))
 
 if TEST_NAME.endswith('_tasks'):
