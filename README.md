@@ -3,6 +3,7 @@
 This is not an official Google product.
 
 # dsub: simple batch jobs with Docker
+[![License](https://img.shields.io/badge/license-Apache%202.0-brightgreen.svg)](https://github.com/googlegenomics/dsub/blob/master/LICENSE)
 
 ## Overview
 
