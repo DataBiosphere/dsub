@@ -3,8 +3,7 @@
 This is not an official Google product.
 
 # dsub: simple batch jobs with Docker
-[![Build Status](https://travis-ci.org/e4p/dsub.svg?branch=testtravis)](https://travis-ci.org/e4p/dsub)
-[![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/googlegenomics/dsub/blob/master/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-brightgreen.svg)](https://github.com/googlegenomics/dsub/blob/master/LICENSE)
 
 ## Overview
 

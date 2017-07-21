@@ -20,12 +20,6 @@ from dsub.lib import param_util
 import parameterized
 
 
-class ParamUtilTravisFailure(unittest.TestCase):
-
-  def testEnvParam(self):
-    self.assertEqual('Yes', 'No')
-
-
 class ParamUtilTest(unittest.TestCase):
 
   def testEnvParam(self):
