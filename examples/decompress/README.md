@@ -35,7 +35,7 @@ To run a command to decompress the VCF file, type:
 dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
-  --logging gs://MY-BUCKET/decompress_one/logging/ \
+  --logging "gs://MY-BUCKET/decompress_one/logging" \
   --disk-size 200 \
   --image ubuntu:14.04 \
   --input INPUT_VCF="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/working/20130723_phase3_wg/cornell/ALL.ChrY.Cornell.20130502.SNPs.Genotypes.vcf.gz" \
@@ -123,7 +123,7 @@ output file name.
 dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
-  --logging gs://MY-BUCKET/decompress_list/logging/ \
+  --logging "gs://MY-BUCKET/decompress_list/logging" \
   --disk-size 200 \
   --image ubuntu:14.04 \
   --command 'gunzip ${INPUT_VCF} && \

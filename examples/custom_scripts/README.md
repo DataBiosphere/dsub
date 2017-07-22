@@ -57,7 +57,7 @@ To run a Bash script to decompress the VCF file, type:
 dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
-  --logging gs://MY-BUCKET/get_vcf_sample_ids.sh/logging \
+  --logging "gs://MY-BUCKET/get_vcf_sample_ids.sh/logging" \
   --disk-size 200 \
   --image ubuntu:14.04 \
   --input INPUT_VCF="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/working/20130723_phase3_wg/cornell/ALL.ChrY.Cornell.20130502.SNPs.Genotypes.vcf.gz" \
@@ -135,7 +135,7 @@ To run a Python script to decompress the VCF file, type:
 dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
-  --logging gs://MY-BUCKET/get_vcf_sample_ids.py/logging \
+  --logging "gs://MY-BUCKET/get_vcf_sample_ids.py/logging" \
   --disk-size 200 \
   --image python:2.7 \
   --input INPUT_VCF="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/working/20130723_phase3_wg/cornell/ALL.ChrY.Cornell.20130502.SNPs.Genotypes.vcf.gz" \
@@ -221,7 +221,7 @@ Run either of the following commands:
 dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
-  --logging gs://MY-BUCKET/get_vcf_sample_ids/logging/ \
+  --logging "gs://MY-BUCKET/get_vcf_sample_ids/logging" \
   --disk-size 200 \
   --image ubuntu:14.04 \
   --script ./examples/custom_scripts/get_vcf_sample_ids.sh \
@@ -233,7 +233,7 @@ dsub \
 dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
-  --logging gs://MY-BUCKET/get_vcf_sample_ids/logging/ \
+  --logging "gs://MY-BUCKET/get_vcf_sample_ids/logging" \
   --disk-size 200 \
   --image python:2.7 \
   --script ./examples/custom_scripts/get_vcf_sample_ids.py \

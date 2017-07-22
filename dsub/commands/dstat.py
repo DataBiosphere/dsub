@@ -29,6 +29,7 @@ Follows the model of bjobs, sinfo, qstat, etc.
 
 import argparse
 import collections
+from datetime import datetime
 import json
 import time
 
@@ -145,8 +146,14 @@ class JsonOutput(OutputFormatter):
   def __init__(self, full):
     super(JsonOutput, self).__init__(full)
 
+  @classmethod
+  def serialize(cls, field):
+    if isinstance(field, datetime):
+      return str(field)
+    return field
+
   def print_table(self, table):
-    print json.dumps(table, indent=2)
+    print json.dumps(table, indent=2, default=self.serialize)
 
 
 def prepare_row(provider, task, full):
