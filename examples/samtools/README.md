@@ -120,7 +120,7 @@ output file name.
 dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
-  --logging "gs://MY-BUCKET/samtools/submit_list/logging/" \
+  --logging "gs://MY-BUCKET/samtools/submit_list/logging" \
   --disk-size 200 \
   --name "samtools index" \
   --image quay.io/cancercollaboratory/dockstore-tool-samtools-index \

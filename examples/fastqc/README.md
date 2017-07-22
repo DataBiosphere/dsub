@@ -157,7 +157,7 @@ output file name.
 dsub \
   --project MY-PROJECT \
   --zones "us-central1-*" \
-  --logging "gs://MY-BUCKET/samtools/submit_list/logging/" \
+  --logging "gs://MY-BUCKET/samtools/submit_list/logging" \
   --disk-size 200 \
   --name "fastqc" \
   --image "gcr.io/MY-PROJECT/fastqc" \

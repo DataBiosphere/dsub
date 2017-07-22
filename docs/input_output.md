@@ -260,16 +260,20 @@ OUTPUT_PATH=/mnt/data/output/gs/bucket/path
 
 ## Notice
 
-Note about the `--input-recursive` and `--output-recursive` flags
-
 As a getting started convenience, if `--input-recursive` or `--output-recursive`
-are used, dsub will automatically check for and, if needed, install the
+are used with the `google` provider, `dsub` will automatically check for and,
+if needed, install the
 [Google Cloud SDK](https://cloud.google.com/sdk/docs/) in the Docker container
 at runtime (before your script executes).
 
-If you use the recursive copy features, you are encouraged to install gcloud
-in your Docker image when you build it in order to avoid the installation at
-runtime.
+If you use the recursive copy features, install the Cloud SDK in your Docker
+image when you build it to avoid the installation at runtime.
+
+If you use a Debian or Ubuntu Docker image, you are encouraged to use the
+[package installation instructions](https://cloud.google.com/sdk/downloads#apt-get).
+
+If you use a Red Hat or CentOS Docker image, you are encouraged to use the
+[package installation instructions](https://cloud.google.com/sdk/downloads#yum).
 
 ## Unsupported path formats:
 

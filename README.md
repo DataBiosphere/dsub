@@ -92,7 +92,7 @@ Here's the simplest example:
     dsub \
         --project my-cloud-project \
         --zones "us-central1-*" \
-        --logging gs://my-bucket/logs \
+        --logging gs://my-bucket/logging \
         --command 'echo hello'
 
 Change `my-cloud-project` to your Google Cloud project, and `my-bucket` to
@@ -113,7 +113,7 @@ You can also save your script to a file, like `hello.sh`. Then you can run:
     dsub \
         --project my-cloud-project \
         --zones "us-central1-*" \
-        --logging gs://my-bucket/logs \
+        --logging gs://my-bucket/logging \
         --script hello.sh
 
 If your script has dependencies that are not stored in your Docker image,
@@ -128,7 +128,7 @@ by passing the `--image` flag.
     dsub \
         --project my-cloud-project \
         --zones "us-central1-*" \
-        --logging gs://my-bucket/logs \
+        --logging gs://my-bucket/logging \
         --image ubuntu:16.04 \
         --script hello.sh
 
@@ -139,7 +139,7 @@ You can pass environment variables to your script using the `--env` flag.
     dsub \
         --project my-cloud-project \
         --zones "us-central1-*" \
-        --logging gs://my-bucket/logs \
+        --logging gs://my-bucket/logging \
         --env MESSAGE=hello \
         --command 'echo ${MESSAGE}'
 
@@ -201,7 +201,7 @@ To specify input and output files, use the `--input` and `--output` flags:
     dsub \
         --project my-cloud-project \
         --zones "us-central1-*" \
-        --logging gs://my-bucket/logs \
+        --logging gs://my-bucket/logging \
         --input INPUT_FILE=gs://my-bucket/my-input-file \
         --output OUTPUT_FILE=gs://my-bucket/my-output-file \
         --command 'cat ${INPUT_FILE} > ${OUTPUT_FILE}'
@@ -223,9 +223,25 @@ To copy folders rather than files, use the `--input-recursive` or
     dsub \
         --project my-cloud-project \
         --zones "us-central1-*" \
-        --logging gs://my-bucket/logs \
+        --logging gs://my-bucket/logging \
         --input-recursive FOLDER=gs://my-bucket/my-folder \
         --command 'find ${FOLDER} -name "foo*"'
+
+##### Notice
+
+As a getting started convenience, if `--input-recursive` or `--output-recursive`
+are used, `dsub` will automatically check for and, if needed, install the
+[Google Cloud SDK](https://cloud.google.com/sdk/docs/) in the Docker container
+at runtime (before your script executes).
+
+If you use the recursive copy features, install the Cloud SDK in your Docker
+image when you build it to avoid the installation at runtime.
+
+If you use a Debian or Ubuntu Docker image, you are encouraged to use the
+[package installation instructions](https://cloud.google.com/sdk/downloads#apt-get).
+
+If you use a Red Hat or CentOS Docker image, you are encouraged to use the
+[package installation instructions](https://cloud.google.com/sdk/downloads#yum).
 
 ### Setting resource requirements
 
@@ -371,3 +387,4 @@ To delete all running jobs for the current user:
   * [Input and Output File Handling](docs/input_output.md)
   * [Job Control](docs/job_control.md)
   * [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
+  * [Backend providers](docs/providers/README.md)
