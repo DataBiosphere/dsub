@@ -13,6 +13,8 @@
 # limitations under the License.
 """Utility functions used by dsub, dstat, ddel."""
 
+from __future__ import print_function
+
 from contextlib import contextmanager
 import fnmatch
 import io
@@ -65,11 +67,11 @@ def replace_print(fileobj=sys.stderr):
 
 def print_error(msg):
   """Utility routine to emit messages to stderr."""
-  print >> sys.stderr, msg
+  print(msg, file=sys.stderr)
 
 
-def get_default_user():
-  """Returns the current user."""
+def get_os_user():
+  """Returns the current OS user, this may be different from the dsub user."""
   return pwd.getpwuid(os.getuid())[0]
 
 

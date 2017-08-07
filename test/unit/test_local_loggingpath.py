@@ -15,29 +15,32 @@
 """
 
 import unittest
+from dsub.lib import param_util
 from dsub.providers import local
+import parameterized
 
 
 class TestLoggingPath(unittest.TestCase):
 
-  def test_logging_path(self):
-    jobid = 'job--id'
-    taskid = 'task--id'
-    test_cases = {
-        # (--logging , jobid, taskid) , expected log prefix
-        (('gs://bucket/file.log', jobid, None), 'gs://bucket/file'),
-        (('gs://bucket/', jobid, None), 'gs://bucket/' + jobid),
-        (('gs://bucket/folder', jobid, None), 'gs://bucket/folder/' + jobid),
-        (('gs://bucket/isitafile.txt', jobid, None),
-         'gs://bucket/isitafile.txt/' + jobid),
-        (('gs://bucket/file.log', jobid, taskid), 'gs://bucket/file'),
-        (('gs://bucket/', jobid, taskid), 'gs://bucket/%s.%s' % (jobid,
-                                                                 taskid)),
-        (('gs://bucket/folder', jobid, taskid),
-         'gs://bucket/folder/%s.%s' % (jobid, taskid)),
-        (('gs://bucket/isitafile.txt', jobid, taskid),
-         'gs://bucket/isitafile.txt/%s.%s' % (jobid, taskid)),
-    }
+  @parameterized.parameterized.expand([
+      # Test name, logs path, logs basename, job id, task id, expected out.
+      ('1G', 'gs://bucket/', 'file.log', 'jobid', None, 'gs://bucket/file'),
+      ('1L', '/tmp/', 'file.log', 'jobid', None, '/tmp/file'),
+      ('2G', 'gs://bucket/', '', 'jobid', None, 'gs://bucket/jobid'),
+      ('2L', '/tmp/', '', 'jobid', None, '/tmp/jobid'),
+      ('3G', 'gs://bk/folder/', '', 'jobid', None, 'gs://bk/folder/jobid'),
+      ('3L', '/tmp/folder/', '', 'jobid', None, '/tmp/folder/jobid'),
+      ('4G', 'gs://b/afile.txt/', '', 'jobid', None, 'gs://b/afile.txt/jobid'),
+      ('5G', 'gs://b/', 'file.log', 'jobid', 'task', 'gs://b/file'),
+      ('6G', 'gs://b/', '', 'jobid', 'taskid', 'gs://b/jobid.taskid'),
+      ('7G', 'gs://b/dir/', '', 'jobid', 'taskid', 'gs://b/dir/jobid.taskid'),
+      ('8G', 'gs://b/afile.txt/', '', 'jid', 'tid', 'gs://b/afile.txt/jid.tid'),
+      # Some unexpected cases should still provide workable output.
+      ('9G', 'gs://tmp/', '', None, 'unexpected', 'gs://tmp/None.unexpected'),
+      ('9L', 'gs://tmp/', '', None, None, 'gs://tmp/None'),
+      ('10G', 'gs://tmp/', '', '', '', 'gs://tmp/'),
+  ])
+  def test_logging_path(self, unused_name, path, logname, jid, tid, expected):
     prov = local.LocalJobProvider()
-    for t in test_cases:
-      self.assertEqual(t[1], prov._make_logging_path(*t[0]))
+    loguri = param_util.UriParts(path, logname)
+    self.assertEqual(expected, prov._prepare_logging_uri(loguri, jid, tid))

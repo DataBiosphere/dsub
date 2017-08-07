@@ -14,6 +14,8 @@
 """Tests for dsub.lib.param_util."""
 
 from __future__ import absolute_import
+from __future__ import print_function
+
 import doctest
 import os
 import re
@@ -109,20 +111,6 @@ class ParamUtilTest(unittest.TestCase):
                        job_data['outputs'][0].docker_path)
 
 
-class InputParamUtilTestFixture(param_util.InputFileParamUtil):
-
-  @staticmethod
-  def local_file_is_accessible(uri, readonly=False):
-    return True
-
-
-class OutputParamUtilTestFixture(param_util.OutputFileParamUtil):
-
-  @staticmethod
-  def local_file_is_accessible(uri, readonly=False):
-    return True
-
-
 class FileParamUtilTest(unittest.TestCase):
 
   @parameterized.parameterized.expand([
@@ -149,7 +137,7 @@ class FileParamUtilTest(unittest.TestCase):
   ])
   def test_input_file_docker_rewrite(self, _, recursive, uri, docker, provider):
     docker = os.path.join('input', docker)
-    file_param_util = InputParamUtilTestFixture('input')
+    file_param_util = param_util.InputFileParamUtil('input')
     param = file_param_util.make_param('TEST', uri, recursive)
     self.assertIsInstance(param, param_util.InputFileParam)
     self.assertEqual('TEST', param.name)
@@ -183,7 +171,7 @@ class FileParamUtilTest(unittest.TestCase):
   ])
   def test_out_file_docker_rewrite(self, _, recursive, uri, docker, provider):
     docker = os.path.join('output', docker)
-    file_param_util = OutputParamUtilTestFixture('output')
+    file_param_util = param_util.OutputFileParamUtil('output')
     param = file_param_util.make_param('TEST', uri, recursive)
     self.assertIsInstance(param, param_util.OutputFileParam)
     self.assertEqual('TEST', param.name)
@@ -192,70 +180,70 @@ class FileParamUtilTest(unittest.TestCase):
 
   @parameterized.parameterized.expand([
       # Non-recursive tests for local and google
-      ('gf', False, 'gs://tmp/myfile', 'gs://tmp/myfile', PG),
-      ('gf', False, 'gs://buc/../myfile', 'gs://buc/../myfile', PG),
-      ('lf', False, 'file:///tmp/myfile', '/tmp/myfile', PL),
-      ('lf', False, '../myfile', '../myfile', PL),
+      ('gf', False, 'gs://tmp/myfile', 'gs://tmp/', 'myfile', PG),
+      ('gf', False, 'gs://buc/../myfile', 'gs://buc/../', 'myfile', PG),
+      ('lf', False, 'file:///tmp/myfile', '/tmp/', 'myfile', PL),
+      ('lf', False, '../myfile', '../', 'myfile', PL),
       # Tests with wildcards.
-      ('gfwc', False, 'gs://tmp/*.bam', 'gs://tmp/', PG),
-      ('gfwc', False, 'gs://tmp/*', 'gs://tmp/', PG),
-      ('gfwc', False, 'gs://bucket/../*', 'gs://bucket/../', PG),
-      ('lfwc', False, '../tmp/*.bam', '../tmp/', PL),
-      ('lfwc', False, './*', './', PL),
-      ('localroot', False, '/*', '/', PL),
-      ('lfwc', False, '/tmp/*', '/tmp/', PL),
-      ('lfwc', False, '/bucket/*', '/bucket/', PL),
+      ('gfwc', False, 'gs://tmp/*.bam', 'gs://tmp/', '*.bam', PG),
+      ('gfwc', False, 'gs://tmp/*', 'gs://tmp/', '*', PG),
+      ('gfwc', False, 'gs://bucket/../*', 'gs://bucket/../', '*', PG),
+      ('lfwc', False, '../tmp/*.bam', '../tmp/', '*.bam', PL),
+      ('lfwc', False, './*', './', '*', PL),
+      ('localroot', False, '/*', '/', '*', PL),
+      ('lfwc', False, '/tmp/*', '/tmp/', '*', PL),
+      ('lfwc', False, '/bucket/*', '/bucket/', '*', PL),
       # Recursive tests for local and google
-      ('lr', True, '/tmp/myfile/', '/tmp/myfile/', PL),
-      ('lr', True, '../myfile', '../myfile/', PL),
-      ('lr', True, './', './', PL),
-      ('gr', True, 'gs://t/myfile/', 'gs://t/myfile/', PG),
-      ('gr', True, 'gs://t/myfile', 'gs://t/myfile/', PG),
-      ('gr', True, 'gs://buc/../myfile', 'gs://buc/../myfile/', PG),
+      ('lr', True, '/tmp/myfile/', '/tmp/myfile/', '', PL),
+      ('lr', True, '../myfile', '../myfile/', '', PL),
+      ('lr', True, './', './', '', PL),
+      ('gr', True, 'gs://t/myfile/', 'gs://t/myfile/', '', PG),
+      ('gr', True, 'gs://t/myfile', 'gs://t/myfile/', '', PG),
+      ('gr', True, 'gs://buc/../myfile', 'gs://buc/../myfile/', '', PG),
   ])
-  def test_uri_rewrite_out(self, _, recursive, uri, out_uri_exp, provider):
+  def test_uri_rewrite_out(self, _, recursive, raw_uri, path, bn, provider):
     # perpare the path if local.
     if provider == PL:
-      out_uri_exp = os.path.abspath(out_uri_exp)
-      if '*' in uri or recursive:
-        out_uri_exp = out_uri_exp.rstrip('/') + '/'
-    out_util = OutputParamUtilTestFixture('')
-    out_param = out_util.make_param('TEST', uri, recursive=recursive)
-    self.assertEqual(out_uri_exp, out_param.uri)
+      path = os.path.abspath(path).rstrip('/') + '/'
+    out_util = param_util.OutputFileParamUtil('')
+    out_param = out_util.make_param('TEST', raw_uri, recursive=recursive)
+    self.assertEqual(path, out_param.uri.path)
+    self.assertEqual(bn, out_param.uri.basename)
+    self.assertEqual(path + bn, out_param.uri)
     self.assertEqual(provider, out_param.file_provider)
 
   @parameterized.parameterized.expand([
       # Non-recursive tests for local and google
-      ('gf', False, 'gs://tmp/myfile', 'gs://tmp/myfile', PG),
-      ('gf', False, 'gs://buc/../myfile', 'gs://buc/../myfile', PG),
-      ('lf', False, 'file:///tmp/myfile', '/tmp/myfile', PL),
-      ('lf', False, '../myfile', '../myfile', PL),
+      ('gf', False, 'gs://tmp/myfile', 'gs://tmp/', 'myfile', PG),
+      ('gf', False, 'gs://buc/../myfile', 'gs://buc/../', 'myfile', PG),
+      ('lf', False, 'file:///tmp/myfile', '/tmp/', 'myfile', PL),
+      ('lf', False, '../myfile', '../', 'myfile', PL),
       # Tests with wildcards.
-      ('gfwc', False, 'gs://tmp/*.bam', 'gs://tmp/*.bam', PG),
-      ('gfwc', False, 'gs://tmp/*', 'gs://tmp/*', PG),
-      ('gfwc', False, 'gs://bucket/../*', 'gs://bucket/../*', PG),
-      ('lfwc', False, '../tmp/*.bam', '../tmp/*.bam', PL),
-      ('lfwc', False, './*', './*', PL),
-      ('localroot', False, '/*', '/*', PL),
-      ('lfwc', False, '/tmp/*', '/tmp/*', PL),
-      ('lfwc', False, '/bucket/*', '/bucket/*', PL),
+      ('gfwc', False, 'gs://tmp/*.bam', 'gs://tmp/', '*.bam', PG),
+      ('gfwc', False, 'gs://tmp/*', 'gs://tmp/', '*', PG),
+      ('gfwc', False, 'gs://bucket/../*', 'gs://bucket/../', '*', PG),
+      ('lfwc', False, '../tmp/*.bam', '../tmp/', '*.bam', PL),
+      ('lfwc', False, './*', './', '*', PL),
+      ('localroot', False, '/*', '/', '*', PL),
+      ('lfwc', False, '/tmp/*', '/tmp/', '*', PL),
+      ('lfwc', False, '/bucket/*', '/bucket/', '*', PL),
       # Recursive tests for local and google
-      ('lr', True, '/tmp/myfile/', '/tmp/myfile/', PL),
-      ('lr', True, '../myfile', '../myfile/', PL),
-      ('lr', True, './', './', PL),
-      ('gr', True, 'gs://t/myfile/', 'gs://t/myfile/', PG),
-      ('gr', True, 'gs://t/myfile', 'gs://t/myfile/', PG),
-      ('gr', True, 'gs://buc/../myfile', 'gs://buc/../myfile/', PG),
+      ('lr', True, '/tmp/myfile/', '/tmp/myfile/', '', PL),
+      ('lr', True, '../myfile', '../myfile/', '', PL),
+      ('lr', True, './', './', '', PL),
+      ('gr', True, 'gs://t/myfile/', 'gs://t/myfile/', '', PG),
+      ('gr', True, 'gs://t/myfile', 'gs://t/myfile/', '', PG),
+      ('gr', True, 'gs://buc/../myfile', 'gs://buc/../myfile/', '', PG),
   ])
-  def test_uri_rewrite_in(self, _, recursive, uri, in_uri_exp, provider):
+  def test_uri_rewrite_in(self, _, recursive, uri_raw, path, bn, provider):
     # perpare the path if local.
     if provider == PL:
-      in_uri_exp = os.path.abspath(in_uri_exp)
-      if uri.endswith('/') or recursive:
-        in_uri_exp += '/'
-    in_util = InputParamUtilTestFixture('')
-    in_param = in_util.make_param('TEST', uri, recursive=recursive)
-    self.assertEqual(in_uri_exp, in_param.uri)
+      path = os.path.abspath(path).rstrip('/') + '/'
+    in_util = param_util.InputFileParamUtil('')
+    in_param = in_util.make_param('TEST', uri_raw, recursive=recursive)
+    self.assertEqual(path, in_param.uri.path)
+    self.assertEqual(bn, in_param.uri.basename)
+    self.assertEqual(path + bn, in_param.uri)
     self.assertEqual(provider, in_param.file_provider)
 
   @parameterized.parameterized.expand([
@@ -267,7 +255,7 @@ class FileParamUtilTest(unittest.TestCase):
       ('no_filename_g', False, 'gs://myfile/', 'not recursive must reference'),
   ])
   def test_output_val_err(self, unused_name, recursive, uri, regex):
-    file_param_util = OutputParamUtilTestFixture('output')
+    file_param_util = param_util.OutputFileParamUtil('output')
     with self.assertRaisesRegexp(ValueError, regex):
       file_param_util.parse_uri(uri, recursive)
 
@@ -277,20 +265,20 @@ class FileParamUtilTest(unittest.TestCase):
       ('ftp', 'ftp://myfile/', 'not supported: ftp://'),
   ])
   def test_file_provider_err(self, unused_name, uri, regex):
-    file_param_util = OutputParamUtilTestFixture('output')
+    file_param_util = param_util.OutputFileParamUtil('output')
     with self.assertRaisesRegexp(ValueError, regex):
       file_param_util.parse_file_provider(uri)
 
   @parameterized.parameterized.expand([
-      ('l', '/tmp/mydir/inner', '/tmp/mydir/inner', PL),
+      ('l', '/tmp/mydir/inner', '/tmp/mydir/inner/', PL),
       ('l_log', '/tmp/mydir/data.log', '/tmp/mydir/data.log', PL),
-      ('l_indir', '/tmp/mydir/extra/../runner', '/tmp/mydir/runner', PL),
-      ('g', 'gs://bucket/mydir', 'gs://bucket/mydir', PG),
+      ('l_indir', '/tmp/mydir/extra/../runner', '/tmp/mydir/runner/', PL),
+      ('g', 'gs://bucket/mydir', 'gs://bucket/mydir/', PG),
       ('glog', 'gs://bucket/my.log', 'gs://bucket/my.log', PG),
   ])
   def test_logging_param_maker(self, unused_name, uri, expected_out, provider):
     param = param_util.build_logging_param(
-        uri, util_class=OutputParamUtilTestFixture)
+        uri, util_class=param_util.OutputFileParamUtil)
     self.assertEqual(param.uri, expected_out)
     self.assertEqual(param.file_provider, provider)
 

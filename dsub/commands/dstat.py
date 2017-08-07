@@ -224,10 +224,10 @@ def parse_arguments():
   parser.add_argument(
       '-j', '--jobs', nargs='*', help='A list of jobs on which to check status')
   parser.add_argument(
-      '-u',
       '--users',
+      '-u',
       nargs='*',
-      default=[dsub_util.get_default_user()],
+      default=[],
       help="""Lists only those jobs which were submitted by the list of users.
           Use "*" to list jobs of any user.""")
   parser.add_argument(
@@ -294,13 +294,18 @@ def main():
   # Set up the Genomics Pipelines service interface
   provider = provider_base.get_provider(args)
 
+  # Make sure users were provided, or try to fill from OS user. This cannot
+  # be made into a default argument since some environments lack the ability
+  # to provide a username automatically.
+  user_list = args.users if args.users else [dsub_util.get_os_user()]
+
   # Track if any jobs are running in the event --wait was requested.
   some_job_running = True
   while some_job_running:
 
     tasks = provider.lookup_job_tasks(
         args.status,
-        user_list=args.users,
+        user_list=user_list,
         job_list=args.jobs,
         max_jobs=args.limit)
 
