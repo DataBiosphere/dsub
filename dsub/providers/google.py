@@ -279,21 +279,19 @@ class _Label(collections.namedtuple('_Label', ['name', 'value'])):
     """Turn the specified name and value into a valid Google label."""
 
     # We want the results to be user-friendly, not just functional.
-    # So we don't base-64 encode or any nonsense like that.
+    # So we can't base-64 encode it.
+    #   * If upper-case: lower-case it
+    #   * If the char is not a standard letter or digit. make it a dash
+    accepted_characters = string.ascii_lowercase + string.digits + '-'
 
-    # Algorithm:
-    #   * For each character
-    #     * If upper-case: lower-case it
-    #     * If underscore period, etc. make it a dash
-    # pyformat: disable
-    lst = [c if c in string.ascii_lowercase
-           else c if c in string.digits
-           else c if c == '-'
-           else c.lower() if c in string.ascii_uppercase
-           else '-' for c in s]
-    # pyformat: enable
+    def label_char_transform(char):
+      if char in accepted_characters:
+        return char
+      if char in string.ascii_uppercase:
+        return char.lower()
+      return '-'
 
-    return ''.join(lst)
+    return ''.join(label_char_transform(c) for c in s)
 
 
 class _Api(object):
@@ -564,10 +562,19 @@ class _Pipelines(object):
         {var.name: var.uri
          for var in job_data['inputs'] if not var.recursive})
 
+    # Remove wildcard references for non-recursive output. When the pipelines
+    # controller generates a delocalize call, it must point to a bare directory
+    # for patterns. The output param OUTFILE=gs://bucket/path/*.bam should
+    # delocalize with a call similar to:
+    #   gsutil cp /mnt/data/output/gs/bucket/path/*.bam gs://bucket/path/
     outputs = {}
-    outputs.update(
-        {var.name: var.uri
-         for var in job_data['outputs'] if not var.recursive})
+    for var in job_data['outputs']:
+      if var.recursive:
+        continue
+      if '*' in var.uri.basename:
+        outputs[var.name] = var.uri.path
+      else:
+        outputs[var.name] = var.uri
 
     labels = {}
     labels.update({

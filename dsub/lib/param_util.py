@@ -15,7 +15,6 @@
 
 import collections
 import csv
-import glob
 import os
 import re
 
@@ -40,6 +39,39 @@ def validate_param_name(name, param_type):
     raise ValueError('Invalid %s: %s' % (param_type, name))
 
 
+class UriParts(str):
+  """Subclass string for multipart URIs.
+
+  This string subclass is used for URI references. The path and basename
+  attributes are used to maintain separation of this information in cases where
+  it might otherwise be ambiguous. The value of a UriParts string is a URI.
+
+  Attributes:
+    path: Strictly speaking, the path attribute is the entire leading part of
+      a URI (including scheme, host, and path). This attribute defines the
+      hierarchical location of a resource. Path must end in a forward
+      slash. Local file URIs are represented as relative URIs (path only).
+    basename: The last token of a path that follows a forward slash. Generally
+      this defines a specific resource or a pattern that matches resources. In
+      the case of URI's that consist only of a path, this will be empty.
+
+  Examples:
+    | uri                         |  uri.path              | uri.basename  |
+    +-----------------------------+------------------------+---------------|
+    | gs://bucket/folder/file.txt | 'gs://bucket/folder/'  | 'file.txt'    |
+    | http://example.com/1.htm    | 'http://example.com/'  | '1.htm'       |
+    | /tmp/tempdir1/              | '/tmp/tempdir1/'       | ''            |
+    | /tmp/ab.txt                 | '/tmp/'                | 'ab.txt'      |
+  """
+
+  def __new__(cls, path, basename):
+    basename = basename if basename is not None else ''
+    newuri = str.__new__(cls, path + basename)
+    newuri.path = path
+    newuri.basename = basename
+    return newuri
+
+
 class EnvParam(collections.namedtuple('EnvParam', ['name', 'value'])):
   """Name/value input parameter to a pipeline.
 
@@ -59,7 +91,7 @@ class LoggingParam(
   """File parameter used for logging.
 
   Attributes:
-    uri (str): A uri or local file path.
+    uri (UriParts): A uri or local file path.
     file_provider (enum): Service or infrastructure hosting the file.
   """
   pass
@@ -131,10 +163,10 @@ class FileParam(
   Attributes:
     name (str): the parameter and environment variable name.
     value (str): the original value given by the user on the command line or
-                 in the TSV file
+                 in the TSV file.
     docker_path (str): the on-VM location; also set as the environment variable
                        value.
-    uri (str): A uri or local file path.
+    uri (UriParts): A uri or local file path.
     recursive (bool): Whether recursive copy is wanted.
     file_provider (enum): Service or infrastructure hosting the file.
   """
@@ -290,8 +322,7 @@ class FileParamUtil(object):
                    a docker worker.
 
     """
-    # The path is split into components so that the filename is not rewritten
-    # and in order to preserve the trailing '/' for the cases that require it.
+    # The path is split into components so that the filename is not rewritten.
     raw_path, filename = os.path.split(raw_uri)
     # Generate the local path that can be resolved by filesystem operations,
     # this removes special shell characters, condenses indirects and replaces
@@ -304,7 +335,7 @@ class FileParamUtil(object):
         normed_path = os.path.join(replacement, normed_path[len(prefix):])
     # Because abspath strips the trailing '/' from bare directory references
     # other than root, this ensures that all directory references end with '/'.
-    normed_uri = os.path.abspath(normed_path).rstrip('/') + '/'
+    normed_uri = directory_fmt(os.path.abspath(normed_path))
     normed_uri = os.path.join(normed_uri, filename)
 
     # Generate the path used inside the docker image;
@@ -318,9 +349,7 @@ class FileParamUtil(object):
     for pattern, replacement in docker_rewrites:
       docker_path = re.sub(pattern, replacement, docker_path)
     docker_path = docker_path.lstrip('./')  # Strips any of '.' './' '/'.
-    docker_path = ('file/' + docker_path).rstrip('/')
-    # Like the normalized URI, ensure that bare directories terminate with '/'.
-    docker_path += '/' + filename
+    docker_path = directory_fmt('file/' + docker_path) + filename
     return normed_uri, docker_path
 
   @staticmethod
@@ -341,18 +370,6 @@ class FileParamUtil(object):
     """
     docker_path = raw_uri.replace('gs://', 'gs/', 1)
     return raw_uri, docker_path
-
-  @staticmethod
-  def local_file_is_accessible(uri, readonly=False):
-    """Check that a local directory or pattern exists and is accessible."""
-    accesslevel = os.R_OK if readonly else os.W_OK
-    files = glob.glob(uri)
-    if not files:
-      return False
-    for filename in files:
-      if not os.access(filename, accesslevel):
-        return False
-    return True
 
   @staticmethod
   def parse_file_provider(uri):
@@ -407,82 +424,51 @@ class FileParamUtil(object):
                        'reference a filename or wildcard: %s' % uri)
 
   def parse_uri(self, raw_uri, recursive):
-    raise NotImplementedError('parse_uri must be implemented by a child class')
-
-  def make_param(self, name, raw_uri, recursive):
-    """Return a *FileParam given an input uri."""
-    docker_path, final_uri, file_provider = self.parse_uri(raw_uri, recursive)
-    # Checks specific to the local file provider.
-    if file_provider == P_LOCAL:
-      if not self.local_file_is_accessible(final_uri, readonly=False):
-        raise ValueError('Output directory must exist: %s' % final_uri)
-    return self.param_class(name, raw_uri, docker_path, final_uri, recursive,
-                            file_provider)
-
-
-class InputFileParamUtil(FileParamUtil):
-
-  def __init__(self, docker_path):
-    super(InputFileParamUtil, self).__init__(AUTO_PREFIX_INPUT, docker_path)
-    self.param_class = InputFileParam
-
-  def parse_uri(self, raw_uri, recursive):
-    """Return a valid docker_path and uri from the uri."""
-    # Recursive URI's must be a directory path. The directory format is forced
-    # by adding a trailing slash. If the user added a wildcard, instead of a
-    # directory, validation will fail.
+    """Return a valid docker_path, uri, and file provider from a flag value."""
+    # Assume recursive URIs are directory paths.
     if recursive:
-      raw_uri = raw_uri.rstrip('/') + '/'
-    # Get the file provider, validate the raw URI, and rewrite the path
-    # component of the URI for docker and remote.
-    file_provider = self.parse_file_provider(raw_uri)
-    self._validate_paths_or_fail(raw_uri, recursive)
-    remote_uri, docker_uri = self.rewrite_uris(raw_uri, file_provider)
-    return docker_uri, remote_uri, file_provider
-
-
-class OutputFileParamUtil(FileParamUtil):
-
-  def __init__(self, docker_path):
-    super(OutputFileParamUtil, self).__init__(AUTO_PREFIX_OUTPUT, docker_path)
-    self.param_class = OutputFileParam
-
-  def parse_uri(self, raw_uri, recursive):
-    """Return a valid uri and docker_path generated from the raw uri."""
-    # Recursive URI's must be a directory path. The directory format is forced
-    # by adding a trailing slash. If the user added a wildcard, instead of a
-    # directory, validation will fail.
-    if recursive:
-      raw_uri = raw_uri.rstrip('/') + '/'
+      raw_uri = directory_fmt(raw_uri)
     # Get the file provider, validate the raw URI, and rewrite the path
     # component of the URI for docker and remote.
     file_provider = self.parse_file_provider(raw_uri)
     self._validate_paths_or_fail(raw_uri, recursive)
     uri, docker_uri = self.rewrite_uris(raw_uri, file_provider)
+    uri_parts = UriParts(
+        directory_fmt(os.path.dirname(uri)), os.path.basename(uri))
+    return docker_uri, uri_parts, file_provider
 
-    if not recursive:
-      # If the filename contains a wildcard, make sure the uri target
-      # is clearly a directory path. Otherwise if the local wildcard ends up
-      # matching a single file, the uri will be a file, rather than a
-      # directory containing a file.
-      path, filename = os.path.split(uri)
-      if '*' in filename:
-        uri = path.rstrip('/') + '/'
+  def make_param(self, name, raw_uri, recursive):
+    """Return a *FileParam given an input uri."""
+    docker_path, uri_parts, provider = self.parse_uri(raw_uri, recursive)
+    return self.param_class(name, raw_uri, docker_path, uri_parts, recursive,
+                            provider)
 
-    return docker_uri, uri, file_provider
+
+class InputFileParamUtil(FileParamUtil):
+  """Implementation of FileParamUtil for input files."""
+
+  def __init__(self, docker_path):
+    super(InputFileParamUtil, self).__init__(AUTO_PREFIX_INPUT, docker_path)
+    self.param_class = InputFileParam
+
+
+class OutputFileParamUtil(FileParamUtil):
+  """Implementation of FileParamUtil for output files."""
+
+  def __init__(self, docker_path):
+    super(OutputFileParamUtil, self).__init__(AUTO_PREFIX_OUTPUT, docker_path)
+    self.param_class = OutputFileParam
 
 
 def build_logging_param(logging_uri, util_class=OutputFileParamUtil):
   """Convenience function simplifies construction of the logging uri."""
   if not logging_uri:
     return LoggingParam(None, None)
+  recursive = not logging_uri.endswith('.log')
   oututil = util_class('')
-  provider = oututil.parse_file_provider(logging_uri)
-  uri, _ = oututil.rewrite_uris(logging_uri, provider)
-  if '*' in uri:
+  _, uri, provider = oututil.parse_uri(logging_uri, recursive)
+  if '*' in uri.basename:
     raise ValueError('Wildcards not allowed in logging URI: %s' % uri)
-  if provider == P_LOCAL and not oututil.local_file_is_accessible(uri):
-    raise ValueError('Logging location must be writable')
   return LoggingParam(uri, provider)
 
 
@@ -806,3 +792,57 @@ def validate_submit_args_or_fail(job_resources, all_task_data, provider_name,
           raise ValueError(
               error_message.format(
                   argname=argname, path=fileparam.uri, provider=provider_name))
+
+
+def directory_fmt(directory):
+  """In ensure that directories end with '/'.
+
+  Frequently we need to ensure that directory paths end with a forward slash.
+  Pythons dirname and split functions in the path library treat this
+  inconsistently creating this requirement. This function is simple but was
+  written to centralize documentation of an often used (and often explained)
+  requirement in this codebase.
+
+  >>> os.path.dirname('gs://bucket/folder/file.txt')
+  'gs://bucket/folder'
+  >>> directory_fmt(os.path.dirname('gs://bucket/folder/file.txt'))
+  'gs://bucket/folder/'
+  >>> os.path.dirname('/newfile')
+  '/'
+  >>> directory_fmt(os.path.dirname('/newfile'))
+  '/'
+
+  Specifically we need this since copy commands must know whether the
+  destination is a directory to function properly. See the following shell
+  interaction for an example of the inconsistency. Notice that text files are
+  copied as expected but the bam is copied over the directory name.
+
+  Multiple files copy, works as intended in all cases:
+      $ touch a.txt b.txt
+      $ gsutil cp ./*.txt gs://mybucket/text_dest
+      $ gsutil ls gs://mybucket/text_dest/
+            0  2017-07-19T21:44:36Z  gs://mybucket/text_dest/a.txt
+            0  2017-07-19T21:44:36Z  gs://mybucket/text_dest/b.txt
+      TOTAL: 2 objects, 0 bytes (0 B)
+
+  Single file copy fails to copy into a directory:
+      $ touch 1.bam
+      $ gsutil cp ./*.bam gs://mybucket/bad_dest
+      $ gsutil ls gs://mybucket/bad_dest
+               0  2017-07-19T21:46:16Z  gs://mybucket/bad_dest
+      TOTAL: 1 objects, 0 bytes (0 B)
+
+  Adding a trailing forward slash fixes this:
+      $ touch my.sam
+      $ gsutil cp ./*.sam gs://mybucket/good_folder
+      $ gsutil ls gs://mybucket/good_folder
+               0  2017-07-19T21:46:16Z  gs://mybucket/good_folder/my.sam
+      TOTAL: 1 objects, 0 bytes (0 B)
+
+  Args:
+    directory (str): a uri without an blob or file basename.
+
+  Returns:
+    the directory with a trailing slash.
+  """
+  return directory.rstrip('/') + '/'

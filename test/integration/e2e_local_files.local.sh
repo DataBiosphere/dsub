@@ -24,8 +24,9 @@ set -o nounset
 #     - accept local inputs
 #     - write to a local output
 #     - save logs to a local directory
-#  * non-recursive and recursive I/O should work for the local
+#  * Non-recursive and recursive I/O should work for the local
 #    runner no differently than the remote runner.
+#  * Non-recursive and recursive I/O will create their output destinations.
 #
 # For a detailed description of what this test does, see e2e_io_recursive.sh.
 
@@ -57,11 +58,6 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Setting up pipeline input..."
   build_recursive_files "${INPUT_DEEP}" "${INPUT_SHALLOW}"
-
-  # Setup output
-  mkdir -p "${OUTPUT_DEEP}"
-  mkdir -p "${OUTPUT_SHALLOW}"
-  mkdir -p "${LOCAL_LOGGING}"
 
   echo "Launching pipeline..."
 

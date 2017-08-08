@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 Google Inc. All Rights Reserved.
+# Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,14 +17,17 @@
 set -o errexit
 set -o nounset
 
-readonly SCRIPT_DIR="$(dirname "${0}")"
-readonly DSUB_DIR="${SCRIPT_DIR}/.."
+readonly VIRTUALENV="dsub_env"
+readonly INSTALL_DIR="$(dirname "${0}")/../install"
+readonly COMMAND="${INSTALL_DIR}/${VIRTUALENV}/bin/$(basename "${0}")"
 
-cd "${DSUB_DIR}"
-
-# Handle the no-arg case to avoid "unbound variable" of "$@" on MacOS
-if [[ $# -eq 0 ]]; then
-  python -m dsub.commands.ddel
-else
-  python -m dsub.commands.ddel "${@}"
+if [[ ! -f "${COMMAND}" ]]; then
+  echo 'Command not installed! Run "make install" and try again.'
+  exit 1
 fi
+
+set +o nounset  # https://github.com/pypa/virtualenv/pull/922
+source "${INSTALL_DIR}/${VIRTUALENV}/bin/activate"
+set -o nounset
+
+exec "${COMMAND}" "${@}"

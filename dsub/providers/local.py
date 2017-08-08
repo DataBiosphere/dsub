@@ -134,6 +134,9 @@ class LocalJobProvider(base.JobProvider):
 
   def prepare_job_metadata(self, script, job_name, user_id):
     job_name_value = job_name or os.path.basename(script)
+    if user_id != dsub_util.get_os_user():
+      raise ValueError('If specified, the local provider\'s "--user" flag must '
+                       'match the current logged-in user.')
     return {
         'job-id': self._make_job_id(job_name_value, user_id),
         'job-name': job_name_value,
@@ -197,7 +200,7 @@ class LocalJobProvider(base.JobProvider):
       readonly DATA_MOUNT_POINT='{data_mount_point}'
       # Absolute path to the data.
       readonly DATA_DIR='{data_dir}'
-      # Absolute path the the CWD inside Docker.
+      # Absolute path to the CWD inside Docker.
       readonly WORKING_DIR='{workingdir}'
       # Absolute path to the env config file
       readonly ENV_FILE='{env_file}'
@@ -348,7 +351,7 @@ class LocalJobProvider(base.JobProvider):
           log_info "Job is canceled, stopping Docker container ${NAME}."
           docker stop "${NAME}"
           echo "CANCELED" > status.txt
-          log_info "Copy logs to ${LOGGING}, and cleanup"
+          log_info "Delocalize logs and cleanup"
           cleanup
           trap EXIT
           echo "Canceled, exiting." > status_message.txt
@@ -592,30 +595,37 @@ class LocalJobProvider(base.JobProvider):
           'Filtering by job name is not implemented for the local provider'
           ' (%s)' % str(job_name_list))
 
+    # The local provider is intended for local, single-user development. There
+    # is no shared queue (jobs run immediately) and hence it makes no sense
+    # to look up a job run by someone else (whether for dstat or for ddel).
+    # If a user is passed in, we will allow it, so long as it is the current
+    # user. Otherwise we explicitly error out.
+    approved_users = [dsub_util.get_os_user()]
     if user_list:
-      user = dsub_util.get_default_user()
-      # We only allow no filtering or filtering by current user.
-      if any([u for u in user_list if u != user]):
+      if user_list != approved_users:
         raise NotImplementedError(
             'Filtering by user is not implemented for the local provider'
             ' (%s)' % str(user_list))
+    else:
+      user_list = approved_users
 
     ret = []
     if not job_list:
       # Default to every job we know about
       job_list = os.listdir(self._provider_root())
     for j in job_list:
-      path = self._provider_root() + '/' + j
-      if not os.path.isdir(path):
-        continue
-      for task_id in os.listdir(path):
-        if task_id == 'task':
-          task_id = None
-        if task_list and task_id not in task_list:
+      for u in user_list:
+        path = self._provider_root() + '/' + j
+        if not os.path.isdir(path):
           continue
-        ret.append(self._get_task_from_task_dir(j, task_id))
-        if max_jobs > 0 and len(ret) > max_jobs:
-          break
+        for task_id in os.listdir(path):
+          if task_id == 'task':
+            task_id = None
+          if task_list and task_id not in task_list:
+            continue
+          ret.append(self._get_task_from_task_dir(j, u, task_id))
+          if max_jobs > 0 and len(ret) > max_jobs:
+            break
     return ret
 
   def get_task_status_message(self, task):
@@ -659,14 +669,13 @@ class LocalJobProvider(base.JobProvider):
     with open(task_dir + '/meta.yaml', 'wt') as f:
       f.write(yaml.dump(data))
 
-  def _get_task_from_task_dir(self, job_id, task_id):
+  def _get_task_from_task_dir(self, job_id, user_id, task_id):
     """Return a Task object with this task's info."""
     path = self._task_directory(job_id, task_id)
     status = 'uninitialized'
     meta = {}
     last_update = 0
     create_time = 0
-    user_id = -1
     pid = -1
     try:
       status_message = ''
@@ -681,7 +690,6 @@ class LocalJobProvider(base.JobProvider):
           for filename in ['/status.txt', '/status_message.txt', '/meta.yaml']
       ])
       create_time = os.path.getmtime(path + '/task.pid')
-      user_id = os.stat(path + '/task.pid').st_uid
     except IOError:
       # Files are not there yet.
       # RUNNING is a misnomer, but there is no PENDING status.
@@ -728,8 +736,7 @@ class LocalJobProvider(base.JobProvider):
         labels=meta.get('labels', None),
         inputs=meta.get('inputs', None),
         outputs=meta.get('outputs', None),
-        # It's called default_user but actually returns the current user
-        user_id=dsub_util.get_default_user() if user_id >= 0 else None,
+        user_id=user_id,
         pid=pid)
 
   def _provider_root(self):
@@ -738,7 +745,7 @@ class LocalJobProvider(base.JobProvider):
     return self.provider_root_cache
 
   @staticmethod
-  def _make_logging_path(gcs_folder_or_file, job_id, task_id):
+  def _prepare_logging_uri(logging_uri, job_id, task_id):
     """Return "gcs_folder/job_id" or "gcs_file" (without .log).
 
     Matches the Pipelines API behavior: if the user specifies a file
@@ -747,30 +754,27 @@ class LocalJobProvider(base.JobProvider):
     for the user.
 
     Args:
-      gcs_folder_or_file: eg. 'gs://bucket/path/myfile.log' or 'gs://bucket/'
+      logging_uri: (param_util.UriParts) A uri to a logging location. Should be
+                   a path or a file ending in '.log'
+                   (ex. 'gs://bucket/logs/myfile.log' or 'gs://bucket/')
       job_id: eg. 'script--foobar-12'
       task_id: The id of the job task (if any)
 
     Returns:
       eg. 'gs://bucket/path/myfile' or 'gs://bucket/script-foobar-12'
     """
-    suffix = '%s.%s' % (job_id, task_id) if task_id else job_id
+    basename = '%s.%s' % (job_id, task_id) if task_id else str(job_id)
+    logging_path = logging_uri.path
+    if logging_uri.basename.endswith('.log'):
+      basename = logging_uri.basename[:-4]
+    return param_util.UriParts(logging_path, basename)
 
-    ret = gcs_folder_or_file
-    if ret.endswith('.log'):
-      ret = ret[:-4]
-    elif ret.endswith('/'):
-      ret += suffix
-    else:
-      ret += '/' + suffix
-    return ret
-
-  def _delocalize_logging_command(self, logpath, file_provider, job_id,
+  def _delocalize_logging_command(self, logging_uri, file_provider, job_id,
                                   task_id):
     """Returns a command to delocalize logs.
 
     Args:
-      logpath: eg. 'gs://bucket/path/myfile.log' or 'gs://bucket/'
+      logging_uri: eg. 'gs://bucket/path/myfile.log' or 'gs://bucket/'
       file_provider: a file provider from param_util.
       job_id: eg. 'script--foobar-12'
       task_id: The id of the job task (if any)
@@ -778,15 +782,17 @@ class LocalJobProvider(base.JobProvider):
     Returns:
       eg. 'gs://bucket/path/myfile' or 'gs://bucket/script-foobar-12'
     """
-    logpath = self._make_logging_path(logpath, job_id, task_id)
+    logging_dest = self._prepare_logging_uri(logging_uri, job_id, task_id)
     command = 'gsutil -q cp' if file_provider == param_util.P_GCS else 'cp'
-
-    body = textwrap.dedent("""\
+    body = ''
+    if file_provider == param_util.P_LOCAL:
+      body += 'mkdir -p "%s"\n' % logging_dest.path
+    body += textwrap.dedent("""\
     [[ -f stdout.txt ]] && {0} stdout.txt {1}-stdout.log
     [[ -f stderr.txt ]] && {0} stderr.txt {1}-stderr.log
     [[ -f log.txt ]] && {0} log.txt {1}.log
     """)
-    return body.format(command, logpath)
+    return body.format(command, logging_dest)
 
   def _make_job_id(self, job_name_value, user_id):
     """Return a job-id string."""
@@ -889,24 +895,34 @@ class LocalJobProvider(base.JobProvider):
 
   def _delocalize_outputs_recursive_command(self, task_dir, task_data):
     outs = task_data.get('outputs', [])
-    gcs = providers_util.build_recursive_delocalize_command(
-        os.path.join(task_dir, DATA_SUBDIR), outs, param_util.P_GCS)
-    local = providers_util.build_recursive_delocalize_command(
-        os.path.join(task_dir, DATA_SUBDIR), outs, param_util.P_LOCAL)
-    return gcs + '\n' + local
+    cmd_lines = []
+    # Generate commands to create any required local output directories.
+    for var in outs:
+      if var.recursive and var.file_provider == param_util.P_LOCAL:
+        cmd_lines.append('  mkdir -p "%s"' % var.uri.path)
+    # Generate local and GCS delocalize commands.
+    cmd_lines.append(
+        providers_util.build_recursive_delocalize_command(
+            os.path.join(task_dir, DATA_SUBDIR), outs, param_util.P_GCS))
+    cmd_lines.append(
+        providers_util.build_recursive_delocalize_command(
+            os.path.join(task_dir, DATA_SUBDIR), outs, param_util.P_LOCAL))
+    return '\n'.join(cmd_lines)
 
   def _delocalize_outputs_commands(self, task_dir, task_data):
     """Copy outputs from local disk to GCS."""
     outs = task_data.get('outputs', [])
     commands = []
     for o in outs:
-      local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + o.docker_path
       if o.recursive:
         continue
+      dest_path = o.uri.path
+      local_path = task_dir + '/' + DATA_SUBDIR + '/' + o.docker_path
       if o.file_provider == param_util.P_GCS:
-        commands.append('gsutil -q cp "%s" "%s"' % (local_file_path, o.uri))
+        commands.append('gsutil -q cp "%s" "%s"' % (local_path, dest_path))
       if o.file_provider == param_util.P_LOCAL:
-        commands.append('cp %s %s' % (local_file_path, o.uri))
+        commands.append('mkdir -p "%s"' % dest_path)
+        commands.append('cp %s %s' % (local_path, dest_path))
 
     commands.append(
         textwrap.dedent("""\

@@ -3,18 +3,18 @@
 File is based on this template: https://github.com/pypa/sampleproject
 """
 
-# To use a consistent encoding
-from codecs import open  # pylint: disable=redefined-builtin
-from os import path
+import unittest
 # Always prefer setuptools over distutils
 from setuptools import find_packages
 from setuptools import setup
 
-here = path.abspath(path.dirname(__file__))
 
-# Get the long description from the README file
-with open(path.join(here, 'README.md'), encoding='utf-8') as f:
-  long_description = f.read()
+def unittest_suite():
+  """Get test suite (Python unit tests only)."""
+  test_loader = unittest.TestLoader()
+  test_suite = test_loader.discover('test/unit', pattern='test_*.py')
+  return test_suite
+
 
 setup(
     name='dsub',
@@ -25,7 +25,6 @@ setup(
     version='0.0.0',
     description=('A command-line tool that makes it easy to submit and run'
                  ' batch scripts in the cloud'),
-    long_description=long_description,
 
     # The project's main homepage.
     url='https://github.com/googlegenomics/dsub',
@@ -88,6 +87,9 @@ setup(
         # dependencies for test code
         'parameterized',
     ],
+
+    # Define a test suite for Python unittests only.
+    test_suite='setup.unittest_suite',
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,

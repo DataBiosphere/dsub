@@ -60,7 +60,7 @@ def parse_arguments():
       '--users',
       '-u',
       nargs='*',
-      default=[dsub_util.get_default_user()],
+      default=[],
       help="""Deletes only those jobs which were submitted by the list of users.
           Use "*" to delete jobs of any user.""")
   return parser.parse_args()
@@ -84,13 +84,18 @@ def main():
   # Set up the Genomics Pipelines service interface
   provider = provider_base.get_provider(args)
 
+  # Make sure users were provided, or try to fill from OS user. This cannot
+  # be made into a default argument since some environments lack the ability
+  # to provide a username automatically.
+  user_list = args.users if args.users else [dsub_util.get_os_user()]
+
   # Let the user know which jobs we are going to look up
   with dsub_util.replace_print():
-    emit_search_criteria(args.users, args.jobs, args.tasks)
+    emit_search_criteria(user_list, args.jobs, args.tasks)
 
     # Delete the requested jobs
     deleted_tasks, error_messages = provider.delete_jobs(
-        args.users, args.jobs, args.tasks)
+        user_list, args.jobs, args.tasks)
 
     # Emit any errors canceling jobs
     for msg in error_messages:

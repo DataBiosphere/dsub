@@ -309,6 +309,11 @@ def parse_arguments(prog, argv):
       action='store_true',
       help="""Enable new behavior for --input parameters that include wildcard
         patterns. This will become the default.""")
+  parser.add_argument(
+      '--user',
+      '-u',
+      default=None,
+      help='User submitting the dsub job, defaults to the current OS user.')
 
   # Add dsub job management arguments
   parser.add_argument(
@@ -423,9 +428,9 @@ def get_job_metadata(args, script, provider):
   Returns:
     A dictionary of job-specific metadata (such as job id, name, etc.)
   """
-
+  user_name = args.user or dsub_util.get_os_user()
   job_metadata = provider.prepare_job_metadata(script.name, args.name,
-                                               dsub_util.get_default_user())
+                                               user_name)
 
   job_metadata['script'] = script
 
