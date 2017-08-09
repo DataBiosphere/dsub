@@ -33,7 +33,6 @@ function call_dsub() {
   local output="${2}"
   local input_recursive="${3:-}"
   local output_recursive="${4:-}"
-  local vars_include_wildcards="${5:-}"
 
   if [[ -z "${input}" ]]; then
     unset input
@@ -49,28 +48,11 @@ function call_dsub() {
     ${output:+--output "${output}"} \
     ${input_recursive:+--input-recursive "${input_recursive}"} \
     ${output_recursive:+--output-recursive "${output_recursive}"} \
-    ${vars_include_wildcards:+--vars-include-wildcards} \
     --dry-run \
     1> "${TEST_STDOUT}" \
     2> "${TEST_STDERR}"
 }
 readonly -f call_dsub
-
-function check_deprecation_warning() {
-  local expected_var="${1}"
-  assert_err_contains \
-    "\
-WARNING: The behavior of docker environment variables for input
-         parameters with wildcard (*) values is changing.
-         Set --vars-include-wildcards to enable the new behavior so
-         you can change your code before it becomes the default.
-         The following input parameters include wildcards:
-           ${expected_var}"
-
-  # Remove the deprecation warning from stderr for downstream output checks
-  sed -i '1,6 d' "${TEST_STDERR}"
-}
-readonly -f check_deprecation_warning
 
 # Define tests
 
@@ -98,10 +80,7 @@ function test_input_wildcard() {
 
   if call_dsub \
     gs://bucket/path/file*.bam \
-    gs://bucket/path/* \
-    "" \
-    "" \
-    "true"; then
+    gs://bucket/path/*; then
 
     # Check that the output contains expected paths
 
@@ -118,31 +97,6 @@ function test_input_wildcard() {
   fi
 }
 readonly -f test_input_wildcard
-
-function test_input_wildcard_deprecated() {
-  local subtest="${FUNCNAME[0]}"
-
-  if call_dsub \
-    gs://bucket/path/file*.bam \
-    gs://bucket/path/*; then
-
-    check_deprecation_warning \
-      "INPUT_0=gs://bucket/path/file*.bam"
-
-    # Check that the output contains expected paths
-    assert_pipeline_input_parameter_equals \
-      0 "INPUT_0" "input/gs/bucket/path/" "gs://bucket/path/file*.bam"
-
-    # Ensure the docker command does not include setting INPUT_0
-    assert_err_not_contains \
-      "INPUT_0="
-
-    test_passed "${subtest}"
-  else
-    test_failed "${subtest}"
-  fi
-}
-readonly -f test_input_wildcard_deprecated
 
 function test_output_file() {
   local subtest="${FUNCNAME[0]}"
@@ -253,7 +207,6 @@ mkdir -p "${TEST_TMP}"
 echo
 test_input_file
 test_input_wildcard
-test_input_wildcard_deprecated
 
 echo
 test_output_file

@@ -75,7 +75,6 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --script "${SCRIPT_DIR}/script_input_wildcards.sh" \
     --input INPUT_BASIC="${GS_INPUT_BASIC}" \
     --input INPUT_WITH_SPACE="${GS_INPUT_WITH_SPACE}" \
-    --vars-include-wildcards \
     --wait
 
 fi
