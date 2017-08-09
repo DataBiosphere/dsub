@@ -357,8 +357,7 @@ class _Pipelines(object):
     }
 
   @classmethod
-  def _build_pipeline_docker_command(cls, script_name, inputs, outputs,
-                                     vars_include_wildcards):
+  def _build_pipeline_docker_command(cls, script_name, inputs, outputs):
     """Return a multi-line string containg the full pipeline docker command."""
 
     # We upload the user script as an environment argument
@@ -411,12 +410,11 @@ class _Pipelines(object):
         var for var in inputs
         if not var.recursive and '*' in os.path.basename(var.docker_path)
     ]
-    if vars_include_wildcards:
-      export_inputs_with_wildcards = '\n'.join([
-          'export {0}="{1}/{2}"'.format(var.name, DATA_MOUNT_POINT,
-                                        var.docker_path)
-          for var in inputs_with_wildcards
-      ])
+    export_inputs_with_wildcards = '\n'.join([
+        'export {0}="{1}/{2}"'.format(var.name, DATA_MOUNT_POINT,
+                                      var.docker_path)
+        for var in inputs_with_wildcards
+    ])
 
     return DOCKER_COMMAND.format(
         mk_runtime_dirs=MK_RUNTIME_DIRS_COMMAND,
@@ -434,8 +432,7 @@ class _Pipelines(object):
   @classmethod
   def build_pipeline(cls, project, min_cores, min_ram, disk_size,
                      boot_disk_size, preemptible, image, zones, script_name,
-                     envs, inputs, outputs, pipeline_name,
-                     vars_include_wildcards):
+                     envs, inputs, outputs, pipeline_name):
     """Builds a pipeline configuration for execution.
 
     Args:
@@ -455,17 +452,14 @@ class _Pipelines(object):
       outputs: list of FileParam objects specifying output variables to set
         within each job.
       pipeline_name: string name of pipeline.
-      vars_include_wildcards: boolean flag indicating whether environment
-        variables for input parameters should include the wildcard (file)
-        portion of the path.
 
     Returns:
       A nested dictionary with one entry under the key emphemeralPipeline
       containing the pipeline configuration.
     """
     # Format the docker command
-    docker_command = cls._build_pipeline_docker_command(
-        script_name, inputs, outputs, vars_include_wildcards)
+    docker_command = cls._build_pipeline_docker_command(script_name, inputs,
+                                                        outputs)
 
     # Pipelines inputParameters can be both simple name/value pairs which get
     # set as environment variables, as well as input file paths which the
@@ -1072,8 +1066,7 @@ class GoogleJobProvider(base.JobProvider):
         envs=job_data['envs'],
         inputs=job_data['inputs'],
         outputs=job_data['outputs'],
-        pipeline_name=job_metadata['pipeline-name'],
-        vars_include_wildcards=job_metadata['vars_include_wildcards'])
+        pipeline_name=job_metadata['pipeline-name'])
 
     # Build the pipelineArgs for this job.
     pipeline.update(

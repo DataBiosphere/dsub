@@ -30,33 +30,15 @@ source "${SCRIPT_DIR}/test_setup_unit.sh"
 
 function call_dsub() {
   local tasks="${1}"
-  local vars_include_wildcards="${2:-}"
 
   run_dsub \
     --script "${SCRIPT}" \
     --tasks "${tasks}" \
-    ${vars_include_wildcards:+--vars-include-wildcards} \
     --dry-run \
     1> "${TEST_STDOUT}" \
     2> "${TEST_STDERR}"
 }
 readonly -f call_dsub
-
-function check_deprecation_warning() {
-  local expected_var="${1}"
-  assert_err_contains \
-    "\
-WARNING: The behavior of docker environment variables for input
-         parameters with wildcard (*) values is changing.
-         Set --vars-include-wildcards to enable the new behavior so
-         you can change your code before it becomes the default.
-         The following input parameters include wildcards:
-           ${expected_var}"
-
-  # Remove the deprecation warning from stderr for downstream output checks
-  sed -i '1,6 d' "${TEST_STDERR}"
-}
-readonly -f check_deprecation_warning
 
 # Define tests
 
@@ -205,38 +187,6 @@ gs://bucket2/path1\tgs://bucket2/path2
 readonly -f test_output_auto
 
 
-function test_input_wildcard_deprecated() {
-  local subtest="${FUNCNAME[0]}"
-
-  local tsv_file="${TEST_TMP}/${subtest}.tsv"
-
-  # Create a simple TSV file
-  util::write_tsv_file "${tsv_file}" \
-'
---input-recursive INPUT_PATH_DEEP\t--input INPUT_PATH_SHALLOW
-gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
-'
-
-  if call_dsub "${tsv_file}"; then
-    check_deprecation_warning \
-      "INPUT_PATH_SHALLOW=gs://bucket1/path1/shallow/*"
-
-    # Ensure the INPUT_PATH_SHALLOW parameter is set properly
-    assert_pipeline_input_parameter_equals \
-      0 "INPUT_PATH_SHALLOW" \
-      "input/gs/bucket1/path1/shallow/" "gs://bucket1/path1/shallow/*"
-
-    # Ensure the docker command does not include setting INPUT_PATH_SHALLOW
-    assert_err_not_contains \
-      "INPUT_PATH_SHALLOW="
-
-    test_passed "${subtest}"
-  else
-    test_failed "${subtest}"
-  fi
-}
-readonly -f test_input_wildcard_deprecated
-
 function test_input_wildcard_and_recursive() {
   local subtest="${FUNCNAME[0]}"
 
@@ -249,7 +199,7 @@ function test_input_wildcard_and_recursive() {
 gs://bucket1/path1/deep\tgs://bucket1/path1/shallow/*
 '
 
-  if call_dsub "${tsv_file}" "true"; then
+  if call_dsub "${tsv_file}"; then
 
     # A direct export of an environment variable for INPUT_PATH_DEEP
     # should be created in the docker command instead of a pipelines
@@ -344,6 +294,5 @@ test_output_file
 test_output_auto
 
 echo
-test_input_wildcard_deprecated
 test_input_wildcard_and_recursive
 test_output_wildcard_and_recursive
