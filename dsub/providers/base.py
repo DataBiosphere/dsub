@@ -131,7 +131,8 @@ class JobProvider(object):
                        job_list=None,
                        job_name_list=None,
                        task_list=None,
-                       max_jobs=0):
+                       create_time=None,
+                       max_tasks=0):
     """Return a list of tasks based on the search criteria.
 
     If any of the filters are empty or "[*]", then no filtering is performed on
@@ -145,7 +146,8 @@ class JobProvider(object):
       job_list: a list of job ids to return.
       job_name_list: a list of job names to return.
       task_list: a list of specific tasks within the specified job(s) to return.
-      max_jobs: the maximum number of jobs to return or 0 for no limit.
+      create_time: a UTC value for earliest create time for a job.
+      max_tasks: the maximum number of job tasks to return or 0 for no limit.
 
     Returns:
       A list of provider-specific objects, each representing a submitted task.

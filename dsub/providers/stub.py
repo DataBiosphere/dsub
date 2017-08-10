@@ -66,7 +66,8 @@ class StubJobProvider(base.JobProvider):
                        user_list='*',
                        job_list='*',
                        task_list='*',
-                       max_jobs=0):
+                       create_time=None,
+                       max_tasks=0):
     """Return a list of operations based on the input criteria.
 
     If any of the filters are empty or "[*]", then no filtering is performed on
@@ -78,7 +79,8 @@ class StubJobProvider(base.JobProvider):
       user_list: a list of ids for the user(s) who launched the job.
       job_list: a list of job ids to return.
       task_list: a list of specific tasks within the specified job(s) to return.
-      max_jobs: the maximum number of jobs to return or 0 for no limit.
+      create_time: a UTC value for earliest create time for a job.
+      max_tasks: the maximum number of job tasks to return or 0 for no limit.
 
     Returns:
       A list of Genomics API Operations objects.
@@ -92,8 +94,8 @@ class StubJobProvider(base.JobProvider):
             (job_list == '*' or x.get('job-id', None) in job_list) and
             (task_list == '*' or x.get('task-id', None) in task_list))
     ]
-    if max_jobs > 0:
-      operations = operations[:max_jobs]
+    if max_tasks > 0:
+      operations = operations[:max_tasks]
     return operations
 
   def get_task_field(self, task, field):

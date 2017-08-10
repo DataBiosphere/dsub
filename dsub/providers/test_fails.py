@@ -47,8 +47,8 @@ class FailsJobProvider(base.JobProvider):
                        user_list=None,
                        job_list=None,
                        task_list=None,
-                       max_jobs=0):
-    del status_list, user_list, job_list, task_list, max_jobs  # never any jobs
+                       max_tasks=0):
+    del status_list, user_list, job_list, task_list, max_tasks  # never any jobs
     raise FailsException("fails provider made lookup_job_tasks fail")
 
   def get_task_status_message(self, task):

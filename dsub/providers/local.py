@@ -52,6 +52,7 @@ submitted will run concurrently.
 
 from collections import namedtuple
 from datetime import datetime
+from datetime import timedelta
 import os
 import signal
 import subprocess
@@ -144,6 +145,8 @@ class LocalJobProvider(base.JobProvider):
     }
 
   def submit_job(self, job_resources, job_metadata, all_task_data):
+    create_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+
     # Validate inputs.
     param_util.validate_submit_args_or_fail(
         job_resources,
@@ -169,9 +172,9 @@ class LocalJobProvider(base.JobProvider):
 
       # Start the task
       env = self._make_environment(task_data)
+      self._write_task_metadata(job_metadata, task_data, task_id, create_time)
       self._run_docker_via_script(task_dir, env, job_resources, job_metadata,
                                   task_data, task_id)
-      self._write_task_metadata(job_metadata, task_data, task_id)
       if task_id is not None:
         launched_tasks.append(str(task_id))
 
@@ -576,13 +579,31 @@ class LocalJobProvider(base.JobProvider):
 
     return tad.get(field, default)
 
+  @classmethod
+  def _utc_int_to_local_datetime(cls, utc_int):
+    """Convert the integer UTC time value into a local datetime."""
+    if utc_int is None:
+      return None
+
+    # Convert from a UTC integer (seconds since the epoch) to a UTC datetime
+    datetime_utc = datetime.utcfromtimestamp(0) + timedelta(seconds=utc_int)
+
+    # Get the offset from UTC to local
+    timestamp = time.mktime(datetime_utc.timetuple())
+    offset = datetime.fromtimestamp(timestamp) - datetime.utcfromtimestamp(
+        timestamp)
+
+    # Convert from a UTC datetime to a local datetime
+    return datetime_utc + offset
+
   def lookup_job_tasks(self,
                        status_list,
                        user_list=None,
                        job_list=None,
                        job_name_list=None,
                        task_list=None,
-                       max_jobs=0):
+                       create_time=None,
+                       max_tasks=0):
 
     status_list = None if status_list == ['*'] else status_list
     user_list = None if user_list == ['*'] else user_list
@@ -594,6 +615,8 @@ class LocalJobProvider(base.JobProvider):
       raise NotImplementedError(
           'Filtering by job name is not implemented for the local provider'
           ' (%s)' % str(job_name_list))
+
+    create_time_local = self._utc_int_to_local_datetime(create_time)
 
     # The local provider is intended for local, single-user development. There
     # is no shared queue (jobs run immediately) and hence it makes no sense
@@ -623,9 +646,19 @@ class LocalJobProvider(base.JobProvider):
             task_id = None
           if task_list and task_id not in task_list:
             continue
-          ret.append(self._get_task_from_task_dir(j, u, task_id))
-          if max_jobs > 0 and len(ret) > max_jobs:
+
+          task = self._get_task_from_task_dir(j, u, task_id)
+          if create_time_local:
+            task_create_time = datetime.strptime(task.create_time,
+                                                 '%Y-%m-%d %H:%M:%S.%f')
+            if task_create_time < create_time_local:
+              continue
+
+          ret.append(task)
+
+          if max_tasks > 0 and len(ret) > max_tasks:
             break
+
     return ret
 
   def get_task_status_message(self, task):
@@ -639,7 +672,7 @@ class LocalJobProvider(base.JobProvider):
 
   # Private methods
 
-  def _write_task_metadata(self, job_metadata, task_data, task_id):
+  def _write_task_metadata(self, job_metadata, task_data, task_id, create_time):
     """Write a file with the data needed for dstat."""
 
     # Build up a dict to dump a YAML file with relevant task details:
@@ -658,6 +691,7 @@ class LocalJobProvider(base.JobProvider):
         'job-id': job_metadata['job-id'],
         'task-id': task_id,
         'job-name': job_metadata['job-name'],
+        'create-time': create_time,
     }
     for key in ['inputs', 'outputs', 'envs', 'labels']:
       if task_data.has_key(key):
@@ -689,7 +723,8 @@ class LocalJobProvider(base.JobProvider):
           os.path.getmtime(path + filename)
           for filename in ['/status.txt', '/status_message.txt', '/meta.yaml']
       ])
-      create_time = os.path.getmtime(path + '/task.pid')
+      create_time = meta.get('create-time',
+                             os.path.getmtime(path + '/task.pid'))
     except IOError:
       # Files are not there yet.
       # RUNNING is a misnomer, but there is no PENDING status.
@@ -703,6 +738,7 @@ class LocalJobProvider(base.JobProvider):
           # Time out
           status = 'CANCELED'
           status_message = 'Process failed to start.'
+        create_time = datetime.fromtimestamp(create_time)
       except IOError:
         # pid file not there, let's say it's still pending.
         pass
@@ -729,7 +765,7 @@ class LocalJobProvider(base.JobProvider):
         job_status=status,
         status_message=status_message,
         job_name=meta.get('job-name', None),
-        create_time=datetime.fromtimestamp(create_time),
+        create_time=create_time,
         last_update=datetime.fromtimestamp(last_update)
         if last_update > 0 else None,
         envs=meta.get('envs', None),

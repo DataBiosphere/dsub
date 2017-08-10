@@ -30,6 +30,7 @@ Follows the model of bjobs, sinfo, qstat, etc.
 import argparse
 import collections
 from datetime import datetime
+from datetime import timedelta
 import json
 import time
 
@@ -222,7 +223,7 @@ def parse_arguments():
       '--project',
       help='Cloud project ID in which to query pipeline operations')
   parser.add_argument(
-      '-j', '--jobs', nargs='*', help='A list of jobs on which to check status')
+      '--jobs', '-j', nargs='*', help='A list of jobs on which to check status')
   parser.add_argument(
       '--users',
       '-u',
@@ -231,13 +232,19 @@ def parse_arguments():
       help="""Lists only those jobs which were submitted by the list of users.
           Use "*" to list jobs of any user.""")
   parser.add_argument(
-      '-s',
       '--status',
+      '-s',
       nargs='*',
       default=['RUNNING'],
       choices=['RUNNING', 'SUCCESS', 'FAILURE', 'CANCELED', '*'],
       help="""Lists only those jobs which match the specified status(es).
           Use "*" to list jobs of any status.""")
+  parser.add_argument(
+      '--age',
+      help="""List only those jobs newer than the specified age. Ages can be
+          listed using a number followed by a unit. Supported units are
+          s (seconds), m (minutes), h (hours), d (days), w (weeks).
+          For example: '7d' (7 days). Bare numbers are treated as UTC.""")
   parser.add_argument(
       '--poll-interval',
       default=10,
@@ -251,8 +258,8 @@ def parse_arguments():
       type=int,
       help='The maximum number of tasks to list. The default is unlimited.')
   parser.add_argument(
-      '-f',
       '--full',
+      '-f',
       action='store_true',
       help='Toggle output with full operation identifiers'
       ' and input parameters.')
@@ -272,11 +279,59 @@ def parse_arguments():
   return args
 
 
+def compute_create_time(age, from_time=datetime.utcnow()):
+  """Compute the create time (UTC) for the list filter.
+
+  If the age is an integer value it is treated as a UTC date.
+  Otherwise the value must be of the form "<integer><unit>" where supported
+  units are s, m, h, d, w (seconds, months, hours, days, weeks).
+
+  Args:
+    age: A "<integer><unit>" string or integer value.
+    from_time:
+
+  Returns:
+    A date value in UTC or None if age parameter is empty.
+  """
+
+  if not age:
+    return None
+
+  try:
+    last_char = age[-1]
+
+    if last_char in 'smhdw':
+      if last_char == 's':
+        interval = timedelta(seconds=int(age[:-1]))
+      elif last_char == 'm':
+        interval = timedelta(minutes=int(age[:-1]))
+      elif last_char == 'h':
+        interval = timedelta(hours=int(age[:-1]))
+      elif last_char == 'd':
+        interval = timedelta(days=int(age[:-1]))
+      elif last_char == 'w':
+        interval = timedelta(weeks=int(age[:-1]))
+
+      start = from_time - interval
+      epoch = datetime.utcfromtimestamp(0)
+
+      return int((start - epoch).total_seconds())
+    else:
+      return int(age)
+
+  except (ValueError, OverflowError) as e:
+    raise ValueError('Unable to parse age string %s: %s' % (age, e))
+
+
 def main():
 
   # Parse args and validate
   args = parse_arguments()
 
+  # Compute the age filter (if any)
+  create_time = compute_create_time(args.age)
+
+  # Set up the output formatter
   if args.format == 'json':
     output_formatter = JsonOutput(args.full)
   elif args.format == 'text':
@@ -307,7 +362,8 @@ def main():
         args.status,
         user_list=user_list,
         job_list=args.jobs,
-        max_jobs=args.limit)
+        create_time=create_time,
+        max_tasks=args.limit)
 
     table = []
 
