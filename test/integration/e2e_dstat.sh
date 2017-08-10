@@ -17,17 +17,6 @@
 set -o errexit
 set -o nounset
 
-function get_status() {
-  local JOBID="$1"
-  local STATUS="$(run_dstat --jobs "${JOBID}" --status "*")"
-  # if the job's pending, then wait.
-  while echo "${STATUS}" | grep -qi 'pending' - ; do
-    sleep 5s
-    STATUS="$(run_dstat --jobs "${JOBID}" --status "*")"
-  done
-  echo "${STATUS}"
-}
-
 # Test dstat.
 #
 # This test launches a single job and then simply verifies that dstat,
@@ -48,7 +37,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   JOBID="$(run_dsub \
     --name "${JOB_NAME}" \
-    --command "echo 'hello world'")"
+    --command 'sleep 1m')"
 
   echo "Checking dstat (default)..."
 
@@ -74,6 +63,25 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     exit 1
   fi
 
+  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${JOB_NAME}"; then
+    echo "Job ${JOB_NAME} not found in the dstat output!"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  echo "Waiting 5 seconds and checking 'dstat --age 5s'..."
+  sleep 5s
+
+  DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}" --age 5s 2>&1)"
+  if [[ -n "${DSTAT_OUTPUT}" ]]; then
+    echo "dstat output not empty as expected:"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  echo "Verifying that the job didn't disappear completely."
+
+  DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}" 2>&1)"
   if ! echo "${DSTAT_OUTPUT}" | grep -qi "${JOB_NAME}"; then
     echo "Job ${JOB_NAME} not found in the dstat output!"
     echo "${DSTAT_OUTPUT}"

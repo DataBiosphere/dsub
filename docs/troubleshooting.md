@@ -72,6 +72,47 @@ To view results for all jobs associated with your user id:
 dstat --project my-project --status "*"
 ```
 
+### Check all of my jobs since <some time>
+
+To view results for jobs associated with your user id, since some point in time,
+use the `--age` flag.
+
+For example, the following command will return all jobs started in the last day:
+
+```
+./dstat --project my-project --status "*" --age 1d
+```
+
+The `--age` flags supports the following types of values:
+
+1. `<integer><unit>`
+2. `<integer>`
+
+The supported `unit` values are:
+
+* `s`: seconds
+* `m`: minutes
+* `h`: hours
+* `d`: days
+* `w`: weeks
+
+For example:
+
+* 60s (60 seconds)
+* 30m (30 minutes)
+* 12h (12 hours)
+* 3d (3 days)
+
+A bare integer value is interpreted as days since the epoch (January 1, 1970).
+
+This allows for the use of the `date` command to generate `--age` values.
+The [coreutils date command](https://www.gnu.org/software/coreutils/manual/html_node/Examples-of-date.html)
+supports even more flexible date strings:
+
+```
+./dstat ... --age "$(date --date="last friday" '+%s')"
+```
+
 ## Monitoring
 
 By default `dstat` will query job status and exit. However, you can use the

@@ -612,7 +612,8 @@ class _Operations(object):
                  user_id=None,
                  job_id=None,
                  job_name=None,
-                 task_id=None):
+                 task_id=None,
+                 create_time=None):
     """Return a filter string for operations.list()."""
 
     ops_filter = []
@@ -628,6 +629,9 @@ class _Operations(object):
       ops_filter.append('labels.job-name = %s' % job_name)
     if task_id != '*':
       ops_filter.append('labels.task-id = %s' % task_id)
+
+    if create_time:
+      ops_filter.append('createTime >= %s' % create_time)
 
     return ' AND '.join(ops_filter)
 
@@ -1136,7 +1140,8 @@ class GoogleJobProvider(base.JobProvider):
                        job_list=None,
                        job_name_list=None,
                        task_list=None,
-                       max_jobs=0):
+                       create_time=None,
+                       max_tasks=0):
     """Return a list of operations based on the input criteria.
 
     If any of the filters are empty or ["*"], then no filtering is performed on
@@ -1150,7 +1155,8 @@ class GoogleJobProvider(base.JobProvider):
       job_list: a list of job ids to return.
       job_name_list: a list of job names to return.
       task_list: a list of specific tasks within the specified job(s) to return.
-      max_jobs: the maximum number of jobs to return or 0 for no limit.
+      create_time: a UTC value for earliest create time for a job.
+      max_tasks: the maximum number of job tasks to return or 0 for no limit.
 
     Raises:
       ValueError: if both a job id list and a job name list are provided
@@ -1184,17 +1190,18 @@ class GoogleJobProvider(base.JobProvider):
           user_id=user_id,
           job_id=job_id,
           job_name=job_name,
-          task_id=task_id)
+          task_id=task_id,
+          create_time=create_time)
 
-      ops = _Operations.list(self._service, ops_filter, max_jobs)
+      ops = _Operations.list(self._service, ops_filter, max_tasks)
       for o in ops:
         o['metadata']['job-status'] = _Operations.operation_status(o)
 
       if ops:
         tasks.extend(ops)
 
-      if max_jobs and len(tasks) > max_jobs:
-        del tasks[max_jobs:]
+      if max_tasks and len(tasks) > max_tasks:
+        del tasks[max_tasks:]
         return tasks
 
     return tasks
