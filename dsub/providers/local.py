@@ -502,9 +502,10 @@ class LocalJobProvider(base.JobProvider):
     f.close()
     return pid
 
-  def delete_jobs(self, user_list, job_list, task_list):
+  def delete_jobs(self, user_list, job_list, task_list, create_time=None):
     # As per the spec, we ignore anything not running.
-    tasks = self.lookup_job_tasks(['RUNNING'], user_list, job_list, task_list)
+    tasks = self.lookup_job_tasks(
+        ['RUNNING'], user_list, job_list, task_list, create_time=create_time)
 
     canceled = []
     cancel_errors = []

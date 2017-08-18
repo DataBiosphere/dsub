@@ -16,6 +16,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+import datetime
 import doctest
 import os
 import re
@@ -109,6 +110,31 @@ class ParamUtilTest(unittest.TestCase):
       self.assertEqual('OUTPUT_PATH', job_data['outputs'][0].name)
       self.assertEqual('output/gs/outputs/results-00%d/' % i,
                        job_data['outputs'][0].docker_path)
+
+  # Fixed values for age_to_create_time
+  fixed_time = datetime.datetime(2017, 1, 1)
+  fixed_time_utc = int(
+      (fixed_time - datetime.datetime.utcfromtimestamp(0)).total_seconds())
+
+  @parameterized.parameterized.expand([
+      ('simple_second', '1s', fixed_time_utc - 1),
+      ('simple_minute', '1m', fixed_time_utc - (1 * 60)),
+      ('simple_hour', '1h', fixed_time_utc - (1 * 60 * 60)),
+      ('simple_day', '1d', fixed_time_utc - (24 * 60 * 60)),
+      ('simple_week', '1w', fixed_time_utc - (7 * 24 * 60 * 60)),
+      ('simple_now', str(fixed_time_utc), fixed_time_utc),
+  ])
+  def test_compute_create_time(self, unused_name, age, expected):
+    result = param_util.age_to_create_time(age, self.fixed_time)
+    self.assertEqual(expected, result)
+
+  @parameterized.parameterized.expand([
+      ('bad_units', '1second'),
+      ('overflow', '100000000w'),
+  ])
+  def test_compute_create_time_fail(self, unused_name, age):
+    with self.assertRaisesRegexp(ValueError, 'Unable to parse age string'):
+      _ = param_util.age_to_create_time(age)
 
 
 class FileParamUtilTest(unittest.TestCase):

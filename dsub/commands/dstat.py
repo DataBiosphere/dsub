@@ -30,11 +30,11 @@ Follows the model of bjobs, sinfo, qstat, etc.
 import argparse
 import collections
 from datetime import datetime
-from datetime import timedelta
 import json
 import time
 
 from ..lib import dsub_util
+from ..lib import param_util
 from ..providers import provider_base
 
 import tabulate
@@ -279,57 +279,13 @@ def parse_arguments():
   return args
 
 
-def compute_create_time(age, from_time=datetime.utcnow()):
-  """Compute the create time (UTC) for the list filter.
-
-  If the age is an integer value it is treated as a UTC date.
-  Otherwise the value must be of the form "<integer><unit>" where supported
-  units are s, m, h, d, w (seconds, months, hours, days, weeks).
-
-  Args:
-    age: A "<integer><unit>" string or integer value.
-    from_time:
-
-  Returns:
-    A date value in UTC or None if age parameter is empty.
-  """
-
-  if not age:
-    return None
-
-  try:
-    last_char = age[-1]
-
-    if last_char in 'smhdw':
-      if last_char == 's':
-        interval = timedelta(seconds=int(age[:-1]))
-      elif last_char == 'm':
-        interval = timedelta(minutes=int(age[:-1]))
-      elif last_char == 'h':
-        interval = timedelta(hours=int(age[:-1]))
-      elif last_char == 'd':
-        interval = timedelta(days=int(age[:-1]))
-      elif last_char == 'w':
-        interval = timedelta(weeks=int(age[:-1]))
-
-      start = from_time - interval
-      epoch = datetime.utcfromtimestamp(0)
-
-      return int((start - epoch).total_seconds())
-    else:
-      return int(age)
-
-  except (ValueError, OverflowError) as e:
-    raise ValueError('Unable to parse age string %s: %s' % (age, e))
-
-
 def main():
 
   # Parse args and validate
   args = parse_arguments()
 
   # Compute the age filter (if any)
-  create_time = compute_create_time(args.age)
+  create_time = param_util.age_to_create_time(args.age)
 
   # Set up the output formatter
   if args.format == 'json':

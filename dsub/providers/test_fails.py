@@ -34,8 +34,8 @@ class FailsJobProvider(base.JobProvider):
     del job_resources, job_metadata, all_job_data  # we fail unconditionally
     raise FailsException("fails provider made submit_job fail")
 
-  def delete_jobs(self, user_list, job_list, task_list):
-    del user_list, job_list, task_list  # we fail unconditionally
+  def delete_jobs(self, user_list, job_list, task_list, create_time=None):
+    del user_list, job_list, task_list, create_time  # we fail unconditionally
     raise FailsException("fails provider made delete_jobs fail")
 
   def get_task_field(self, job, field, default=None):
