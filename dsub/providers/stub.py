@@ -28,7 +28,7 @@ class StubJobProvider(base.JobProvider):
   def submit_job(self, job_resources, job_metadata, all_job_data):
     pass
 
-  def delete_jobs(self, user_list, job_list, task_list):
+  def delete_jobs(self, user_list, job_list, task_list, create_time=None):
     pass
 
   # 2) Methods that manipulate the state of the fictional operations.

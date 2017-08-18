@@ -15,6 +15,7 @@
 
 import collections
 import csv
+import datetime
 import os
 import re
 
@@ -846,3 +847,47 @@ def directory_fmt(directory):
     the directory with a trailing slash.
   """
   return directory.rstrip('/') + '/'
+
+
+def age_to_create_time(age, from_time=datetime.datetime.utcnow()):
+  """Compute the create time (UTC) for the list filter.
+
+  If the age is an integer value it is treated as a UTC date.
+  Otherwise the value must be of the form "<integer><unit>" where supported
+  units are s, m, h, d, w (seconds, months, hours, days, weeks).
+
+  Args:
+    age: A "<integer><unit>" string or integer value.
+    from_time:
+
+  Returns:
+    A date value in UTC or None if age parameter is empty.
+  """
+
+  if not age:
+    return None
+
+  try:
+    last_char = age[-1]
+
+    if last_char in 'smhdw':
+      if last_char == 's':
+        interval = datetime.timedelta(seconds=int(age[:-1]))
+      elif last_char == 'm':
+        interval = datetime.timedelta(minutes=int(age[:-1]))
+      elif last_char == 'h':
+        interval = datetime.timedelta(hours=int(age[:-1]))
+      elif last_char == 'd':
+        interval = datetime.timedelta(days=int(age[:-1]))
+      elif last_char == 'w':
+        interval = datetime.timedelta(weeks=int(age[:-1]))
+
+      start = from_time - interval
+      epoch = datetime.datetime.utcfromtimestamp(0)
+
+      return int((start - epoch).total_seconds())
+    else:
+      return int(age)
+
+  except (ValueError, OverflowError) as e:
+    raise ValueError('Unable to parse age string %s: %s' % (age, e))

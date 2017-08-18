@@ -19,6 +19,7 @@ Follows the model of qdel.
 import argparse
 
 from ..lib import dsub_util
+from ..lib import param_util
 from ..providers import provider_base
 
 
@@ -63,6 +64,12 @@ def parse_arguments():
       default=[],
       help="""Deletes only those jobs which were submitted by the list of users.
           Use "*" to delete jobs of any user.""")
+  parser.add_argument(
+      '--age',
+      help="""Deletes only those jobs newer than the specified age. Ages can be
+          listed using a number followed by a unit. Supported units are
+          s (seconds), m (minutes), h (hours), d (days), w (weeks).
+          For example: '7d' (7 days). Bare numbers are treated as UTC.""")
   return parser.parse_args()
 
 
@@ -81,6 +88,9 @@ def main():
   # Parse args and validate
   args = parse_arguments()
 
+  # Compute the age filter (if any)
+  create_time = param_util.age_to_create_time(args.age)
+
   # Set up the Genomics Pipelines service interface
   provider = provider_base.get_provider(args)
 
@@ -95,7 +105,7 @@ def main():
 
     # Delete the requested jobs
     deleted_tasks, error_messages = provider.delete_jobs(
-        user_list, args.jobs, args.tasks)
+        user_list, args.jobs, args.tasks, create_time)
 
     # Emit any errors canceling jobs
     for msg in error_messages:

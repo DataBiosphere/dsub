@@ -1155,7 +1155,7 @@ class GoogleJobProvider(base.JobProvider):
       job_list: a list of job ids to return.
       job_name_list: a list of job names to return.
       task_list: a list of specific tasks within the specified job(s) to return.
-      create_time: a UTC value for earliest create time for a job.
+      create_time: a UTC value for earliest create time for a task.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
 
     Raises:
@@ -1206,13 +1206,14 @@ class GoogleJobProvider(base.JobProvider):
 
     return tasks
 
-  def delete_jobs(self, user_list, job_list, task_list):
+  def delete_jobs(self, user_list, job_list, task_list, create_time=None):
     """Kills the operations associated with the specified job or job.task.
 
     Args:
       user_list: List of user ids who "own" the job(s) to cancel.
       job_list: List of job_ids to cancel.
       task_list: List of task-ids to cancel.
+      create_time: a UTC value for earliest create time for a task.
 
     Returns:
       A list of tasks canceled and a list of error messages.
@@ -1222,7 +1223,8 @@ class GoogleJobProvider(base.JobProvider):
         ['RUNNING'],
         user_list=user_list,
         job_list=job_list,
-        task_list=task_list)
+        task_list=task_list,
+        create_time=create_time)
 
     print 'Found %d tasks to delete.' % len(tasks)
 
