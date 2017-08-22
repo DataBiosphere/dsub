@@ -315,6 +315,11 @@ The task range values can take any of the following forms:
 *   `m-` indicates to submit all tasks starting with task `m`
 *   `m-n` indicates to submit all tasks from `m` to `n` (inclusive).
 
+### Logging
+
+The `--logging` flag points to a location for `dsub` task log files. For details
+on how to specify your logging path, see [Logging](docs/logging.md).
+
 ### Job control
 
 It's possible to wait for a job to complete before starting another, see [job
@@ -376,15 +381,18 @@ To delete all running jobs for the current user:
 
 ## What next?
 
-* See the examples:
-  * [Custom scripts](examples/custom_scripts)
-  * [Decompress files](examples/decompress)
-  * [FastQC](examples/fastqc)
-  * [Samtools index](examples/samtools)
+*   See the examples:
 
-* See more documentation for:
-  * [Scripts, Commands, and Docker](docs/code.md)
-  * [Input and Output File Handling](docs/input_output.md)
-  * [Job Control](docs/job_control.md)
-  * [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
-  * [Backend providers](docs/providers/README.md)
+    *   [Custom scripts](examples/custom_scripts)
+    *   [Decompress files](examples/decompress)
+    *   [FastQC](examples/fastqc)
+    *   [Samtools index](examples/samtools)
+
+*   See more documentation for:
+
+    *   [Scripts, Commands, and Docker](docs/code.md)
+    *   [Input and Output File Handling](docs/input_output.md)
+    *   [Logging](docs/logging.md)
+    *   [Job Control](docs/job_control.md)
+    *   [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
+    *   [Backend providers](docs/providers/README.md)

@@ -638,7 +638,7 @@ def tasks_file_to_job_data(tasks, input_file_param_util,
             output_file_param_util.make_param(name, row[i], param.recursive))
 
     job_data.append({
-        'task_id': task_id,
+        'task-id': task_id,
         'labels': labels,
         'envs': envs,
         'inputs': inputs,

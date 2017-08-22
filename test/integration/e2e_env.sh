@@ -17,7 +17,7 @@
 set -o errexit
 set -o nounset
 
-# Test the google provider sets up the environment as expected.
+# Test that the provider sets up the environment as expected.
 
 # Do standard test setup
 readonly SCRIPT_DIR="$(dirname "${0}")"

@@ -117,6 +117,7 @@ Task = namedtuple('Task', [
     'job_name',
     'create_time',
     'last_update',
+    'logging',
     'envs',
     'labels',
     'inputs',
@@ -156,36 +157,40 @@ class LocalJobProvider(base.JobProvider):
         output_providers=_SUPPORTED_FILE_PROVIDERS,
         logging_providers=_SUPPORTED_LOGGING_PROVIDERS)
 
-    # Get script.
-    script = job_metadata['script']
-
     # Launch tasks!
     launched_tasks = []
     for task_data in all_task_data:
-      task_id = task_data.get('task_id')
+      task_metadata = providers_util.get_task_metadata(job_metadata,
+                                                       task_data.get('task-id'))
+
+      # Format the logging path and set it into the task metadata
+      task_metadata['logging'] = providers_util.format_logging_uri(
+          job_resources.logging.uri, task_metadata)
 
       # Set up directories
-      task_dir = self._task_directory(job_metadata['job-id'], task_id)
+      task_dir = self._task_directory(
+          task_metadata.get('job-id'), task_metadata.get('task-id'))
       self._mkdir_outputs(task_dir, task_data)
 
+      script = task_metadata.get('script')
       self._stage_script(task_dir, script.name, script.value)
 
       # Start the task
       env = self._make_environment(task_data)
-      self._write_task_metadata(job_metadata, task_data, task_id, create_time)
-      self._run_docker_via_script(task_dir, env, job_resources, job_metadata,
-                                  task_data, task_id)
-      if task_id is not None:
-        launched_tasks.append(str(task_id))
+      self._write_task_metadata(task_metadata, task_data, create_time)
+      self._run_docker_via_script(task_dir, env, job_resources, task_metadata,
+                                  task_data)
+      if task_metadata.get('task-id') is not None:
+        launched_tasks.append(str(task_metadata.get('task-id')))
 
     return {
-        'job-id': job_metadata['job-id'],
-        'user-id': job_metadata['user-id'],
+        'job-id': job_metadata.get('job-id'),
+        'user-id': job_metadata.get('user-id'),
         'task-id': launched_tasks
     }
 
-  def _run_docker_via_script(self, task_dir, env, job_resources, job_metadata,
-                             task_data, task_id):
+  def _run_docker_via_script(self, task_dir, env, job_resources, task_metadata,
+                             task_data):
     script_header = textwrap.dedent("""\
       #!/bin/bash
 
@@ -440,19 +445,17 @@ class LocalJobProvider(base.JobProvider):
       fi
       """)
 
-    job_id = job_metadata['job-id']
-
     # Build the local runner script
     volumes = ('-v ' + task_dir + '/' + DATA_SUBDIR + '/'
                ':' + DATA_MOUNT_POINT)
-    logging = job_resources.logging
 
     script = script_header.format(
         volumes=volumes,
-        name=self._get_docker_name(job_id, task_id),
+        name=self._get_docker_name(
+            task_metadata.get('job-id'), task_metadata.get('task-id')),
         image=job_resources.image,
         script=DATA_MOUNT_POINT + '/' + SCRIPT_DIR + '/' +
-        job_metadata['script'].name,
+        task_metadata['script'].name,
         env_file=task_dir + '/' + 'docker.env',
         uid=os.getuid(),
         data_mount_point=DATA_MOUNT_POINT,
@@ -471,7 +474,7 @@ class LocalJobProvider(base.JobProvider):
         delocalize_command=self._delocalize_outputs_commands(
             task_dir, task_data),
         delocalize_logs_command=self._delocalize_logging_command(
-            logging.uri, logging.file_provider, job_id, task_id),) + script_body
+            job_resources.logging.file_provider, task_metadata),) + script_body
 
     # Write the local runner script
     script_fname = task_dir + '/runner.sh'
@@ -673,7 +676,7 @@ class LocalJobProvider(base.JobProvider):
 
   # Private methods
 
-  def _write_task_metadata(self, job_metadata, task_data, task_id, create_time):
+  def _write_task_metadata(self, task_metadata, task_data, create_time):
     """Write a file with the data needed for dstat."""
 
     # Build up a dict to dump a YAML file with relevant task details:
@@ -689,10 +692,11 @@ class LocalJobProvider(base.JobProvider):
     #   labels:
     #     name: value
     data = {
-        'job-id': job_metadata['job-id'],
-        'task-id': task_id,
-        'job-name': job_metadata['job-name'],
+        'job-id': task_metadata.get('job-id'),
+        'task-id': task_metadata.get('task-id'),
+        'job-name': task_metadata.get('job-name'),
         'create-time': create_time,
+        'logging': task_metadata.get('logging'),
     }
     for key in ['inputs', 'outputs', 'envs', 'labels']:
       if task_data.has_key(key):
@@ -700,7 +704,8 @@ class LocalJobProvider(base.JobProvider):
         for param in task_data[key]:
           data[key][param.name] = param.value
 
-    task_dir = self._task_directory(job_metadata['job-id'], task_id)
+    task_dir = self._task_directory(
+        task_metadata.get('job-id'), task_metadata.get('task-id'))
     with open(task_dir + '/meta.yaml', 'wt') as f:
       f.write(yaml.dump(data))
 
@@ -765,14 +770,15 @@ class LocalJobProvider(base.JobProvider):
         task_id=task_id,
         job_status=status,
         status_message=status_message,
-        job_name=meta.get('job-name', None),
+        job_name=meta.get('job-name'),
         create_time=create_time,
         last_update=datetime.fromtimestamp(last_update)
         if last_update > 0 else None,
-        envs=meta.get('envs', None),
-        labels=meta.get('labels', None),
-        inputs=meta.get('inputs', None),
-        outputs=meta.get('outputs', None),
+        logging=meta.get('logging'),
+        envs=meta.get('envs'),
+        labels=meta.get('labels'),
+        inputs=meta.get('inputs'),
+        outputs=meta.get('outputs'),
         user_id=user_id,
         pid=pid)
 
@@ -781,55 +787,46 @@ class LocalJobProvider(base.JobProvider):
       self.provider_root_cache = tempfile.gettempdir() + '/dsub-local'
     return self.provider_root_cache
 
-  @staticmethod
-  def _prepare_logging_uri(logging_uri, job_id, task_id):
-    """Return "gcs_folder/job_id" or "gcs_file" (without .log).
-
-    Matches the Pipelines API behavior: if the user specifies a file
-    name for the logs we use that. Otherwise we pick a name.
-    In this case we choose the job ID because that's convenient
-    for the user.
-
-    Args:
-      logging_uri: (param_util.UriParts) A uri to a logging location. Should be
-                   a path or a file ending in '.log'
-                   (ex. 'gs://bucket/logs/myfile.log' or 'gs://bucket/')
-      job_id: eg. 'script--foobar-12'
-      task_id: The id of the job task (if any)
-
-    Returns:
-      eg. 'gs://bucket/path/myfile' or 'gs://bucket/script-foobar-12'
-    """
-    basename = '%s.%s' % (job_id, task_id) if task_id else str(job_id)
-    logging_path = logging_uri.path
-    if logging_uri.basename.endswith('.log'):
-      basename = logging_uri.basename[:-4]
-    return param_util.UriParts(logging_path, basename)
-
-  def _delocalize_logging_command(self, logging_uri, file_provider, job_id,
-                                  task_id):
+  def _delocalize_logging_command(self, file_provider, task_metadata):
     """Returns a command to delocalize logs.
 
     Args:
-      logging_uri: eg. 'gs://bucket/path/myfile.log' or 'gs://bucket/'
       file_provider: a file provider from param_util.
-      job_id: eg. 'script--foobar-12'
-      task_id: The id of the job task (if any)
+      task_metadata: dictionary of values such as job-id and task-id.
 
     Returns:
       eg. 'gs://bucket/path/myfile' or 'gs://bucket/script-foobar-12'
     """
-    logging_dest = self._prepare_logging_uri(logging_uri, job_id, task_id)
-    command = 'gsutil -q cp' if file_provider == param_util.P_GCS else 'cp'
-    body = ''
+
+    # Get the logging prefix (everything up to ".log")
+    logging_prefix = os.path.splitext(task_metadata.get('logging'))[0]
+
+    # Set the provider-specific mkdir and file copy commands
     if file_provider == param_util.P_LOCAL:
-      body += 'mkdir -p "%s"\n' % logging_dest.path
-    body += textwrap.dedent("""\
-    [[ -f stdout.txt ]] && {0} stdout.txt {1}-stdout.log
-    [[ -f stderr.txt ]] && {0} stderr.txt {1}-stderr.log
-    [[ -f log.txt ]] && {0} log.txt {1}.log
-    """)
-    return body.format(command, logging_dest)
+      mkdir_cmd = 'mkdir -p "%s"\n' % os.path.dirname(logging_prefix)
+      cp_cmd = 'cp'
+    elif file_provider == param_util.P_GCS:
+      mkdir_cmd = ''
+      cp_cmd = 'gsutil -q cp'
+    else:
+      assert False
+
+    # Construct the copy command
+    copy_logs_cmd = textwrap.dedent("""\
+      [[ -f stdout.txt ]] && {cp_cmd} stdout.txt {prefix}-stdout.log
+      [[ -f stderr.txt ]] && {cp_cmd} stderr.txt {prefix}-stderr.log
+      [[ -f log.txt ]] && {cp_cmd} log.txt {prefix}.log
+    """).format(
+        cp_cmd=cp_cmd, prefix=logging_prefix)
+
+    # Build up the command
+    body = textwrap.dedent("""\
+      {mkdir_cmd}
+      {copy_logs_cmd}
+    """).format(
+        mkdir_cmd=mkdir_cmd, copy_logs_cmd=copy_logs_cmd)
+
+    return body
 
   def _make_job_id(self, job_name_value, user_id):
     """Return a job-id string."""

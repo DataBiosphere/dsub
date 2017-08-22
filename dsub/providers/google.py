@@ -39,6 +39,7 @@ from dateutil.tz import tzlocal
 from ..lib import param_util
 from ..lib import providers_util
 from oauth2client.client import GoogleCredentials
+from oauth2client.client import HttpAccessTokenRefreshError
 import pytz
 
 
@@ -320,6 +321,11 @@ class _Api(object):
         if e.errno not in TRANSIENT_SOCKET_ERROR_CODES:
           raise e
 
+      except HttpAccessTokenRefreshError as e:
+        retry_interval *= 2
+
+        _print_error(('Token refresh error (%s). Retrying...') % e)
+
       if retry_interval > 0:
         time.sleep(retry_interval)
 
@@ -532,17 +538,17 @@ class _Pipelines(object):
     # pyformat: enable
 
   @classmethod
-  def build_pipeline_args(cls, project, script, job_data, preemptible,
-                          logging_dir, scopes):
+  def build_pipeline_args(cls, project, script, task_data, preemptible,
+                          logging_uri, scopes):
     """Builds pipeline args for execution.
 
     Args:
       project: string name of project.
       script: Body of the script to execute.
-      job_data: dictionary of value for envs, inputs, and outputs for this
-          pipeline instance.
+      task_data: dictionary of value for envs, inputs, and outputs for this
+          task.
       preemptible: use a preemptible VM for the job
-      logging_dir: directory for job logging output.
+      logging_uri: path for job logging output.
       scopes: list of scope.
 
     Returns:
@@ -551,10 +557,10 @@ class _Pipelines(object):
     """
     inputs = {}
     inputs.update({SCRIPT_VARNAME: script})
-    inputs.update({var.name: var.value for var in job_data['envs']})
+    inputs.update({var.name: var.value for var in task_data['envs']})
     inputs.update(
         {var.name: var.uri
-         for var in job_data['inputs'] if not var.recursive})
+         for var in task_data['inputs'] if not var.recursive})
 
     # Remove wildcard references for non-recursive output. When the pipelines
     # controller generates a delocalize call, it must point to a bare directory
@@ -562,7 +568,7 @@ class _Pipelines(object):
     # delocalize with a call similar to:
     #   gsutil cp /mnt/data/output/gs/bucket/path/*.bam gs://bucket/path/
     outputs = {}
-    for var in job_data['outputs']:
+    for var in task_data['outputs']:
       if var.recursive:
         continue
       if '*' in var.uri.basename:
@@ -573,7 +579,7 @@ class _Pipelines(object):
     labels = {}
     labels.update({
         label.name: label.value if label.value else ''
-        for label in job_data['labels']
+        for label in task_data['labels']
     })
 
     # pyformat: disable
@@ -592,7 +598,7 @@ class _Pipelines(object):
             },
             # Pass the user-specified GCS destination for pipeline logging.
             'logging': {
-                'gcsPath': logging_dir
+                'gcsPath': logging_uri
             },
         }
     }
@@ -750,6 +756,8 @@ class _Operations(object):
       value = metadata['labels'].get('user-id')
     elif field == 'job-status':
       value = metadata['job-status']
+    elif field == 'logging':
+      value = metadata['request']['pipelineArgs']['logging']['gcsPath']
     elif field == 'envs':
       value = cls._get_operation_input_field_values(metadata, False)
     elif field == 'labels':
@@ -1036,23 +1044,22 @@ class GoogleJobProvider(base.JobProvider):
         'user-id': user_id
     }
 
-  def _build_pipeline_labels(self, job_metadata, task_id):
+  def _build_pipeline_labels(self, task_metadata):
     labels = [
-        _Label(name, job_metadata[name])
+        _Label(name, task_metadata[name])
         for name in ['job-name', 'job-id', 'user-id']
     ]
 
-    if task_id:
-      labels.append(_Label('task-id', 'task-%d' % task_id))
+    if task_metadata.get('task-id') is not None:
+      labels.append(_Label('task-id', 'task-%d' % task_metadata.get('task-id')))
 
     return labels
 
-  def _build_pipeline_request(self, job_resources, job_metadata, job_data):
+  def _build_pipeline_request(self, job_resources, task_metadata, task_data):
     """Returns a Pipeline objects for the job."""
 
-    script = job_metadata['script']
-    job_data['labels'] = self._build_pipeline_labels(job_metadata,
-                                                     job_data.get('task_id'))
+    script = task_metadata['script']
+    task_data['labels'] = self._build_pipeline_labels(task_metadata)
 
     # Build the ephemeralPipeline for this job.
     # The ephemeralPipeline definition changes for each job because file
@@ -1067,16 +1074,19 @@ class GoogleJobProvider(base.JobProvider):
         image=job_resources.image,
         zones=job_resources.zones,
         script_name=script.name,
-        envs=job_data['envs'],
-        inputs=job_data['inputs'],
-        outputs=job_data['outputs'],
-        pipeline_name=job_metadata['pipeline-name'])
+        envs=task_data['envs'],
+        inputs=task_data['inputs'],
+        outputs=task_data['outputs'],
+        pipeline_name=task_metadata['pipeline-name'])
 
     # Build the pipelineArgs for this job.
+    logging_uri = providers_util.format_logging_uri(job_resources.logging.uri,
+                                                    task_metadata)
+
     pipeline.update(
-        _Pipelines.build_pipeline_args(
-            self._project, script.value, job_data, job_resources.preemptible,
-            job_resources.logging.uri, job_resources.scopes))
+        _Pipelines.build_pipeline_args(self._project, script.value, task_data,
+                                       job_resources.preemptible, logging_uri,
+                                       job_resources.scopes))
 
     return pipeline
 
@@ -1110,12 +1120,16 @@ class GoogleJobProvider(base.JobProvider):
         input_providers=_SUPPORTED_INPUT_PROVIDERS,
         output_providers=_SUPPORTED_OUTPUT_PROVIDERS,
         logging_providers=_SUPPORTED_LOGGING_PROVIDERS)
+
     # Prepare and submit jobs.
     launched_tasks = []
     requests = []
-    for job_data in all_task_data:
-      request = self._build_pipeline_request(job_resources, job_metadata,
-                                             job_data)
+    for task_data in all_task_data:
+      task_metadata = providers_util.get_task_metadata(job_metadata,
+                                                       task_data.get('task-id'))
+
+      request = self._build_pipeline_request(job_resources, task_metadata,
+                                             task_data)
 
       if self._dry_run:
         requests.append(request)
