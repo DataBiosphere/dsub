@@ -81,7 +81,7 @@ function dsub_google() {
   dsub \
     --provider google \
     --project "${PROJECT_ID}" \
-    --logging "${LOGGING}" \
+    --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
     --zones "${ZONES:-us-central1-*}" \
     "${DISK_SIZE:+--disk-size ${DISK_SIZE}}" \
     "${BOOT_DISK_SIZE:+--boot-disk-size ${BOOT_DISK_SIZE}}" \
@@ -91,7 +91,7 @@ function dsub_google() {
 function dsub_local() {
   dsub \
     --provider local \
-    --logging "${LOGGING}" \
+    --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
     "${@}"
 }
 

@@ -96,6 +96,7 @@ class TextOutput(OutputFormatter):
         ('end-time', 'Ended',),
         ('user-id', 'User',),
         ('internal-id', 'Internal ID',),
+        ('logging', 'Logging',),
         ('inputs', 'Inputs', self.format_inputs_outputs),
         ('outputs', 'Outputs', self.format_inputs_outputs),
     ]
@@ -183,6 +184,7 @@ def prepare_row(provider, task, full):
       row_spec('create-time', False, None),
       row_spec('end-time', False, 'NA'),
       row_spec('internal-id', False, None),
+      row_spec('logging', False, None),
       row_spec('inputs', False, {}),
       row_spec('outputs', False, {}),
       row_spec('envs', False, {}),
