@@ -50,7 +50,8 @@ readonly INPUT_SHALLOW="${LOCAL_INPUTS}/shallow"
 # Output setup
 readonly OUTPUT_DEEP="${LOCAL_OUTPUTS}/deep"
 readonly OUTPUT_SHALLOW="${LOCAL_OUTPUTS}/shallow"
-readonly LOCAL_LOGGING="${TEST_TMP}/output_logs"
+readonly LOCAL_LOGGING="${TEST_TMP}/output_logs/task.log"
+declare LOGGING_OVERRIDE
 
 echo "Setting up test inputs"
 
@@ -61,6 +62,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
+  LOGGING_OVERRIDE="${LOCAL_LOGGING}"
   run_dsub \
     --image "google/cloud-sdk:latest" \
     --script "${SCRIPT_DIR}/script_io_recursive.sh" \
@@ -74,6 +76,19 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 fi
 
 echo
+echo "Checking logs were copied out..."
+
+readonly LOCAL_LOG_PREFIX="${LOCAL_LOGGING%.*}"
+
+for SUFFIX in "-stdout.log" "-stderr.log" ".log"; do
+  LOG_FILE="${LOCAL_LOG_PREFIX}${SUFFIX}"
+  if [[ ! -e "${LOG_FILE}" ]]; then
+    2>&1 echo "Expected log file does not exist: ${LOG_FILE}"
+    exit 1
+  fi
+done
+
+echo
 echo "Checking output..."
 
 # Setup variables used in result checking.
@@ -82,7 +97,7 @@ setup_expected_fs_output_entries "${DOCKER_LOCAL_OUTPUTS}"
 setup_expected_remote_output_entries "${LOCAL_OUTPUTS}"
 
 # Verify in the stdout file that the expected directories were written
-readonly RESULT=$(gsutil cat "${STDOUT_LOG}")
+readonly RESULT=$(cat "${LOCAL_LOG_PREFIX}-stdout.log")
 
 readonly FS_FIND_IN=$(echo "${RESULT}" | sed -n '/^BEGIN: find$/,/^END: find$/p' \
   | grep --fixed-strings "${DOCKER_LOCAL_INPUTS}")

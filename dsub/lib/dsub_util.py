@@ -18,8 +18,10 @@ from __future__ import print_function
 from contextlib import contextmanager
 import fnmatch
 import io
+import oauth2client.client
 import os
 import pwd
+import retrying
 from StringIO import StringIO
 import sys
 
@@ -87,6 +89,22 @@ def _get_storage_service(credentials):
   return discovery.build('storage', 'v1', credentials=credentials)
 
 
+def _retry_download_check(exception):
+  """Return True if we should retry, False otherwise"""
+  print_error('Exception during download: %s' % str(exception))
+  return isinstance(exception, oauth2client.client.HttpAccessTokenRefreshError)
+
+
+# Exponential backoff retrying downloads of GCS object chunks.
+# Maximum 23 retries.
+# Wait 1, 2, 4 ... 64, 64, 64... seconds.
+@retrying.retry(stop_max_attempt_number=23,
+                retry_on_exception=_retry_download_check,
+                wait_exponential_multiplier=1000, wait_exponential_max=64000)
+def _downloader_next_chunk(downloader):
+  return downloader.next_chunk()
+
+
 def _load_file_from_gcs(gcs_file_path, credentials=None):
   """Load context from a text file in gcs.
 
@@ -107,7 +125,7 @@ def _load_file_from_gcs(gcs_file_path, credentials=None):
   downloader = MediaIoBaseDownload(file_handle, request, chunksize=1024 * 1024)
   done = False
   while not done:
-    _, done = downloader.next_chunk()
+    _, done = _downloader_next_chunk(downloader)
 
   return StringIO(file_handle.getvalue())
 

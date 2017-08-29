@@ -17,6 +17,8 @@
 Follows the model of bsub, qsub, srun, etc.
 """
 
+from __future__ import print_function
+
 import argparse
 import collections
 import os
@@ -24,6 +26,7 @@ import re
 import sys
 import time
 
+from ..lib import dsub_errors
 from ..lib import dsub_util
 from ..lib import job_util
 from ..lib import param_util
@@ -459,7 +462,7 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
   job_set = set([j for j in jobid_list if j != NO_JOB])
   error_messages = []
   while job_set and (not error_messages or not stop_on_failure):
-    print 'Waiting for: %s.' % (', '.join(job_set))
+    print('Waiting for: %s.' % (', '.join(job_set)))
 
     # Poll until any remaining jobs have completed
     jobs_left = wait_for_any_job(provider, job_set, poll_interval)
@@ -488,7 +491,7 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
     for t in dominant_job_tasks:
       job_id = provider.get_task_field(t, 'job-id')
       status = provider.get_task_field(t, 'job-status')
-      print '  %s: %s' % (str(job_id), str(status))
+      print('  %s: %s' % (str(job_id), str(status)))
       if status in ['FAILURE', 'CANCELED']:
         error_messages += [provider.get_tasks_completion_messages([t])]
 
@@ -608,7 +611,7 @@ def dsub_main(prog, argv):
   # * only emit the job-id to stdout (which can then be used programmatically).
   with dsub_util.replace_print():
     launched_job = run_main(args)
-  print launched_job.get('job-id', '')
+  print(launched_job.get('job-id', ''))
   return launched_job
 
 
@@ -617,7 +620,11 @@ def call(argv):
 
 
 def main(prog=sys.argv[0], argv=sys.argv[1:]):
-  dsub_main(prog, argv)
+  try:
+    dsub_main(prog, argv)
+  except dsub_errors.JobError as e:
+    print('%s: %s' % (type(e).__name__, str(e)), file=sys.stderr)
+    sys.exit(1)
   return 0
 
 
@@ -674,53 +681,55 @@ def run_main(args):
         args.output_recursive, input_file_param_util, output_file_param_util)
 
   if not args.dry_run:
-    print 'Job: %s' % job_metadata['job-id']
+    print('Job: %s' % job_metadata['job-id'])
 
   # Wait for predecessor jobs (if any)
   if args.after:
     if args.dry_run:
-      print '(Pretend) waiting for: %s.' % (args.after)
+      print('(Pretend) waiting for: %s.' % (args.after))
     else:
-      print 'Waiting for predecessor jobs to complete...'
+      print('Waiting for predecessor jobs to complete...')
       error_messages = wait_after(provider, args.after, args.poll_interval,
                                   True)
       if error_messages:
-        print('One or more predecessor jobs completed, but did not succeed. '
-              'Exiting.')
         for msg in error_messages:
           print_error(msg)
-        sys.exit(1)
+        raise dsub_errors.PredecessorJobFailureError(
+            'One or more predecessor jobs completed but did not succeed.',
+            error_messages)
 
   # If requested, skip running this job if its outputs already exist
   if args.skip and not args.dry_run:
     if _job_outputs_are_present(all_task_data[0]):
-      print 'Job output already present, skipping new job submission.'
+      print('Job output already present, skipping new job submission.')
       return {'job-id': NO_JOB}
 
   # Launch all the job tasks!
   launched_job = provider.submit_job(job_resources, job_metadata, all_task_data)
 
   if not args.dry_run:
-    print 'Launched job-id: %s' % launched_job['job-id']
+    print('Launched job-id: %s' % launched_job['job-id'])
     if launched_job.get('task-id'):
-      print '%s task(s)' % len(launched_job['task-id'])
-    print 'To check the status, run:'
-    print '  dstat%s --jobs %s --status \'*\'' % (
-        provider_base.get_dstat_provider_args(args), launched_job['job-id'])
-    print 'To cancel the job, run:'
-    print '  ddel%s --jobs %s' % (provider_base.get_ddel_provider_args(args),
-                                  launched_job['job-id'])
+      print('%s task(s)' % len(launched_job['task-id']))
+    print('To check the status, run:')
+    print('  dstat%s --jobs %s --status \'*\'' % (
+        provider_base.get_dstat_provider_args(args), launched_job['job-id']))
+    print('To cancel the job, run:')
+    print('  ddel%s --jobs %s' % (provider_base.get_ddel_provider_args(args),
+                                  launched_job['job-id']))
 
   # Poll for job completion
   if args.wait:
-    print 'Waiting for job to complete...'
+    print('Waiting for job to complete...')
 
     error_messages = wait_after(provider, [job_metadata['job-id']],
                                 args.poll_interval, False)
     if error_messages:
       for msg in error_messages:
         print_error(msg)
-      sys.exit(1)
+      raise dsub_errors.JobExecutionError(
+          'One or more jobs finished with status FAILURE or CANCELED'
+          ' during wait.', error_messages)
 
   return launched_job
 

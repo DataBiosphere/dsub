@@ -75,6 +75,7 @@ setup(
         'python-dateutil',
         'pytz',
         'pyyaml',
+        'retrying',
         'tabulate',
 
         # dependencies for test code
