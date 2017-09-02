@@ -25,6 +25,7 @@ import itertools
 import json
 import os
 import re
+import retrying
 import socket
 import string
 import sys
@@ -32,8 +33,8 @@ import textwrap
 import time
 from . import base
 
-from apiclient import errors
-from apiclient.discovery import build
+import apiclient.errors
+import apiclient.discovery
 from dateutil.tz import tzlocal
 
 from ..lib import param_util
@@ -159,8 +160,11 @@ INSTALL_CLOUD_SDK = textwrap.dedent("""\
 
 # Transient errors for the Google APIs should not cause them to fail.
 # There are a set of HTTP and socket errors which we automatically retry.
-HTTP_ERROR_TOO_FREQUENT_POLLING = 429
-TRANSIENT_HTTP_ERROR_CODES = set([500, 503, 504])
+#  429: too frequent polling
+#  50x: backend error
+TRANSIENT_HTTP_ERROR_CODES = set([429, 500, 503, 504])
+
+# Socket error 104 (connection reset) should also be retried
 TRANSIENT_SOCKET_ERROR_CODES = set([104])
 
 # When attempting to cancel an operation that is already completed
@@ -295,39 +299,43 @@ class _Label(collections.namedtuple('_Label', ['name', 'value'])):
     return ''.join(label_char_transform(c) for c in s)
 
 
+def _retry_api_check(exception):
+  """Return True if we should retry. False otherwise.
+
+  Args:
+    exception: An exception to test for transience.
+
+  Returns:
+    True if we should retry. False otherwise.
+  """
+  _print_error('Exception %s: %s' % (type(exception).__name__, str(exception)))
+
+  if isinstance(exception, apiclient.errors.HttpError):
+    if exception.resp.status in TRANSIENT_HTTP_ERROR_CODES:
+      return True
+
+  if isinstance(exception, socket.error):
+    if exception.errno in TRANSIENT_SOCKET_ERROR_CODES:
+      return True
+
+  if isinstance(exception, HttpAccessTokenRefreshError):
+    return True
+
+  return False
+
+
 class _Api(object):
 
+  # Exponential backoff retrying API execution.
+  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
   @staticmethod
+  @retrying.retry(
+      stop_max_attempt_number=23,
+      retry_on_exception=_retry_api_check,
+      wait_exponential_multiplier=1000,
+      wait_exponential_max=64000)
   def execute(api):
-    # On success, return immediately.
-    # On transient errors, retry after the retry_interval.
-    # If we are polling too frequently, then back-off until success.
-
-    retry_interval = 1
-
-    while True:
-      try:
-        return api.execute()
-      except errors.HttpError as e:
-        if e.resp.status == HTTP_ERROR_TOO_FREQUENT_POLLING:
-          retry_interval *= 2
-
-          _print_error(
-              ('Too frequent polling. Increasing retry interval to %d seconds.')
-              % retry_interval)
-        if e.resp.status not in TRANSIENT_HTTP_ERROR_CODES:
-          raise e
-      except socket.error as e:
-        if e.errno not in TRANSIENT_SOCKET_ERROR_CODES:
-          raise e
-
-      except HttpAccessTokenRefreshError as e:
-        retry_interval *= 2
-
-        _print_error(('Token refresh error (%s). Retrying...') % e)
-
-      if retry_interval > 0:
-        time.sleep(retry_interval)
+    return api.execute()
 
 
 class _Pipelines(object):
@@ -990,8 +998,20 @@ class GoogleJobProvider(base.JobProvider):
 
     self._service = self._setup_service(credentials)
 
-  @staticmethod
-  def _setup_service(credentials=None):
+  # Exponential backoff retrying API discovery.
+  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
+  @classmethod
+  @retrying.retry(
+      stop_max_attempt_number=23,
+      retry_on_exception=_retry_api_check,
+      wait_exponential_multiplier=1000,
+      wait_exponential_max=64000)
+  def _do_setup_service(cls, credentials):
+    return apiclient.discovery.build(
+        'genomics', 'v1alpha2', credentials=credentials)
+
+  @classmethod
+  def _setup_service(cls, credentials=None):
     """Configures genomics API client.
 
     Args:
@@ -1002,7 +1022,7 @@ class GoogleJobProvider(base.JobProvider):
     """
     if not credentials:
       credentials = GoogleCredentials.get_application_default()
-    return build('genomics', 'v1alpha2', credentials=credentials)
+    return cls._do_setup_service(credentials)
 
   def prepare_job_metadata(self, script, job_name, user_id):
     """Returns a dictionary of metadata fields for the job."""
