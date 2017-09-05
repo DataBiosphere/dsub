@@ -114,36 +114,6 @@ DEFAULT_INPUT_LOCAL_PATH = 'input'
 DEFAULT_OUTPUT_LOCAL_PATH = 'output'
 
 
-class ListParamAction(argparse.Action):
-  """Append each value as a separate element to the parser destination.
-
-  This class refines the 'append' action argument.
-  For the parameters:
-
-    --myarg val1 val2 --myarg val3
-
-  'append' action yields:
-
-    args.myval = ['val1 val2', 'val3']
-
-  ListParamAction yields:
-
-    args.myval = ['val1', 'val2', 'val3']
-  """
-
-  def __init__(self, option_strings, dest, **kwargs):
-    super(ListParamAction, self).__init__(option_strings, dest, **kwargs)
-
-  def __call__(self, parser, namespace, values, option_string=None):
-    params = getattr(namespace, self.dest, [])
-
-    # Input comes in as a list (possibly len=1) of NAME=VALUE pairs
-    for arg in values:
-      params.append(arg)
-
-    setattr(namespace, self.dest, params)
-
-
 class TaskParamAction(argparse.Action):
   """Parse the task flag value into a dict."""
 
@@ -263,21 +233,21 @@ def parse_arguments(prog, argv):
   parser.add_argument(
       '--env',
       nargs='*',
-      action=ListParamAction,
+      action=param_util.ListParamAction,
       default=[],
       help='Environment variables for the script\'s execution environment',
       metavar='KEY=VALUE')
   parser.add_argument(
       '--label',
       nargs='*',
-      action=ListParamAction,
+      action=param_util.ListParamAction,
       default=[],
       help='Labels to associate to the job.',
       metavar='KEY=VALUE')
   parser.add_argument(
       '--input',
       nargs='*',
-      action=ListParamAction,
+      action=param_util.ListParamAction,
       default=[],
       help="""Input path arguments to localize into the script's execution
           environment""",
@@ -285,7 +255,7 @@ def parse_arguments(prog, argv):
   parser.add_argument(
       '--input-recursive',
       nargs='*',
-      action=ListParamAction,
+      action=param_util.ListParamAction,
       default=[],
       help="""Input path arguments to localize recursively into the script\'s
           execution environment""",
@@ -293,7 +263,7 @@ def parse_arguments(prog, argv):
   parser.add_argument(
       '--output',
       nargs='*',
-      action=ListParamAction,
+      action=param_util.ListParamAction,
       default=[],
       help="""Output path arguments to de-localize from the script\'s execution
           environment""",
@@ -301,7 +271,7 @@ def parse_arguments(prog, argv):
   parser.add_argument(
       '--output-recursive',
       nargs='*',
-      action=ListParamAction,
+      action=param_util.ListParamAction,
       default=[],
       help="""Output path arguments to de-localize recursively from the script's
           execution environment""",

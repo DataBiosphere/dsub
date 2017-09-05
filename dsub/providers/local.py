@@ -505,10 +505,21 @@ class LocalJobProvider(base.JobProvider):
     f.close()
     return pid
 
-  def delete_jobs(self, user_list, job_list, task_list, create_time=None):
+  def delete_jobs(self,
+                  user_list,
+                  job_list,
+                  task_list,
+                  labels,
+                  create_time=None):
     # As per the spec, we ignore anything not running.
     tasks = self.lookup_job_tasks(
-        ['RUNNING'], user_list, job_list, task_list, create_time=create_time)
+        status_list=['RUNNING'],
+        user_list=user_list,
+        job_list=job_list,
+        job_name_list=None,
+        task_list=task_list,
+        labels=labels,
+        create_time=create_time)
 
     canceled = []
     cancel_errors = []
@@ -606,14 +617,17 @@ class LocalJobProvider(base.JobProvider):
                        job_list=None,
                        job_name_list=None,
                        task_list=None,
+                       labels=None,
                        create_time=None,
                        max_tasks=0):
-
+    # 'OR' filtering arguments.
     status_list = None if status_list == ['*'] else status_list
     user_list = None if user_list == ['*'] else user_list
     job_list = None if job_list == ['*'] else job_list
     job_name_list = None if job_name_list == ['*'] else job_name_list
     task_list = None if task_list == ['*'] else task_list
+    # 'AND' filtering arguments.
+    labels = labels if labels else []
 
     if job_name_list:
       raise NotImplementedError(
@@ -638,7 +652,7 @@ class LocalJobProvider(base.JobProvider):
 
     ret = []
     if not job_list:
-      # Default to every job we know about
+      # Default to every job we know about.
       job_list = os.listdir(self._provider_root())
     for j in job_list:
       for u in user_list:
@@ -652,6 +666,12 @@ class LocalJobProvider(base.JobProvider):
             continue
 
           task = self._get_task_from_task_dir(j, u, task_id)
+          # If labels are defined, all labels must match.
+          labels_match = all([k in task.labels and task.labels[k] == v
+                              for k, v in labels])
+          if labels and not labels_match:
+            continue
+          # Check that the job is not too old.
           if create_time_local:
             task_create_time = datetime.strptime(task.create_time,
                                                  '%Y-%m-%d %H:%M:%S.%f')

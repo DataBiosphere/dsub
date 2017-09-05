@@ -37,7 +37,6 @@ function check_label() {
 #
 # This test launches a single job and then verifies that dstat
 # reflects the labels that were specified in dsub.
-
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
 # This test is not sensitive to the output of the dsub job.
@@ -63,7 +62,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   JOBID="$(run_dsub \
     --label genre=jazz \
     --label subgenre=bebop \
-    --command "echo 'hello world'")"
+    --command "echo 'hello world'; sleep 4m;")"
 
   echo "Checking dstat (full)..."
 
@@ -76,6 +75,28 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   check_label 'genre: jazz'
   check_label 'subgenre: bebop'
+
+  echo
+  echo "Running ddel against a non-matching label - should not kill pipeline."
+  run_ddel --jobs "${JOBID}" --label "genre=rock" --label "subgenre=bebop"
+
+  echo
+  echo "Check that the job is not canceled."
+  if util::wait_for_canceled_status "${JOBID}"; then
+    echo "ERROR: Operation is canceled, but ddel should not have canceled it."
+    util::get_job_status "${JOBID}"
+    exit 1
+  fi
+
+  echo
+  echo "Killing the pipeline"
+  run_ddel --jobs "${JOBID}" --label "genre=jazz" --label "subgenre=bebop"
+
+  if ! util::wait_for_canceled_status "${JOBID}"; then
+    echo "dstat does not show the operation as canceled after wait."
+    util::get_job_status "${JOBID}"
+    exit 1
+  fi
 
   # As of this writing we cannot combine --labels from the command line
   # and task file, that's why we run two tests.

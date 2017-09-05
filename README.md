@@ -325,6 +325,15 @@ on how to specify your logging path, see [Logging](docs/logging.md).
 It's possible to wait for a job to complete before starting another, see [job
 control with dsub](docs/job_control.md).
 
+### Labeling jobs and tasks
+
+You can add custom labels to jobs and tasks, which allows you to monitor and
+cancel tasks using your own identifiers. In addition, with the `google`
+provider, labeling a task will label associated compute resources such as
+virtual machines and disks.
+
+For more details, see [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
+
 ### Viewing job status
 
 The `dstat` command displays the status of jobs:

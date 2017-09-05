@@ -68,7 +68,7 @@ def get_ddel_provider_args(args):
 
 def check_for_unsupported_flag(args):
   """Raise an error if the provider doesn't support a provided flag."""
-  if args.label and args.provider not in ['test-fails', 'local']:
+  if args.label and args.provider not in ['test-fails', 'local', 'google']:
     raise ValueError(
         '--label is not supported by the "%s" provider.' % args.provider)
 

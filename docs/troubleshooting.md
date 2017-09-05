@@ -72,6 +72,96 @@ To view results for all jobs associated with your user id:
 dstat --project my-project --status "*"
 ```
 
+### Check jobs with my own labels
+
+Jobs and tasks can have arbitrary labels attached at launch time.
+These labels can then be used by `dstat` and `ddel` for lookup.
+
+#### Setting labels with `dsub`
+
+You can set labels on your job using the `--label` flag. For example:
+
+```
+dsub \
+  --label "billing-code=c9" \
+  --label "batch=august-2017" \
+  ...
+```
+
+You can set labels in your `--tasks` file. For example:
+
+```
+--label billing-code<tab>--label batch<tab>--label sample-id<tab>--env ...
+a9<tab>august-2017<tab>sam001<tab>...
+h25<tab>august-2017<tab>sam002<tab>...
+```
+
+#### Lookup by labels with `dstat`
+
+To lookup jobs by label with `dstat`, specify one or more `--label` flags
+on the command line. Lookups match *all* labels specified (a logical `AND`).
+
+For example, looking up all tasks from the above `--tasks` example:
+
+```
+dstat \
+  --label "billing-code=a9" \
+  --label "batch=august-2017" \
+  --status "*" \
+  ...
+```
+
+Will match all jobs with the `billing-code` label of `a9`, while:
+
+```
+dstat \
+  --label "billing-code=999" \
+  --label "batch=august-2017" \
+  --label "sample-id=sam002" \
+  --status "*" \
+  ...
+```
+
+will match only the second task.
+
+#### Cancel by labels with `ddel`
+
+The flags to `ddel` can be used in the same way.
+
+To delete all of the above tasks:
+
+```
+ddel \
+  --label "billing-code=a9" \
+  --label "batch=august-2017" \
+  --status "*" \
+  ...
+```
+
+To delete only the second task:
+
+```
+dstat \
+  --label "billing-code=a9" \
+  --label "batch=august-2017" \
+  --label "sample-id=sam002" \
+  --status "*" \
+  ...
+```
+
+#### Label restrictions:
+
+Rules for setting labels follow the
+[Google Compute Engine Restrictions](https://cloud.google.com/compute/docs/labeling-resources#restrictions):
+
+- You can assign up to 64 labels to each resource.
+- Label keys and values must conform to the following restrictions:
+  - Keys and values cannot be longer than 63 characters each.
+  - Keys and values can only contain lowercase letters, numeric characters,
+    underscores, and dashes.
+  - Label keys and values must start with a lowercase letter.
+  - Label keys cannot be empty.
+
 ### Check all of my jobs since <some time>
 
 To view results for jobs associated with your user id, since some point in time,

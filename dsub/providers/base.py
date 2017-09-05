@@ -105,7 +105,12 @@ class JobProvider(object):
     raise NotImplementedError()
 
   @abstractmethod
-  def delete_jobs(self, user_list, job_list, task_list, create_time=None):
+  def delete_jobs(self,
+                  user_list,
+                  job_list,
+                  task_list,
+                  labels,
+                  create_time=None):
     """Kills the operations associated with the specified job or job.task.
 
     Some providers may provide only a "cancel" operation, which terminates the
@@ -115,6 +120,7 @@ class JobProvider(object):
       user_list: List of user ids who "own" the job(s) to delete.
       job_list: List of job ids to delete.
       task_list: List of task ids to delete.
+      labels: List of LabelParam, each must match the job(s) to be cancelled.
       create_time: a UTC value for earliest create time for a task.
 
     Returns:
@@ -132,6 +138,7 @@ class JobProvider(object):
                        job_list=None,
                        job_name_list=None,
                        task_list=None,
+                       labels=None,
                        create_time=None,
                        max_tasks=0):
     """Return a list of tasks based on the search criteria.
@@ -147,6 +154,7 @@ class JobProvider(object):
       job_list: a list of job ids to return.
       job_name_list: a list of job names to return.
       task_list: a list of specific tasks within the specified job(s) to return.
+      labels: a list of LabelParam, each must match the job(s) returned.
       create_time: a UTC value for earliest create time for a task.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
 

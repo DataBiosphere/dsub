@@ -70,10 +70,18 @@ def parse_arguments():
           listed using a number followed by a unit. Supported units are
           s (seconds), m (minutes), h (hours), d (days), w (weeks).
           For example: '7d' (7 days). Bare numbers are treated as UTC.""")
+  parser.add_argument(
+      '--label',
+      nargs='*',
+      action=param_util.ListParamAction,
+      default=[],
+      help='User labels to match. Tasks returned must match all labels.',
+      metavar='KEY=VALUE')
   return parser.parse_args()
 
 
-def emit_search_criteria(users, jobs, tasks):
+def emit_search_criteria(users, jobs, tasks, labels):
+  """Print the filters used to delete tasks. Use raw flags as arguments."""
   print 'Delete running jobs:'
   print '  user:'
   print '    %s\n' % users
@@ -82,6 +90,10 @@ def emit_search_criteria(users, jobs, tasks):
   if tasks:
     print '  task-id:'
     print '    %s\n' % tasks
+  # Labels are in a LabelParam namedtuple and must be reformated for printing.
+  if labels:
+    print '  labels:'
+    print '    %s\n' % repr(labels)
 
 
 def main():
@@ -99,13 +111,16 @@ def main():
   # to provide a username automatically.
   user_list = args.users if args.users else [dsub_util.get_os_user()]
 
+  # Process user labels.
+  labels = param_util.parse_pair_args(args.label, param_util.LabelParam)
+
   # Let the user know which jobs we are going to look up
   with dsub_util.replace_print():
-    emit_search_criteria(user_list, args.jobs, args.tasks)
+    emit_search_criteria(user_list, args.jobs, args.tasks, args.label)
 
     # Delete the requested jobs
     deleted_tasks, error_messages = provider.delete_jobs(
-        user_list, args.jobs, args.tasks, create_time)
+        user_list, args.jobs, args.tasks, labels, create_time)
 
     # Emit any errors canceling jobs
     for msg in error_messages:
