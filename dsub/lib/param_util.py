@@ -13,6 +13,7 @@
 # limitations under the License.
 """Utility functions and classes for input, output, and script parameters."""
 
+import argparse
 import collections
 import csv
 import datetime
@@ -28,6 +29,8 @@ P_LOCAL = 'local'
 P_GCS = 'google-cloud-storage'
 FILE_PROVIDERS = frozenset([P_LOCAL, P_GCS])
 
+RESERVED_LABELS = frozenset(['job-name', 'job-id', 'user-id', 'task-id'])
+
 
 def validate_param_name(name, param_type):
   """Validate that the name follows posix conventions for env variables."""
@@ -38,6 +41,37 @@ def validate_param_name(name, param_type):
   # digits, and alphabetics from the portable character set.
   if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name):
     raise ValueError('Invalid %s: %s' % (param_type, name))
+
+
+class ListParamAction(argparse.Action):
+  """Append each value as a separate element to the parser destination.
+
+  This class satisifes the action interface of argparse.ArgumentParser and
+  refines the 'append' action for arguments with `nargs='*'`.
+
+  For the parameters:
+
+    --myarg val1 val2 --myarg val3
+
+  The 'append' action yields:
+
+    args.myval = ['val1 val2', 'val3']
+
+  While ListParamAction yields:
+
+    args.myval = ['val1', 'val2', 'val3']
+  """
+
+  def __init__(self, option_strings, dest, **kwargs):
+    super(ListParamAction, self).__init__(option_strings, dest, **kwargs)
+
+  def __call__(self, parser, namespace, values, option_string=None):
+    params = getattr(namespace, self.dest, [])
+
+    # Input comes in as a list (possibly len=1) of NAME=VALUE pairs
+    for arg in values:
+      params.append(arg)
+    setattr(namespace, self.dest, params)
 
 
 class UriParts(str):
@@ -101,21 +135,27 @@ class LoggingParam(
 class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
   """Name/value label parameter to a pipeline.
 
+  Subclasses of LabelParam may flip the _allow_reserved_keys attribute in order
+  to allow reserved label values to be used. The check against reserved keys
+  ensures that providers can rely on the label system to track dsub-related
+  values without allowing users to accidentially overwrite the labels.
+
   Attributes:
     name (str): the label name.
     value (str): the label value (optional).
   """
+  _allow_reserved_keys = False
   __slots__ = ()
 
   def __new__(cls, name, value=None):
     cls.validate_label(name, value)
     return super(LabelParam, cls).__new__(cls, name, value)
 
-  @staticmethod
-  def validate_label(name, value):
+  @classmethod
+  def validate_label(cls, name, value):
     """Raise ValueError if the label is invalid."""
     # Rules for labels are described in:
-    # https://www.google.com/url?sa=D&q=https%3A%2F%2Fcloud.google.com%2Fcompute%2Fdocs%2Flabeling-resources%23restrictions
+    #  https://cloud.google.com/compute/docs/labeling-resources#restrictions
 
     # * Keys and values cannot be longer than 63 characters each.
     # * Keys and values can only contain lowercase letters, numeric characters,
@@ -124,14 +164,17 @@ class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
     # * Label keys must start with a lowercase letter and international
     #   characters are allowed.
     # * Label keys cannot be empty.
-
-    LabelParam._check_label_rule(name, 'name')
+    cls._check_label_rule(name, 'name')
 
     # The value can be empty.
     # If not empty, must conform to the same rules as the name.
-
     if value:
-      LabelParam._check_label_rule(value, 'value')
+      cls._check_label_rule(value, 'value')
+
+    # Ensure that reserved labels are not being used.
+    if not cls._allow_reserved_keys and name in RESERVED_LABELS:
+      raise ValueError('Label flag (%s=...) must not use reserved keys: %r' % (
+          name, list(RESERVED_LABELS)))
 
   @staticmethod
   def _check_label_rule(param_value, param_type):
@@ -627,7 +670,7 @@ def tasks_file_to_job_data(tasks, input_file_param_util,
         envs.append(EnvParam(name, row[i]))
 
       elif isinstance(param, LabelParam):
-        labels.append(LabelParam(param.name, row[i]))
+        labels.append(LabelParam(name, row[i]))
 
       elif isinstance(param, InputFileParam):
         inputs.append(
@@ -650,6 +693,27 @@ def tasks_file_to_job_data(tasks, input_file_param_util,
     raise ValueError('No tasks added from %s' % path)
 
   return job_data
+
+
+def parse_pair_args(labels, argclass):
+  """Parse flags of key=value pairs and return a list of argclass.
+
+  For pair variables, we need to:
+     * split the input into name=value pairs (value optional)
+     * Create the EnvParam object
+
+  Args:
+    labels: list of 'key' or 'key=value' strings.
+    argclass: Container class for args, must instantiate with argclass(k, v).
+
+  Returns:
+    list of argclass objects.
+  """
+  label_data = []
+  for arg in labels:
+    name, value = split_pair(arg, '=', nullable_idx=1)
+    label_data.append(argclass(name, value))
+  return label_data
 
 
 def args_to_job_data(envs, labels, inputs, inputs_recursive, outputs,
@@ -683,20 +747,9 @@ def args_to_job_data(envs, labels, inputs, inputs_recursive, outputs,
     'envs', 'inputs', and 'outputs' that defines the set of parameters and data
     for a job.
   """
-
-  # For environment variables, we need to:
-  #   * split the input into name=value pairs (value optional)
-  #   * Create the EnvParam object
-  env_data = []
-  for arg in envs:
-    name, value = split_pair(arg, '=', nullable_idx=1)
-    env_data.append(EnvParam(name, value))
-
-  # Labels are processed identically to environment variables
-  label_data = []
-  for arg in labels:
-    name, value = split_pair(arg, '=', nullable_idx=1)
-    label_data.append(LabelParam(name, value))
+  # Parse environmental vairables and labels.
+  env_data = parse_pair_args(envs, EnvParam)
+  label_data = parse_pair_args(labels, LabelParam)
 
   # For input files, we need to:
   #   * split the input into name=uri pairs (name optional)

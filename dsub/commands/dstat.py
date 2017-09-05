@@ -248,6 +248,13 @@ def parse_arguments():
           s (seconds), m (minutes), h (hours), d (days), w (weeks).
           For example: '7d' (7 days). Bare numbers are treated as UTC.""")
   parser.add_argument(
+      '--label',
+      nargs='*',
+      action=param_util.ListParamAction,
+      default=[],
+      help='User labels to match. Tasks returned must match all labels.',
+      metavar='KEY=VALUE')
+  parser.add_argument(
       '--poll-interval',
       default=10,
       type=int,
@@ -282,7 +289,6 @@ def parse_arguments():
 
 
 def main():
-
   # Parse args and validate
   args = parse_arguments()
 
@@ -312,6 +318,7 @@ def main():
   # to provide a username automatically.
   user_list = args.users if args.users else [dsub_util.get_os_user()]
 
+  labels = param_util.parse_pair_args(args.label, param_util.LabelParam)
   # Track if any jobs are running in the event --wait was requested.
   some_job_running = True
   while some_job_running:
@@ -320,6 +327,7 @@ def main():
         args.status,
         user_list=user_list,
         job_list=args.jobs,
+        labels=labels,
         create_time=create_time,
         max_tasks=args.limit)
 

@@ -91,3 +91,54 @@ function util::expand_tsv_fields() {
 readonly -f util::expand_tsv_fields
 
 
+# get_job_status
+#
+# Run dstat and return the "status" field for the specified job.
+function util::get_job_status() {
+  local job_id="$1"
+
+  local dstat_out=$(\
+    run_dstat \
+      --jobs "${job_id}" \
+      --status "*" \
+      --age 30m \
+      --full \
+      --format json)
+
+  python "${SCRIPT_DIR}"/get_json_value.py \
+    "${dstat_out}" "[0].status"
+}
+readonly -f util::get_job_status
+
+
+# wait_for_canceled_status
+#
+# Wait a maximum number of seconds for a job to reach canceled status.
+# If it is canceled status, then return 0, otherwise if it the maximum wait
+# is reached, return 1.
+function util::wait_for_canceled_status() {
+  local job_id="${1}"
+
+  # After calling ddel, we wait a short bit for canceled status.
+  # For most providers, this should be very fast, but the Google Pipelines API
+  # "operations.cancel" will return success when the operation is internally
+  # marked for deletion and there can be a short delay before it is externally
+  # marked as CANCELED.
+  local max_wait_sec=10
+  if [[ "${DSUB_PROVIDER}" == "google" ]]; then
+    max_wait_sec=90
+  fi
+
+  echo "Waiting up to ${max_wait_sec} sec for CANCELED status of ${job_id}"
+  for ((sec = 0; sec < max_wait_sec; sec += 5)); do
+    local status="$(util::get_job_status "${job_id}")"
+    if [[ "${status}" == "CANCELED" ]]; then
+      return 0
+    fi
+    echo "Status: ${status}. Sleep 5s"
+    sleep 5s
+  done
+
+  return 1
+}
+readonly -f util::wait_for_canceled_status

@@ -19,7 +19,6 @@ Google Genomics Pipelines and Operations APIs.
 """
 
 # pylint: disable=g-tzinfo-datetime
-import collections
 from datetime import datetime
 import itertools
 import json
@@ -266,18 +265,15 @@ def _print_error(msg):
   print >> sys.stderr, msg
 
 
-class _Label(collections.namedtuple('_Label', ['name', 'value'])):
+class _Label(param_util.LabelParam):
   """Name/value label metadata for a pipeline.
 
   Attributes:
     name (str): the label name.
     value (str): the label value (optional).
   """
+  _allow_reserved_keys = True
   __slots__ = ()
-
-  def __new__(cls, name, value=None):
-    param_util.LabelParam.validate_label(name, value)
-    return super(_Label, cls).__new__(cls, name, value)
 
   @staticmethod
   def convert_to_label_chars(s):
@@ -626,6 +622,7 @@ class _Operations(object):
                  user_id=None,
                  job_id=None,
                  job_name=None,
+                 labels=None,
                  task_id=None,
                  create_time=None):
     """Return a filter string for operations.list()."""
@@ -643,6 +640,12 @@ class _Operations(object):
       ops_filter.append('labels.job-name = %s' % job_name)
     if task_id != '*':
       ops_filter.append('labels.task-id = %s' % task_id)
+
+    # Even though labels are nominally 'arbitrary strings' they are trusted
+    # since param_util restricts the character set.
+    if labels:
+      for l in labels:
+        ops_filter.append('labels.%s = %s' % (l.name, l.value))
 
     if create_time:
       ops_filter.append('createTime >= %s' % create_time)
@@ -769,7 +772,9 @@ class _Operations(object):
     elif field == 'envs':
       value = cls._get_operation_input_field_values(metadata, False)
     elif field == 'labels':
-      return {}
+      # Reserved labels are filtered from dsub task output.
+      value = {k: v for k, v in metadata['labels'].items()
+               if k not in param_util.RESERVED_LABELS}
     elif field == 'inputs':
       value = cls._get_operation_input_field_values(metadata, True)
     elif field == 'outputs':
@@ -1079,7 +1084,7 @@ class GoogleJobProvider(base.JobProvider):
     """Returns a Pipeline objects for the job."""
 
     script = task_metadata['script']
-    task_data['labels'] = self._build_pipeline_labels(task_metadata)
+    task_data['labels'].extend(self._build_pipeline_labels(task_metadata))
 
     # Build the ephemeralPipeline for this job.
     # The ephemeralPipeline definition changes for each job because file
@@ -1174,6 +1179,7 @@ class GoogleJobProvider(base.JobProvider):
                        job_list=None,
                        job_name_list=None,
                        task_list=None,
+                       labels=None,
                        create_time=None,
                        max_tasks=0):
     """Return a list of operations based on the input criteria.
@@ -1189,6 +1195,8 @@ class GoogleJobProvider(base.JobProvider):
       job_list: a list of job ids to return.
       job_name_list: a list of job names to return.
       task_list: a list of specific tasks within the specified job(s) to return.
+      labels: a list of LabelParam with user-added labels. All labels must
+        match the task being fetched.
       create_time: a UTC value for earliest create time for a task.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
 
@@ -1215,6 +1223,9 @@ class GoogleJobProvider(base.JobProvider):
       raise ValueError(
           'Filtering by both job IDs and job names is not supported')
 
+    # AND filter rule arguments.
+    labels = labels if labels else []
+
     tasks = []
     for status, job_id, job_name, user_id, task_id in itertools.product(
         status_list, job_list, job_name_list, user_list, task_list):
@@ -1224,6 +1235,7 @@ class GoogleJobProvider(base.JobProvider):
           user_id=user_id,
           job_id=job_id,
           job_name=job_name,
+          labels=labels,
           task_id=task_id,
           create_time=create_time)
 
@@ -1240,13 +1252,19 @@ class GoogleJobProvider(base.JobProvider):
 
     return tasks
 
-  def delete_jobs(self, user_list, job_list, task_list, create_time=None):
+  def delete_jobs(self,
+                  user_list,
+                  job_list,
+                  task_list,
+                  labels,
+                  create_time=None):
     """Kills the operations associated with the specified job or job.task.
 
     Args:
       user_list: List of user ids who "own" the job(s) to cancel.
       job_list: List of job_ids to cancel.
       task_list: List of task-ids to cancel.
+      labels: List of LabelParam, each must match the job(s) to be canceled.
       create_time: a UTC value for earliest create time for a task.
 
     Returns:
@@ -1258,6 +1276,7 @@ class GoogleJobProvider(base.JobProvider):
         user_list=user_list,
         job_list=job_list,
         task_list=task_list,
+        labels=labels,
         create_time=create_time)
 
     print 'Found %d tasks to delete.' % len(tasks)
