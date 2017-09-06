@@ -26,6 +26,7 @@ Follows the model of bjobs, sinfo, qstat, etc.
 # qstat and hence dstat.py defaults to listing jobs for the current user, so
 # there is no need to include user information in the default output.
 
+from __future__ import print_function
 
 import argparse
 import collections
@@ -118,8 +119,8 @@ class TextOutput(OutputFormatter):
     return new_row
 
   def print_table(self, table):
-    print tabulate.tabulate(table, headers='keys')
-    print
+    print(tabulate.tabulate(table, headers='keys'))
+    print('')
 
 
 class YamlOutput(OutputFormatter):
@@ -139,7 +140,7 @@ class YamlOutput(OutputFormatter):
       return dumper.represent_scalar('tag:yaml.org,2002:str', data)
 
   def print_table(self, table):
-    print yaml.dump(table, default_flow_style=False)
+    print(yaml.dump(table, default_flow_style=False))
 
 
 class JsonOutput(OutputFormatter):
@@ -155,10 +156,10 @@ class JsonOutput(OutputFormatter):
     return field
 
   def print_table(self, table):
-    print json.dumps(table, indent=2, default=self.serialize)
+    print(json.dumps(table, indent=2, default=self.serialize))
 
 
-def prepare_row(provider, task, full):
+def prepare_row(task, full):
   """return a dict with the task's info (more if "full" is set)."""
 
   # Would like to include the Job ID in the default set of columns, but
@@ -198,7 +199,7 @@ def prepare_row(provider, task, full):
   for col in columns:
     key, optional, default = col
 
-    value = provider.get_task_field(task, key, default)
+    value = task.get_field(key, default)
     if not optional or value:
       row[key] = value
 
@@ -274,7 +275,7 @@ def parse_arguments():
       ' and input parameters.')
   parser.add_argument(
       '--format',
-      choices=['text', 'json', 'yaml'],
+      choices=['text', 'json', 'yaml', 'provider-json'],
       help='Set the output format.')
   # Add provider-specific arguments
   provider_base.add_provider_argument(parser)
@@ -302,6 +303,8 @@ def main():
     output_formatter = TextOutput(args.full)
   elif args.format == 'yaml':
     output_formatter = YamlOutput(args.full)
+  elif args.format == 'provider-json':
+    output_formatter = JsonOutput(args.full)
   else:
     # If --full is passed, then format defaults to yaml.
     # Else format defaults to text
@@ -313,40 +316,102 @@ def main():
   # Set up the Genomics Pipelines service interface
   provider = provider_base.get_provider(args)
 
+  # Set poll interval to zero if --wait is not set.
+  poll_interval = args.poll_interval if args.wait else 0
+
   # Make sure users were provided, or try to fill from OS user. This cannot
   # be made into a default argument since some environments lack the ability
   # to provide a username automatically.
   user_list = args.users if args.users else [dsub_util.get_os_user()]
 
   labels = param_util.parse_pair_args(args.label, param_util.LabelParam)
+
+  job_producer = dstat_job_producer(
+      provider=provider,
+      status_list=args.status,
+      user_list=user_list,
+      job_list=args.jobs,
+      label_list=labels,
+      max_age=create_time,
+      max_tasks=args.limit,
+      full_output=args.full,
+      poll_interval=poll_interval,
+      raw_format=bool(args.format == 'provider-json'))
+
   # Track if any jobs are running in the event --wait was requested.
-  some_job_running = True
-  while some_job_running:
-
-    tasks = provider.lookup_job_tasks(
-        args.status,
-        user_list=user_list,
-        job_list=args.jobs,
-        labels=labels,
-        create_time=create_time,
-        max_tasks=args.limit)
-
-    table = []
-
-    some_job_running = False
-    for task in tasks:
-      row = prepare_row(provider, task, args.full)
+  for tasks in job_producer:
+    for row in tasks:
+      table = []
       row = output_formatter.prepare_output(row)
-
       table.append(row)
-      if provider.get_task_field(task, 'job-status') == 'RUNNING':
-        some_job_running = True
-
-    if table:
       output_formatter.print_table(table)
 
-    if args.wait and some_job_running:
-      time.sleep(args.poll_interval)
+
+def dstat_job_producer(provider,
+                       status_list,
+                       user_list,
+                       job_list,
+                       label_list,
+                       max_age,
+                       max_tasks,
+                       full_output=False,
+                       poll_interval=0,
+                       raw_format=False):
+  """Generate jobs as lists of task dicts ready for formatting/output.
+
+  This function separates dstat logic from flag parsing and user output. Users
+  of dstat who intend to access the data programmatically should use this.
+
+  Args:
+    provider: an instantiated dsub provider.
+    status_list: a list of status strings that eligible jobs may match.
+    user_list: a list of user strings that eligible jobs may match.
+    job_list: a list of job-id strings eligible jobs may match.
+    label_list: list of LabelParam that all tasks must match.
+    max_age: (int) maximum age of task in seconds.
+    max_tasks: (int) maximum number of tasks to return per dstat job lookup.
+    full_output: (bool) return all dsub fields.
+    poll_interval: (int) wait time between poll events, dstat will poll jobs
+                   until all jobs succeed or fail. Set to zero to disable
+                   polling and return after the first lookup.
+    raw_format: (bool) set True to prevent dsub from normalizing the task dict,
+                this defaults to False and should only be set True if a
+                provider-specific view of tasks is absolutely required.
+                (NB: provider interfaces change over time, no transition path
+                will be provided for users depending on this flag).
+
+  Yields:
+    lists of task dictionaries - each list representing a dstat poll event.
+  """
+  some_job_running = True
+  while some_job_running:
+    # Get a batch of jobs.
+    tasks = provider.lookup_job_tasks(
+        status_list,
+        user_list=user_list,
+        job_list=job_list,
+        labels=label_list,
+        create_time=max_age,
+        max_tasks=max_tasks)
+
+    some_job_running = False
+
+    formatted_tasks = []
+    for task in tasks:
+      # Format tasks as specified.
+      if raw_format:
+        formatted_tasks.append(task.raw_task_data())
+      else:
+        formatted_tasks.append(prepare_row(task, full_output))
+
+      # Determine if any of the jobs are running.
+      if task.get_field('task-status') == 'RUNNING':
+        some_job_running = True
+
+    # Yield the tasks and determine if the loop should continue.
+    yield formatted_tasks
+    if poll_interval and some_job_running:
+      time.sleep(poll_interval)
     else:
       break
 

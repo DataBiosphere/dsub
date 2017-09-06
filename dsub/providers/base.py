@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Interface for the providers.
+"""Interface for the providers and tasks.
 
 The job submission model for dsub assumes that each call to dsub is for a single
 job. Each job may contain tasks. Tasks are homogeneous in that they run the same
@@ -159,7 +159,7 @@ class JobProvider(object):
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
 
     Returns:
-      A list of provider-specific objects, each representing a submitted task.
+      A list of Task objects.
 
     Raises:
       ValueError: if both a job id list and a job name list are provided
@@ -167,17 +167,35 @@ class JobProvider(object):
     raise NotImplementedError()
 
   @abstractmethod
-  def get_task_field(self, task, field):
-    """Return a field from the provider-specific task object.
+  def get_tasks_completion_messages(self, tasks):
+    """List of the error message of each given task."""
+    raise NotImplementedError()
+
+
+class Task(object):
+  """Basic container for task metadata."""
+
+  @abstractmethod
+  def raw_task_data(self):
+    """Return a provider-specific representation of task data.
+
+    Returns:
+      dictionary of task data from the provider.
+    """
+    raise NotImplementedError()
+
+  @abstractmethod
+  def get_field(self, field, default=None):
+    """Return a metadata-field for the task.
 
     Not all fields need to be supported by all providers.
     Field identifiers include:
 
     'job-name', 'job-id', 'task-id', 'user-id',
-    'job-status', 'error-message', 'create-time', 'end-time'
+    'task-status', 'error-message', 'create-time', 'end-time'
     'inputs', 'outputs'
 
-    The following are needed by dstat:
+    The following are required by dstat:
     - status: The task status ('RUNNING', 'CANCELED', 'FAILED', 'SUCCESS')
     - status-message: A short message that is displayed in the default
                       dstat output. This should be as concise and useful as
@@ -191,17 +209,7 @@ class JobProvider(object):
     dstat's full output shows status and status-detail
 
     Args:
-      task: object returned by lookup_job_tasks
       field: one of the choices listed above.
+      default: the value to return if no value if found.
     """
-    raise NotImplementedError()
-
-  @abstractmethod
-  def get_task_status_message(self, task):
-    """The 'error-message' from the task, or status if no error."""
-    raise NotImplementedError()
-
-  @abstractmethod
-  def get_tasks_completion_messages(self, tasks):
-    """List of the error message of each given task."""
     raise NotImplementedError()

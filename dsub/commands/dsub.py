@@ -446,11 +446,11 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
     # We don't want to overwhelm the user with output when there are many
     # tasks per job. So we get a single "dominant" task for each of the
     # completed jobs (one that is representative of the job's fate).
-    dominant_job_tasks = dominant_task_for_jobs(provider, tasks_completed)
+    dominant_job_tasks = dominant_task_for_jobs(tasks_completed)
     if len(dominant_job_tasks) != len(jobs_completed):
       # print info about the jobs we couldn't find
       # (should only occur for "--after" where the job ID is a typo).
-      jobs_found = dsub_util.tasks_to_job_ids(provider, dominant_job_tasks)
+      jobs_found = dsub_util.tasks_to_job_ids(dominant_job_tasks)
       jobs_not_found = jobs_completed.difference(jobs_found)
       for j in jobs_not_found:
         error = '%s: not found' % (j)
@@ -459,8 +459,8 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
 
     # Print the dominant task for the completed jobs
     for t in dominant_job_tasks:
-      job_id = provider.get_task_field(t, 'job-id')
-      status = provider.get_task_field(t, 'job-status')
+      job_id = t.get_field('job-id')
+      status = t.get_field('task-status')
       print('  %s: %s' % (str(job_id), str(status)))
       if status in ['FAILURE', 'CANCELED']:
         error_messages += [provider.get_tasks_completion_messages([t])]
@@ -470,7 +470,7 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
   return error_messages
 
 
-def dominant_task_for_jobs(provider, tasks):
+def dominant_task_for_jobs(tasks):
   """A list with, for each job, its dominant task.
 
   The dominant task is the one that exemplifies its job's
@@ -480,32 +480,31 @@ def dominant_task_for_jobs(provider, tasks):
   - the first SUCCESS task.
 
   Args:
-    provider: job service provider
     tasks: a list of tasks to consider
 
   Returns:
     A list with, for each job, its dominant task.
   """
 
-  per_job = group_tasks_by_jobid(provider, tasks)
+  per_job = group_tasks_by_jobid(tasks)
 
   ret = []
   for job_id in per_job.keys():
     tasks_in_salience_order = sorted(
-        per_job[job_id], key=lambda t: importance_of_task(provider, t))
+        per_job[job_id], key=importance_of_task)
     ret.append(tasks_in_salience_order[0])
   return ret
 
 
-def group_tasks_by_jobid(provider, tasks):
+def group_tasks_by_jobid(tasks):
   """A defaultdict with, for each job, a list of its tasks."""
   ret = collections.defaultdict(list)
   for t in tasks:
-    ret[provider.get_task_field(t, 'job-id')].append(t)
+    ret[t.get_field('job-id')].append(t)
   return ret
 
 
-def importance_of_task(provider, task):
+def importance_of_task(task):
   """Tuple (importance, end-time). Smaller values are more important."""
   # The status of a job is going to be determined by the roll-up of its tasks.
   # A FAILURE or CANCELED task means the job has FAILED.
@@ -519,8 +518,8 @@ def importance_of_task(provider, task):
   # 2- The first RUNNING task, or if none
   # 3- The first SUCCESS task.
   importance = {'FAILURE': 0, 'CANCELED': 0, 'RUNNING': 1, 'SUCCESS': 2}
-  return (importance[provider.get_task_field(task, 'job-status')],
-          provider.get_task_field(task, 'end-time'))
+  return (importance[task.get_field('task-status')],
+          task.get_field('end-time'))
 
 
 def wait_for_any_job(provider, jobid_list, poll_interval):
@@ -545,8 +544,8 @@ def wait_for_any_job(provider, jobid_list, poll_interval):
     running_jobs = set([])
     failed_jobs = set([])
     for t in tasks:
-      status = provider.get_task_field(t, 'job-status')
-      job_id = provider.get_task_field(t, 'job-id')
+      status = t.get_field('task-status')
+      job_id = t.get_field('job-id')
       if status in ['FAILURE', 'CANCELED']:
         failed_jobs.add(job_id)
       if status == 'RUNNING':

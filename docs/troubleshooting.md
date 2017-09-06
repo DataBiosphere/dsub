@@ -261,7 +261,13 @@ the output automatically changes to [YAML](http://yaml.org/) which is
 detailed output.
 
 You can use the `--full` and `--format` parameters together to get the output
-you want. `--format` supports the values `json`, `text`, and `yaml`.
+you want. `--format` supports the values `json`, `text`, `yaml` and
+`provider-json`.
+
+The provider JSON output format (`--format=provider-json`) can be used to
+debug jobs by inspecting the provider-specific representation of task data.
+Provider data representations change over time and no attempt is made to
+maintain consistency between dsub versions.
 
 ### Full output (default format YAML)
 

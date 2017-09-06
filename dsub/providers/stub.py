@@ -48,7 +48,7 @@ class StubJobProvider(base.JobProvider):
        - status-message: string
        - error-messages : list of string
     """
-    self._operations = ops
+    self._operations = [StubTask(o) for o in ops]
 
   def get_operations(self):
     return self._operations
@@ -89,37 +89,35 @@ class StubJobProvider(base.JobProvider):
     operations = [
         x for x in self._operations
         if ((not status_list or status_list[0] == '*' or
-             x.get('status', (None, None))[0] in status_list) and
-            (user_list == '*' or x.get('user', None) in user_list) and
-            (job_list == '*' or x.get('job-id', None) in job_list) and
-            (task_list == '*' or x.get('task-id', None) in task_list))
+             x.get_field('status', (None, None))[0] in status_list) and
+            (user_list == '*' or x.get_field('user', None) in user_list) and
+            (job_list == '*' or x.get_field('job-id', None) in job_list) and
+            (task_list == '*' or x.get_field('task-id', None) in task_list))
     ]
     if max_tasks > 0:
       operations = operations[:max_tasks]
     return operations
 
-  def get_task_field(self, task, field):
-    if field == 'job-status':
-      return task['status'][0]
-    return task.get(field, None)
-
-  def get_task_status_message(self, task):
-    # Mimic the behavior of the Google one, which
-    # will return "Success", or the error message if there's one.
-    ret = task.get('status', (None, None))
-    if ret[0] == 'SUCCESS':
-      ret = ('Success', ret[1])
-    elif task.has_key('error-message'):
-      ret = (task['error-message'], ret[1])
-    return ret
-
   def get_tasks_completion_messages(self, tasks):
     error_messages = []
     for task in tasks:
-      error_messages += [task.get('error-message', '')]
+      error_messages += [task.get_field('error-message', '')]
 
     return error_messages
 
+
+class StubTask(base.Task):
+
+  def __init__(self, op):
+    self.op = op
+
+  def get_field(self, field, default=None):
+    if field == 'task-status':
+      return self.op['status'][0]
+    return self.op.get(field, None)
+
+  def raw_task_data(self):
+    return self.op
 
 if __name__ == '__main__':
   pass

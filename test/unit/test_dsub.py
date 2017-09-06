@@ -217,7 +217,6 @@ class TestWaitAfterBatch(unittest.TestCase):
 class TestDominantTask(unittest.TestCase):
 
   def test_earliest_failure(self):
-    prov = stub.StubJobProvider()
     ops = [{
         'job-id': 'job-1',
         'task-id': 'task-1',
@@ -244,8 +243,9 @@ class TestDominantTask(unittest.TestCase):
         'end-time': 5,
         'status': ('SUCCESS', '1')
     }]
-    ret = dsub_command.dominant_task_for_jobs(prov, ops)
-    self.assertEqual(ret[0]['task-id'], 'task-3')
+    ops = [stub.StubTask(o) for o in ops]
+    ret = dsub_command.dominant_task_for_jobs(ops)
+    self.assertEqual(ret[0].get_field('task-id'), 'task-3')
 
 
 class TestNameCommand(unittest.TestCase):
