@@ -108,24 +108,6 @@ _SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 
-# The task object for this provider. "job_status" is really task status.
-Task = namedtuple('Task', [
-    'job_id',
-    'task_id',
-    'job_status',
-    'status_message',
-    'job_name',
-    'create_time',
-    'last_update',
-    'logging',
-    'envs',
-    'labels',
-    'inputs',
-    'outputs',
-    'user_id',
-    'pid',
-])
-
 
 class LocalJobProvider(base.JobProvider):
   """Docker jobs running locally (i.e. on the caller's computer)."""
@@ -451,7 +433,7 @@ class LocalJobProvider(base.JobProvider):
 
     script = script_header.format(
         volumes=volumes,
-        name=self._get_docker_name(
+        name=LocalTask.format_docker_name(
             task_metadata.get('job-id'), task_metadata.get('task-id')),
         image=job_resources.image,
         script=DATA_MOUNT_POINT + '/' + SCRIPT_DIR + '/' +
@@ -527,14 +509,14 @@ class LocalJobProvider(base.JobProvider):
       # Try to cancel it for real.
       # First, tell the runner script to skip delocalization
       task_dir = self._task_directory(
-          self.get_task_field(task, 'job-id'),
-          self.get_task_field(task, 'task-id'))
+          task.get_field('job-id'),
+          task.get_field('task-id'))
       today = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
       with open(os.path.join(task_dir, 'die'), 'wt') as f:
         f.write('Operation canceled at %s\n' % today)
 
       # Next, kill Docker if it's running.
-      docker_name = self._get_docker_name_for_task(task)
+      docker_name = task.get_docker_name_for_task()
 
       try:
         subprocess.check_output(['docker', 'kill', docker_name])
@@ -546,7 +528,7 @@ class LocalJobProvider(base.JobProvider):
         continue
 
       # The script should have quit in response. If it hasn't, kill it.
-      pid = self.get_task_field(task, 'pid', 0)
+      pid = task.get_field('pid', 0)
       if pid <= 0:
         cancel_errors += ['Unable to cancel %s: missing pid.' % docker_name]
         continue
@@ -570,29 +552,6 @@ class LocalJobProvider(base.JobProvider):
         f.write(msg)
 
     return (canceled, cancel_errors)
-
-  def get_task_field(self, task, field, default=None):
-    # Convert the incoming Task object to a dict.
-    # With the exception of "status', the dsub "field" names map directly to the
-    # Task members where "-" in the field name is "_" in the Task member name.
-    tad = {
-        key.replace('_', '-'): value
-        for key, value in task._asdict().iteritems()
-    }
-
-    if field == 'status':
-      return tad.get('job-status', None)
-    # dstat expects to find a field called "status-message" that contains
-    # status if SUCCESS, status-message otherwise
-    if field == 'status-message':
-      if tad.get('job-status', '') == 'SUCCESS':
-        return 'Success'
-      else:
-        return self._last_line(tad.get('status-message', None))
-    if field == 'status-detail':
-      return tad.get('status-message', None)
-
-    return tad.get(field, default)
 
   @classmethod
   def _utc_int_to_local_datetime(cls, utc_int):
@@ -667,13 +626,14 @@ class LocalJobProvider(base.JobProvider):
 
           task = self._get_task_from_task_dir(j, u, task_id)
           # If labels are defined, all labels must match.
-          labels_match = all([k in task.labels and task.labels[k] == v
-                              for k, v in labels])
+          task_labels = task.get_field('labels')
+          labels_match = all(
+              [k in task_labels and task_labels[k] == v for k, v in labels])
           if labels and not labels_match:
             continue
           # Check that the job is not too old.
           if create_time_local:
-            task_create_time = datetime.strptime(task.create_time,
+            task_create_time = datetime.strptime(task.get_field('create-time'),
                                                  '%Y-%m-%d %H:%M:%S.%f')
             if task_create_time < create_time_local:
               continue
@@ -685,14 +645,8 @@ class LocalJobProvider(base.JobProvider):
 
     return ret
 
-  def get_task_status_message(self, task):
-    status = self.get_task_field(task, 'status')
-    if status == 'FAILURE':
-      return self.get_task_field(task, 'status-message')
-    return status
-
   def get_tasks_completion_messages(self, tasks):
-    return [self.get_task_field(task, 'status-message') for task in tasks]
+    return [task.get_field('status-message') for task in tasks]
 
   # Private methods
 
@@ -785,10 +739,10 @@ class LocalJobProvider(base.JobProvider):
         # pid file does not exist, may be from an old version of dsub
         status = 'CANCELED'
         status_message = 'task.pid missing'
-    return Task(
+    return LocalTask(
         job_id=job_id,
         task_id=task_id,
-        job_status=status,
+        task_status=status,
         status_message=status_message,
         job_name=meta.get('job-name'),
         create_time=create_time,
@@ -997,12 +951,68 @@ class LocalJobProvider(base.JobProvider):
     # Ensure the user script is executable.
     os.chmod(path, st.st_mode | 0100)
 
-  def _get_docker_name_for_task(self, task):
-    return self._get_docker_name(
-        self.get_task_field(task, 'job-id'),
-        self.get_task_field(task, 'task-id'))
 
-  def _get_docker_name(self, job_id, task_id):
+# The task object for this provider.
+_RawTask = namedtuple('_RawTask', [
+    'job_id',
+    'task_id',
+    'task_status',
+    'status_message',
+    'job_name',
+    'create_time',
+    'last_update',
+    'logging',
+    'envs',
+    'labels',
+    'inputs',
+    'outputs',
+    'user_id',
+    'pid',
+])
+
+
+class LocalTask(base.Task):
+  """Basic container for task metadata."""
+
+  def __init__(self, *args, **kwargs):
+    self._raw = _RawTask(*args, **kwargs)
+
+  def raw_task_data(self):
+    """Return a provider-specific representation of task data.
+
+    Returns:
+      string of task data from the provider.
+    """
+    return self._raw._asdict()
+
+  def get_field(self, field, default=None):
+    # Convert the incoming Task object to a dict.
+    # With the exception of "status', the dsub "field" names map directly to the
+    # Task members where "-" in the field name is "_" in the Task member name.
+    tad = {
+        key.replace('_', '-'): value
+        for key, value in self._raw._asdict().iteritems()
+    }
+
+    if field == 'status':
+      return tad.get('task-status', None)
+    if field == 'status-message':
+      if tad.get('task-status', '') == 'SUCCESS':
+        return 'Success'
+      else:
+        return self._last_line(tad.get('status-message', None))
+    if field == 'status-detail':
+      return tad.get('status-message', None)
+
+    return tad.get(field, default)
+
+  def get_docker_name_for_task(self):
+    return self.format_docker_name(
+        self.get_field('job-id'),
+        self.get_field('task-id'))
+
+  @staticmethod
+  def format_docker_name(job_id, task_id):
     # The name of the docker container is formatted as either:
     #  <job-id>.<task-id>
     # for "task" jobs, or just <job-id> for non-task jobs
@@ -1012,13 +1022,21 @@ class LocalJobProvider(base.JobProvider):
     else:
       return '%s.%s' % (job_id, task_id)
 
-  def _last_line(self, value):
+  def get_task_status_message(self):
+    status = self.get_field('status')
+    if status == 'FAILURE':
+      return self.get_field('status-message')
+    return status
+
+  @staticmethod
+  def _last_line(value):
     """Return the last line."""
     if not value:
       return value
     if value.endswith('\n'):
       return value.split('\n')[-2]
     return value.split('\n')[-1]
+
 
 if __name__ == '__main__':
   pass

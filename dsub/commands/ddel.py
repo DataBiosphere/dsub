@@ -128,11 +128,11 @@ def main():
 
     # Emit the count of deleted jobs.
     # Only emit anything about tasks if any of the jobs contains a task-id.
-    deleted_jobs = dsub_util.tasks_to_job_ids(provider, deleted_tasks)
+    deleted_jobs = dsub_util.tasks_to_job_ids(deleted_tasks)
     job_count = len(deleted_jobs)
 
     deleted_tasks = [
-        t for t in deleted_tasks if provider.get_task_field(t, 'task-id')
+        t for t in deleted_tasks if t.get_field('task-id')
     ]
 
     tasks_msg = ''

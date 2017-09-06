@@ -77,9 +77,9 @@ def get_os_user():
   return pwd.getpwuid(os.getuid())[0]
 
 
-def tasks_to_job_ids(provider, task_list):
+def tasks_to_job_ids(task_list):
   """Returns the set of job IDs for the given tasks."""
-  return set([provider.get_task_field(t, 'job-id') for t in task_list])
+  return set([t.get_field('job-id') for t in task_list])
 
 
 def _get_storage_service(credentials):

@@ -38,10 +38,6 @@ class FailsJobProvider(base.JobProvider):
     del user_list, job_list, task_list, create_time  # we fail unconditionally
     raise FailsException("fails provider made delete_jobs fail")
 
-  def get_task_field(self, job, field, default=None):
-    del job, field  # unused
-    return default
-
   def lookup_job_tasks(self,
                        status_list,
                        user_list=None,
@@ -50,10 +46,6 @@ class FailsJobProvider(base.JobProvider):
                        max_tasks=0):
     del status_list, user_list, job_list, task_list, max_tasks  # never any jobs
     raise FailsException("fails provider made lookup_job_tasks fail")
-
-  def get_task_status_message(self, task):
-    del task  # doesn't matter
-    return "DOOMED"
 
   def get_tasks_completion_messages(self, tasks):
     del tasks  # doesn't matter either
@@ -64,5 +56,14 @@ class FailsJobProvider(base.JobProvider):
     return {"job-id": "DOOMED_JOB"}
 
 
+class FailTask(base.Task):
+  """Dummy task."""
+
+  def raw_task_data(self):
+    return {}
+
+  def get_task_field(self, job, field, default=None):
+    del job, field  # unused
+    return default
 if __name__ == "__main__":
   pass

@@ -24,16 +24,14 @@ import itertools
 import json
 import os
 import re
-import retrying
 import socket
 import string
 import sys
 import textwrap
-import time
 from . import base
 
-import apiclient.errors
 import apiclient.discovery
+import apiclient.errors
 from dateutil.tz import tzlocal
 
 from ..lib import param_util
@@ -41,6 +39,7 @@ from ..lib import providers_util
 from oauth2client.client import GoogleCredentials
 from oauth2client.client import HttpAccessTokenRefreshError
 import pytz
+import retrying
 
 
 _PROVIDER_NAME = 'google'
@@ -695,119 +694,7 @@ class _Operations(object):
     if max_ops and len(operations) > max_ops:
       del operations[max_ops:]
 
-    return operations
-
-  @staticmethod
-  def append_operation_error(error_messages, operation):
-    if 'error' in operation:
-      if 'task-id' in operation['metadata']['labels']:
-        job_id = operation['metadata']['labels']['task-id']
-      else:
-        job_id = operation['metadata']['labels']['job-id']
-
-      error_messages.append('Error in job %s - code %s: %s' %
-                            (job_id, operation['error']['code'],
-                             operation['error']['message']))
-
-  @classmethod
-  def _get_operation_input_field_values(cls, metadata, file_input):
-    """Returns a dictionary of envs or file inputs for an operation.
-
-    Args:
-      metadata: operation metadata field
-      file_input: True to return a dict of file inputs, False to return envs.
-
-    Returns:
-      A dictionary of input field name value pairs
-    """
-
-    # To determine input parameter type, we iterate through the
-    # pipeline inputParameters.
-    # The values come from the pipelineArgs inputs.
-    input_args = metadata['request']['ephemeralPipeline']['inputParameters']
-    vals_dict = metadata['request']['pipelineArgs']['inputs']
-
-    # Get the names for files or envs
-    names = [
-        arg['name'] for arg in input_args if ('localCopy' in arg) == file_input
-    ]
-
-    # Build the return dict
-    values = {name: vals_dict[name] for name in names if name in vals_dict}
-
-    return values
-
-  @classmethod
-  def get_operation_field(cls, operation, field, default=None):
-    """Returns a value from the operation for a specific set of field names.
-
-    Args:
-      operation: an operation object returned from operations.list()
-      field: a dsub-specific job metadata key
-      default: default value to return if field does not exist or is empty.
-
-    Returns:
-      A text string for the field or a list for 'inputs'.
-
-    Raises:
-      ValueError: if the field label is not supported by the operation
-    """
-
-    metadata = operation.get('metadata')
-
-    if field == 'internal-id':
-      value = operation['name']
-    elif field == 'job-name':
-      value = metadata['labels'].get('job-name')
-    elif field == 'job-id':
-      value = metadata['labels'].get('job-id')
-    elif field == 'task-id':
-      value = metadata['labels'].get('task-id')
-    elif field == 'user-id':
-      value = metadata['labels'].get('user-id')
-    elif field == 'job-status':
-      value = metadata['job-status']
-    elif field == 'logging':
-      value = metadata['request']['pipelineArgs']['logging']['gcsPath']
-    elif field == 'envs':
-      value = cls._get_operation_input_field_values(metadata, False)
-    elif field == 'labels':
-      # Reserved labels are filtered from dsub task output.
-      value = {k: v for k, v in metadata['labels'].items()
-               if k not in param_util.RESERVED_LABELS}
-    elif field == 'inputs':
-      value = cls._get_operation_input_field_values(metadata, True)
-    elif field == 'outputs':
-      value = metadata['request']['pipelineArgs']['outputs']
-    elif field == 'create-time':
-      value = cls._localize_datestamp(metadata['createTime'])
-    elif field == 'end-time':
-      if 'endTime' in metadata:
-        value = cls._localize_datestamp(metadata['endTime'])
-      else:
-        value = None
-    elif field == 'status':
-      value = cls.operation_status(operation)
-    elif field in ['status-message', 'status-detail']:
-      status, last_update = cls.operation_status_message(operation)
-      value = status
-    elif field == 'last-update':
-      status, last_update = cls.operation_status_message(operation)
-      value = last_update
-    else:
-      raise ValueError('Unsupported display field: "%s"' % field)
-
-    return value if value else default
-
-  @classmethod
-  def _get_operation_full_job_id(cls, op):
-    """Returns the job-id or job-id.task-id for the operation."""
-    job_id = cls.get_operation_field(op, 'job-id')
-    task_id = cls.get_operation_field(op, 'task-id')
-    if task_id:
-      return '%s.%s' % (job_id, task_id)
-    else:
-      return job_id
+    return [GoogleOperation(o) for o in operations]
 
   @classmethod
   def _cancel_batch(cls, service, ops):
@@ -860,21 +747,23 @@ class _Operations(object):
     # objects by name
     ops_by_name = {}
     for op in ops:
-      ops_by_name[op['name']] = op
+      op_name = op.get_field('internal-id')
+      ops_by_name[op_name] = op
       batch.add(
-          service.operations().cancel(name=op['name'], body={}),
-          request_id=op['name'])
+          service.operations().cancel(name=op_name, body={}),
+          request_id=op_name)
 
     # Cancel the operations
     batch.execute()
 
     # Iterate through the canceled and failed lists to build our return lists
-    canceled_ops = [ops_by_name[op['name']] for op in canceled]
-    error_messages = [
-        "Error canceling '%s': %s" %
-        (cls._get_operation_full_job_id(ops_by_name[op['name']]), op['msg'])
-        for op in failed
-    ]
+    canceled_ops = [ops_by_name[cancel['name']] for cancel in canceled]
+    error_messages = []
+    for fail in failed:
+      message = "Error canceling '%s': %s"
+      op = ops_by_name[fail['name']]
+      message %= (op.get_operation_full_job_id(), fail['msg'])
+      error_messages.append(message)
 
     return canceled_ops, error_messages
 
@@ -906,89 +795,6 @@ class _Operations(object):
       error_messages.extend(batch_messages)
 
     return canceled_ops, error_messages
-
-  @classmethod
-  def _localize_datestamp(cls, datestamp):
-    """Converts a datestamp from RFC3339 UTC to local time.
-
-    Args:
-      datestamp: a datetime value in RFC3339 UTC "Zulu" format
-
-    Returns:
-      A datestamp in local time and up to seconds, or the original string if it
-      cannot be properly parsed.
-    """
-
-    # The timestamp from the Google Operations are all in RFC3339 format, but
-    # they are sometimes formatted to nanoseconds and sometimes only seconds.
-    # Parse both:
-    # * 2016-11-14T23:04:55Z
-    # * 2016-11-14T23:05:56.010429380Z
-    # And any sub-second precision in-between.
-
-    m = re.match(r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}).*Z',
-                 datestamp)
-    if not m:
-      return datestamp
-
-    # Create a UTC datestamp from parsed components
-    g = [int(val) for val in m.groups()]
-    dt = datetime(g[0], g[1], g[2], g[3], g[4], g[5], tzinfo=pytz.utc)
-    return dt.astimezone(tzlocal()).strftime('%Y-%m-%d %H:%M:%S')
-
-  @classmethod
-  def operation_status(cls, operation):
-    """Returns the status of this operation.
-
-    ie. RUNNING, SUCCESS, CANCELED or FAILURE.
-
-    Args:
-      operation: Operation
-
-    Returns:
-      A printable status string
-    """
-    if not operation['done']:
-      return 'RUNNING'
-    if 'error' not in operation:
-      return 'SUCCESS'
-    if operation['error'].get('code', 0) == 1:
-      return 'CANCELED'
-    return 'FAILURE'
-
-  @classmethod
-  def operation_status_message(cls, operation):
-    """Returns the most relevant status string and last updated date string.
-
-    This string is meant for display only.
-
-    Args:
-      operation: Operation
-
-    Returns:
-      A printable status string and date string.
-    """
-    metadata = operation['metadata']
-    if not operation['done']:
-      if 'events' in metadata and metadata['events']:
-        # Get the last event
-        last_event = metadata['events'][-1]
-
-        msg = last_event['description']
-        ds = last_event['startTime']
-      else:
-        msg = 'Pending'
-        ds = metadata['createTime']
-    else:
-      ds = metadata['endTime']
-
-      if 'error' in operation:
-        # Shorten message if it's too long.
-        msg = operation['error']['message']
-      else:
-        msg = 'Success'
-
-    return (msg, cls._localize_datestamp(ds))
 
 
 class GoogleJobProvider(base.JobProvider):
@@ -1120,7 +926,7 @@ class GoogleJobProvider(base.JobProvider):
     if self._verbose:
       print 'Launched operation %s' % operation['name']
 
-    return self.get_task_field(operation, 'task-id')
+    return GoogleOperation(operation).get_field('task-id')
 
   def submit_job(self, job_resources, job_metadata, all_task_data):
     """Submit the job (or tasks) to be executed.
@@ -1240,8 +1046,6 @@ class GoogleJobProvider(base.JobProvider):
           create_time=create_time)
 
       ops = _Operations.list(self._service, ops_filter, max_tasks)
-      for o in ops:
-        o['metadata']['job-status'] = _Operations.operation_status(o)
 
       if ops:
         tasks.extend(ops)
@@ -1283,28 +1087,217 @@ class GoogleJobProvider(base.JobProvider):
 
     return _Operations.cancel(self._service, tasks)
 
-  def get_task_field(self, task, field, default=None):
-    return _Operations.get_operation_field(task, field, default)
+  def get_tasks_completion_messages(self, tasks):
+    completion_messages = []
+    for task in tasks:
+      errmsg = task.error_message()
+      if errmsg:
+        completion_messages.append(errmsg)
+      else:
+        completion_messages.append(task.get_task_status_message())
+    return completion_messages
 
-  def get_task_status_message(self, task):
+
+class GoogleOperation(base.Task):
+  """Task wrapper around a Pipelines API operation object."""
+
+  def __init__(self, operation_data):
+    self._op = operation_data
+    # Sanity check for operation_status().
+    unused_status = self.operation_status()
+
+  def raw_task_data(self):
+    return self._op
+
+  def get_field(self, field, default=None):
+    """Returns a value from the operation for a specific set of field names.
+
+    Args:
+      field: a dsub-specific job metadata key
+      default: default value to return if field does not exist or is empty.
+
+    Returns:
+      A text string for the field or a list for 'inputs'.
+
+    Raises:
+      ValueError: if the field label is not supported by the operation
+    """
+
+    metadata = self._op.get('metadata')
+
+    if field == 'internal-id':
+      value = self._op['name']
+    elif field == 'job-name':
+      value = metadata['labels'].get('job-name')
+    elif field == 'job-id':
+      value = metadata['labels'].get('job-id')
+    elif field == 'task-id':
+      value = metadata['labels'].get('task-id')
+    elif field == 'user-id':
+      value = metadata['labels'].get('user-id')
+    elif field == 'task-status':
+      value = self.operation_status()
+    elif field == 'logging':
+      value = metadata['request']['pipelineArgs']['logging']['gcsPath']
+    elif field == 'envs':
+      value = self._get_operation_input_field_values(metadata, False)
+    elif field == 'labels':
+      # Reserved labels are filtered from dsub task output.
+      value = {k: v for k, v in metadata['labels'].items()
+               if k not in param_util.RESERVED_LABELS}
+    elif field == 'inputs':
+      value = self._get_operation_input_field_values(metadata, True)
+    elif field == 'outputs':
+      value = metadata['request']['pipelineArgs']['outputs']
+    elif field == 'create-time':
+      value = self._localize_datestamp(metadata['createTime'])
+    elif field == 'end-time':
+      if 'endTime' in metadata:
+        value = self._localize_datestamp(metadata['endTime'])
+      else:
+        value = None
+    elif field == 'status':
+      value = self.operation_status()
+    elif field in ['status-message', 'status-detail']:
+      status, last_update = self.operation_status_message()
+      value = status
+    elif field == 'last-update':
+      status, last_update = self.operation_status_message()
+      value = last_update
+    else:
+      raise ValueError('Unsupported display field: "%s"' % field)
+
+    return value if value else default
+
+  def operation_status(self):
+    """Returns the status of this operation.
+
+    ie. RUNNING, SUCCESS, CANCELED or FAILURE.
+
+    Returns:
+      A printable status string
+    """
+    if not self._op['done']:
+      return 'RUNNING'
+    if 'error' not in self._op:
+      return 'SUCCESS'
+    if self._op['error'].get('code', 0) == 1:
+      return 'CANCELED'
+    return 'FAILURE'
+
+  def operation_status_message(self):
     """Returns the most relevant status string and last updated date string.
 
     This string is meant for display only.
 
-    Args:
-      task: the operation for which to get status.
-
     Returns:
       A printable status string and date string.
     """
-    return _Operations.operation_status_message(task)
+    metadata = self._op['metadata']
+    if not self._op['done']:
+      if 'events' in metadata and metadata['events']:
+        # Get the last event
+        last_event = metadata['events'][-1]
 
-  def get_tasks_completion_messages(self, tasks):
-    error_messages = []
-    for task in tasks:
-      _Operations.append_operation_error(error_messages, task)
+        msg = last_event['description']
+        ds = last_event['startTime']
+      else:
+        msg = 'Pending'
+        ds = metadata['createTime']
+    else:
+      ds = metadata['endTime']
 
-    return error_messages
+      if 'error' in self._op:
+        # Shorten message if it's too long.
+        msg = self._op['error']['message']
+      else:
+        msg = 'Success'
+
+    return (msg, self._localize_datestamp(ds))
+
+  def get_operation_full_job_id(self):
+    """Returns the job-id or job-id.task-id for the operation."""
+    job_id = self._op.get_field('job-id')
+    task_id = self._op.get_field('task-id')
+    if task_id:
+      return '%s.%s' % (job_id, task_id)
+    else:
+      return job_id
+
+  @staticmethod
+  def _localize_datestamp(datestamp):
+    """Converts a datestamp from RFC3339 UTC to local time.
+
+    Args:
+      datestamp: a datetime value in RFC3339 UTC "Zulu" format
+
+    Returns:
+      A datestamp in local time and up to seconds, or the original string if it
+      cannot be properly parsed.
+    """
+
+    # The timestamp from the Google Operations are all in RFC3339 format, but
+    # they are sometimes formatted to nanoseconds and sometimes only seconds.
+    # Parse both:
+    # * 2016-11-14T23:04:55Z
+    # * 2016-11-14T23:05:56.010429380Z
+    # And any sub-second precision in-between.
+
+    m = re.match(r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}).*Z',
+                 datestamp)
+    if not m:
+      return datestamp
+
+    # Create a UTC datestamp from parsed components
+    g = [int(val) for val in m.groups()]
+    dt = datetime(g[0], g[1], g[2], g[3], g[4], g[5], tzinfo=pytz.utc)
+    return dt.astimezone(tzlocal()).strftime('%Y-%m-%d %H:%M:%S')
+
+  @classmethod
+  def _get_operation_input_field_values(cls, metadata, file_input):
+    """Returns a dictionary of envs or file inputs for an operation.
+
+    Args:
+      metadata: operation metadata field
+      file_input: True to return a dict of file inputs, False to return envs.
+
+    Returns:
+      A dictionary of input field name value pairs
+    """
+
+    # To determine input parameter type, we iterate through the
+    # pipeline inputParameters.
+    # The values come from the pipelineArgs inputs.
+    input_args = metadata['request']['ephemeralPipeline']['inputParameters']
+    vals_dict = metadata['request']['pipelineArgs']['inputs']
+
+    # Get the names for files or envs
+    names = [
+        arg['name'] for arg in input_args if ('localCopy' in arg) == file_input
+    ]
+
+    # Build the return dict
+    return {name: vals_dict[name] for name in names if name in vals_dict}
+
+  def error_message(self):
+    """Returns an error message if the operation failed for any reason.
+
+    Failure as defined here means; ended for any reason other than 'success'.
+    This means that a successful cancelation will also create an error message
+    here.
+
+    Returns:
+      string, string will be empty if job did not error.
+    """
+    if 'error' in self._op:
+      if 'task-id' in self._op['metadata']['labels']:
+        job_id = self._op['metadata']['labels']['task-id']
+      else:
+        job_id = self._op['metadata']['labels']['job-id']
+      return 'Error in job %s - code %s: %s' % (
+          job_id, self._op['error']['code'], self._op['error']['message'])
+    else:
+      return ''
 
 
 if __name__ == '__main__':

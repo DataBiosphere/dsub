@@ -18,6 +18,11 @@ import unittest
 from dsub.providers import stub
 
 
+def raw_ops(tasklist):
+  """Convert returned operations to raw operations."""
+  return [t.raw_task_data() for t in tasklist]
+
+
 class TestGetJob(unittest.TestCase):
 
   def test_get_success(self):
@@ -26,7 +31,7 @@ class TestGetJob(unittest.TestCase):
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
     tasks = prov.lookup_job_tasks(['SUCCESS'])
-    self.assertEqual(tasks, [job_suc])
+    self.assertEqual(raw_ops(tasks), [job_suc])
 
   def test_get_several(self):
     prov = stub.StubJobProvider()
@@ -35,7 +40,7 @@ class TestGetJob(unittest.TestCase):
     job_run = {'job-id': 'job_run', 'status': ('RUNNING', '123')}
     prov.set_operations([job_suc, job_fail, job_run])
     tasks = prov.lookup_job_tasks(['SUCCESS', 'FAILURE'])
-    self.assertEqual(tasks, [job_suc, job_fail])
+    self.assertEqual(raw_ops(tasks), [job_suc, job_fail])
 
   def test_get_star(self):
     prov = stub.StubJobProvider()
@@ -43,7 +48,7 @@ class TestGetJob(unittest.TestCase):
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
     tasks = prov.lookup_job_tasks('*')
-    self.assertEqual(tasks, [job_suc, job_fail])
+    self.assertEqual(raw_ops(tasks), [job_suc, job_fail])
 
   def test_get_star_list(self):
     prov = stub.StubJobProvider()
@@ -51,7 +56,7 @@ class TestGetJob(unittest.TestCase):
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
     tasks = prov.lookup_job_tasks(['*'])
-    self.assertEqual(tasks, [job_suc, job_fail])
+    self.assertEqual(raw_ops(tasks), [job_suc, job_fail])
 
   def test_get_none(self):
     prov = stub.StubJobProvider()
@@ -59,7 +64,7 @@ class TestGetJob(unittest.TestCase):
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
     tasks = prov.lookup_job_tasks(None)
-    self.assertEqual(tasks, [job_suc, job_fail])
+    self.assertEqual(raw_ops(tasks), [job_suc, job_fail])
 
 
 if __name__ == '__main__':
