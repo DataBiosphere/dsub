@@ -542,7 +542,7 @@ class _Pipelines(object):
 
   @classmethod
   def build_pipeline_args(cls, project, script, task_data, preemptible,
-                          logging_uri, scopes):
+                          logging_uri, scopes, keep_alive):
     """Builds pipeline args for execution.
 
     Args:
@@ -553,6 +553,7 @@ class _Pipelines(object):
       preemptible: use a preemptible VM for the job
       logging_uri: path for job logging output.
       scopes: list of scope.
+      keep_alive: Seconds to keep VM alive on failure
 
     Returns:
       A nested dictionary with one entry under the key pipelineArgs containing
@@ -586,7 +587,7 @@ class _Pipelines(object):
     })
 
     # pyformat: disable
-    return {
+    args = {
         'pipelineArgs': {
             'projectId': project,
             'resources': {
@@ -606,6 +607,12 @@ class _Pipelines(object):
         }
     }
     # pyformat: enable
+
+    if keep_alive:
+      args['pipelineArgs'][
+          'keep_vm_alive_on_failure_duration'] = '%ss' % keep_alive
+
+    return args
 
   @staticmethod
   def run_pipeline(service, pipeline):
@@ -915,9 +922,9 @@ class GoogleJobProvider(base.JobProvider):
                                                     task_metadata)
 
     pipeline.update(
-        _Pipelines.build_pipeline_args(self._project, script.value, task_data,
-                                       job_resources.preemptible, logging_uri,
-                                       job_resources.scopes))
+        _Pipelines.build_pipeline_args(
+            self._project, script.value, task_data, job_resources.preemptible,
+            logging_uri, job_resources.scopes, job_resources.keep_alive))
 
     return pipeline
 
