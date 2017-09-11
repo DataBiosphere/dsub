@@ -352,6 +352,13 @@ def parse_arguments(prog, argv):
       default=DEFAULT_SCOPES,
       nargs='+',
       help='Space-separated scopes for GCE instances.')
+  google.add_argument(
+      '--keep-alive',
+      type=int,
+      help="""Time (in seconds) to keep a tasks's virtual machine (VM) running
+      after a localization, docker command, or delocalization failure.
+      Allows for connecting to the VM for debugging.
+      Default is 0; maximum allowed value is 86400 (1 day).""")
 
   args = parser.parse_args(argv)
 
@@ -381,7 +388,8 @@ def get_job_resources(args):
       image=args.image,
       zones=args.zones,
       logging=logging,
-      scopes=args.scopes)
+      scopes=args.scopes,
+      keep_alive=args.keep_alive)
 
 
 def get_job_metadata(args, script, provider):

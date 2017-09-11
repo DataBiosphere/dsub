@@ -34,10 +34,12 @@ function call_dsub() {
   local script="${2:-}"
   local zones="${3:-}"
   local preemptible="${4:-}"
+  local keep_alive="${5:-}"
 
   ZONES="${zones}" \
   run_dsub \
     "${preemptible:+--preemptible}" \
+    ${keep_alive:+"--keep-alive" "${keep_alive}"} \
     --command "${command}" \
     --script "${script}" \
     --env TEST_NAME="${TEST_NAME}" \
@@ -180,6 +182,46 @@ function test_no_preemptible() {
 }
 readonly -f test_preemptible
 
+function test_keep_alive() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    'echo "${TEST_NAME}"' \
+    "" \
+    "us-*" \
+    "" \
+    3600; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipelineArgs.keep_vm_alive_on_failure_duration" "3600s"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_keep_alive
+
+function test_no_keep_alive() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    'echo "${TEST_NAME}"' \
+    "" \
+    "us-*"; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipelineArgs.keep_vm_alive_on_failure_duration" ""
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_keep_alive
+
 # Run the tests
 trap "exit_handler" EXIT
 
@@ -196,3 +238,7 @@ test_zones_multi_regional
 echo
 test_preemptible
 test_no_preemptible
+
+echo
+test_keep_alive
+test_no_keep_alive

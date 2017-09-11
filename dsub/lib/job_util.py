@@ -20,7 +20,7 @@ import collections
 class JobResources(
     collections.namedtuple('JobResources', [
         'min_cores', 'min_ram', 'disk_size', 'boot_disk_size', 'preemptible',
-        'image', 'logging', 'zones', 'scopes'
+        'image', 'logging', 'zones', 'scopes', 'keep_alive'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -34,6 +34,7 @@ class JobResources(
     logging (param_util.LoggingParam): path to location for jobs to write logs
     zones (str): location in which to run the job
     scopes (list): OAuth2 scopes for the job
+    keep_alive (int): Seconds to keep VM alive on failure
   """
   __slots__ = ()
 
@@ -46,10 +47,11 @@ class JobResources(
               image=None,
               logging=None,
               zones=None,
-              scopes=None):
+              scopes=None,
+              keep_alive=None):
     return super(JobResources, cls).__new__(cls, min_cores, min_ram, disk_size,
                                             boot_disk_size, preemptible, image,
-                                            logging, zones, scopes)
+                                            logging, zones, scopes, keep_alive)
 
 
 class Script(object):
