@@ -28,7 +28,12 @@ class StubJobProvider(base.JobProvider):
   def submit_job(self, job_resources, job_metadata, all_job_data):
     pass
 
-  def delete_jobs(self, user_list, job_list, task_list, create_time=None):
+  def delete_jobs(self,
+                  user_list,
+                  job_list,
+                  task_list,
+                  labels,
+                  create_time=None):
     pass
 
   # 2) Methods that manipulate the state of the fictional operations.
@@ -44,7 +49,9 @@ class StubJobProvider(base.JobProvider):
        - status: tuple (string,date)
        - user: string
        - job-id: string
+       - job-name: string
        - task-id: string
+       - labels: list<dict>
        - status-message: string
        - error-messages : list of string
     """
@@ -63,9 +70,11 @@ class StubJobProvider(base.JobProvider):
 
   def lookup_job_tasks(self,
                        status_list,
-                       user_list='*',
-                       job_list='*',
-                       task_list='*',
+                       user_list=None,
+                       job_list=None,
+                       job_name_list=None,
+                       task_list=None,
+                       labels=None,
                        create_time=None,
                        max_tasks=0):
     """Return a list of operations based on the input criteria.
@@ -86,13 +95,25 @@ class StubJobProvider(base.JobProvider):
       A list of Genomics API Operations objects.
     """
 
+    if status_list and len(status_list) == 1 and status_list[0] == '*':
+      status_list = None
+    user_list = None if user_list == '*' else user_list
+    job_list = None if job_list == '*' else job_list
+    job_name_list = None if job_name_list == '*' else job_name_list
+    task_list = None if task_list == '*' else task_list
+
+    if labels or create_time:
+      raise NotImplementedError(
+          'Lookup by labels and create_time not yet supported by stub.')
+
     operations = [
         x for x in self._operations
-        if ((not status_list or status_list[0] == '*' or
-             x.get_field('status', (None, None))[0] in status_list) and
-            (user_list == '*' or x.get_field('user', None) in user_list) and
-            (job_list == '*' or x.get_field('job-id', None) in job_list) and
-            (task_list == '*' or x.get_field('task-id', None) in task_list))
+        if ((not status_list or x.get_field('status',
+                                            (None, None))[0] in status_list) and
+            (not user_list or x.get_field('user', None) in user_list) and
+            (not job_list or x.get_field('job-id', None) in job_list) and
+            (not job_name_list or x.get_field('job-name', None) in job_name_list
+            ) and (not task_list or x.get_field('task-id', None) in task_list))
     ]
     if max_tasks > 0:
       operations = operations[:max_tasks]

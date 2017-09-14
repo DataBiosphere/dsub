@@ -332,7 +332,7 @@ def main():
       user_list=user_list,
       job_list=args.jobs,
       label_list=labels,
-      max_age=create_time,
+      create_time=create_time,
       max_tasks=args.limit,
       full_output=args.full,
       poll_interval=poll_interval,
@@ -349,11 +349,13 @@ def main():
 
 def dstat_job_producer(provider,
                        status_list,
-                       user_list,
-                       job_list,
-                       label_list,
-                       max_age,
-                       max_tasks,
+                       user_list=None,
+                       job_list=None,
+                       job_name_list=None,
+                       task_list=None,
+                       label_list=None,
+                       create_time=None,
+                       max_tasks=0,
                        full_output=False,
                        poll_interval=0,
                        raw_format=False):
@@ -367,8 +369,10 @@ def dstat_job_producer(provider,
     status_list: a list of status strings that eligible jobs may match.
     user_list: a list of user strings that eligible jobs may match.
     job_list: a list of job-id strings eligible jobs may match.
+    job_name_list: a list of job-name strings eligible jobs may match.
+    task_list: a list of task-id strings eligible tasks may match.
     label_list: list of LabelParam that all tasks must match.
-    max_age: (int) maximum age of task in seconds.
+    create_time: a UTC value for earliest create time for a task.
     max_tasks: (int) maximum number of tasks to return per dstat job lookup.
     full_output: (bool) return all dsub fields.
     poll_interval: (int) wait time between poll events, dstat will poll jobs
@@ -390,8 +394,10 @@ def dstat_job_producer(provider,
         status_list,
         user_list=user_list,
         job_list=job_list,
+        job_name_list=job_name_list,
+        task_list=task_list,
         labels=label_list,
-        create_time=max_age,
+        create_time=create_time,
         max_tasks=max_tasks)
 
     some_job_running = False

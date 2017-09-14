@@ -20,7 +20,7 @@ DESCRIPTION = ('A command-line tool that makes it easy to submit and run'
 PROJECT_URL = 'https://github.com/googlegenomics/dsub'
 KEYWORDS = 'cloud bioinformatics'
 
-# TODO(e4p): Restore full classifier list and project metadata. The metadata
+# TODO: Restore full classifier list and project metadata. The metadata
 #              was trimmed prior to the initial pypi push. The metadata will be
 #              restored when we push the first dsub release.
 setup(

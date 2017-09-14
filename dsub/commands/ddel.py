@@ -117,15 +117,9 @@ def main():
   # Let the user know which jobs we are going to look up
   with dsub_util.replace_print():
     emit_search_criteria(user_list, args.jobs, args.tasks, args.label)
-
     # Delete the requested jobs
-    deleted_tasks, error_messages = provider.delete_jobs(
-        user_list, args.jobs, args.tasks, labels, create_time)
-
-    # Emit any errors canceling jobs
-    for msg in error_messages:
-      print msg
-
+    deleted_tasks = ddel_tasks(provider, user_list, args.jobs, args.tasks,
+                               labels, create_time)
     # Emit the count of deleted jobs.
     # Only emit anything about tasks if any of the jobs contains a task-id.
     deleted_jobs = dsub_util.tasks_to_job_ids(deleted_tasks)
@@ -142,6 +136,39 @@ def main():
 
   print '%d job%s deleted%s' % (job_count, ''
                                 if job_count == 1 else 's', tasks_msg)
+
+
+def ddel_tasks(provider,
+               user_list=None,
+               job_list=None,
+               task_list=None,
+               labels=None,
+               create_time=None):
+  """Kill jobs or job tasks.
+
+  This function separates ddel logic from flag parsing and user output. Users
+  of ddel who intend to access the data programmatically should use this.
+
+  Args:
+    provider: an instantiated dsub provider.
+    user_list: List of user ids who "own" the job(s) to delete.
+    job_list: List of job ids to delete.
+    task_list: List of task ids to delete.
+    labels: List of LabelParam, each must match the job(s) to be cancelled.
+    create_time: a UTC value for earliest create time for a task.
+
+  Returns:
+    list of job ids which were deleted.
+  """
+  # Delete the requested jobs
+  deleted_tasks, error_messages = provider.delete_jobs(
+      user_list, job_list, task_list, labels, create_time)
+
+  # Emit any errors canceling jobs
+  for msg in error_messages:
+    print msg
+
+  return deleted_tasks
 
 
 if __name__ == '__main__':
