@@ -32,6 +32,11 @@ explicit tasks.
 
 from abc import ABCMeta
 from abc import abstractmethod
+import os
+
+with open(os.path.join(os.path.dirname(__file__), '../VERSION'), 'r') as vf:
+  DSUB_VERSION = ''.join(l for l in vf.readlines() if not l.startswith('#'))
+DSUB_VERSION = DSUB_VERSION.strip()
 
 
 class JobProvider(object):
@@ -51,6 +56,7 @@ class JobProvider(object):
     * job-id
     * user-id
     * script
+    * dsub-version
 
     The creation of the job metadata is done by the provider, as the rules
     around these items are provider-specific. For example, one job provider

@@ -875,17 +875,21 @@ class GoogleJobProvider(base.JobProvider):
     job_id = '%s--%s--%s' % (job_name_value[:10], user_id,
                              datetime.now().strftime('%y%m%d-%H%M%S-%f')[:16])
 
+    # Standard version is MAJOR.MINOR(.PATCH). This will convert the version
+    # string to "vMAJOR-MINOR(-PATCH)". Example; "0.1.0" -> "v0-1-0".
+    version = _Label.convert_to_label_chars('v%s' % base.DSUB_VERSION)
     return {
         'pipeline-name': pipeline_name,
         'job-name': job_name_value,
         'job-id': job_id,
-        'user-id': user_id
+        'user-id': user_id,
+        'dsub-version': version,
     }
 
   def _build_pipeline_labels(self, task_metadata):
     labels = [
         _Label(name, task_metadata[name])
-        for name in ['job-name', 'job-id', 'user-id']
+        for name in ['job-name', 'job-id', 'user-id', 'dsub-version']
     ]
 
     if task_metadata.get('task-id') is not None:

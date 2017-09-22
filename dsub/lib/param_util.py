@@ -29,7 +29,8 @@ P_LOCAL = 'local'
 P_GCS = 'google-cloud-storage'
 FILE_PROVIDERS = frozenset([P_LOCAL, P_GCS])
 
-RESERVED_LABELS = frozenset(['job-name', 'job-id', 'user-id', 'task-id'])
+RESERVED_LABELS = frozenset(
+    ['job-name', 'job-id', 'user-id', 'task-id', 'dsub-version'])
 
 
 def validate_param_name(name, param_type):

@@ -1,4 +1,4 @@
-# Copyright 2016 Google Inc. All Rights Reserved.
+# Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,11 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Package marker file."""
-import os
+#
+# The VERSION file must contain a single uncommented line with the dsub
+# version number. This is not a Python module and cannot be imported. Empty
+# lines and lines beginning with '#' are ignored.
 
-# VERSION is parsed here to decouple dsub's __init__ from the implementation
-# of providers.
-with open(os.path.join(os.path.dirname(__file__), 'VERSION'), 'r') as vf:
-  __version__ = ''.join(l for l in vf.readlines() if not l.startswith('#'))
-__version__ = __version__.strip()
+0.1.0

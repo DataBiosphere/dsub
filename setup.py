@@ -3,6 +3,7 @@
 File is based on this template: https://github.com/pypa/sampleproject
 """
 
+import os
 import unittest
 # Always prefer setuptools over distutils
 from setuptools import find_packages
@@ -15,23 +16,24 @@ def unittest_suite():
   test_suite = test_loader.discover('test/unit', pattern='test_*.py')
   return test_suite
 
-DESCRIPTION = ('A command-line tool that makes it easy to submit and run'
-               ' batch scripts in the cloud')
-PROJECT_URL = 'https://github.com/googlegenomics/dsub'
-KEYWORDS = 'cloud bioinformatics'
 
-# TODO: Restore full classifier list and project metadata. The metadata
-#              was trimmed prior to the initial pypi push. The metadata will be
-#              restored when we push the first dsub release.
+def get_dsub_version():
+  versionfilename = os.path.join(os.path.dirname(__file__), 'dsub/VERSION')
+  with open(versionfilename, 'r') as vf:
+    versionraw = ''.join(l for l in vf.readlines() if not l.startswith('#'))
+  return versionraw.strip()
+
+
 setup(
     name='dsub',
 
     # Versions should comply with PEP440.
-    version='0.0.0',
-    description='dsub',
+    version=get_dsub_version(),
+    description=('A command-line tool that makes it easy to submit and run'
+                 ' batch scripts in the cloud'),
 
     # The project's main homepage.
-    url='',
+    url='https://github.com/googlegenomics/dsub',
 
     # Author details
     author='Google',
@@ -48,12 +50,12 @@ setup(
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
-        # 'Topic :: Scientific/Engineering :: Bio-Informatics',
-        # 'Topic :: Scientific/Engineering :: Information Analysis',
-        # 'Topic :: System :: Distributed Computing',
+        'Topic :: Scientific/Engineering :: Bio-Informatics',
+        'Topic :: Scientific/Engineering :: Information Analysis',
+        'Topic :: System :: Distributed Computing',
 
         # Pick your license as you wish (should match "license" above)
-        # 'License :: OSI Approved :: Apache License',
+        'License :: OSI Approved :: Apache License',
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
@@ -62,9 +64,13 @@ setup(
     ],
 
     # What does your project relate to?
-    keywords='',
+    keywords='cloud bioinformatics',
+
     # Packages to distribute.
     packages=find_packages(),
+    package_data={
+        'dsub': ['VERSION'],
+    },
 
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed.
