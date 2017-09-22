@@ -588,10 +588,6 @@ class LocalJobProvider(base.JobProvider):
     # 'AND' filtering arguments.
     labels = labels if labels else []
 
-    if job_name_list:
-      raise NotImplementedError(
-          'Filtering by job name is not implemented for the local provider'
-          ' (%s)' % str(job_name_list))
 
     create_time_local = self._utc_int_to_local_datetime(create_time)
 
@@ -625,6 +621,14 @@ class LocalJobProvider(base.JobProvider):
             continue
 
           task = self._get_task_from_task_dir(j, u, task_id)
+          status = task.get_field('status')
+          if status_list and status not in status_list:
+            continue
+
+          job_name = task.get_field('job-name')
+          if job_name_list and job_name not in job_name_list:
+            continue
+
           # If labels are defined, all labels must match.
           task_labels = task.get_field('labels')
           labels_match = all(

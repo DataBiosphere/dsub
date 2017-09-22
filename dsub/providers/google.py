@@ -1032,6 +1032,11 @@ class GoogleJobProvider(base.JobProvider):
     job_name_list = job_name_list if job_name_list else ['*']
     task_list = task_list if task_list else ['*']
 
+    # The task-id label value of "task-n" instead of just "n" is a hold-over
+    # from early label value character restrictions.
+    # Accept both forms, "task-n" and "n", for lookups by task-id.
+    task_list = ['task-{}'.format(t) if t.isdigit() else t for t in task_list]
+
     if set(job_list) != set(['*']) and set(job_name_list) != set(['*']):
       raise ValueError(
           'Filtering by both job IDs and job names is not supported')

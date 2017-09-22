@@ -548,7 +548,7 @@ def wait_for_any_job(provider, jobid_list, poll_interval):
   if not jobid_list:
     return
   while True:
-    tasks = provider.lookup_job_tasks('*', job_list=jobid_list)
+    tasks = provider.lookup_job_tasks(['*'], job_list=jobid_list)
     running_jobs = set([])
     failed_jobs = set([])
     for t in tasks:
