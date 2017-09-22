@@ -226,7 +226,20 @@ def parse_arguments():
       '--project',
       help='Cloud project ID in which to query pipeline operations')
   parser.add_argument(
-      '--jobs', '-j', nargs='*', help='A list of jobs on which to check status')
+      '--jobs',
+      '-j',
+      nargs='*',
+      help='A list of jobs IDs on which to check status')
+  parser.add_argument(
+      '--names',
+      '-n',
+      nargs='*',
+      help='A list of job names on which to check status')
+  parser.add_argument(
+      '--tasks',
+      '-t',
+      nargs='*',
+      help='A list of task IDs on which to check status')
   parser.add_argument(
       '--users',
       '-u',
@@ -331,6 +344,8 @@ def main():
       status_list=args.status,
       user_list=user_list,
       job_list=args.jobs,
+      job_name_list=args.names,
+      task_list=args.tasks,
       label_list=labels,
       create_time=create_time,
       max_tasks=args.limit,

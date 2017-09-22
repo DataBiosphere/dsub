@@ -19,13 +19,35 @@ set -o nounset
 
 # Test dstat.
 #
-# This test launches a single job and then verifies that dstat
-# can lookup jobs by job-id, status, age, and job-name, with
-# both default and --full output. It ensures that no error is
-# returned and the output looks minimally sane.
+# This test launches a job with multiple tasks and then verifies
+# that dstat can lookup jobs by job-id, status, age, task-id,
+# and job-name, with both default and --full output. It ensures
+# that no error is returned and the output looks minimally sane.
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 readonly JOB_NAME="test-job"
+
+# Utility routine for getting a list of task statuses
+function check_correct_task() {
+  local dstat_output="${1}"
+  local task_id="${2}"
+
+  if [[ "${DSUB_PROVIDER}" == "google" ]]; then
+    # For historical reasons, the dstat provider for google formats task ids as "task-n".
+    task_id="task-${task_id}"
+  else
+    # For the local provider, task IDs are stored as integers and single-quoted
+    # when formatted to yaml
+    task_id="'${task_id}'"
+  fi
+
+  if ! echo "${dstat_output}" | grep -qi "task-id: ${task_id}"; then
+    echo "Task \"task-id: ${task_id}\" not found in the dstat output!"
+    echo "${dstat_output}"
+    exit 1
+  fi
+}
+readonly -f check_correct_task
 
 # This test is not sensitive to the output of the dsub job.
 # Set the ALLOW_DIRTY_TESTS environment variable to 1 in your shell to
@@ -38,7 +60,30 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   JOBID="$(run_dsub \
     --name "${JOB_NAME}" \
-    --command 'sleep 1m')"
+    --command 'sleep 1m' \
+    --tasks "${TASKS_FILE}")"
+
+  # Get a count of the number of lines in the tasks file.
+  # It should be one more than the total number of tasks, since it includes
+  # the header line.
+  readonly TASKS_FILE_LINE_COUNT="$(cat "${TASKS_FILE}" | wc -l)"
+  readonly EXPECTED_TASKS_COUNT="$((TASKS_FILE_LINE_COUNT - 1))"
+
+  # Ensure the correct number of tasks were launched
+  if ! TASKS_STATUS="$(run_dstat --jobs "${JOBID}" --full --format yaml 2>&1 | sed --quiet 's#^ *status: *\(.*\)#\1#p')"; then
+    echo "dstat exited with a non-zero exit code!"
+    echo "Output:"
+    echo "${TASKS_STATUS}"
+    exit 1
+  fi
+
+  readonly TASKS_LAUNCH_COUNT="$(echo "${TASKS_STATUS}" | wc -l)"
+
+  if [[ "${TASKS_LAUNCH_COUNT}" -ne "${EXPECTED_TASKS_COUNT}" ]]; then
+    2>&1 echo "Unexpected count of launched tasks: ${TASKS_LAUNCH_COUNT}"
+    2>&1 echo "Expected count of launched tasks: ${EXPECTED_TASKS_COUNT}"
+    exit 1
+  fi
 
   echo "Checking dstat (by status)..."
 
@@ -54,6 +99,19 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     echo "${DSTAT_OUTPUT}"
     exit 1
   fi
+
+  echo "Checking dstat (by tasks)..."
+
+  TASK_NUM=2
+
+  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full  --jobs "${JOBID}" --tasks "${TASK_NUM}" 2>&1)"; then
+    echo "dstat exited with a non-zero exit code!"
+    echo "Output:"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  check_correct_task "${DSTAT_OUTPUT}" "${TASK_NUM}"
 
   echo "Checking dstat (by job-name)..."
 
