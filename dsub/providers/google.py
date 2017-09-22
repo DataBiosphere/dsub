@@ -1229,8 +1229,8 @@ class GoogleOperation(base.Task):
 
   def get_operation_full_job_id(self):
     """Returns the job-id or job-id.task-id for the operation."""
-    job_id = self._op.get_field('job-id')
-    task_id = self._op.get_field('task-id')
+    job_id = self.get_field('job-id')
+    task_id = self.get_field('task-id')
     if task_id:
       return '%s.%s' % (job_id, task_id)
     else:
