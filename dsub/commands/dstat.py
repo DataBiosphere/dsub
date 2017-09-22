@@ -354,12 +354,12 @@ def main():
       raw_format=bool(args.format == 'provider-json'))
 
   # Track if any jobs are running in the event --wait was requested.
-  for tasks in job_producer:
-    for row in tasks:
-      table = []
+  for poll_event_tasks in job_producer:
+    table = []
+    for row in poll_event_tasks:
       row = output_formatter.prepare_output(row)
       table.append(row)
-      output_formatter.print_table(table)
+    output_formatter.print_table(table)
 
 
 def dstat_job_producer(provider,
