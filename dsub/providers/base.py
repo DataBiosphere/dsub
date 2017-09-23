@@ -32,11 +32,8 @@ explicit tasks.
 
 from abc import ABCMeta
 from abc import abstractmethod
-import os
 
-with open(os.path.join(os.path.dirname(__file__), '../VERSION'), 'r') as vf:
-  DSUB_VERSION = ''.join(l for l in vf.readlines() if not l.startswith('#'))
-DSUB_VERSION = DSUB_VERSION.strip()
+DSUB_VERSION = '0.1.0'
 
 
 class JobProvider(object):

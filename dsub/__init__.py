@@ -16,6 +16,4 @@ import os
 
 # VERSION is parsed here to decouple dsub's __init__ from the implementation
 # of providers.
-with open(os.path.join(os.path.dirname(__file__), 'VERSION'), 'r') as vf:
-  __version__ = ''.join(l for l in vf.readlines() if not l.startswith('#'))
-__version__ = __version__.strip()
+__version__ = '0.1.0'
