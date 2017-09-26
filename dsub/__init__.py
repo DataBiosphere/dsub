@@ -12,8 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Package marker file."""
-import os
-
-# VERSION is parsed here to decouple dsub's __init__ from the implementation
-# of providers.
-__version__ = '0.1.0'
+from _dsub_version import DSUB_VERSION as __version__

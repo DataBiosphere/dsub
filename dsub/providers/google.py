@@ -29,6 +29,7 @@ import string
 import sys
 import textwrap
 from . import base
+from .._dsub_version import DSUB_VERSION
 
 import apiclient.discovery
 import apiclient.errors
@@ -877,7 +878,7 @@ class GoogleJobProvider(base.JobProvider):
 
     # Standard version is MAJOR.MINOR(.PATCH). This will convert the version
     # string to "vMAJOR-MINOR(-PATCH)". Example; "0.1.0" -> "v0-1-0".
-    version = _Label.convert_to_label_chars('v%s' % base.DSUB_VERSION)
+    version = _Label.convert_to_label_chars('v%s' % DSUB_VERSION)
     return {
         'pipeline-name': pipeline_name,
         'job-name': job_name_value,

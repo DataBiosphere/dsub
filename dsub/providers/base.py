@@ -33,8 +33,6 @@ explicit tasks.
 from abc import ABCMeta
 from abc import abstractmethod
 
-DSUB_VERSION = '0.1.0'
-
 
 class JobProvider(object):
   """Interface all job providers should inherit from."""

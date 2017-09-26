@@ -11,9 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# The VERSION file must contain a single uncommented line with the dsub
-# version number. This is not a Python module and cannot be imported. Empty
-# lines and lines beginning with '#' are ignored.
 
-0.1.0
+"""Single source of truth for dsub's version.
+
+This must remain small and dependency-free so that any dsub module may
+import it without creating circular dependencies. Note that this module
+is parsed as a text file by setup.py and changes to the format of this
+file could break setup.py.
+"""
+
+DSUB_VERSION = '0.1.0'

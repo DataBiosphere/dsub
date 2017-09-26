@@ -60,6 +60,7 @@ import tempfile
 import textwrap
 import time
 from . import base
+from .._dsub_version import DSUB_VERSION
 from ..lib import dsub_util
 from ..lib import param_util
 from ..lib import providers_util
@@ -125,7 +126,7 @@ class LocalJobProvider(base.JobProvider):
         'job-id': self._make_job_id(job_name_value, user_id),
         'job-name': job_name_value,
         'user-id': user_id,
-        'dsub-version': base.DSUB_VERSION,
+        'dsub-version': DSUB_VERSION,
     }
 
   def submit_job(self, job_resources, job_metadata, all_task_data):

@@ -19,7 +19,6 @@ import unittest
 
 import dsub as dsub_init
 from dsub.commands import dsub as dsub_command
-from dsub.providers import base
 from dsub.providers import stub
 import fake_time
 
@@ -285,10 +284,6 @@ class TestDsubVersion(unittest.TestCase):
   def test_init(self):
     self.assertTrue(hasattr(dsub_init, '__version__'))
     self.assertIsNotNone(re.search(self.VERSION_REGEX, dsub_init.__version__))
-
-  def test_provider_base(self):
-    self.assertTrue(hasattr(base, 'DSUB_VERSION'))
-    self.assertIsNotNone(re.search(self.VERSION_REGEX, base.DSUB_VERSION))
 
 
 if __name__ == '__main__':
