@@ -55,6 +55,7 @@ from datetime import datetime
 from datetime import timedelta
 import os
 import signal
+import string
 import subprocess
 import tempfile
 import textwrap
@@ -108,6 +109,44 @@ _SUPPORTED_FILE_PROVIDERS = frozenset([param_util.P_GCS, param_util.P_LOCAL])
 _SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
+
+
+def _format_task_name(job_id, task_id):
+  """Create a task name from a job-id and a task-id.
+
+  Task names are used internally by dsub as well as by the docker task runner.
+  The name is formatted as either "<job-id>.<task-id>" or jobs with multple
+  tasks, or just "<job-id>" for jobs with a single task. Task names follow
+  formatting conventions allowing them to be safely used as a docker name.
+
+  Args:
+    job_id: (str) the job ID.
+    task_id: (str) the task ID.
+
+  Returns:
+    a task name string.
+  """
+  if task_id is None:
+    docker_name = job_id
+  else:
+    docker_name = '%s.%s' % (job_id, task_id)
+
+  # Docker container names must match: [a-zA-Z0-9][a-zA-Z0-9_.-]
+  # So 1) prefix it with "dsub-" and 2) change all invalid characters to "-".
+  return 'dsub-{}'.format(_convert_suffix_to_docker_chars(docker_name))
+
+
+def _convert_suffix_to_docker_chars(suffix):
+  """Rewrite string so that all characters are valid in a docker name suffix."""
+  # Docker container names must match: [a-zA-Z0-9][a-zA-Z0-9_.-]
+  accepted_characters = string.ascii_letters + string.digits + '_.-'
+
+  def label_char_transform(char):
+    if char in accepted_characters:
+      return char
+    return '-'
+
+  return ''.join(label_char_transform(c) for c in suffix)
 
 
 class LocalJobProvider(base.JobProvider):
@@ -435,7 +474,7 @@ class LocalJobProvider(base.JobProvider):
 
     script = script_header.format(
         volumes=volumes,
-        name=LocalTask.format_docker_name(
+        name=_format_task_name(
             task_metadata.get('job-id'), task_metadata.get('task-id')),
         image=job_resources.image,
         script=DATA_MOUNT_POINT + '/' + SCRIPT_DIR + '/' +
@@ -589,7 +628,6 @@ class LocalJobProvider(base.JobProvider):
     task_list = None if task_list == ['*'] else task_list
     # 'AND' filtering arguments.
     labels = labels if labels else []
-
 
     create_time_local = self._utc_int_to_local_datetime(create_time)
 
@@ -1017,20 +1055,8 @@ class LocalTask(base.Task):
     return tad.get(field, default)
 
   def get_docker_name_for_task(self):
-    return self.format_docker_name(
-        self.get_field('job-id'),
-        self.get_field('task-id'))
-
-  @staticmethod
-  def format_docker_name(job_id, task_id):
-    # The name of the docker container is formatted as either:
-    #  <job-id>.<task-id>
-    # for "task" jobs, or just <job-id> for non-task jobs
-    # (those have "None" as the task ID).
-    if task_id is None:
-      return job_id
-    else:
-      return '%s.%s' % (job_id, task_id)
+    return _format_task_name(
+        self.get_field('job-id'), self.get_field('task-id'))
 
   def get_task_status_message(self):
     status = self.get_field('status')
@@ -1046,7 +1072,6 @@ class LocalTask(base.Task):
     if value.endswith('\n'):
       return value.split('\n')[-2]
     return value.split('\n')[-1]
-
 
 if __name__ == '__main__':
   pass

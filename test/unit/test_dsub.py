@@ -263,6 +263,7 @@ class TestNameCommand(unittest.TestCase):
         ('  \n  /bin/true', 'true'),
         ('/usr/bin/sort "${INFILE}" > "${OUTFILE}"', 'sort'),
         ('export VAR=val\necho ${VAR}', 'export'),
+        ('# ignore\n  # ignore\n  export VAR=val\n echo ${VAR}', 'export'),
     }
     for t in test_cases:
       self.assertEqual(t[1], dsub_command._name_for_command(t[0]))

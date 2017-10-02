@@ -689,11 +689,11 @@ def run_main(args):
     if launched_job.get('task-id'):
       print('%s task(s)' % len(launched_job['task-id']))
     print('To check the status, run:')
-    print('  dstat%s --jobs %s --status \'*\'' % (
-        provider_base.get_dstat_provider_args(args), launched_job['job-id']))
+    print("  dstat%s --jobs '%s' --status '*'" %
+          (provider_base.get_dstat_provider_args(args), launched_job['job-id']))
     print('To cancel the job, run:')
-    print('  ddel%s --jobs %s' % (provider_base.get_ddel_provider_args(args),
-                                  launched_job['job-id']))
+    print("  ddel%s --jobs '%s'" % (provider_base.get_ddel_provider_args(args),
+                                    launched_job['job-id']))
 
   # Poll for job completion
   if args.wait:
@@ -715,15 +715,25 @@ def _name_for_command(command):
   r"""Craft a simple command name from the command.
 
   The best command strings for this are going to be those where a simple
-  command was given:
+  command was given; we will use the command to derive the name.
+
+  We won't always be able to figure something out and the caller should just
+  specify a "--name" on the command-line.
+
+  For example, commands like "export VAR=val\necho ${VAR}", this function would
+  return "export".
+
+  If the command starts space or a comment, then we'll skip to the first code
+  we can find.
+
+  If we find nothing, just return "command".
 
   >>> _name_for_command('samtools index "${BAM}"')
   'samtools'
   >>> _name_for_command('/usr/bin/sort "${INFILE}" > "${OUTFILE}"')
   'sort'
-
-  For commands like "export VAR=val\necho ${VAR}", the user may want to pass
-  --name to specify a more informative name.
+  >>> _name_for_command('# This should be ignored')
+  'command'
 
   Arguments:
     command: the user-provided command
@@ -731,8 +741,14 @@ def _name_for_command(command):
     a proposed name for the task.
   """
 
-  # strip() to eliminate any leading whitespace from the token:
-  return os.path.basename(re.split(r'\s', command.strip())[0])
+  lines = command.splitlines()
+  for line in lines:
+    line = line.strip()
+    if line and not line.startswith('#'):
+      return os.path.basename(re.split(r'\s', line)[0])
+
+  return 'command'
+
 
 if __name__ == '__main__':
   main(sys.argv[0], sys.argv[1:])
