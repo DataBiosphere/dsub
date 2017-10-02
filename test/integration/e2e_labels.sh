@@ -49,10 +49,10 @@ mkdir -p "${TEST_TMP}"
 
 # Create a simple TSV file
 readonly TASKS_FILE="${TEST_TMP}/${TEST_NAME}.tsv"
-util::write_tsv_file "${TASKS_FILE}" \
-' --label song
-  cheryl
-  milestones
+util::write_tsv_file "${TASKS_FILE}" '
+--label batch\t--label item-number
+hello-world\t1
+hello-world\t2
 '
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
@@ -60,8 +60,8 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Launching pipeline..."
 
   JOBID="$(run_dsub \
-    --label genre=jazz \
-    --label subgenre=bebop \
+    --label batch=hello-world \
+    --label item-number=1 \
     --command "echo 'hello world'; sleep 4m;")"
 
   echo "Checking dstat (full)..."
@@ -73,12 +73,12 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     exit 1
   fi
 
-  check_label 'genre: jazz'
-  check_label 'subgenre: bebop'
+  check_label "batch: hello-world"
+  check_label "item-number: '1'"
 
   echo
   echo "Running ddel against a non-matching label - should not kill pipeline."
-  run_ddel --jobs "${JOBID}" --label "genre=rock" --label "subgenre=bebop"
+  run_ddel --jobs "${JOBID}" --label "batch=hello-world" --label "item-number=2"
 
   echo
   echo "Check that the job is not canceled."
@@ -90,7 +90,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo
   echo "Killing the pipeline"
-  run_ddel --jobs "${JOBID}" --label "genre=jazz" --label "subgenre=bebop"
+  run_ddel --jobs "${JOBID}" --label "batch=hello-world" --label "item-number=1"
 
   if ! util::wait_for_canceled_status "${JOBID}"; then
     echo "dstat does not show the operation as canceled after wait."
@@ -116,8 +116,9 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     exit 1
   fi
 
-  check_label 'song: cheryl'
-  check_label 'song: milestones'
+  check_label "batch: hello-world"
+  check_label "item-number: '1'"
+  check_label "item-number: '2'"
 
   echo "SUCCESS"
 

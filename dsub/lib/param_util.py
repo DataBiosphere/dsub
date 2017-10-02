@@ -165,12 +165,8 @@ class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
     # * Label keys must start with a lowercase letter and international
     #   characters are allowed.
     # * Label keys cannot be empty.
-    cls._check_label_rule(name, 'name')
-
-    # The value can be empty.
-    # If not empty, must conform to the same rules as the name.
-    if value:
-      cls._check_label_rule(value, 'value')
+    cls._check_label_name(name)
+    cls._check_label_value(value)
 
     # Ensure that reserved labels are not being used.
     if not cls._allow_reserved_keys and name in RESERVED_LABELS:
@@ -178,15 +174,28 @@ class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
           name, list(RESERVED_LABELS)))
 
   @staticmethod
-  def _check_label_rule(param_value, param_type):
-    if len(param_value) < 1 or len(param_value) > 63:
-      raise ValueError('Label %s must be 1-63 characters long: "%s"' %
-                       (param_type, param_value))
-    if not re.match(r'^[a-z]([-_a-z0-9]*)?$', param_value):
+  def _check_label_name(name):
+    if len(name) < 1 or len(name) > 63:
+      raise ValueError('Label name must be 1-63 characters long: "%s"' % name)
+    if not re.match(r'^[a-z]([-_a-z0-9]*)?$', name):
       raise ValueError(
-          'Invalid %s for label: "%s". Must start with a lowercase letter and '
-          'contain only lowercase letters, numeric characters, underscores, '
-          'and dashes.' % (param_type, param_value))
+          'Invalid name for label: "%s". Must start with a lowercase letter '
+          'and contain only lowercase letters, numeric characters, '
+          'underscores, and dashes.' % name)
+
+  @staticmethod
+  def _check_label_value(value):
+    if not value:
+      return
+
+    if len(value) > 63:
+      raise ValueError(
+          'Label values must not be longer than 63 characters: "%s"' % value)
+
+    if not re.match(r'^([-_a-z0-9]*)?$', value):
+      raise ValueError(
+          'Invalid value for label: "%s". Must contain only lowercase letters, '
+          'numeric characters, underscores, and dashes.' % value)
 
 
 class FileParam(
