@@ -17,7 +17,7 @@
 set -o errexit
 set -o nounset
 
-# Test for the --after and --wait flags
+# Test the --after and --wait flags when dsub jobs succeed
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
@@ -27,45 +27,23 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 TEST_FILE_PATH_1="${OUTPUTS}/testfile_1.txt"
 TEST_FILE_PATH_2="${OUTPUTS}/testfile_2.txt"
 
-
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
-  echo "Launching pipeline..."
-
   # (1) Launch a simple job that should succeed after a short wait
+  echo "Launch a job (and don't --wait)..."
   JOBID=$(run_dsub \
     --command 'sleep 5s && echo "hello world" > "${OUT}"' \
     --output OUT="${TEST_FILE_PATH_1}")
 
   # (2) Wait for the previous job and then launch a new one that blocks
   # until exit
+  echo "Launch a job (--after the previous, and then --wait)..."
   run_dsub \
     --after "${JOBID}" \
     --command 'cat "${IN}" > "${OUT}"' \
     --input IN="${TEST_FILE_PATH_1}" \
     --output OUT="${TEST_FILE_PATH_2}" \
     --wait
-
-  # (3) Launch a job to test command execution failure
-  if run_dsub \
-      --command 'exit 1' \
-      --wait; then
-    echo "Expected dsub to exit with error."
-    exit 1
-  fi
-
-  # (4) Launch a bad job to allow the next call to detect its failure
-  BAD_JOB_PREVIOUS=$(run_dsub \
-    --command 'sleep 5s && exit 1')
-
-  # (5) This call to dsub should fail before submit
-  if run_dsub \
-      --command 'echo "does not matter"' \
-      --after "${BAD_JOB_PREVIOUS}" \
-      --wait; then
-    echo "Expected dsub to exit with error."
-    exit 1
-  fi
 
 fi
 
