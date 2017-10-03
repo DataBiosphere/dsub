@@ -26,7 +26,7 @@ function check_label() {
   #  label2: value2
   #
   # and $LABEL_LINE would be e.g. "label2: value2"
-  if ! echo "${DSTAT_OUTPUT}" | grep 'labels:' -A2 | grep -q "${LABEL_LINE}"; then
+  if ! echo "${DSTAT_OUTPUT}" | grep 'labels:' -A10 | grep -q "${LABEL_LINE}"; then
     echo "Label ${LABEL_LINE} not found in the dstat output!"
     echo "${DSTAT_OUTPUT}"
     exit 1

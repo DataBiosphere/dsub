@@ -1,4 +1,4 @@
-# Copyright 2016 Google Inc. All Rights Reserved.
+# Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,5 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Package marker file."""
-from _dsub_version import DSUB_VERSION as __version__
+
+"""Single source of truth for dsub's version.
+
+This must remain small and dependency-free so that any dsub module may
+import it without creating circular dependencies. Note that this module
+is parsed as a text file by setup.py and changes to the format of this
+file could break setup.py.
+"""
+
+DSUB_VERSION = '0.1.0'

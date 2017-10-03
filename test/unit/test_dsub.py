@@ -11,11 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Unit tests for dsub.
-"""
+"""Unit tests for dsub."""
 
 import doctest
+import re
 import unittest
+
+import dsub as dsub_init
 from dsub.commands import dsub as dsub_command
 from dsub.providers import stub
 import fake_time
@@ -271,6 +273,17 @@ class TestExamplesInDocstrings(unittest.TestCase):
   def test_doctest(self):
     result = doctest.testmod(dsub_command, report=True)
     self.assertEqual(0, result.failed)
+
+
+class TestDsubVersion(unittest.TestCase):
+
+  # Find's any string containing "N.N". For example, "abc44.0100d" would pass.
+  # Essentially this returns a hit for any "version-ish" string.
+  VERSION_REGEX = r'\d{1,4}\.\d{1,4}'
+
+  def test_init(self):
+    self.assertTrue(hasattr(dsub_init, '__version__'))
+    self.assertIsNotNone(re.search(self.VERSION_REGEX, dsub_init.__version__))
 
 
 if __name__ == '__main__':

@@ -60,6 +60,7 @@ import tempfile
 import textwrap
 import time
 from . import base
+from .._dsub_version import DSUB_VERSION
 from ..lib import dsub_util
 from ..lib import param_util
 from ..lib import providers_util
@@ -125,6 +126,7 @@ class LocalJobProvider(base.JobProvider):
         'job-id': self._make_job_id(job_name_value, user_id),
         'job-name': job_name_value,
         'user-id': user_id,
+        'dsub-version': DSUB_VERSION,
     }
 
   def submit_job(self, job_resources, job_metadata, all_task_data):
@@ -675,12 +677,16 @@ class LocalJobProvider(base.JobProvider):
         'job-name': task_metadata.get('job-name'),
         'create-time': create_time,
         'logging': task_metadata.get('logging'),
+        'labels': {
+            'dsub-version': task_metadata.get('dsub-version', '0')
+        },
     }
     for key in ['inputs', 'outputs', 'envs', 'labels']:
       if task_data.has_key(key):
-        data[key] = {}
+        data_field = data.get(key, {})
         for param in task_data[key]:
-          data[key][param.name] = param.value
+          data_field[param.name] = param.value
+        data[key] = data_field
 
     task_dir = self._task_directory(
         task_metadata.get('job-id'), task_metadata.get('task-id'))

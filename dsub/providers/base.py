@@ -51,6 +51,7 @@ class JobProvider(object):
     * job-id
     * user-id
     * script
+    * dsub-version
 
     The creation of the job metadata is done by the provider, as the rules
     around these items are provider-specific. For example, one job provider

@@ -1,38 +1,23 @@
-# Contributing
+# How to Contribute
 
-Want to contribute? Great! Please read this page so your submission can go
-through smoothly.
+We'd love to accept your patches and contributions to this project. There are
+just a few small guidelines you need to follow.
 
 ## Contributor License Agreement
 
-Before we can use your code, you must sign the
-[Google Individual Contributor License Agreement](https://cla.developers.google.com/about/google-individual)
-(CLA), which you can do online. The CLA is necessary mainly because you own the
-copyright to your changes, even after your contribution becomes part of our
-codebase, so we need your permission to use and distribute your code. We also
-need to be sure of various other things — for instance that you'll tell us if
-you know that your code infringes on other people's patents.
+Contributions to this project must be accompanied by a Contributor License
+Agreement. You (or your employer) retain the copyright to your contribution,
+this simply gives us permission to use and redistribute your contributions as
+part of the project. Head over to https://cla.developers.google.com/ to see
+your current agreements on file or to sign a new one.
 
-Contributions made by corporations are covered by a different agreement than
-the one above. If you work for a company that wants to allow you to contribute
-your work, then you'll need to sign a
-[Software Grant and Corporate Contributor License Agreement](https://cla.developers.google.com/about/google-corporate).
+You generally only need to submit a CLA once, so if you've already submitted one
+(even if it was for a different project), you probably don't need to do it
+again.
 
-You don't have to sign the CLA until after you've submitted your code for review
-and a member has approved it, but you must do it before we can put your code
-into the repository. Before you start working on a larger contribution, you
-should get in touch with us first through the issue tracker with your idea so
-that we can help out and possibly guide you. Coordinating up front makes it much
-easier to avoid frustration later on.
+## Code reviews
 
-## Developer Workflow
-
-If you would like to add a new feature, cmdlet, or change, first
-[create a new Issue](https://github.com/googlegenomics/dockerflow/issues/new).
-There we will triage the idea and discuss any design or implementation details.
-
-Contributors are expected to do their work in a local fork and submit code for
-consideration via a GitHub pull request.
-
-When the pull request process deems the change ready, it will be merged directly
-into the tree. Congratulations and thank you!
+All submissions, including submissions by project members, require review. We
+use GitHub pull requests for this purpose. Consult
+[GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
+information on using pull requests.
