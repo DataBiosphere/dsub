@@ -87,17 +87,18 @@ class TextOutput(OutputFormatter):
     # Define the ordering of fields for text output along with any
     # transformations.
     column_map = [
-        ('job-id', 'Job ID',),
-        ('job-name', 'Job Name',),
-        ('task-id', 'Task',),
+        ('job-id', 'Job ID'),
+        ('job-name', 'Job Name'),
+        ('task-id', 'Task'),
         ('status-message', 'Status', self.format_status),
-        ('status-detail', 'Status-details',),
-        ('last-update', 'Last Update',),
-        ('create-time', 'Created',),
-        ('end-time', 'Ended',),
-        ('user-id', 'User',),
-        ('internal-id', 'Internal ID',),
-        ('logging', 'Logging',),
+        ('status-detail', 'Status-details'),
+        ('last-update', 'Last Update'),
+        ('create-time', 'Created'),
+        ('start-time', 'Started'),
+        ('end-time', 'Ended'),
+        ('user-id', 'User'),
+        ('internal-id', 'Internal ID'),
+        ('logging', 'Logging'),
         ('inputs', 'Inputs', self.format_inputs_outputs),
         ('outputs', 'Outputs', self.format_inputs_outputs),
     ]

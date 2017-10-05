@@ -1201,6 +1201,7 @@ class GoogleOperation(base.Task):
 
     metadata = self._op.get('metadata')
 
+    value = None
     if field == 'internal-id':
       value = self._op['name']
     elif field == 'job-name':
@@ -1227,11 +1228,17 @@ class GoogleOperation(base.Task):
       value = metadata['request']['pipelineArgs']['outputs']
     elif field == 'create-time':
       value = self._localize_datestamp(metadata['createTime'])
+    elif field == 'start-time':
+      # Look through the events list for all "start" events (only one expected).
+      start_events = [
+          e for e in metadata.get('events', []) if e['description'] == 'start'
+      ]
+      # Get the startTime from the last "start" event.
+      if start_events:
+        value = self._localize_datestamp(start_events[-1]['startTime'])
     elif field == 'end-time':
       if 'endTime' in metadata:
         value = self._localize_datestamp(metadata['endTime'])
-      else:
-        value = None
     elif field == 'status':
       value = self.operation_status()
     elif field in ['status-message', 'status-detail']:

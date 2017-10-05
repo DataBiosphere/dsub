@@ -1051,6 +1051,10 @@ class LocalTask(base.Task):
         return self._last_line(tad.get('status-message', None))
     if field == 'status-detail':
       return tad.get('status-message', None)
+    if field == 'start-time':
+      # There's no delay between creation and start since we launch docker
+      # immediately for local runs.
+      return tad.get('create-time', None)
 
     return tad.get(field, default)
 
