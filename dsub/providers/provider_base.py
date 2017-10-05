@@ -19,6 +19,13 @@ from . import local
 from . import test_fails
 
 
+PROVIDER_NAME_MAP = {
+    google.GoogleJobProvider: 'google',
+    local.LocalJobProvider: 'local',
+    test_fails.FailsJobProvider: 'test-fails',
+}
+
+
 def get_provider(args):
   """Returns a provider for job submission requests."""
 
@@ -36,6 +43,11 @@ def get_provider(args):
     raise ValueError('Unknown provider: ' + provider)
 
 
+def get_provider_name(provider):
+  """Returns the name of a given provider."""
+  return PROVIDER_NAME_MAP[provider.__class__]
+
+
 def add_provider_argument(parser):
   parser.add_argument(
       '--provider',
@@ -47,23 +59,24 @@ def add_provider_argument(parser):
       metavar='PROVIDER')
 
 
-def get_dstat_provider_args(args):
+def get_dstat_provider_args(provider, project):
   """A string with the arguments to point dstat to the same provider+project."""
-  if args.provider == 'google':
-    return ' --project %s' % args.project
-  elif args.provider == 'local':
+  provider_name = get_provider_name(provider)
+  if provider_name == 'google':
+    return ' --project %s' % project
+  elif provider_name == 'local':
     return ' --provider local'
-  elif args.provider == 'test-fails':
+  elif provider_name == 'test-fails':
     return ''
   # New providers should add their dstat required arguments here.
   assert False
   return ''
 
 
-def get_ddel_provider_args(args):
+def get_ddel_provider_args(provider_type, project):
   """A string with the arguments to point ddel to the same provider+project."""
   # Change this if the two ever diverge.
-  return get_dstat_provider_args(args)
+  return get_dstat_provider_args(provider_type, project)
 
 
 def check_for_unsupported_flag(args):

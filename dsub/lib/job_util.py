@@ -16,6 +16,14 @@
 
 import collections
 
+DEFAULT_MIN_CORES = 1
+DEFAULT_MIN_RAM = 3.75
+DEFAULT_DISK_SIZE = 200
+DEFAULT_BOOT_DISK_SIZE = 10
+DEFAULT_SCOPES = [
+    'https://www.googleapis.com/auth/bigquery',
+]
+
 
 class JobResources(
     collections.namedtuple('JobResources', [
@@ -39,15 +47,15 @@ class JobResources(
   __slots__ = ()
 
   def __new__(cls,
-              min_cores=1,
-              min_ram=1,
-              disk_size=10,
-              boot_disk_size=10,
+              min_cores=DEFAULT_MIN_CORES,
+              min_ram=DEFAULT_MIN_RAM,
+              disk_size=DEFAULT_DISK_SIZE,
+              boot_disk_size=DEFAULT_BOOT_DISK_SIZE,
               preemptible=False,
               image=None,
               logging=None,
               zones=None,
-              scopes=None,
+              scopes=DEFAULT_SCOPES,
               keep_alive=None):
     return super(JobResources, cls).__new__(cls, min_cores, min_ram, disk_size,
                                             boot_disk_size, preemptible, image,

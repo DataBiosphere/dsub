@@ -31,14 +31,14 @@ class JobUtilTest(unittest.TestCase):
     resource = job_util.JobResources()
     self.check_resources({
         'min_cores': 1,
-        'min_ram': 1,
-        'disk_size': 10,
+        'min_ram': 3.75,
+        'disk_size': 200,
         'boot_disk_size': 10,
         'preemptible': False,
         'image': None,
         'logging': None,
         'zones': None,
-        'scopes': None
+        'scopes': ['https://www.googleapis.com/auth/bigquery',]
     }, resource)
 
     # User defined job resources.
@@ -50,13 +50,13 @@ class JobUtilTest(unittest.TestCase):
     self.check_resources({
         'min_cores': 8,
         'min_ram': 16,
-        'disk_size': 10,
+        'disk_size': 200,
         'boot_disk_size': 10,
         'preemptible': False,
         'image': 'my-docker-img',
         'logging': None,
         'zones': 'us-east1-a,us-central1-a',
-        'scopes': None
+        'scopes': ['https://www.googleapis.com/auth/bigquery',]
     }, resource)
 
   def testScriptCreation(self):
