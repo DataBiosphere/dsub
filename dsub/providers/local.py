@@ -252,8 +252,8 @@ class LocalJobProvider(base.JobProvider):
       }}
 
       localize_data() {{
-        true # ensure body is not empty, to avoid error.
         {localize_command}
+        recursive_localize_data
       }}
 
       recursive_delocalize_data() {{
@@ -262,33 +262,39 @@ class LocalJobProvider(base.JobProvider):
       }}
 
       delocalize_data() {{
-        true # ensure body is not empty, to avoid error.
         {delocalize_command}
+        recursive_delocalize_data
       }}
 
       delocalize_logs() {{
-        true # ensure body is not empty, to avoid error.
         {delocalize_logs_command}
       }}
       """)
     script_body = textwrap.dedent("""\
       # Delete local files
       cleanup() {
+        local rm_data_dir="${1:-true}"
+
         echo "Copying the logs before cleanup"
         delocalize_logs
         # Not putting it in status_message because we don't want that to be the
         # last line in case of error.
-        echo "cleaning up ${DATA_DIR}"
-        # Clean up files written from inside Docker
-        2>&1 docker run \\
-         --name "${NAME}-cleanup" \\
-         --workdir "${DATA_MOUNT_POINT}/${WORKING_DIR}" \\
-         "${VOLUMES[@]}" \\
-         --env-file "${ENV_FILE}" \\
-         "${IMAGE}" \\
-         rm -rf "${DATA_MOUNT_POINT}/*" | tee -a log.txt
+
         # Clean up files staged from outside Docker
-        rm -rf "${DATA_DIR}" || echo "sorry, unable to delete ${DATA_DIR}."
+        if [[ "${rm_data_dir}" == "true" ]]; then
+          echo "cleaning up ${DATA_DIR}"
+
+          # Clean up files written from inside Docker
+          2>&1 docker run \\
+            --name "${NAME}-cleanup" \\
+            --workdir "${DATA_MOUNT_POINT}/${WORKING_DIR}" \\
+            "${VOLUMES[@]}" \\
+            --env-file "${ENV_FILE}" \\
+            "${IMAGE}" \\
+            rm -rf "${DATA_MOUNT_POINT}/*" | tee -a log.txt
+
+          rm -rf "${DATA_DIR}" || echo "sorry, unable to delete ${DATA_DIR}."
+        fi
       }
 
       log_info() {
@@ -309,21 +315,18 @@ class LocalJobProvider(base.JobProvider):
         local parent_lineno="$1"
         local code="$2"
         local message="${3:-Error}"
+
+        # Disable further traps
+        trap EXIT
+        trap ERR
+
         if [[ $code != "0" ]]; then
           echo "FAILURE" > status.txt
           log_error "${message} on or near line ${parent_lineno}; exiting with status ${code}"
         fi
-        cleanup
-        # Disable further traps
-        trap EXIT
+        cleanup "false"
         exit "${code}"
       }
-      # This will trigger whenever a command returns an error code
-      # (exactly like set -e)
-      trap 'error ${LINENO} $? Error' ERR
-      # This will trigger on all other exits. We disable it before normal
-      # exit so we know if it fires it means there's a problem.
-      trap 'error ${LINENO} $? "Exit (undefined variable or kill?)"' EXIT
 
       fetch_image() {
         local image="$1"
@@ -376,20 +379,30 @@ class LocalJobProvider(base.JobProvider):
           chown -R "${usergroup}" "${docker_directory}" >> stdout.txt 2>> stderr.txt
       }
 
-
       exit_if_canceled() {
         if [[ -f die ]]; then
           log_info "Job is canceled, stopping Docker container ${NAME}."
           docker stop "${NAME}"
           echo "CANCELED" > status.txt
           log_info "Delocalize logs and cleanup"
-          cleanup
+          cleanup "false"
           trap EXIT
           echo "Canceled, exiting." > status_message.txt
           exit 1
         fi
       }
 
+
+      # This will trigger whenever a command returns an error code
+      # (exactly like set -e)
+      trap 'error ${LINENO} $? Error' ERR
+
+      # This will trigger on all other exits. We disable it before normal
+      # exit so we know if it fires it means there's a problem.
+      trap 'error ${LINENO} $? "Exit (undefined variable or kill?)"' EXIT
+
+      # Make sure that ERR traps are inherited by shell functions
+      set -o errtrace
 
       # Beginning main execution
 
@@ -456,7 +469,7 @@ class LocalJobProvider(base.JobProvider):
       # recursively)
       trap EXIT
       log_info "Delocalize logs and cleanup."
-      cleanup
+      cleanup "true"
       if [[ -z "${FAILURE_MESSAGE}" ]]; then
         echo "SUCCESS" > status.txt
         log_info "Done"
@@ -923,20 +936,24 @@ class LocalJobProvider(base.JobProvider):
     for i in ins:
       if i.recursive:
         continue
-      gcs_file_path = i.value
-      local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + i.docker_path
-      commands.append('mkdir -p "%s"' % os.path.dirname(local_file_path))
-      commands.append('gsutil -q cp "%s" "%s"' %
-                      (gcs_file_path,
-                       self._get_input_target_path(local_file_path)))
 
-    commands.append(
-        textwrap.dedent("""\
-    if ! recursive_localize_data; then
-      log_error "Recursive localization failed."
-      exit 1
-    fi
-    """))
+      source_file_path = i.uri
+      local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + i.docker_path
+      dest_file_path = self._get_input_target_path(local_file_path)
+
+      commands.append('mkdir -p "%s"' % os.path.dirname(local_file_path))
+
+      if i.file_provider in [param_util.P_LOCAL, param_util.P_GCS]:
+        # The semantics that we expect here are implemented consistently in
+        # "gsutil cp", and are a bit different than "cp" when it comes to
+        # wildcard handling, so use it for both local and GCS:
+        #
+        # - `cp path/* dest/` will error if "path" has subdirectories.
+        # - `cp "path/*" "dest/"` will fail (it expects wildcard expansion
+        #   to come from shell).
+        commands.append('gsutil -q cp "%s" "%s"' % (source_file_path,
+                                                    dest_file_path))
+
     return '\n'.join(commands)
 
   def _mkdir_outputs(self, task_dir, task_data):
@@ -972,20 +989,19 @@ class LocalJobProvider(base.JobProvider):
     for o in outs:
       if o.recursive:
         continue
+
+      # The destination path is o.uri.path, which is the target directory
+      # (rather than o.uri, which includes the filename or wildcard).
       dest_path = o.uri.path
       local_path = task_dir + '/' + DATA_SUBDIR + '/' + o.docker_path
-      if o.file_provider == param_util.P_GCS:
-        commands.append('gsutil -q cp "%s" "%s"' % (local_path, dest_path))
+
       if o.file_provider == param_util.P_LOCAL:
         commands.append('mkdir -p "%s"' % dest_path)
-        commands.append('cp %s %s' % (local_path, dest_path))
 
-    commands.append(
-        textwrap.dedent("""\
-    if ! recursive_delocalize_data; then
-      log_error "Recursive delocalization failed."
-      exit 1
-    fi"""))
+      # Use gsutil even for local files (explained in _localize_inputs_command).
+      if o.file_provider in [param_util.P_LOCAL, param_util.P_GCS]:
+        commands.append('gsutil -q cp "%s" "%s"' % (local_path, dest_path))
+
     return '\n'.join(commands)
 
   def _stage_script(self, task_dir, script_name, script_text):
