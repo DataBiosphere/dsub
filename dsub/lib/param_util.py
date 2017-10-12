@@ -757,7 +757,7 @@ def args_to_job_data(envs, labels, inputs, inputs_recursive, outputs,
     'envs', 'inputs', and 'outputs' that defines the set of parameters and data
     for a job.
   """
-  # Parse environmental vairables and labels.
+  # Parse environmental variables and labels.
   env_data = parse_pair_args(envs, EnvParam)
   label_data = parse_pair_args(labels, LabelParam)
 
