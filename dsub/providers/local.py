@@ -154,7 +154,6 @@ class LocalJobProvider(base.JobProvider):
 
   def __init__(self):
     self._operations = []
-    self.provider_root_cache = None
 
   def prepare_job_metadata(self, script, job_name, user_id):
     job_name_value = job_name or os.path.basename(script)
@@ -818,9 +817,7 @@ class LocalJobProvider(base.JobProvider):
         pid=pid)
 
   def _provider_root(self):
-    if not self.provider_root_cache:
-      self.provider_root_cache = tempfile.gettempdir() + '/dsub-local'
-    return self.provider_root_cache
+    return tempfile.gettempdir() + '/dsub-local'
 
   def _delocalize_logging_command(self, file_provider, task_metadata):
     """Returns a command to delocalize logs.
