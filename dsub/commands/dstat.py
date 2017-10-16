@@ -167,30 +167,30 @@ def prepare_row(task, full):
   # it is a long value and would leave little room for status and update time.
 
   row_spec = collections.namedtuple('row_spec',
-                                    ['key', 'optional', 'default_value'])
+                                    ['key', 'required', 'default_value'])
 
   # pyformat: disable
   default_columns = [
-      row_spec('job-name', False, None),
-      row_spec('task-id', True, None),
-      row_spec('last-update', False, None)
+      row_spec('job-name', True, None),
+      row_spec('task-id', False, None),
+      row_spec('last-update', True, None)
   ]
   short_columns = default_columns + [
-      row_spec('status-message', False, None),
+      row_spec('status-message', True, None),
   ]
   full_columns = default_columns + [
-      row_spec('job-id', False, None),
-      row_spec('user-id', False, None),
-      row_spec('status', False, None),
-      row_spec('status-detail', False, None),
-      row_spec('create-time', False, None),
-      row_spec('end-time', False, 'NA'),
-      row_spec('internal-id', False, None),
-      row_spec('logging', False, None),
-      row_spec('inputs', False, {}),
-      row_spec('outputs', False, {}),
-      row_spec('envs', False, {}),
-      row_spec('labels', False, {}),
+      row_spec('job-id', True, None),
+      row_spec('user-id', True, None),
+      row_spec('status', True, None),
+      row_spec('status-detail', True, None),
+      row_spec('create-time', True, None),
+      row_spec('end-time', True, 'NA'),
+      row_spec('internal-id', True, None),
+      row_spec('logging', True, None),
+      row_spec('inputs', True, {}),
+      row_spec('outputs', True, {}),
+      row_spec('envs', True, {}),
+      row_spec('labels', True, {}),
   ]
   # pyformat: enable
 
@@ -198,10 +198,10 @@ def prepare_row(task, full):
 
   row = {}
   for col in columns:
-    key, optional, default = col
+    key, required, default = col
 
     value = task.get_field(key, default)
-    if not optional or value:
+    if required or value is not None:
       row[key] = value
 
   return row
