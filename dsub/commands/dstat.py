@@ -173,10 +173,8 @@ def prepare_row(task, full):
   default_columns = [
       row_spec('job-name', True, None),
       row_spec('task-id', False, None),
-      row_spec('last-update', True, None)
-  ]
-  short_columns = default_columns + [
-      row_spec('status-message', True, None),
+      row_spec('last-update', True, None),
+      row_spec('status-message', True, None)
   ]
   full_columns = default_columns + [
       row_spec('job-id', True, None),
@@ -194,7 +192,7 @@ def prepare_row(task, full):
   ]
   # pyformat: enable
 
-  columns = full_columns if full else short_columns
+  columns = full_columns if full else default_columns
 
   row = {}
   for col in columns:
