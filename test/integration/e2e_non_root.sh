@@ -25,7 +25,8 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-readonly INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam"
+# Do io setup
+source "${SCRIPT_DIR}/io_setup.sh"
 
 readonly BUILD_DIR="${TEST_TMP}/${TEST_NAME}"
 readonly DOCKERFILE="${BUILD_DIR}/Dockerfile"
@@ -81,12 +82,7 @@ EOF
 
   echo "Launching pipeline..."
 
-  JOB_ID=$(run_dsub \
-    --image "${IMAGE}" \
-    --script "${SCRIPT_DIR}/script_io_test.sh" \
-    --input INPUT_PATH="${INPUT_BAM}" \
-    --output OUTPUT_PATH="${OUTPUTS}/*.md5" \
-    --wait)
+  JOB_ID=$(io_setup::run_dsub)
 
   if [[ "${DSUB_PROVIDER}" == "local" ]]; then
     # Cleanup is more challenging when the Docker user isn't root,
@@ -96,4 +92,5 @@ EOF
 
 fi
 
-source "${SCRIPT_DIR}/io_check_output.sh"
+# Check output
+io_setup::check_output

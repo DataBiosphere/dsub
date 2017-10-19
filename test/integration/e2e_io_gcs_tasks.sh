@@ -37,22 +37,29 @@ readonly TASKS_FILE_TMPL_NAME="io_tasks"
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
+# Do io_task setup
+source "${SCRIPT_DIR}/io_tasks_setup.sh"
+
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
-  # Copy the TASKS_FILE to gcs to test loading tasks from gcs.
+  # Copy the script to GCS to test loading the script remotely
+  echo "Copying script to ${DSUB_PARAMS}"
+  gsutil cp "${SCRIPT_DIR}/script_io_test.sh" "${DSUB_PARAMS}/"
+
+  # Copy the TASKS_FILE to GCS to test loading the tasks file remotely
   echo "Copying tasks file to ${DSUB_PARAMS}"
   gsutil cp "${TASKS_FILE}" "${DSUB_PARAMS}/"
 
   echo "Launching pipelines..."
 
-  run_dsub \
-    --script "${SCRIPT_DIR}/script_io_test.sh" \
-    --tasks "${DSUB_PARAMS}/$(basename "${TASKS_FILE}")" \
-    --wait
+  io_tasks_setup::run_dsub \
+    "${DSUB_PARAMS}/script_io_test.sh" \
+    "${DSUB_PARAMS}/$(basename "${TASKS_FILE}")"
 
 fi
 
-source "${SCRIPT_DIR}/io_tasks_check_output.sh"
+# Check output
+io_tasks_setup::check_output
 
 # Clean up what we uploaded after the test is done.
 gsutil rm "${DSUB_PARAMS}"/**

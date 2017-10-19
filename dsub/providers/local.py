@@ -167,12 +167,13 @@ class LocalJobProvider(base.JobProvider):
         'dsub-version': DSUB_VERSION,
     }
 
-  def submit_job(self, job_resources, job_metadata, all_task_data):
+  def submit_job(self, job_resources, job_metadata, job_data, all_task_data):
     create_time = datetime.now()
 
     # Validate inputs.
     param_util.validate_submit_args_or_fail(
         job_resources,
+        job_data,
         all_task_data,
         provider_name=_PROVIDER_NAME,
         input_providers=_SUPPORTED_FILE_PROVIDERS,
@@ -192,16 +193,17 @@ class LocalJobProvider(base.JobProvider):
       # Set up directories
       task_dir = self._task_directory(
           task_metadata.get('job-id'), task_metadata.get('task-id'))
-      self._mkdir_outputs(task_dir, task_data)
+      self._mkdir_outputs(task_dir, job_data['outputs'] + task_data['outputs'])
 
       script = task_metadata.get('script')
       self._stage_script(task_dir, script.name, script.value)
 
       # Start the task
-      env = self._make_environment(task_data)
-      self._write_task_metadata(task_metadata, task_data, create_time)
+      env = self._make_environment(job_data['inputs'] + task_data['inputs'],
+                                   job_data['outputs'] + task_data['outputs'])
+      self._write_task_metadata(task_metadata, job_data, task_data, create_time)
       self._run_docker_via_script(task_dir, env, job_resources, task_metadata,
-                                  task_data)
+                                  job_data, task_data)
       if task_metadata.get('task-id') is not None:
         launched_tasks.append(str(task_metadata.get('task-id')))
 
@@ -212,7 +214,7 @@ class LocalJobProvider(base.JobProvider):
     }
 
   def _run_docker_via_script(self, task_dir, env, job_resources, task_metadata,
-                             task_data):
+                             job_data, task_data):
     script_header = textwrap.dedent("""\
       #!/bin/bash
 
@@ -553,16 +555,17 @@ class LocalJobProvider(base.JobProvider):
         date_format='+%Y-%m-%d %H:%M:%S',
         workingdir=WORKING_DIR,
         export_input_dirs=providers_util.build_recursive_localize_env(
-            task_dir, task_data.get('inputs', [])),
+            task_dir, job_data['inputs'] + task_data['inputs']),
         recursive_localize_command=self._localize_inputs_recursive_command(
-            task_dir, task_data),
-        localize_command=self._localize_inputs_command(task_dir, task_data),
+            task_dir, job_data['inputs'] + task_data['inputs']),
+        localize_command=self._localize_inputs_command(
+            task_dir, job_data['inputs'] + task_data['inputs']),
         export_output_dirs=providers_util.build_recursive_gcs_delocalize_env(
-            task_dir, task_data.get('outputs', [])),
+            task_dir, job_data['outputs'] + task_data['outputs']),
         recursive_delocalize_command=self._delocalize_outputs_recursive_command(
-            task_dir, task_data),
+            task_dir, job_data['outputs'] + task_data['outputs']),
         delocalize_command=self._delocalize_outputs_commands(
-            task_dir, task_data),
+            task_dir, job_data['outputs'] + task_data['outputs']),
         delocalize_logs_command=self._delocalize_logging_command(
             job_resources.logging.file_provider, task_metadata),
     ) + script_body
@@ -575,7 +578,7 @@ class LocalJobProvider(base.JobProvider):
     os.chmod(script_fname, 0500)
 
     # Write the environment variables
-    env_vars = env.items() + task_data['envs'] + [
+    env_vars = env.items() + job_data['envs'] + task_data['envs'] + [
         param_util.EnvParam('DATA_ROOT', DATA_MOUNT_POINT),
         param_util.EnvParam('TMPDIR', DATA_MOUNT_POINT + '/tmp')
     ]
@@ -763,7 +766,8 @@ class LocalJobProvider(base.JobProvider):
 
   # Private methods
 
-  def _write_task_metadata(self, task_metadata, task_data, create_time):
+  def _write_task_metadata(self, task_metadata, job_data, task_data,
+                           create_time):
     """Write a file with the data needed for dstat."""
 
     # Build up a dict to dump a YAML file with relevant task details:
@@ -789,11 +793,11 @@ class LocalJobProvider(base.JobProvider):
         },
     }
     for key in ['inputs', 'outputs', 'envs', 'labels']:
-      if task_data.has_key(key):
-        data_field = data.get(key, {})
-        for param in task_data[key]:
-          data_field[param.name] = param.value
-        data[key] = data_field
+      data_field = data.get(key, {})
+
+      for param in job_data[key] + task_data[key]:
+        data_field[param.name] = param.value
+      data[key] = data_field
 
     task_dir = self._task_directory(
         task_metadata.get('job-id'), task_metadata.get('task-id'))
@@ -971,23 +975,20 @@ class LocalJobProvider(base.JobProvider):
     dir_name = 'task' if task_id is None else str(task_id)
     return self._provider_root() + '/' + job_id + '/' + dir_name
 
-  def _make_environment(self, task_data):
+  def _make_environment(self, inputs, outputs):
     """Return a dictionary of environment variables for the VM."""
     ret = {}
-    ins = task_data.get('inputs', [])
-    for i in ins:
+    for i in inputs:
       ret[i.name] = DATA_MOUNT_POINT + '/' + i.docker_path
-    outs = task_data.get('outputs', [])
-    for o in outs:
+    for o in outputs:
       ret[o.name] = DATA_MOUNT_POINT + '/' + o.docker_path
     return ret
 
-  def _localize_inputs_recursive_command(self, task_dir, task_data):
+  def _localize_inputs_recursive_command(self, task_dir, inputs):
     """Returns a command that will stage recursive inputs."""
-    ins = task_data.get('inputs', [])
     data_dir = os.path.join(task_dir, DATA_SUBDIR)
     provider_commands = [
-        providers_util.build_recursive_localize_command(data_dir, ins,
+        providers_util.build_recursive_localize_command(data_dir, inputs,
                                                         file_provider)
         for file_provider in _SUPPORTED_INPUT_PROVIDERS
     ]
@@ -1014,11 +1015,10 @@ class LocalJobProvider(base.JobProvider):
     else:
       return local_file_path
 
-  def _localize_inputs_command(self, task_dir, task_data):
+  def _localize_inputs_command(self, task_dir, inputs):
     """Returns a command that will stage inputs."""
-    ins = task_data.get('inputs', [])
     commands = []
-    for i in ins:
+    for i in inputs:
       if i.recursive:
         continue
 
@@ -1041,37 +1041,34 @@ class LocalJobProvider(base.JobProvider):
 
     return '\n'.join(commands)
 
-  def _mkdir_outputs(self, task_dir, task_data):
+  def _mkdir_outputs(self, task_dir, outputs):
     os.makedirs(task_dir + '/' + DATA_SUBDIR + '/' + WORKING_DIR)
     os.makedirs(task_dir + '/' + DATA_SUBDIR + '/tmp')
-    outs = task_data.get('outputs', [])
-    for o in outs:
+    for o in outputs:
       local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + o.docker_path
       # makedirs errors out if the folder already exists, so check.
       if not os.path.isdir(os.path.dirname(local_file_path)):
         os.makedirs(os.path.dirname(local_file_path))
 
-  def _delocalize_outputs_recursive_command(self, task_dir, task_data):
-    outs = task_data.get('outputs', [])
+  def _delocalize_outputs_recursive_command(self, task_dir, outputs):
     cmd_lines = []
     # Generate commands to create any required local output directories.
-    for var in outs:
+    for var in outputs:
       if var.recursive and var.file_provider == param_util.P_LOCAL:
         cmd_lines.append('  mkdir -p "%s"' % var.uri.path)
     # Generate local and GCS delocalize commands.
     cmd_lines.append(
         providers_util.build_recursive_delocalize_command(
-            os.path.join(task_dir, DATA_SUBDIR), outs, param_util.P_GCS))
+            os.path.join(task_dir, DATA_SUBDIR), outputs, param_util.P_GCS))
     cmd_lines.append(
         providers_util.build_recursive_delocalize_command(
-            os.path.join(task_dir, DATA_SUBDIR), outs, param_util.P_LOCAL))
+            os.path.join(task_dir, DATA_SUBDIR), outputs, param_util.P_LOCAL))
     return '\n'.join(cmd_lines)
 
-  def _delocalize_outputs_commands(self, task_dir, task_data):
+  def _delocalize_outputs_commands(self, task_dir, outputs):
     """Copy outputs from local disk to GCS."""
-    outs = task_data.get('outputs', [])
     commands = []
-    for o in outs:
+    for o in outputs:
       if o.recursive:
         continue
 

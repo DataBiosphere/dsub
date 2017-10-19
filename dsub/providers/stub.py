@@ -25,7 +25,7 @@ class StubJobProvider(base.JobProvider):
   # 1) Methods that are supposed to do something. Use mocks
   #    if you need to check that they are called.
 
-  def submit_job(self, job_resources, job_metadata, all_job_data):
+  def submit_job(self, job_resources, job_metadata, job_data, all_job_data):
     pass
 
   def delete_jobs(self,

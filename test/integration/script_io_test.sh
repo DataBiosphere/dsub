@@ -17,6 +17,8 @@
 # script_io_tests.sh
 #
 # Basic pipeline script, which exercises file localization/de-localiation.
+# Note: The behavior of this script is coupled to the implementation of output
+#       checks defined in io_setup.sh. Changes here could break these tests.
 #
 # The script must be run with:
 #   INPUT_PATH: file or directory where files have been localized,
@@ -29,6 +31,9 @@
 
 set -o errexit
 set -o nounset
+
+echo "POPULATION_FILE = ${POPULATION_FILE}"
+echo "OUTPUT_POPULATION_FILE = ${OUTPUT_POPULATION_FILE}"
 
 echo "INPUT_PATH = ${INPUT_PATH}"
 echo "OUTPUT_PATH = ${OUTPUT_PATH}"
@@ -54,3 +59,6 @@ for INPUT_FILE in "${INPUT_FILE_LIST[@]}"; do
   md5sum "${INPUT_FILE}" | awk '{ print $1 }' > "${OUTPUT_DIR}/${FILE_NAME}.md5"
 done
 
+# Write the md5 for the population file to a task-specific output location
+md5sum "${POPULATION_FILE}" | awk '{ print $1 }' \
+  > "$(dirname "${OUTPUT_POPULATION_FILE}")/${TASK_ID}.md5"

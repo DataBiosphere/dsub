@@ -547,15 +547,17 @@ class _Pipelines(object):
     # pyformat: enable
 
   @classmethod
-  def build_pipeline_args(cls, project, script, task_data, preemptible,
-                          logging_uri, scopes, keep_alive):
+  def build_pipeline_args(cls, project, script, job_data, task_data,
+                          preemptible, logging_uri, scopes, keep_alive):
     """Builds pipeline args for execution.
 
     Args:
       project: string name of project.
       script: Body of the script to execute.
-      task_data: dictionary of value for envs, inputs, and outputs for this
-          task.
+      job_data: dictionary of values for labels, envs, inputs, and outputs for
+          this job.
+      task_data: dictionary of values for labels, envs, inputs, and outputs for
+          this task.
       preemptible: use a preemptible VM for the job
       logging_uri: path for job logging output.
       scopes: list of scope.
@@ -565,12 +567,16 @@ class _Pipelines(object):
       A nested dictionary with one entry under the key pipelineArgs containing
       the pipeline arguments.
     """
+    # For the Pipelines API, envs and file inputs are all "inputs".
     inputs = {}
     inputs.update({SCRIPT_VARNAME: script})
-    inputs.update({var.name: var.value for var in task_data['envs']})
     inputs.update(
-        {var.name: var.uri
-         for var in task_data['inputs'] if not var.recursive})
+        {var.name: var.value
+         for var in job_data['envs'] + task_data['envs']})
+    inputs.update({
+        var.name: var.uri
+        for var in job_data['inputs'] + task_data['inputs'] if not var.recursive
+    })
 
     # Remove wildcard references for non-recursive output. When the pipelines
     # controller generates a delocalize call, it must point to a bare directory
@@ -578,7 +584,7 @@ class _Pipelines(object):
     # delocalize with a call similar to:
     #   gsutil cp /mnt/data/output/gs/bucket/path/*.bam gs://bucket/path/
     outputs = {}
-    for var in task_data['outputs']:
+    for var in job_data['outputs'] + task_data['outputs']:
       if var.recursive:
         continue
       if '*' in var.uri.basename:
@@ -589,7 +595,7 @@ class _Pipelines(object):
     labels = {}
     labels.update({
         label.name: label.value if label.value else ''
-        for label in task_data['labels']
+        for label in job_data['labels'] + task_data['labels']
     })
 
     # pyformat: disable
@@ -956,7 +962,8 @@ class GoogleJobProvider(base.JobProvider):
 
     return labels
 
-  def _build_pipeline_request(self, job_resources, task_metadata, task_data):
+  def _build_pipeline_request(self, job_resources, task_metadata, job_data,
+                              task_data):
     """Returns a Pipeline objects for the job."""
 
     script = task_metadata['script']
@@ -975,9 +982,9 @@ class GoogleJobProvider(base.JobProvider):
         image=job_resources.image,
         zones=job_resources.zones,
         script_name=script.name,
-        envs=task_data['envs'],
-        inputs=task_data['inputs'],
-        outputs=task_data['outputs'],
+        envs=job_data['envs'] + task_data['envs'],
+        inputs=job_data['inputs'] + task_data['inputs'],
+        outputs=job_data['outputs'] + task_data['outputs'],
         pipeline_name=task_metadata['pipeline-name'])
 
     # Build the pipelineArgs for this job.
@@ -985,9 +992,10 @@ class GoogleJobProvider(base.JobProvider):
                                                     task_metadata)
 
     pipeline.update(
-        _Pipelines.build_pipeline_args(
-            self._project, script.value, task_data, job_resources.preemptible,
-            logging_uri, job_resources.scopes, job_resources.keep_alive))
+        _Pipelines.build_pipeline_args(self._project, script.value, job_data,
+                                       task_data, job_resources.preemptible,
+                                       logging_uri, job_resources.scopes,
+                                       job_resources.keep_alive))
 
     return pipeline
 
@@ -998,13 +1006,14 @@ class GoogleJobProvider(base.JobProvider):
 
     return GoogleOperation(operation).get_field('task-id')
 
-  def submit_job(self, job_resources, job_metadata, all_task_data):
+  def submit_job(self, job_resources, job_metadata, job_data, all_task_data):
     """Submit the job (or tasks) to be executed.
 
     Args:
       job_resources: resource parameters required by each job.
       job_metadata: job parameters such as job-id, user-id, script
-      all_task_data: list of task arguments
+      job_data: arguments global to the job
+      all_task_data: list of arguments for each task
 
     Returns:
       A dictionary containing the 'user-id', 'job-id', and 'task-id' list.
@@ -1016,6 +1025,7 @@ class GoogleJobProvider(base.JobProvider):
     # Validate task data and resources.
     param_util.validate_submit_args_or_fail(
         job_resources,
+        job_data,
         all_task_data,
         provider_name=_PROVIDER_NAME,
         input_providers=_SUPPORTED_INPUT_PROVIDERS,
@@ -1030,7 +1040,7 @@ class GoogleJobProvider(base.JobProvider):
                                                        task_data.get('task-id'))
 
       request = self._build_pipeline_request(job_resources, task_metadata,
-                                             task_data)
+                                             job_data, task_data)
 
       if self._dry_run:
         requests.append(request)

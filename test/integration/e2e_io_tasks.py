@@ -24,6 +24,9 @@ import sys
 import test_setup_e2e as test
 import test_util
 
+POPULATION_FILE = 'gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/20131219.superpopulations.tsv'
+POPULATION_MD5 = '68a73f849b82071afe11888bac1aa8a7'
+
 if not os.environ.get('CHECK_RESULTS_ONLY'):
   print 'Launching pipeline...'
 
@@ -31,6 +34,9 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
   launched_job = test.run_dsub([
       '--script', '%s/script_io_test.sh' % test.TEST_DIR,
       '--tasks', test.TASKS_FILE,
+      '--env', 'TEST_NAME=%s' % test.TEST_NAME,
+      '--input', 'POPULATION_FILE=%s' % POPULATION_FILE,
+      '--output', 'OUTPUT_POPULATION_FILE=%s/*' % test.OUTPUTS,
       '--wait'])
   # pyformat: enable
 
@@ -67,7 +73,9 @@ RESULTS_EXPECTED = ('4afb9b8908959dbd4e2d5c54bf254c93',
                     '0dc006ed39ddad2790034ca497631234',
                     '36e37a0dab5926dbf5a1b8afc0cdac8b')
 
-for i in range(len(INPUT_BAMS)):
+TASKS_COUNT = len(INPUT_BAMS)
+
+for i in range(TASKS_COUNT):
   INPUT_BAM = INPUT_BAMS[i]
   RESULT_EXPECTED = RESULTS_EXPECTED[i]
 
@@ -75,6 +83,22 @@ for i in range(len(INPUT_BAMS)):
       test.TASKS_FILE, '--input INPUT_PATH', r'^.*/%s$' % INPUT_BAM,
       '--output OUTPUT_PATH')
   OUTPUT_FILE = '%s/%s.md5' % (OUTPUT_PATH[:-len('/*.md5')], INPUT_BAM)
+  RESULT = test_util.gsutil_cat(OUTPUT_FILE)
+
+  if not test_util.diff(RESULT_EXPECTED.strip(), RESULT.strip()):
+    print 'Output file does not match expected'
+    sys.exit(1)
+
+  print
+  print 'Output file matches expected:'
+  print '*****************************'
+  print 'RESULT'
+  print '*****************************'
+
+# Check that the population file got copied for each of the tasks
+RESULT_EXPECTED = POPULATION_MD5
+for i in range(TASKS_COUNT):
+  OUTPUT_FILE = '%s/TASK_%s.md5' % (test.OUTPUTS, (i + 1))
   RESULT = test_util.gsutil_cat(OUTPUT_FILE)
 
   if not test_util.diff(RESULT_EXPECTED.strip(), RESULT.strip()):
