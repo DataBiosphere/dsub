@@ -211,6 +211,9 @@ def parse_arguments():
   Returns:
     A Namespace of parsed arguments.
   """
+  # Handle version flag and exit if it was passed.
+  param_util.handle_version_flag()
+
   provider_required_args = {
       'google': ['project'],
       'test-fails': [],
@@ -221,6 +224,8 @@ def parse_arguments():
     epilog += '  %s: %s\n' % (provider, provider_required_args[provider])
   parser = argparse.ArgumentParser(
       formatter_class=argparse.ArgumentDefaultsHelpFormatter, epilog=epilog)
+  parser.add_argument(
+      '--version', '-v', default=False, help='Print the dsub version and exit.')
   parser.add_argument(
       '--project',
       help='Cloud project ID in which to query pipeline operations')

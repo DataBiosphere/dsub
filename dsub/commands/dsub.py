@@ -178,6 +178,8 @@ def _parse_arguments(prog, argv):
   Returns:
     A Namespace of parsed arguments.
   """
+  # Handle version flag and exit if it was passed.
+  param_util.handle_version_flag()
 
   provider_required_args = {
       'google': ['project', 'zones', 'logging'],
@@ -193,6 +195,8 @@ def _parse_arguments(prog, argv):
       epilog=epilog)
 
   # Add dsub core job submission arguments
+  parser.add_argument(
+      '--version', '-v', default=False, help='Print the dsub version and exit.')
   parser.add_argument(
       '--name',
       help="""Name for pipeline. Defaults to the script name or

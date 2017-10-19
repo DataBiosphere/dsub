@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utility functions and classes for input, output, and script parameters."""
+from __future__ import absolute_import
+from __future__ import print_function
 
 import argparse
 import collections
@@ -19,8 +21,10 @@ import csv
 import datetime
 import os
 import re
+import sys
 
-import dsub_util
+from . import dsub_util
+from .._dsub_version import DSUB_VERSION
 
 AUTO_PREFIX_INPUT = 'INPUT_'  # Prefix for auto-generated input names
 AUTO_PREFIX_OUTPUT = 'OUTPUT_'  # Prefix for auto-generated output names
@@ -910,6 +914,23 @@ def directory_fmt(directory):
     the directory with a trailing slash.
   """
   return directory.rstrip('/') + '/'
+
+
+def handle_version_flag():
+  """If the --version flag is passed, print version to stdout and exit.
+
+  Within dsub commands, --version should be the highest priority flag.
+  This function supplies a repeatable and DRY way of checking for the
+  version flag and printing the version. Callers still need to define a version
+  flag in the command's flags so that it shows up in help output.
+  """
+  parser = argparse.ArgumentParser(description='Version parser', add_help=False)
+  parser.add_argument('--version', '-v', dest='version', action='store_true')
+  parser.set_defaults(version=False)
+  args, _ = parser.parse_known_args()
+  if args.version:
+    print('dsub version: %s' % DSUB_VERSION)
+    sys.exit()
 
 
 def age_to_create_time(age, from_time=datetime.datetime.utcnow()):

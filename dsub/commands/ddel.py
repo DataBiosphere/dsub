@@ -29,6 +29,9 @@ def parse_arguments():
   Returns:
     A Namespace of parsed arguments.
   """
+  # Handle version flag and exit if it was passed.
+  param_util.handle_version_flag()
+
   provider_required_args = {
       'google': ['project'],
       'test-fails': [],
@@ -40,6 +43,8 @@ def parse_arguments():
   parser = argparse.ArgumentParser(
       formatter_class=argparse.ArgumentDefaultsHelpFormatter, epilog=epilog)
   provider_base.add_provider_argument(parser)
+  parser.add_argument(
+      '--version', '-v', default=False, help='Print the dsub version and exit.')
   google = parser.add_argument_group(
       title='google',
       description='Options for the Google provider (Pipelines API)')
