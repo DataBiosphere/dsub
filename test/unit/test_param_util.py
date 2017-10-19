@@ -36,26 +36,39 @@ class ParamUtilTest(unittest.TestCase):
     self.assertEqual('my_name', env_param.name)
     self.assertEqual('my_value', env_param.value)
 
-  def testLabelParam(self):
-    good_labels = [('genre', 'jazz'), ('underscores_are',
-                                       'totally_ok'), ('dashes-are', 'also-ok'),
-                   ('num_123', 'good_456'), ('final_underscore_', 'ok_too_'),
-                   ('final-dash', 'no-problem-'), ('optional_value',
-                                                   ''), ('a' * 63,
-                                                         'not_too_long')]
-    for name, value in good_labels:
-      label_param = param_util.LabelParam(name, value)
-      self.assertEqual(name, label_param.name)
-      self.assertEqual(value, label_param.value)
-    bad_labels = [('WHATS',
-                   'updog'), ('1', 'initial_number'), ('initial_number', '1'),
-                  ('-', 'initial_dash'), ('initial_dash', '-'),
-                  ('spaces bad', ''), ('midCaps', 'bad'), ('bad', 'midCaps'),
-                  ('a' * 64, 'too_long'), ('', 'name_required'), ('too_long',
-                                                                  'a' * 64)]
-    for name, value in bad_labels:
-      with self.assertRaises(ValueError):
-        param_util.LabelParam(name, value)
+  @parameterized.parameterized.expand([
+      ('gl1', 'genre', 'jazz'),
+      ('gl2', 'underscores_are', 'totally_ok'),
+      ('gl3', 'dashes-are', 'also-ok'),
+      ('gl4', 'num_123', 'good_456'),
+      ('gl5', 'final_underscore_', 'ok_too_'),
+      ('gl6', 'final-dash', 'no-problem-'),
+      ('gl7', 'optional_value', ''),
+      ('gl8', 'optional_value_2', None),
+      ('gl9', 'a' * 63, 'not_too_long'),
+      ('gl10', 'numbers-are-now-okay', '1'),
+      ('gl11', 'zero-is-okay', '0'),
+      ('gl12', 'initial_dash', '-abc'),
+      ('gl13', 'initial_underscore', '_abc'),
+  ])
+  def test_good_labels(self, unused_name, name, value):
+    label_param = param_util.LabelParam(name, value)
+    self.assertEqual(name, label_param.name)
+    self.assertEqual(value, label_param.value)
+
+  @parameterized.parameterized.expand(
+      [('bl1', 'WHATS', 'updog'),
+       ('bl2', '1', 'initial_number'),
+       ('bl4', '-', 'initial_dash'),
+       ('bl6', 'spaces bad', ''),
+       ('bl7', 'midCaps', 'bad'),
+       ('bl8', 'bad', 'midCaps'),
+       ('bl9', 'a' * 64, 'too_long'),
+       ('bl10', '', 'name_required'),
+       ('bl11', 'too_long', 'a' * 64)])  # pyformat: disable
+  def test_bad_labels(self, unused_name, name, value):
+    with self.assertRaises(ValueError):
+      param_util.LabelParam(name, value)
 
   def testFileParam(self):
     file_param = param_util.FileParam(

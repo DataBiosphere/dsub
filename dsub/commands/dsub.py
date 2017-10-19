@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Submit batch jobs.
 
 Follows the model of bsub, qsub, srun, etc.
@@ -34,8 +33,6 @@ from ..lib.dsub_util import print_error
 from ..providers import provider_base
 
 SLEEP_FUNCTION = time.sleep  # so we can replace it in tests
-
-DEFAULT_SCOPES = ['https://www.googleapis.com/auth/bigquery',]
 
 # When --skip is used, dsub will skip launching a new job if the outputs
 # already exist. In that case, dsub returns a special job-id ("NO_JOB")
@@ -170,7 +167,7 @@ class TaskParamAction(argparse.Action):
     setattr(namespace, self.dest, tasks)
 
 
-def parse_arguments(prog, argv):
+def _parse_arguments(prog, argv):
   """Parses command line arguments.
 
   Args:
@@ -181,6 +178,8 @@ def parse_arguments(prog, argv):
   Returns:
     A Namespace of parsed arguments.
   """
+  # Handle version flag and exit if it was passed.
+  param_util.handle_version_flag()
 
   provider_required_args = {
       'google': ['project', 'zones', 'logging'],
@@ -196,6 +195,8 @@ def parse_arguments(prog, argv):
       epilog=epilog)
 
   # Add dsub core job submission arguments
+  parser.add_argument(
+      '--version', '-v', default=False, help='Print the dsub version and exit.')
   parser.add_argument(
       '--name',
       help="""Name for pipeline. Defaults to the script name or
@@ -279,7 +280,6 @@ def parse_arguments(prog, argv):
   parser.add_argument(
       '--user',
       '-u',
-      default=None,
       help='User submitting the dsub job, defaults to the current OS user.')
 
   # Add dsub job management arguments
@@ -309,12 +309,18 @@ def parse_arguments(prog, argv):
 
   # Add dsub resource requirement arguments
   parser.add_argument(
-      '--min-cores', default=1, type=int, help='Minimum CPU cores for each job')
+      '--min-cores',
+      default=job_util.DEFAULT_MIN_CORES,
+      type=int,
+      help='Minimum CPU cores for each job')
   parser.add_argument(
-      '--min-ram', default=3.75, type=float, help='Minimum RAM per job in GB')
+      '--min-ram',
+      default=job_util.DEFAULT_MIN_RAM,
+      type=float,
+      help='Minimum RAM per job in GB')
   parser.add_argument(
       '--disk-size',
-      default=200,
+      default=job_util.DEFAULT_DISK_SIZE,
       type=int,
       help='Size (in GB) of data disk to attach for each job')
 
@@ -329,12 +335,10 @@ def parse_arguments(prog, argv):
       title='google',
       description='Options for the Google provider (Pipelines API)')
   google.add_argument(
-      '--project',
-      default=None,
-      help='Cloud project ID in which to run the pipeline')
+      '--project', help='Cloud project ID in which to run the pipeline')
   google.add_argument(
       '--boot-disk-size',
-      default=10,
+      default=job_util.DEFAULT_BOOT_DISK_SIZE,
       type=int,
       help='Size (in GB) of the boot disk')
   google.add_argument(
@@ -343,13 +347,10 @@ def parse_arguments(prog, argv):
       action='store_true',
       help='Use a preemptible VM for the job')
   google.add_argument(
-      '--zones',
-      default=None,
-      nargs='+',
-      help='List of Google Compute Engine zones.')
+      '--zones', nargs='+', help='List of Google Compute Engine zones.')
   google.add_argument(
       '--scopes',
-      default=DEFAULT_SCOPES,
+      default=job_util.DEFAULT_SCOPES,
       nargs='+',
       help='Space-separated scopes for GCE instances.')
   google.add_argument(
@@ -369,7 +370,7 @@ def parse_arguments(prog, argv):
   return args
 
 
-def get_job_resources(args):
+def _get_job_resources(args):
   """Extract job-global resources requirements from input args.
 
   Args:
@@ -392,27 +393,27 @@ def get_job_resources(args):
       keep_alive=args.keep_alive)
 
 
-def get_job_metadata(args, script, provider):
+def _get_job_metadata(user_id, job_name, script, provider):
   """Allow provider to extract job-specific metadata from command-line args.
 
   Args:
-    args: parsed command-line arguments
+    user_id: user submitting the job
+    job_name: name for the job
     script: the script to run
     provider: job service provider
 
   Returns:
     A dictionary of job-specific metadata (such as job id, name, etc.)
   """
-  user_name = args.user or dsub_util.get_os_user()
-  job_metadata = provider.prepare_job_metadata(script.name, args.name,
-                                               user_name)
+  user_id = user_id or dsub_util.get_os_user()
+  job_metadata = provider.prepare_job_metadata(script.name, job_name, user_id)
 
   job_metadata['script'] = script
 
   return job_metadata
 
 
-def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
+def _wait_after(provider, jobid_list, poll_interval, stop_on_failure):
   """Print status info as we wait for those jobs.
 
   Blocks until either all of the listed jobs succeed,
@@ -443,7 +444,7 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
     print('Waiting for: %s.' % (', '.join(job_set)))
 
     # Poll until any remaining jobs have completed
-    jobs_left = wait_for_any_job(provider, job_set, poll_interval)
+    jobs_left = _wait_for_any_job(provider, job_set, poll_interval)
 
     # Calculate which jobs just completed
     jobs_completed = job_set.difference(jobs_left)
@@ -454,7 +455,7 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
     # We don't want to overwhelm the user with output when there are many
     # tasks per job. So we get a single "dominant" task for each of the
     # completed jobs (one that is representative of the job's fate).
-    dominant_job_tasks = dominant_task_for_jobs(tasks_completed)
+    dominant_job_tasks = _dominant_task_for_jobs(tasks_completed)
     if len(dominant_job_tasks) != len(jobs_completed):
       # print info about the jobs we couldn't find
       # (should only occur for "--after" where the job ID is a typo).
@@ -478,7 +479,7 @@ def wait_after(provider, jobid_list, poll_interval, stop_on_failure):
   return error_messages
 
 
-def dominant_task_for_jobs(tasks):
+def _dominant_task_for_jobs(tasks):
   """A list with, for each job, its dominant task.
 
   The dominant task is the one that exemplifies its job's
@@ -494,17 +495,16 @@ def dominant_task_for_jobs(tasks):
     A list with, for each job, its dominant task.
   """
 
-  per_job = group_tasks_by_jobid(tasks)
+  per_job = _group_tasks_by_jobid(tasks)
 
   ret = []
   for job_id in per_job.keys():
-    tasks_in_salience_order = sorted(
-        per_job[job_id], key=importance_of_task)
+    tasks_in_salience_order = sorted(per_job[job_id], key=_importance_of_task)
     ret.append(tasks_in_salience_order[0])
   return ret
 
 
-def group_tasks_by_jobid(tasks):
+def _group_tasks_by_jobid(tasks):
   """A defaultdict with, for each job, a list of its tasks."""
   ret = collections.defaultdict(list)
   for t in tasks:
@@ -512,7 +512,7 @@ def group_tasks_by_jobid(tasks):
   return ret
 
 
-def importance_of_task(task):
+def _importance_of_task(task):
   """Tuple (importance, end-time). Smaller values are more important."""
   # The status of a job is going to be determined by the roll-up of its tasks.
   # A FAILURE or CANCELED task means the job has FAILED.
@@ -526,11 +526,10 @@ def importance_of_task(task):
   # 2- The first RUNNING task, or if none
   # 3- The first SUCCESS task.
   importance = {'FAILURE': 0, 'CANCELED': 0, 'RUNNING': 1, 'SUCCESS': 2}
-  return (importance[task.get_field('task-status')],
-          task.get_field('end-time'))
+  return (importance[task.get_field('task-status')], task.get_field('end-time'))
 
 
-def wait_for_any_job(provider, jobid_list, poll_interval):
+def _wait_for_any_job(provider, jobid_list, poll_interval):
   """Waits until any of the listed jobs is not running.
 
   In particular, if any of the jobs sees one of its tasks fail,
@@ -581,7 +580,7 @@ def _job_outputs_are_present(job_data):
 
 def dsub_main(prog, argv):
   # Parse args and validate
-  args = parse_arguments(prog, argv)
+  args = _parse_arguments(prog, argv)
   # intent:
   # * dsub tightly controls the output to stdout.
   # * wrap the main body such that output goes to stderr.
@@ -606,9 +605,10 @@ def main(prog=sys.argv[0], argv=sys.argv[1:]):
 
 
 def run_main(args):
-  """Actual dsub body, post-stdout-redirection."""
   if args.command and args.script:
-    raise ValueError('Cannot supply both --command and a script name.')
+    raise ValueError('Cannot supply both a --command and --script flag')
+
+  provider_base.check_for_unsupported_flag(args)
 
   if (args.env or args.input or args.input_recursive or args.output or
       args.output_recursive) and args.tasks:
@@ -620,31 +620,7 @@ def run_main(args):
     raise ValueError('Output skipping (--skip) not supported for --task '
                      'commands.')
 
-  provider_base.check_for_unsupported_flag(args)
-
-  if args.command:
-    if args.name:
-      command_name = args.name
-    else:
-      command_name = _name_for_command(args.command)
-
-    # add the shebang line to ensure the script's run.
-    script = job_util.Script(command_name, '#!/bin/bash\n' + args.command)
-  elif args.script:
-    # Read the script file
-    script_file = dsub_util.load_file(args.script)
-    script = job_util.Script(os.path.basename(args.script), script_file.read())
-  else:
-    raise ValueError('One of --command or a script name must be supplied')
-
-  # Set up the Genomics Pipelines service interface
-  provider = provider_base.get_provider(args)
-
-  # Extract arguments that are global for the batch of jobs to run
-  job_resources = get_job_resources(args)
-  job_metadata = get_job_metadata(args, script, provider)
-
-  # Set up job parameters and job data from a tasks file or the command-line
+  # Set up job parameters and job data from a tasks file or flags.
   input_file_param_util = param_util.InputFileParamUtil(
       DEFAULT_INPUT_LOCAL_PATH)
   output_file_param_util = param_util.OutputFileParamUtil(
@@ -657,17 +633,74 @@ def run_main(args):
         args.env, args.label, args.input, args.input_recursive, args.output,
         args.output_recursive, input_file_param_util, output_file_param_util)
 
-  if not args.dry_run:
+  return run(
+      provider_base.get_provider(args),
+      _get_job_resources(args),
+      all_task_data,
+      name=args.name,
+      dry_run=args.dry_run,
+      command=args.command,
+      script=args.script,
+      user=args.user,
+      wait=args.wait,
+      poll_interval=args.poll_interval,
+      after=args.after,
+      skip=args.skip,
+      project=args.project,
+      disable_warning=True)
+
+
+def run(provider,
+        job_resources,
+        task_data,
+        name=None,
+        dry_run=False,
+        command=None,
+        script=None,
+        user=None,
+        wait=False,
+        poll_interval=10,
+        after=None,
+        skip=False,
+        project=None,
+        disable_warning=False):
+  """Actual dsub body, post-stdout-redirection."""
+  if not disable_warning:
+    raise ValueError('Do not user this unstable API component!')
+
+  if len(task_data) > 1 and skip:
+    raise ValueError('The skip option is not supported with multiple tasks')
+
+  if command and script:
+    raise ValueError('Cannot supply both a command and script value.')
+
+  if command:
+    if name:
+      command_name = name
+    else:
+      command_name = _name_for_command(command)
+
+    # Add the shebang line to ensure the command is treated as Bash
+    script = job_util.Script(command_name, '#!/bin/bash\n' + command)
+  elif script:
+    # Read the script file
+    script_file = dsub_util.load_file(script)
+    script = job_util.Script(os.path.basename(script), script_file.read())
+  else:
+    raise ValueError('One of --command or a script name must be supplied')
+
+  job_metadata = _get_job_metadata(user, name, script, provider)
+
+  if not dry_run:
     print('Job: %s' % job_metadata['job-id'])
 
   # Wait for predecessor jobs (if any)
-  if args.after:
-    if args.dry_run:
-      print('(Pretend) waiting for: %s.' % (args.after))
+  if after:
+    if dry_run:
+      print('(Pretend) waiting for: %s.' % (after))
     else:
       print('Waiting for predecessor jobs to complete...')
-      error_messages = wait_after(provider, args.after, args.poll_interval,
-                                  True)
+      error_messages = _wait_after(provider, after, poll_interval, True)
       if error_messages:
         for msg in error_messages:
           print_error(msg)
@@ -676,31 +709,33 @@ def run_main(args):
             error_messages)
 
   # If requested, skip running this job if its outputs already exist
-  if args.skip and not args.dry_run:
-    if _job_outputs_are_present(all_task_data[0]):
+  if skip and not dry_run:
+    if _job_outputs_are_present(task_data[0]):
       print('Job output already present, skipping new job submission.')
       return {'job-id': NO_JOB}
 
   # Launch all the job tasks!
-  launched_job = provider.submit_job(job_resources, job_metadata, all_task_data)
+  launched_job = provider.submit_job(job_resources, job_metadata, task_data)
 
-  if not args.dry_run:
+  if not dry_run:
     print('Launched job-id: %s' % launched_job['job-id'])
     if launched_job.get('task-id'):
       print('%s task(s)' % len(launched_job['task-id']))
     print('To check the status, run:')
-    print('  dstat%s --jobs %s --status \'*\'' % (
-        provider_base.get_dstat_provider_args(args), launched_job['job-id']))
+    print("  dstat%s --jobs '%s' --status '*'" %
+          (provider_base.get_dstat_provider_args(provider, project),
+           launched_job['job-id']))
     print('To cancel the job, run:')
-    print('  ddel%s --jobs %s' % (provider_base.get_ddel_provider_args(args),
-                                  launched_job['job-id']))
+    print("  ddel%s --jobs '%s'" %
+          (provider_base.get_ddel_provider_args(provider, project),
+           launched_job['job-id']))
 
   # Poll for job completion
-  if args.wait:
+  if wait:
     print('Waiting for job to complete...')
 
-    error_messages = wait_after(provider, [job_metadata['job-id']],
-                                args.poll_interval, False)
+    error_messages = _wait_after(provider, [job_metadata['job-id']],
+                                 poll_interval, False)
     if error_messages:
       for msg in error_messages:
         print_error(msg)
@@ -715,15 +750,25 @@ def _name_for_command(command):
   r"""Craft a simple command name from the command.
 
   The best command strings for this are going to be those where a simple
-  command was given:
+  command was given; we will use the command to derive the name.
+
+  We won't always be able to figure something out and the caller should just
+  specify a "--name" on the command-line.
+
+  For example, commands like "export VAR=val\necho ${VAR}", this function would
+  return "export".
+
+  If the command starts space or a comment, then we'll skip to the first code
+  we can find.
+
+  If we find nothing, just return "command".
 
   >>> _name_for_command('samtools index "${BAM}"')
   'samtools'
   >>> _name_for_command('/usr/bin/sort "${INFILE}" > "${OUTFILE}"')
   'sort'
-
-  For commands like "export VAR=val\necho ${VAR}", the user may want to pass
-  --name to specify a more informative name.
+  >>> _name_for_command('# This should be ignored')
+  'command'
 
   Arguments:
     command: the user-provided command
@@ -731,8 +776,14 @@ def _name_for_command(command):
     a proposed name for the task.
   """
 
-  # strip() to eliminate any leading whitespace from the token:
-  return os.path.basename(re.split(r'\s', command.strip())[0])
+  lines = command.splitlines()
+  for line in lines:
+    line = line.strip()
+    if line and not line.startswith('#'):
+      return os.path.basename(re.split(r'\s', line)[0])
+
+  return 'command'
+
 
 if __name__ == '__main__':
   main(sys.argv[0], sys.argv[1:])

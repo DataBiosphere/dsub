@@ -192,9 +192,8 @@ class Task(object):
     Not all fields need to be supported by all providers.
     Field identifiers include:
 
-    'job-name', 'job-id', 'task-id', 'user-id',
-    'task-status', 'error-message', 'create-time', 'end-time'
-    'inputs', 'outputs'
+    'job-name', 'job-id', 'task-id', 'user-id', 'task-status', 'error-message',
+    'create-time', 'start-time', 'end-time', 'inputs', 'outputs'
 
     The following are required by dstat:
     - status: The task status ('RUNNING', 'CANCELED', 'FAILED', 'SUCCESS')

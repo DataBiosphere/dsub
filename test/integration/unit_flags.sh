@@ -78,7 +78,7 @@ function test_having_command_and_script() {
     assert_output_empty
 
     assert_err_contains \
-      "ValueError: Cannot supply both --command and a script name"
+      "ValueError: Cannot supply both a --command and --script flag"
 
     test_passed "${subtest}"
   fi

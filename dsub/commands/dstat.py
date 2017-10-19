@@ -87,17 +87,18 @@ class TextOutput(OutputFormatter):
     # Define the ordering of fields for text output along with any
     # transformations.
     column_map = [
-        ('job-id', 'Job ID',),
-        ('job-name', 'Job Name',),
-        ('task-id', 'Task',),
+        ('job-id', 'Job ID'),
+        ('job-name', 'Job Name'),
+        ('task-id', 'Task'),
         ('status-message', 'Status', self.format_status),
-        ('status-detail', 'Status-details',),
-        ('last-update', 'Last Update',),
-        ('create-time', 'Created',),
-        ('end-time', 'Ended',),
-        ('user-id', 'User',),
-        ('internal-id', 'Internal ID',),
-        ('logging', 'Logging',),
+        ('status-detail', 'Status-details'),
+        ('last-update', 'Last Update'),
+        ('create-time', 'Created'),
+        ('start-time', 'Started'),
+        ('end-time', 'Ended'),
+        ('user-id', 'User'),
+        ('internal-id', 'Internal ID'),
+        ('logging', 'Logging'),
         ('inputs', 'Inputs', self.format_inputs_outputs),
         ('outputs', 'Outputs', self.format_inputs_outputs),
     ]
@@ -166,41 +167,39 @@ def prepare_row(task, full):
   # it is a long value and would leave little room for status and update time.
 
   row_spec = collections.namedtuple('row_spec',
-                                    ['key', 'optional', 'default_value'])
+                                    ['key', 'required', 'default_value'])
 
   # pyformat: disable
   default_columns = [
-      row_spec('job-name', False, None),
-      row_spec('task-id', True, None),
-      row_spec('last-update', False, None)
-  ]
-  short_columns = default_columns + [
-      row_spec('status-message', False, None),
+      row_spec('job-name', True, None),
+      row_spec('task-id', False, None),
+      row_spec('last-update', True, None),
+      row_spec('status-message', True, None)
   ]
   full_columns = default_columns + [
-      row_spec('job-id', False, None),
-      row_spec('user-id', False, None),
-      row_spec('status', False, None),
-      row_spec('status-detail', False, None),
-      row_spec('create-time', False, None),
-      row_spec('end-time', False, 'NA'),
-      row_spec('internal-id', False, None),
-      row_spec('logging', False, None),
-      row_spec('inputs', False, {}),
-      row_spec('outputs', False, {}),
-      row_spec('envs', False, {}),
-      row_spec('labels', False, {}),
+      row_spec('job-id', True, None),
+      row_spec('user-id', True, None),
+      row_spec('status', True, None),
+      row_spec('status-detail', True, None),
+      row_spec('create-time', True, None),
+      row_spec('end-time', True, 'NA'),
+      row_spec('internal-id', True, None),
+      row_spec('logging', True, None),
+      row_spec('inputs', True, {}),
+      row_spec('outputs', True, {}),
+      row_spec('envs', True, {}),
+      row_spec('labels', True, {}),
   ]
   # pyformat: enable
 
-  columns = full_columns if full else short_columns
+  columns = full_columns if full else default_columns
 
   row = {}
   for col in columns:
-    key, optional, default = col
+    key, required, default = col
 
     value = task.get_field(key, default)
-    if not optional or value:
+    if required or value is not None:
       row[key] = value
 
   return row
@@ -212,6 +211,9 @@ def parse_arguments():
   Returns:
     A Namespace of parsed arguments.
   """
+  # Handle version flag and exit if it was passed.
+  param_util.handle_version_flag()
+
   provider_required_args = {
       'google': ['project'],
       'test-fails': [],
@@ -222,6 +224,8 @@ def parse_arguments():
     epilog += '  %s: %s\n' % (provider, provider_required_args[provider])
   parser = argparse.ArgumentParser(
       formatter_class=argparse.ArgumentDefaultsHelpFormatter, epilog=epilog)
+  parser.add_argument(
+      '--version', '-v', default=False, help='Print the dsub version and exit.')
   parser.add_argument(
       '--project',
       help='Cloud project ID in which to query pipeline operations')

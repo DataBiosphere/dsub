@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utility functions and classes for input, output, and script parameters."""
+from __future__ import absolute_import
+from __future__ import print_function
 
 import argparse
 import collections
@@ -19,8 +21,10 @@ import csv
 import datetime
 import os
 import re
+import sys
 
-import dsub_util
+from . import dsub_util
+from .._dsub_version import DSUB_VERSION
 
 AUTO_PREFIX_INPUT = 'INPUT_'  # Prefix for auto-generated input names
 AUTO_PREFIX_OUTPUT = 'OUTPUT_'  # Prefix for auto-generated output names
@@ -165,12 +169,8 @@ class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
     # * Label keys must start with a lowercase letter and international
     #   characters are allowed.
     # * Label keys cannot be empty.
-    cls._check_label_rule(name, 'name')
-
-    # The value can be empty.
-    # If not empty, must conform to the same rules as the name.
-    if value:
-      cls._check_label_rule(value, 'value')
+    cls._check_label_name(name)
+    cls._check_label_value(value)
 
     # Ensure that reserved labels are not being used.
     if not cls._allow_reserved_keys and name in RESERVED_LABELS:
@@ -178,15 +178,28 @@ class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
           name, list(RESERVED_LABELS)))
 
   @staticmethod
-  def _check_label_rule(param_value, param_type):
-    if len(param_value) < 1 or len(param_value) > 63:
-      raise ValueError('Label %s must be 1-63 characters long: "%s"' %
-                       (param_type, param_value))
-    if not re.match(r'^[a-z]([-_a-z0-9]*)?$', param_value):
+  def _check_label_name(name):
+    if len(name) < 1 or len(name) > 63:
+      raise ValueError('Label name must be 1-63 characters long: "%s"' % name)
+    if not re.match(r'^[a-z]([-_a-z0-9]*)?$', name):
       raise ValueError(
-          'Invalid %s for label: "%s". Must start with a lowercase letter and '
-          'contain only lowercase letters, numeric characters, underscores, '
-          'and dashes.' % (param_type, param_value))
+          'Invalid name for label: "%s". Must start with a lowercase letter '
+          'and contain only lowercase letters, numeric characters, '
+          'underscores, and dashes.' % name)
+
+  @staticmethod
+  def _check_label_value(value):
+    if not value:
+      return
+
+    if len(value) > 63:
+      raise ValueError(
+          'Label values must not be longer than 63 characters: "%s"' % value)
+
+    if not re.match(r'^([-_a-z0-9]*)?$', value):
+      raise ValueError(
+          'Invalid value for label: "%s". Must contain only lowercase letters, '
+          'numeric characters, underscores, and dashes.' % value)
 
 
 class FileParam(
@@ -748,7 +761,7 @@ def args_to_job_data(envs, labels, inputs, inputs_recursive, outputs,
     'envs', 'inputs', and 'outputs' that defines the set of parameters and data
     for a job.
   """
-  # Parse environmental vairables and labels.
+  # Parse environmental variables and labels.
   env_data = parse_pair_args(envs, EnvParam)
   label_data = parse_pair_args(labels, LabelParam)
 
@@ -901,6 +914,23 @@ def directory_fmt(directory):
     the directory with a trailing slash.
   """
   return directory.rstrip('/') + '/'
+
+
+def handle_version_flag():
+  """If the --version flag is passed, print version to stdout and exit.
+
+  Within dsub commands, --version should be the highest priority flag.
+  This function supplies a repeatable and DRY way of checking for the
+  version flag and printing the version. Callers still need to define a version
+  flag in the command's flags so that it shows up in help output.
+  """
+  parser = argparse.ArgumentParser(description='Version parser', add_help=False)
+  parser.add_argument('--version', '-v', dest='version', action='store_true')
+  parser.set_defaults(version=False)
+  args, _ = parser.parse_known_args()
+  if args.version:
+    print('dsub version: %s' % DSUB_VERSION)
+    sys.exit()
 
 
 def age_to_create_time(age, from_time=datetime.datetime.utcnow()):

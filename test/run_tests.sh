@@ -20,7 +20,8 @@ set -o nounset
 # Global variables for running tests in parallel
 
 # Set up a local directory for tests to write intermediate files
-readonly TEST_OUTPUT_DIR=/tmp/dsub_test
+readonly TEST_OUTPUT_DIR=/tmp/dsub_test/"$(date +'%Y%m%d_%H%M%S')"
+readonly TEST_TIMES_FILE="${TEST_OUTPUT_DIR}"/timing.txt
 
 # We allow for the integration tests to run concurrently.
 # By default, we run all of them at the same time, but MAX_CONCURRENCY
@@ -131,6 +132,8 @@ function check_wait_for_integration_tests() {
 
     cat "${test_dir}/output.txt"
     echo
+
+    grep "test completed in" "${test_dir}/output.txt" >> "${TEST_TIMES_FILE}"
   done
 
   # Emit failed tests last
@@ -147,10 +150,21 @@ function check_wait_for_integration_tests() {
 
     echo "FAILED: Test failed with exit code ${exit_code}"
     echo
+
+    grep "test completed in" "${test_dir}/output.txt" >> "${TEST_TIMES_FILE}"
   done
 
+  # Emit the time it took to run each test, sorted numerically so the slowest
+  # tests are at the end.
+  echo "Test timing summary:"
+  echo
+  cat "${TEST_TIMES_FILE}" \
+    | sed -e 's#^\*\*\* \(.*\): test completed in \(.*\) seconds \*\*\*$#\2\t\1#' \
+    | sort -n
+  echo
+
   if [[ "${failures}" -gt 0 ]]; then
-    echo "*** FAILED: ${failures} tests failed"
+    echo "*** $(basename "${0}") completed (FAILED): ${failures} tests failed"
     exit 1
   fi
 
@@ -287,4 +301,4 @@ done
 check_wait_for_integration_tests "force_wait"
 
 readonly RUN_TESTS_ENDSEC=$(date +'%s')
-echo "*** $(basename "${0}") completed in $((RUN_TESTS_ENDSEC - RUN_TESTS_STARTSEC)) seconds ***"
+echo "*** $(basename "${0}") completed (SUCCESS) in $((RUN_TESTS_ENDSEC - RUN_TESTS_STARTSEC)) seconds ***"

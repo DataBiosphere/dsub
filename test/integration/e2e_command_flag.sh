@@ -40,7 +40,11 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
     --env VAR4="VAL4" \
     --env VAR5="VAL5" \
-    --command "env | grep ^VAR | sort" \
+    --command '
+      # This comment is here to verify that dsub will properly handle
+      # a command that starts with a comment, specifically with regards to
+      # deriving a usable job name.
+      env | grep ^VAR | sort' \
     --wait
 
 fi

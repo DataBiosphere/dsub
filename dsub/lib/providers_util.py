@@ -44,14 +44,14 @@ def build_recursive_localize_env(destination, inputs):
   return export_input_dirs
 
 
-def build_recursive_localize_command(destination, inputs, file_filter):
+def build_recursive_localize_command(destination, inputs, file_provider):
   """Return a multi-line string with a shell script to copy recursively.
 
   Arguments:
     destination: Folder where to put the data.
                  For example /mnt/data
     inputs: a list of InputFileParam
-    file_filter: file provider string used to filter the output params; the
+    file_provider: file provider string used to filter the output params; the
                  returned command will only apply outputs whose file provider
                  matches this file filter.
 
@@ -59,11 +59,12 @@ def build_recursive_localize_command(destination, inputs, file_filter):
     a multi-line string with a shell script that copies the inputs
     recursively from GCS.
   """
-  command = _LOCALIZE_COMMAND_MAP[file_filter]
+  command = _LOCALIZE_COMMAND_MAP[file_provider]
   filtered_inputs = [
       var for var in inputs
-      if var.recursive and var.file_provider == file_filter
+      if var.recursive and var.file_provider == file_provider
   ]
+
   copy_input_dirs = '\n'.join([
       textwrap.dedent("""
       mkdir -p {data_mount}/{docker_path}
@@ -109,14 +110,14 @@ def build_recursive_gcs_delocalize_env(source, outputs):
   ])
 
 
-def build_recursive_delocalize_command(source, outputs, file_filter):
+def build_recursive_delocalize_command(source, outputs, file_provider):
   """Return a multi-line string with a shell script to copy recursively.
 
   Arguments:
     source: Folder with the data.
             For example /mnt/data
     outputs: a list of OutputFileParam.
-    file_filter: file provider string used to filter the output params; the
+    file_provider: file provider string used to filter the output params; the
                  returned command will only apply outputs whose file provider
                  matches this file filter.
 
@@ -124,11 +125,12 @@ def build_recursive_delocalize_command(source, outputs, file_filter):
     a multi-line string with a shell script that copies the inputs
     recursively to GCS.
   """
-  command = _LOCALIZE_COMMAND_MAP[file_filter]
+  command = _LOCALIZE_COMMAND_MAP[file_provider]
   filtered_outputs = [
       var for var in outputs
-      if var.recursive and var.file_provider == file_filter
+      if var.recursive and var.file_provider == file_provider
   ]
+
   return '\n'.join([
       textwrap.dedent("""
       for ((i = 0; i < 3; i++)); do
