@@ -17,7 +17,6 @@
 set -o errexit
 set -o nounset
 
-
 function provider_verify_stopped_job() {
   local job_id="${1}"
 
@@ -90,6 +89,14 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo
   echo "dstat indicates that the job is canceled."
+
+  # Check that there is a valid end time
+  DSTAT_OUTPUT=$(run_dstat --status '*' --jobs "${JOB_ID}" --full)
+  if ! util::dstat_yaml_job_has_valid_end_time "${DSTAT_OUTPUT}"; then
+    echo "dstat output for ${JOB_ID} does not include a valid end time."
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
 
   provider_verify_stopped_job "${JOB_ID}"
 

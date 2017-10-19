@@ -33,7 +33,6 @@ from .._dsub_version import DSUB_VERSION
 
 import apiclient.discovery
 import apiclient.errors
-from dateutil.tz import tzlocal
 
 from ..lib import param_util
 from ..lib import providers_util
@@ -374,7 +373,7 @@ class _Pipelines(object):
 
   @classmethod
   def _build_pipeline_docker_command(cls, script_name, inputs, outputs):
-    """Return a multi-line string containg the full pipeline docker command."""
+    """Return a multi-line string of the full pipeline docker command."""
 
     # We upload the user script as an environment argument
     # and write it to SCRIPT_DIR (preserving its local file name).
@@ -1167,10 +1166,7 @@ class GoogleJobProvider(base.JobProvider):
     completion_messages = []
     for task in tasks:
       errmsg = task.error_message()
-      if errmsg:
-        completion_messages.append(errmsg)
-      else:
-        completion_messages.append(task.get_task_status_message())
+      completion_messages.append(errmsg)
     return completion_messages
 
 
@@ -1227,7 +1223,7 @@ class GoogleOperation(base.Task):
     elif field == 'outputs':
       value = metadata['request']['pipelineArgs']['outputs']
     elif field == 'create-time':
-      value = self._localize_datestamp(metadata['createTime'])
+      value = self._parse_datestamp(metadata['createTime'])
     elif field == 'start-time':
       # Look through the events list for all "start" events (only one expected).
       start_events = [
@@ -1235,10 +1231,10 @@ class GoogleOperation(base.Task):
       ]
       # Get the startTime from the last "start" event.
       if start_events:
-        value = self._localize_datestamp(start_events[-1]['startTime'])
+        value = self._parse_datestamp(start_events[-1]['startTime'])
     elif field == 'end-time':
       if 'endTime' in metadata:
-        value = self._localize_datestamp(metadata['endTime'])
+        value = self._parse_datestamp(metadata['endTime'])
     elif field == 'status':
       value = self.operation_status()
     elif field in ['status-message', 'status-detail']:
@@ -1248,7 +1244,7 @@ class GoogleOperation(base.Task):
       status, last_update = self.operation_status_message()
       value = last_update
     else:
-      raise ValueError('Unsupported display field: "%s"' % field)
+      raise ValueError('Unsupported field: "%s"' % field)
 
     return value if value else default
 
@@ -1296,7 +1292,7 @@ class GoogleOperation(base.Task):
       else:
         msg = 'Success'
 
-    return (msg, self._localize_datestamp(ds))
+    return (msg, self._parse_datestamp(ds))
 
   def get_operation_full_job_id(self):
     """Returns the job-id or job-id.task-id for the operation."""
@@ -1308,15 +1304,14 @@ class GoogleOperation(base.Task):
       return job_id
 
   @staticmethod
-  def _localize_datestamp(datestamp):
-    """Converts a datestamp from RFC3339 UTC to local time.
+  def _parse_datestamp(datestamp):
+    """Converts a datestamp from RFC3339 UTC to a datetime.
 
     Args:
-      datestamp: a datetime value in RFC3339 UTC "Zulu" format
+      datestamp: a datetime string in RFC3339 UTC "Zulu" format
 
     Returns:
-      A datestamp in local time and up to seconds, or the original string if it
-      cannot be properly parsed.
+      A datetime.
     """
 
     # The timestamp from the Google Operations are all in RFC3339 format, but
@@ -1328,13 +1323,17 @@ class GoogleOperation(base.Task):
 
     m = re.match(r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}).*Z',
                  datestamp)
+
+    # It would be unexpected to get a different date format back from Google.
+    # If we raise an exception here, we can break people completely.
+    # Instead, let's just return None and people can report that some dates
+    # are not showing up.
     if not m:
-      return datestamp
+      return None
 
     # Create a UTC datestamp from parsed components
     g = [int(val) for val in m.groups()]
-    dt = datetime(g[0], g[1], g[2], g[3], g[4], g[5], tzinfo=pytz.utc)
-    return dt.astimezone(tzlocal()).strftime('%Y-%m-%d %H:%M:%S')
+    return datetime(g[0], g[1], g[2], g[3], g[4], g[5], tzinfo=pytz.utc)
 
   @classmethod
   def _get_operation_input_field_values(cls, metadata, file_input):

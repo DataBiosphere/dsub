@@ -27,6 +27,14 @@ set -o nounset
 readonly SCRIPT_DIR="$(dirname "${0}")"
 readonly JOB_NAME="test-job"
 
+function dstat_output_job_name() {
+  local dstat_out="${1}"
+
+  python "${SCRIPT_DIR}"/get_data_value.py \
+    "yaml" "${dstat_out}" "[0].job-name"
+}
+readonly -f dstat_output_job_name
+
 # This test is not sensitive to the output of the dsub job.
 # Set the ALLOW_DIRTY_TESTS environment variable to 1 in your shell to
 # run this test without first emptying the output and logging directories.
@@ -42,14 +50,14 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Checking dstat (by status)..."
 
-  if ! DSTAT_OUTPUT="$(run_dstat --status 'RUNNING' --jobs "${JOBID}" 2>&1)"; then
+  if ! DSTAT_OUTPUT="$(test_dstat --status 'RUNNING' --jobs "${JOBID}" --full)"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
     exit 1
   fi
 
-  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${JOB_NAME}"; then
+  if [[ "$(dstat_output_job_name "${DSTAT_OUTPUT}")" != "${JOB_NAME}" ]]; then
     echo "Job ${JOB_NAME} not found in the dstat output!"
     echo "${DSTAT_OUTPUT}"
     exit 1
@@ -57,14 +65,14 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Checking dstat (by job-name)..."
 
-  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --names "${JOB_NAME}" 2>&1)"; then
+  if ! DSTAT_OUTPUT="$(test_dstat --status '*' --full --names "${JOB_NAME}")"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
     exit 1
   fi
 
-  if ! echo "${DSTAT_OUTPUT}" | grep -qi "job-name: ${JOB_NAME}"; then
+  if [[ "$(dstat_output_job_name "${DSTAT_OUTPUT}")" != "${JOB_NAME}" ]]; then
     echo "Job ${JOB_NAME} not found in the dstat output!"
     echo "${DSTAT_OUTPUT}"
     exit 1
@@ -72,7 +80,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Checking dstat (by job-id: default)..."
 
-  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}" 2>&1)"; then
+  if ! DSTAT_OUTPUT="$(test_dstat --status '*' --jobs "${JOBID}")"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
@@ -87,14 +95,14 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Checking dstat (by job-id: full)..."
 
-  if ! DSTAT_OUTPUT=$(run_dstat --status '*' --full --jobs "${JOBID}" 2>&1); then
+  if ! DSTAT_OUTPUT=$(test_dstat --status '*' --full --jobs "${JOBID}"); then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
     exit 1
   fi
 
-  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${JOB_NAME}"; then
+  if [[ "$(dstat_output_job_name "${DSTAT_OUTPUT}")" != "${JOB_NAME}" ]]; then
     echo "Job ${JOB_NAME} not found in the dstat output!"
     echo "${DSTAT_OUTPUT}"
     exit 1
@@ -103,8 +111,8 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Waiting 5 seconds and checking 'dstat --age 5s'..."
   sleep 5s
 
-  DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}" --age 5s 2>&1)"
-  if [[ -n "${DSTAT_OUTPUT}" ]]; then
+  DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}" --age 5s --full)"
+  if [[ "${DSTAT_OUTPUT}" != "[]" ]]; then
     echo "dstat output not empty as expected:"
     echo "${DSTAT_OUTPUT}"
     exit 1
@@ -112,8 +120,8 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Verifying that the job didn't disappear completely."
 
-  DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}" 2>&1)"
-  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${JOB_NAME}"; then
+  DSTAT_OUTPUT="$(test_dstat --status '*' --jobs "${JOBID}" --full)"
+  if [[ "$(dstat_output_job_name "${DSTAT_OUTPUT}")" != "${JOB_NAME}" ]]; then
     echo "Job ${JOB_NAME} not found in the dstat output!"
     echo "${DSTAT_OUTPUT}"
     exit 1

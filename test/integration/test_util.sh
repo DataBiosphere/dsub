@@ -97,16 +97,20 @@ readonly -f util::expand_tsv_fields
 function util::get_job_status() {
   local job_id="$1"
 
-  local dstat_out=$(\
+  local dstat_out
+
+  if ! dstat_out=$(
     run_dstat \
       --jobs "${job_id}" \
       --status "*" \
       --age 30m \
       --full \
-      --format json)
+      --format json); then
+    return 1
+  fi
 
-  python "${SCRIPT_DIR}"/get_json_value.py \
-    "${dstat_out}" "[0].status"
+  python "${SCRIPT_DIR}"/get_data_value.py \
+    "json" "${dstat_out}" "[0].status"
 }
 readonly -f util::get_job_status
 
@@ -129,12 +133,17 @@ function util::wait_for_canceled_status() {
     max_wait_sec=90
   fi
 
+  local status
   echo "Waiting up to ${max_wait_sec} sec for CANCELED status of ${job_id}"
   for ((sec = 0; sec < max_wait_sec; sec += 5)); do
-    local status="$(util::get_job_status "${job_id}")"
+    if ! status="$(util::get_job_status "${job_id}")"; then
+      return 1
+    fi
+
     if [[ "${status}" == "CANCELED" ]]; then
       return 0
     fi
+
     echo "Status: ${status}. Sleep 5s"
     sleep 5s
   done
@@ -142,3 +151,32 @@ function util::wait_for_canceled_status() {
   return 1
 }
 readonly -f util::wait_for_canceled_status
+
+function util::is_valid_dstat_datetime() {
+  local datetime="${1}"
+
+  # If this fails to parse, it will exit with a non-zero exit code
+  python -c '
+import datetime
+import sys
+datetime.datetime.strptime(sys.argv[1], "%Y-%m-%d %H:%M:%S.%f")
+' "${datetime}"
+}
+readonly -f util::is_valid_dstat_datetime
+
+function util::dstat_yaml_output_end_time() {
+  local dstat_out="${1}"
+
+  python "${SCRIPT_DIR}"/get_data_value.py \
+    "yaml" "${dstat_out}" "[0].end-time"
+}
+readonly -f util::dstat_yaml_output_end_time
+
+function util::dstat_yaml_job_has_valid_end_time() {
+  local dstat_out="${1}"
+
+  local end_time="$(util::dstat_yaml_output_end_time "${dstat_out}")"
+  util::is_valid_dstat_datetime "${end_time}"
+}
+readonly -f util::dstat_yaml_job_has_valid_end_time
+

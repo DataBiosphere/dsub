@@ -79,8 +79,8 @@ import yaml
 #    runner.sh: Local runner script
 #    status.txt: File for the runner script to record task status (RUNNING,
 #    FAILURE, etc.)
-#    status_message.txt: File for the runner script to write log messages
-#    task.pid: Process ID file for Docker container
+#    log.txt: File for the runner script to write log messages
+#    task.pid: Process ID file for task runner
 #
 # From task directory, the data directory is made available to the Docker
 # container as /mnt/data. Inside the data directory, the local provider sets up:
@@ -168,7 +168,7 @@ class LocalJobProvider(base.JobProvider):
     }
 
   def submit_job(self, job_resources, job_metadata, all_task_data):
-    create_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+    create_time = datetime.now()
 
     # Validate inputs.
     param_util.validate_submit_args_or_fail(
@@ -267,17 +267,17 @@ class LocalJobProvider(base.JobProvider):
 
       delocalize_logs() {{
         {delocalize_logs_command}
+
+        delocalize_logs_function "${{cp_cmd}}" "${{prefix}}"
       }}
       """)
     script_body = textwrap.dedent("""\
       # Delete local files
-      cleanup() {
+      function cleanup() {
         local rm_data_dir="${1:-true}"
 
-        echo "Copying the logs before cleanup"
+        log_info "Copying the logs before cleanup"
         delocalize_logs
-        # Not putting it in status_message because we don't want that to be the
-        # last line in case of error.
 
         # Clean up files staged from outside Docker
         if [[ "${rm_data_dir}" == "true" ]]; then
@@ -290,27 +290,67 @@ class LocalJobProvider(base.JobProvider):
             "${VOLUMES[@]}" \\
             --env-file "${ENV_FILE}" \\
             "${IMAGE}" \\
-            rm -rf "${DATA_MOUNT_POINT}/*" | tee -a log.txt
+            rm -rf "${DATA_MOUNT_POINT}/*" | tee -a "${TASK_DIR}/log.txt"
 
           rm -rf "${DATA_DIR}" || echo "sorry, unable to delete ${DATA_DIR}."
         fi
       }
+      readonly -f cleanup
 
-      log_info() {
-        local prefix=$(date "${DATE_FORMAT}")
-        echo "${prefix} I: $@" | tee -a log.txt
-        echo "I: $@" > status_message.txt
-      }
+      function delocalize_logs_function() {
+        local cp_cmd="${1}"
+        local prefix="${2}"
 
-      log_error() {
-        local prefix=$(date "${DATE_FORMAT}")
-        echo "${prefix} E: $@" | tee -a log.txt
-        # Appending so we can see what happened just before the failure.
-        echo "E: $@" >> status_message.txt
+        if [[ -f "${TASK_DIR}/stdout.txt" ]]; then
+          ${cp_cmd} "${TASK_DIR}/stdout.txt" "${prefix}-stdout.log"
+        fi
+        if [[ -f "${TASK_DIR}/stderr.txt" ]]; then
+          ${cp_cmd} "${TASK_DIR}/stderr.txt" "${prefix}-stderr.log"
+        fi
+        if [[ -f "${TASK_DIR}/log.txt" ]]; then
+          ${cp_cmd} "${TASK_DIR}/log.txt" "${prefix}.log"
+        fi
       }
+      readonly -f delocalize_logs_function
+
+      function get_datestamp() {
+        date "${DATE_FORMAT}"
+      }
+      readonly -f get_datestamp
+
+      function write_status() {
+        local status="${1}"
+        echo "${status}" > "${TASK_DIR}/status.txt"
+        case "${status}" in
+          SUCCESS|FAILURE|CANCELED)
+            # Record the finish time (with microseconds)
+            # Prepend "10#" so numbers like 0999... are not treated as octal
+            local nanos=$(echo "10#"$(date "+%N"))
+            echo $(date "+%Y-%m-%d %H:%M:%S").$((nanos/1000)) \
+              > "${TASK_DIR}/end-time.txt"
+            ;;
+          RUNNING)
+            ;;
+          *)
+            echo 2>&1 "Unexpected status: ${status}"
+            exit 1
+            ;;
+        esac
+      }
+      readonly -f write_status
+
+      function log_info() {
+        echo "$(get_datestamp) I: $@" | tee -a "${TASK_DIR}/log.txt"
+      }
+      readonly -f log_info
+
+      function log_error() {
+        echo "$(get_datestamp) E: $@" | tee -a "${TASK_DIR}/log.txt"
+      }
+      readonly -f log_error
 
       # Correctly log failures and nounset exits
-      error() {
+      function error() {
         local parent_lineno="$1"
         local code="$2"
         local message="${3:-Error}"
@@ -320,14 +360,15 @@ class LocalJobProvider(base.JobProvider):
         trap ERR
 
         if [[ $code != "0" ]]; then
-          echo "FAILURE" > status.txt
+          write_status "FAILURE"
           log_error "${message} on or near line ${parent_lineno}; exiting with status ${code}"
         fi
         cleanup "false"
         exit "${code}"
       }
+      readonly -f error
 
-      fetch_image() {
+      function fetch_image() {
         local image="$1"
 
         for ((attempt=0; attempt < 3; attempt++)); do
@@ -342,8 +383,9 @@ class LocalJobProvider(base.JobProvider):
         log_error "FAILED to fetch ${image}"
         exit 1
       }
+      readonly -f fetch_image
 
-      fetch_image_if_necessary() {
+      function fetch_image_if_necessary() {
         local image="$1"
 
         # Remove everything from the first / on
@@ -355,16 +397,18 @@ class LocalJobProvider(base.JobProvider):
           fetch_image "${image}"
         fi
       }
+      readonly -f fetch_image_if_necessary
 
-      get_docker_user() {
+      function get_docker_user() {
         # Get the userid and groupid the Docker image is set to run as.
         docker run \\
           --name "${NAME}-get-docker-userid" \\
           "${IMAGE}" \\
-          bash -c 'echo "$(id -u):$(id -g)"' 2>> stderr.txt
+          bash -c 'echo "$(id -u):$(id -g)"' 2>> "${TASK_DIR}/stderr.txt"
       }
+      readonly -f get_docker_user
 
-      docker_recursive_chown() {
+      function docker_recursive_chown() {
         # Calls, in Docker: chown -R $1 $2
         local usergroup="$1"
         local docker_directory="$2"
@@ -375,21 +419,24 @@ class LocalJobProvider(base.JobProvider):
           --user 0 \\
           "${VOLUMES[@]}" \\
           "${IMAGE}" \\
-          chown -R "${usergroup}" "${docker_directory}" >> stdout.txt 2>> stderr.txt
+          chown -R "${usergroup}" "${docker_directory}" \\
+          >> "${TASK_DIR}/stdout.txt" 2>> "${TASK_DIR}/stderr.txt"
       }
+      readonly -f docker_recursive_chown
 
-      exit_if_canceled() {
+      function exit_if_canceled() {
         if [[ -f die ]]; then
           log_info "Job is canceled, stopping Docker container ${NAME}."
           docker stop "${NAME}"
-          echo "CANCELED" > status.txt
+          write_status "CANCELED"
           log_info "Delocalize logs and cleanup"
           cleanup "false"
           trap EXIT
-          echo "Canceled, exiting." > status_message.txt
+          log_info "Canceled, exiting."
           exit 1
         fi
       }
+      readonly -f exit_if_canceled
 
 
       # This will trigger whenever a command returns an error code
@@ -407,7 +454,7 @@ class LocalJobProvider(base.JobProvider):
 
       # Copy inputs
       cd "${TASK_DIR}"
-      echo "RUNNING" > status.txt
+      write_status "RUNNING"
       log_info "Localizing inputs."
       localize_data
 
@@ -434,13 +481,21 @@ class LocalJobProvider(base.JobProvider):
          --env-file "${ENV_FILE}" \\
          "${IMAGE}" \\
          "${SCRIPT_FILE}"
-      exit_if_canceled
+
+      # Start a log writer in the background
+      docker logs --follow "${NAME}" \
+        >> "${TASK_DIR}/stdout.txt" 2>> "${TASK_DIR}/stderr.txt" &
+
+      # Wait for completion
       DOCKER_EXITCODE=$(docker wait "${NAME}")
       log_info "Docker exit code ${DOCKER_EXITCODE}."
       if [[ "${DOCKER_EXITCODE}" != 0 ]]; then
         FAILURE_MESSAGE="Docker exit code ${DOCKER_EXITCODE} (check stderr)."
       fi
-      docker logs "${NAME}" >> stdout.txt 2>> stderr.txt
+
+      # If we were canceled during execution, be sure to process as such
+      exit_if_canceled
+
       # Re-enable trap
       trap 'error ${LINENO} $? Error' ERR
 
@@ -470,10 +525,10 @@ class LocalJobProvider(base.JobProvider):
       log_info "Delocalize logs and cleanup."
       cleanup "true"
       if [[ -z "${FAILURE_MESSAGE}" ]]; then
-        echo "SUCCESS" > status.txt
+        write_status "SUCCESS"
         log_info "Done"
       else
-        echo "FAILURE" > status.txt
+        write_status "FAILURE"
         # we want this to be the last line in the log, for dstat to work right.
         log_error "${FAILURE_MESSAGE}"
         exit 1
@@ -495,7 +550,7 @@ class LocalJobProvider(base.JobProvider):
         uid=os.getuid(),
         data_mount_point=DATA_MOUNT_POINT,
         data_dir=task_dir + '/' + DATA_SUBDIR,
-        date_format='+%Y/%m/%d %H:%M:%S',
+        date_format='+%Y-%m-%d %H:%M:%S',
         workingdir=WORKING_DIR,
         export_input_dirs=providers_util.build_recursive_localize_env(
             task_dir, task_data.get('inputs', [])),
@@ -509,7 +564,8 @@ class LocalJobProvider(base.JobProvider):
         delocalize_command=self._delocalize_outputs_commands(
             task_dir, task_data),
         delocalize_logs_command=self._delocalize_logging_command(
-            job_resources.logging.file_provider, task_metadata),) + script_body
+            job_resources.logging.file_provider, task_metadata),
+    ) + script_body
 
     # Write the local runner script
     script_fname = task_dir + '/runner.sh'
@@ -564,7 +620,7 @@ class LocalJobProvider(base.JobProvider):
       task_dir = self._task_directory(
           task.get_field('job-id'),
           task.get_field('task-id'))
-      today = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+      today = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
       with open(os.path.join(task_dir, 'die'), 'wt') as f:
         f.write('Operation canceled at %s\n' % today)
 
@@ -595,12 +651,12 @@ class LocalJobProvider(base.JobProvider):
       canceled += [task]
 
       # Mark the job as 'CANCELED' for the benefit of dstat
+      today = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
       with open(os.path.join(task_dir, 'status.txt'), 'wt') as f:
         f.write('CANCELED\n')
-      today = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+      with open(os.path.join(task_dir, 'end-time.txt'), 'wt') as f:
+        f.write(today)
       msg = 'Operation canceled at %s\n' % today
-      with open(os.path.join(task_dir, 'status_message.txt'), 'wt') as f:
-        f.write(msg)
       with open(os.path.join(task_dir, 'log.txt'), 'a') as f:
         f.write(msg)
 
@@ -614,7 +670,6 @@ class LocalJobProvider(base.JobProvider):
 
     # Convert from a UTC integer (seconds since the epoch) to a UTC datetime
     datetime_utc = datetime.utcfromtimestamp(0) + timedelta(seconds=utc_int)
-
     # Get the offset from UTC to local
     timestamp = time.mktime(datetime_utc.timetuple())
     offset = datetime.fromtimestamp(timestamp) - datetime.utcfromtimestamp(
@@ -673,6 +728,9 @@ class LocalJobProvider(base.JobProvider):
             continue
 
           task = self._get_task_from_task_dir(j, u, task_id)
+          if not task:
+            continue
+
           status = task.get_field('status')
           if status_list and status not in status_list:
             continue
@@ -689,8 +747,7 @@ class LocalJobProvider(base.JobProvider):
             continue
           # Check that the job is not too old.
           if create_time_local:
-            task_create_time = datetime.strptime(task.get_field('create-time'),
-                                                 '%Y-%m-%d %H:%M:%S.%f')
+            task_create_time = task.get_field('create-time')
             if task_create_time < create_time_local:
               continue
 
@@ -725,7 +782,7 @@ class LocalJobProvider(base.JobProvider):
         'job-id': task_metadata.get('job-id'),
         'task-id': task_metadata.get('task-id'),
         'job-name': task_metadata.get('job-name'),
-        'create-time': create_time,
+        'create-time': create_time.strftime('%Y-%m-%d %H:%M:%S.%f'),
         'logging': task_metadata.get('logging'),
         'labels': {
             'dsub-version': task_metadata.get('dsub-version', '0')
@@ -740,72 +797,104 @@ class LocalJobProvider(base.JobProvider):
 
     task_dir = self._task_directory(
         task_metadata.get('job-id'), task_metadata.get('task-id'))
-    with open(task_dir + '/meta.yaml', 'wt') as f:
+    with open(os.path.join(task_dir, 'meta.yaml'), 'wt') as f:
       f.write(yaml.dump(data))
+
+  def _read_task_metadata(self, task_dir):
+    """Read the meta file containing core fields for dstat."""
+
+    try:
+      with open(os.path.join(task_dir, 'meta.yaml'), 'r') as f:
+        meta = yaml.load('\n'.join(f.readlines()))
+
+      # Make sure that create-time string is turned into a datetime
+      meta['create-time'] = datetime.strptime(meta['create-time'],
+                                              '%Y-%m-%d %H:%M:%S.%f')
+
+      return meta
+    except (IOError, OSError):
+      # lookup_job_tasks may try to read the task metadata as a task is being
+      # created. In that case, just catch the exception and return None.
+      return None
+
+  def _get_end_time_from_task_dir(self, task_dir):
+    try:
+      with open(os.path.join(task_dir, 'end-time.txt'), 'r') as f:
+        return datetime.strptime(f.readline().strip(), '%Y-%m-%d %H:%M:%S.%f')
+    except (IOError, OSError):
+      return None
+
+  def _get_last_update_time_from_task_dir(self, task_dir):
+    last_update = 0
+    for filename in ['status.txt', 'log.txt', 'meta.yaml']:
+      try:
+        mtime = os.path.getmtime(os.path.join(task_dir, filename))
+        last_update = max(last_update, mtime)
+      except (IOError, OSError):
+        pass
+
+    return last_update
+
+  def _get_status_from_task_dir(self, task_dir):
+    try:
+      with open(os.path.join(task_dir, 'status.txt'), 'r') as f:
+        return f.readline().strip()
+    except (IOError, OSError):
+      return None
+
+  def _get_log_detail_from_task_dir(self, task_dir):
+    try:
+      with open(os.path.join(task_dir, 'log.txt'), 'r') as f:
+        return f.read().splitlines()
+    except (IOError, OSError):
+      return None
 
   def _get_task_from_task_dir(self, job_id, user_id, task_id):
     """Return a Task object with this task's info."""
-    path = self._task_directory(job_id, task_id)
-    status = 'uninitialized'
-    meta = {}
-    last_update = 0
-    create_time = 0
+
+    # We need to be very careful about how we read and interpret the contents
+    # of the task directory. The directory could be changing because a new
+    # task is being created. The directory could be changing because a task
+    # is ending.
+
+    # If the meta.yaml exists, it means the task is scheduled. It does not mean
+    # it is yet running.
+    # If the task.pid file exists, it means that the runner.sh was started.
+    task_dir = self._task_directory(job_id, task_id)
+
+    # If the metadata does not exist, the task does not yet exist.
+    meta = self._read_task_metadata(task_dir)
+    if not meta:
+      return None
+
+    # Get the pid of the runner
     pid = -1
     try:
-      status_message = ''
-      with open(path + '/status.txt', 'r') as f:
-        status = f.readline().strip()
-      with open(path + '/status_message.txt', 'r') as f:
-        status_message = ''.join(f.readlines())
-      with open(path + '/meta.yaml', 'r') as f:
-        meta = yaml.load('\n'.join(f.readlines()))
-      last_update = max([
-          os.path.getmtime(path + filename)
-          for filename in ['/status.txt', '/status_message.txt', '/meta.yaml']
-      ])
-      create_time = meta.get('create-time',
-                             os.path.getmtime(path + '/task.pid'))
-    except IOError:
-      # Files are not there yet.
-      # RUNNING is a misnomer, but there is no PENDING status.
-      status = 'RUNNING'
-      status_message = 'Process not found yet'
-      # Perhaps they crashed before being able to write those files?
-      # Check the time.
-      try:
-        create_time = os.path.getmtime(path + '/task.pid')
-        if time.time() - create_time > 60:
-          # Time out
-          status = 'CANCELED'
-          status_message = 'Process failed to start.'
-        create_time = datetime.fromtimestamp(create_time)
-      except IOError:
-        # pid file not there, let's say it's still pending.
-        pass
+      with open(os.path.join(task_dir, 'task.pid'), 'r') as f:
+        pid = int(f.readline().strip())
+    except (IOError, OSError):
+      pass
 
-    if status == 'RUNNING':
-      # Double-check running jobs, because it may have been killed but unable to
-      # update status (kill -9).
-      try:
-        with open(path + '/task.pid', 'r') as f:
-          pid = int(f.readline().strip())
-        try:
-          os.kill(pid, 0)
-        except OSError:
-          # Process is not running
-          status = 'CANCELED'
-          status_message = 'Process was killed.'
-      except IOError:
-        # pid file does not exist, may be from an old version of dsub
-        status = 'CANCELED'
-        status_message = 'task.pid missing'
+    # Read the files written by the runner.sh.
+    # For new tasks, these may not have been written yet.
+    end_time = self._get_end_time_from_task_dir(task_dir)
+    last_update = self._get_last_update_time_from_task_dir(task_dir)
+    status = self._get_status_from_task_dir(task_dir)
+    log_detail = self._get_log_detail_from_task_dir(task_dir)
+
+    # If the status file is not yet written, then mark the task as pending
+    if not status:
+      status = 'RUNNING'
+      log_detail = ['Pending']
+
     return LocalTask(
         job_id=job_id,
         task_id=task_id,
         task_status=status,
-        status_message=status_message,
+        log_detail=log_detail,
         job_name=meta.get('job-name'),
-        create_time=create_time,
+        create_time=meta.get('create-time'),
+        end_time=end_time,
         last_update=datetime.fromtimestamp(last_update)
         if last_update > 0 else None,
         logging=meta.get('logging'),
@@ -845,9 +934,8 @@ class LocalJobProvider(base.JobProvider):
 
     # Construct the copy command
     copy_logs_cmd = textwrap.dedent("""\
-      [[ -f stdout.txt ]] && {cp_cmd} stdout.txt {prefix}-stdout.log
-      [[ -f stderr.txt ]] && {cp_cmd} stderr.txt {prefix}-stderr.log
-      [[ -f log.txt ]] && {cp_cmd} log.txt {prefix}.log
+      local cp_cmd="{cp_cmd}"
+      local prefix="{prefix}"
     """).format(
         cp_cmd=cp_cmd, prefix=logging_prefix)
 
@@ -1018,9 +1106,10 @@ _RawTask = namedtuple('_RawTask', [
     'job_id',
     'task_id',
     'task_status',
-    'status_message',
+    'log_detail',
     'job_name',
     'create_time',
+    'end_time',
     'last_update',
     'logging',
     'envs',
@@ -1055,40 +1144,39 @@ class LocalTask(base.Task):
         for key, value in self._raw._asdict().iteritems()
     }
 
+    value = None
     if field == 'status':
-      return tad.get('task-status', None)
-    if field == 'status-message':
-      if tad.get('task-status', '') == 'SUCCESS':
-        return 'Success'
+      value = tad.get('task-status')
+    elif field == 'status-message':
+      if tad.get('task-status') == 'SUCCESS':
+        value = 'Success'
       else:
-        return self._last_line(tad.get('status-message', None))
-    if field == 'status-detail':
-      return tad.get('status-message', None)
-    if field == 'start-time':
+        # Return the last line of output
+        value = self._last_lines(tad.get('log-detail'), 1)
+    elif field == 'status-detail':
+      # Return the last three lines of output
+      value = self._last_lines(tad.get('log-detail'), 3)
+    elif field == 'start-time':
       # There's no delay between creation and start since we launch docker
       # immediately for local runs.
-      return tad.get('create-time', None)
+      value = tad.get('create-time')
+    else:
+      value = tad.get(field)
 
-    return tad.get(field, default)
+    return value if value else default
 
   def get_docker_name_for_task(self):
     return _format_task_name(
         self.get_field('job-id'), self.get_field('task-id'))
 
-  def get_task_status_message(self):
-    status = self.get_field('status')
-    if status == 'FAILURE':
-      return self.get_field('status-message')
-    return status
-
   @staticmethod
-  def _last_line(value):
-    """Return the last line."""
+  def _last_lines(value, count):
+    """Return the last line(s) as a single (newline delimited) string."""
     if not value:
-      return value
-    if value.endswith('\n'):
-      return value.split('\n')[-2]
-    return value.split('\n')[-1]
+      return ''
+
+    return '\n'.join(value[-count:])
+
 
 if __name__ == '__main__':
   pass

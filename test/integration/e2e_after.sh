@@ -31,7 +31,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   # (1) Launch a simple job that should succeed after a short wait
   echo "Launch a job (and don't --wait)..."
-  JOBID=$(run_dsub \
+  JOB_ID=$(run_dsub \
     --command 'sleep 5s && echo "hello world" > "${OUT}"' \
     --output OUT="${TEST_FILE_PATH_1}")
 
@@ -39,11 +39,20 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   # until exit
   echo "Launch a job (--after the previous, and then --wait)..."
   run_dsub \
-    --after "${JOBID}" \
+    --after "${JOB_ID}" \
     --command 'cat "${IN}" > "${OUT}"' \
     --input IN="${TEST_FILE_PATH_1}" \
     --output OUT="${TEST_FILE_PATH_2}" \
     --wait
+
+  # (3) Validate the end time for the failed job
+  echo "Check that the success job has a proper end-time set"
+  DSTAT_OUTPUT=$(run_dstat --status '*' --jobs "${JOB_ID}" --full)
+  if ! util::dstat_yaml_job_has_valid_end_time "${DSTAT_OUTPUT}"; then
+    echo "dstat output for ${JOB_ID} does not include a valid end time."
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
 
 fi
 

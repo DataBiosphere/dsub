@@ -14,16 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Utililty for helping shell scripts extract values from JSON.
+"""Utililty for helping shell scripts extract values from JSON or YAML.
 
 Usage:
 
-  python get_json_value.py JSON-STRING FIELD
+  python get_data_value.py DOC-TYPE DOC-STRING FIELD
 
 The supported syntax can handle simple keys, indexes into arrays, as well
 as field matching within arrays.
 
-For example:
+For example (JSON):
 
 {
   "data": {
@@ -58,6 +58,7 @@ To extract "arg1_value2", use the path:
 import json
 import re
 import sys
+import yaml
 
 
 def unquote(value):
@@ -67,13 +68,22 @@ def unquote(value):
   return value
 
 
-def main(json_string, field):
+def main():
 
-  if len(sys.argv) != 3:
-    print >> sys.stderr, 'Usage: %s JSON FIELD' % sys.argv[0]
+  if len(sys.argv) != 4:
+    print >> sys.stderr, 'Usage: %s [json|yaml] DOC-STRING FIELD' % sys.argv[0]
     sys.exit(1)
 
-  data = json.loads(json_string)
+  doc_type = sys.argv[1]
+  doc_string = sys.argv[2]
+  field = sys.argv[3]
+
+  if doc_type == 'json':
+    data = json.loads(doc_string)
+  elif doc_type == 'yaml':
+    data = yaml.load(doc_string)
+  else:
+    raise ValueError('Unsupported doc type: %s' % doc_type)
 
   # field is expected to be period-separated: foo.bar.baz
   fields = field.split('.')
@@ -93,6 +103,7 @@ def main(json_string, field):
           print >> sys.stderr, 'Cannot value match on non-list object.'
           print >> sys.stderr, 'Key: %s' % key
           print >> sys.stderr, 'Value: %s' % curr
+          sys.exit(1)
 
         found = None
         for item in curr:
@@ -111,6 +122,7 @@ def main(json_string, field):
         print >> sys.stderr, 'Cannot index into a on non-list object.'
         print >> sys.stderr, 'Key: %s' % key
         print >> sys.stderr, 'Value: %s' % curr
+        sys.exit(1)
 
       if idx >= len(curr):
         sys.exit(1)
@@ -128,4 +140,4 @@ def main(json_string, field):
 
 
 if __name__ == '__main__':
-  main(sys.argv[1], sys.argv[2])
+  main()

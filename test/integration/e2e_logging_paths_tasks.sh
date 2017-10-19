@@ -35,8 +35,8 @@ function dstat_get_logging() {
       --full \
       --format json)
 
-  python "${SCRIPT_DIR}"/get_json_value.py \
-    "${dstat_out}" "[$((task_id-1))].logging"
+  python "${SCRIPT_DIR}"/get_data_value.py \
+    "json" "${dstat_out}" "[$((task_id-1))].logging"
 }
 readonly -f dstat_get_logging
 

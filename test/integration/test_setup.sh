@@ -120,6 +120,14 @@ function dstat_local() {
     "${@}"
 }
 
+function test_dstat() {
+  # Version of dstat that automatically adds "--age 5m".
+  # This speeds up tests and helps avoid dstat calls that return jobs
+  # from other test runs.
+  # If a test takes longer than 5 minutes, then we should fix the test.
+  dstat_"${DSUB_PROVIDER}" --age "5m" "${@}"
+}
+
 # ddel
 
 function run_ddel() {

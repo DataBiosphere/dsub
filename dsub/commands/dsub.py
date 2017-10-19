@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import argparse
 import collections
+import datetime
 import os
 import re
 import sys
@@ -526,7 +527,8 @@ def _importance_of_task(task):
   # 2- The first RUNNING task, or if none
   # 3- The first SUCCESS task.
   importance = {'FAILURE': 0, 'CANCELED': 0, 'RUNNING': 1, 'SUCCESS': 2}
-  return (importance[task.get_field('task-status')], task.get_field('end-time'))
+  return (importance[task.get_field('task-status')], task.get_field(
+      'end-time', datetime.datetime.max))
 
 
 def _wait_for_any_job(provider, jobid_list, poll_interval):
