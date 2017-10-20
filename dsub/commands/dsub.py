@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import argparse
 import collections
+import datetime
 import os
 import re
 import sys
@@ -526,7 +527,8 @@ def _importance_of_task(task):
   # 2- The first RUNNING task, or if none
   # 3- The first SUCCESS task.
   importance = {'FAILURE': 0, 'CANCELED': 0, 'RUNNING': 1, 'SUCCESS': 2}
-  return (importance[task.get_field('task-status')], task.get_field('end-time'))
+  return (importance[task.get_field('task-status')], task.get_field(
+      'end-time', datetime.datetime.max))
 
 
 def _wait_for_any_job(provider, jobid_list, poll_interval):
@@ -578,6 +580,63 @@ def _job_outputs_are_present(job_data):
   return True
 
 
+def _validate_job_and_task_arguments(job_data, all_task_data):
+  """Validates that job and task argument names do not overlap."""
+
+  if not all_task_data:
+    return
+
+  task_data = all_task_data[0]
+
+  # The use case for specifying a label or env/input/output parameter on
+  # the command-line and also including it in the --tasks file is not obvious.
+  # Should the command-line override the --tasks file? Why?
+  # Until this use is articulated, generate an error on overlapping names.
+
+  # Check labels
+  from_jobs = [label.name for label in job_data['labels']]
+  from_tasks = [label.name for label in task_data['labels']]
+
+  intersect = set(from_jobs) & set(from_tasks)
+  if intersect:
+    raise ValueError(
+        'Names for labels on the command-line and in the --tasks file must not '
+        'be repeated: {}'.format(','.join(intersect)))
+
+  # Check envs, inputs, and outputs, all of which must not overlap each other
+  from_jobs = [
+      item.name
+      for item in job_data['envs'] + job_data['inputs'] + job_data['outputs']
+  ]
+  from_tasks = [
+      item.name
+      for item in task_data['envs'] + task_data['inputs'] + task_data['outputs']
+  ]
+
+  intersect = set(from_jobs) & set(from_tasks)
+  if intersect:
+    raise ValueError(
+        'Names for envs, inputs, and outputs on the command-line and in the '
+        '--tasks file must not be repeated: {}'.format(','.join(intersect)))
+
+
+def _ensure_job_data_is_complete(job_data):
+  # The contract with providers and downstream code is that the job_data
+  # contains non-None 'labels', 'envs', 'inputs', and 'outputs'.
+  for param in 'labels', 'envs', 'inputs', 'outputs':
+    if not job_data.get(param):
+      job_data[param] = []
+
+
+def _ensure_task_data_is_complete(all_task_data):
+  # The contract with providers and downstream code is that all task_data
+  # contain non-None 'labels', 'envs', 'inputs', and 'outputs'.
+  for task_data in all_task_data:
+    for param in 'labels', 'envs', 'inputs', 'outputs':
+      if not task_data.get(param):
+        task_data[param] = []
+
+
 def dsub_main(prog, argv):
   # Parse args and validate
   args = _parse_arguments(prog, argv)
@@ -605,16 +664,12 @@ def main(prog=sys.argv[0], argv=sys.argv[1:]):
 
 
 def run_main(args):
+  """Execute job/task submission from command-line arguments."""
+
   if args.command and args.script:
     raise ValueError('Cannot supply both a --command and --script flag')
 
   provider_base.check_for_unsupported_flag(args)
-
-  if (args.env or args.input or args.input_recursive or args.output or
-      args.output_recursive) and args.tasks:
-    raise ValueError('Cannot supply both command-line parameters '
-                     '(--env/--input/--input-recursive/--output/'
-                     '--output-recursive) and --tasks')
 
   if args.tasks and args.skip:
     raise ValueError('Output skipping (--skip) not supported for --task '
@@ -625,17 +680,33 @@ def run_main(args):
       DEFAULT_INPUT_LOCAL_PATH)
   output_file_param_util = param_util.OutputFileParamUtil(
       DEFAULT_OUTPUT_LOCAL_PATH)
+
+  # Get job arguments from the command line
+  job_data = param_util.args_to_job_data(
+      args.env, args.label, args.input, args.input_recursive, args.output,
+      args.output_recursive, input_file_param_util, output_file_param_util)
+
+  # If --tasks is on the command-line, then get task-specific data
   if args.tasks:
     all_task_data = param_util.tasks_file_to_job_data(
         args.tasks, input_file_param_util, output_file_param_util)
+
+    # Validate job data + task data
+    _validate_job_and_task_arguments(job_data, all_task_data)
   else:
-    all_task_data = param_util.args_to_job_data(
-        args.env, args.label, args.input, args.input_recursive, args.output,
-        args.output_recursive, input_file_param_util, output_file_param_util)
+    # Create the implicit task
+    all_task_data = [{
+        'task-id': None,
+        'labels': [],
+        'envs': [],
+        'inputs': [],
+        'outputs': []
+    }]
 
   return run(
       provider_base.get_provider(args),
       _get_job_resources(args),
+      job_data,
       all_task_data,
       name=args.name,
       dry_run=args.dry_run,
@@ -652,7 +723,8 @@ def run_main(args):
 
 def run(provider,
         job_resources,
-        task_data,
+        job_data,
+        all_task_data,
         name=None,
         dry_run=False,
         command=None,
@@ -668,7 +740,7 @@ def run(provider,
   if not disable_warning:
     raise ValueError('Do not user this unstable API component!')
 
-  if len(task_data) > 1 and skip:
+  if len(all_task_data) > 1 and skip:
     raise ValueError('The skip option is not supported with multiple tasks')
 
   if command and script:
@@ -688,6 +760,11 @@ def run(provider,
     script = job_util.Script(os.path.basename(script), script_file.read())
   else:
     raise ValueError('One of --command or a script name must be supplied')
+
+  # The contract with providers and downstream code is that the job_data
+  # and task_data contain 'labels', 'envs', 'inputs', and 'outputs'.
+  _ensure_job_data_is_complete(job_data)
+  _ensure_task_data_is_complete(all_task_data)
 
   job_metadata = _get_job_metadata(user, name, script, provider)
 
@@ -710,12 +787,13 @@ def run(provider,
 
   # If requested, skip running this job if its outputs already exist
   if skip and not dry_run:
-    if _job_outputs_are_present(task_data[0]):
+    if _job_outputs_are_present(job_data):
       print('Job output already present, skipping new job submission.')
       return {'job-id': NO_JOB}
 
   # Launch all the job tasks!
-  launched_job = provider.submit_job(job_resources, job_metadata, task_data)
+  launched_job = provider.submit_job(job_resources, job_metadata, job_data,
+                                     all_task_data)
 
   if not dry_run:
     print('Launched job-id: %s' % launched_job['job-id'])

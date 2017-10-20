@@ -35,18 +35,16 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-readonly INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam"
+# Do io setup
+source "${SCRIPT_DIR}/io_setup.sh"
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
-  run_dsub \
-    --script "${SCRIPT_DIR}/script_io_test.sh" \
-    --input INPUT_PATH="${INPUT_BAM}" \
-    --output OUTPUT_PATH="${OUTPUTS}/*.md5" \
-    --wait
+  io_setup::run_dsub
 
 fi
 
-source "${SCRIPT_DIR}/io_check_output.sh"
+# Check output
+io_setup::check_output

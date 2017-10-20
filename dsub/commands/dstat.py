@@ -33,6 +33,7 @@ import collections
 from datetime import datetime
 import json
 import time
+from dateutil.tz import tzlocal
 
 from ..lib import dsub_util
 from ..lib import param_util
@@ -48,7 +49,32 @@ class OutputFormatter(object):
   def __init__(self, full):
     self._full = full
 
+  def _format_date(self, dt, fmt):
+    if not dt:
+      return ''
+
+    # Format dates using local timezone
+    if dt.tzinfo:
+      return dt.astimezone(tzlocal()).strftime(fmt)
+    else:
+      return dt.strftime(fmt)
+
+  def format_date_micro(self, dt):
+    return self._format_date(dt, '%Y-%m-%d %H:%M:%S.%f')
+
+  def format_date_seconds(self, dt):
+    return self._format_date(dt, '%Y-%m-%d %H:%M:%S')
+
+  def default_format_date(self, dt):
+    return self.format_date_micro(dt)
+
   def prepare_output(self, row):
+    date_fields = ['last-update', 'create-time', 'start-time', 'end-time']
+
+    for col in date_fields:
+      if col in row:
+        row[col] = self.default_format_date(row[col])
+
     return row
 
   def print_table(self, table):
@@ -82,6 +108,11 @@ class TextOutput(OutputFormatter):
     return ', '.join('%s=%s' % (key, value)
                      for key, value in sorted(values.iteritems()))
 
+  def text_format_date(self, dt):
+    if self._full:
+      return self.format_date_micro(dt)
+    return self.format_date_seconds(dt)
+
   def prepare_output(self, row):
 
     # Define the ordering of fields for text output along with any
@@ -91,11 +122,11 @@ class TextOutput(OutputFormatter):
         ('job-name', 'Job Name'),
         ('task-id', 'Task'),
         ('status-message', 'Status', self.format_status),
-        ('status-detail', 'Status-details'),
-        ('last-update', 'Last Update'),
-        ('create-time', 'Created'),
-        ('start-time', 'Started'),
-        ('end-time', 'Ended'),
+        ('status-detail', 'Status Details'),
+        ('last-update', 'Last Update', self.text_format_date),
+        ('create-time', 'Created', self.text_format_date),
+        ('start-time', 'Started', self.text_format_date),
+        ('end-time', 'Ended', self.text_format_date),
         ('user-id', 'User'),
         ('internal-id', 'Internal ID'),
         ('logging', 'Logging'),
@@ -182,7 +213,7 @@ def prepare_row(task, full):
       row_spec('status', True, None),
       row_spec('status-detail', True, None),
       row_spec('create-time', True, None),
-      row_spec('end-time', True, 'NA'),
+      row_spec('end-time', True, None),
       row_spec('internal-id', True, None),
       row_spec('logging', True, None),
       row_spec('inputs', True, {}),

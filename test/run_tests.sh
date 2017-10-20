@@ -120,6 +120,9 @@ function check_wait_for_integration_tests() {
     return
   fi
 
+  echo "Launched ${#TEST_PIDS[@]} tests."
+  echo
+
   echo "Waiting on " "${TEST_PIDS[@]}"
   wait "${TEST_PIDS[@]}"
 
@@ -193,17 +196,21 @@ readonly -f end_test
 function get_test_providers() {
   local test_file="$(basename "${1}")"
 
-  local default_provider_list="google"
-  local all_provider_list="local google"
-
   # We use a naming convention on files that are provider-specific
   if [[ ${test_file} == *.*.sh ]]; then
-    # Return the last token before the ".sh"
-    echo "${test_file}" | awk -F . '{ print $(NF-1) }'
+    # Get the last token before the ".sh"
+    provider="$(echo "${test_file}" | awk -F . '{ print $(NF-1) }')"
+
+    # If an explicit DSUB_PROVIDER was set, then validate against it.
+    if [[ -z "${DSUB_PROVIDER:-}" ]] || \
+       [[ "${provider}" == "${DSUB_PROVIDER}" ]]; then
+      echo -n "${provider}"
+    fi
     return
   fi
 
-  echo "${all_provider_list}"
+  local all_provider_list="${DSUB_PROVIDER:-local google}"
+  echo -n "${all_provider_list}"
 }
 readonly -f get_test_providers
 
@@ -288,9 +295,13 @@ for TEST_TYPE in "${TESTS[@]}"; do
   fi
 
   for TEST in "${TEST_LIST[@]}"; do
-    PROVIDER_LIST=($(get_test_providers "${TEST}"))
+    PROVIDER_LIST="$(get_test_providers "${TEST}")"
 
-    for PROVIDER in "${PROVIDER_LIST[@]:-}"; do
+    if [[ -z "${PROVIDER_LIST}" ]]; then
+      continue
+    fi
+
+    for PROVIDER in ${PROVIDER_LIST}; do
       run_integration_test "${PROVIDER}" "${TEST}"
       check_wait_for_integration_tests
     done

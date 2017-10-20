@@ -757,9 +757,8 @@ def args_to_job_data(envs, labels, inputs, inputs_recursive, outputs,
     output_file_param_util: Utility for producing OutputFileParam objects.
 
   Returns:
-    job_data: an array of length one, containing a dictionary of
-    'envs', 'inputs', and 'outputs' that defines the set of parameters and data
-    for a job.
+    job_data: a dictionary of 'envs', 'inputs', and 'outputs' that defines the
+    set of parameters and data for a job.
   """
   # Parse environmental variables and labels.
   env_data = parse_pair_args(envs, EnvParam)
@@ -789,17 +788,27 @@ def args_to_job_data(envs, labels, inputs, inputs_recursive, outputs,
       output_data.append(
           output_file_param_util.make_param(name, value, recursive))
 
-  return [{
+  return {
       'envs': env_data,
       'inputs': input_data,
       'outputs': output_data,
       'labels': label_data,
-  }]
+  }
 
 
-def validate_submit_args_or_fail(job_resources, all_task_data, provider_name,
-                                 input_providers, output_providers,
-                                 logging_providers):
+def _validate_providers(fileparams, argname, providers, provider_name):
+  error_message = ('Unsupported {argname} path ({path}) for '
+                   'provider {provider!r}.')
+  for fileparam in fileparams:
+    if fileparam.file_provider not in providers:
+      raise ValueError(
+          error_message.format(
+              argname=argname, path=fileparam.uri, provider=provider_name))
+
+
+def validate_submit_args_or_fail(job_resources, job_data, all_task_data,
+                                 provider_name, input_providers,
+                                 output_providers, logging_providers):
   """Validate that arguments passed to submit_job have valid file providers.
 
   This utility function takes resources and task data args from `submit_job`
@@ -808,11 +817,15 @@ def validate_submit_args_or_fail(job_resources, all_task_data, provider_name,
 
   >>> res = type('', (object,),
   ...            {"logging": LoggingParam('gs://logtemp', P_GCS)})()
+  >>> job_data={'inputs': [], 'outputs': []}
   >>> task_data = [
-  ...    {'inputs': [FileParam('IN', uri='gs://in/*', file_provider=P_GCS)]},
-  ...    {'outputs': [FileParam('OUT', uri='gs://out/*', file_provider=P_GCS)]}]
+  ...    {'inputs': [FileParam('IN', uri='gs://in/*', file_provider=P_GCS)],
+  ...     'outputs': []},
+  ...    {'inputs': [],
+  ...     'outputs': [FileParam('OUT', uri='gs://out/*', file_provider=P_GCS)]}]
   ...
   >>> validate_submit_args_or_fail(job_resources=res,
+  ...                              job_data=job_data,
   ...                              all_task_data=task_data,
   ...                              provider_name='MYPROVIDER',
   ...                              input_providers=[P_GCS],
@@ -820,6 +833,7 @@ def validate_submit_args_or_fail(job_resources, all_task_data, provider_name,
   ...                              logging_providers=[P_GCS])
   ...
   >>> validate_submit_args_or_fail(job_resources=res,
+  ...                              job_data=job_data,
   ...                              all_task_data=task_data,
   ...                              provider_name='MYPROVIDER',
   ...                              input_providers=[P_GCS],
@@ -831,6 +845,7 @@ def validate_submit_args_or_fail(job_resources, all_task_data, provider_name,
 
   Args:
     job_resources: instance of job_util.JobResources.
+    job_data: (dict) the job data to be validated
     all_task_data: ([]dicts) the task data list to be validated.
     provider_name: (str) the name of the execution provider.
     input_providers: (string collection) whitelist of file providers for input.
@@ -840,26 +855,21 @@ def validate_submit_args_or_fail(job_resources, all_task_data, provider_name,
   Raises:
     ValueError: if any file providers do not match the whitelists.
   """
-  error_message = ('Unsupported {argname} path ({path}) for '
-                   'provider {provider!r}.')
   # Validate logging file provider.
-  logging = job_resources.logging
-  if logging.file_provider not in logging_providers:
-    raise ValueError(
-        error_message.format(
-            argname='logging', path=logging.uri, provider=provider_name))
+  _validate_providers([job_resources.logging], 'logging', logging_providers,
+                      provider_name)
 
-  # Validate input file provider.
+  # Validate job input and output file providers
+  _validate_providers(job_data['inputs'], 'input', input_providers,
+                      provider_name)
+  _validate_providers(job_data['outputs'], 'output', output_providers,
+                      provider_name)
+
+  # Validate input and output file providers.
   for task in all_task_data:
-    for argtype, whitelist in [('inputs', input_providers), ('outputs',
-                                                             output_providers)]:
-      argname = argtype.rstrip('s')
-      for fileparam in task.get(argtype, []):
-
-        if fileparam.file_provider not in whitelist:
-          raise ValueError(
-              error_message.format(
-                  argname=argname, path=fileparam.uri, provider=provider_name))
+    _validate_providers(task['inputs'], 'input', input_providers, provider_name)
+    _validate_providers(task['outputs'], 'output', output_providers,
+                        provider_name)
 
 
 def directory_fmt(directory):

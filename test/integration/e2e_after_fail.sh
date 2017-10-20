@@ -50,6 +50,15 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     exit 1
   fi
 
+  # (4) Validate the end time for the failed job
+  echo "Check that the failed job has a proper end-time set"
+  DSTAT_OUTPUT=$(run_dstat --status '*' --jobs "${BAD_JOB_PREVIOUS}" --full)
+  if ! util::dstat_yaml_job_has_valid_end_time "${DSTAT_OUTPUT}"; then
+    echo "dstat output for ${BAD_JOB_PREVIOUS} does not include a valid end time."
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
 fi
 
 echo "SUCCESS"

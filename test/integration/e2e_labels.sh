@@ -50,9 +50,9 @@ mkdir -p "${TEST_TMP}"
 # Create a simple TSV file
 readonly TASKS_FILE="${TEST_TMP}/${TEST_NAME}.tsv"
 util::write_tsv_file "${TASKS_FILE}" '
---label batch\t--label item-number
-hello-world\t1
-hello-world\t2
+--label item-number
+1
+2
 '
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
@@ -105,6 +105,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   JOBID="$(run_dsub \
     --tasks "${TASKS_FILE}" \
+    --label batch=hello-world \
     --command "echo 'hello world'")"
 
   echo "Checking dstat (full)..."
@@ -123,5 +124,3 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "SUCCESS"
 
 fi
-
-

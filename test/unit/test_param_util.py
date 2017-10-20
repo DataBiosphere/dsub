@@ -329,9 +329,11 @@ class TestSubmitValidator(unittest.TestCase):
         {
             'inputs': [
                 param_util.FileParam('IN', uri='gs://in/*', file_provider=PG)
-            ]
+            ],
+            'outputs': []
         },
         {
+            'inputs': [],
             'outputs': [
                 param_util.FileParam('OUT', uri='gs://out/*', file_provider=PG)
             ]
@@ -343,6 +345,8 @@ class TestSubmitValidator(unittest.TestCase):
         'gs://buck/logs', PG))
     param_util.validate_submit_args_or_fail(
         job_resources=resources,
+        job_data={'inputs': [],
+                  'outputs': []},
         all_task_data=self.task_data,
         provider_name='MYPROVIDER',
         input_providers=[PG],
@@ -361,6 +365,8 @@ class TestSubmitValidator(unittest.TestCase):
     with self.assertRaisesRegexp(ValueError, re.escape(err_expected)):
       param_util.validate_submit_args_or_fail(
           job_resources=resources,
+          job_data={'inputs': [],
+                    'outputs': []},
           all_task_data=self.task_data,
           provider_name='MYPROVIDER',
           input_providers=inwl,

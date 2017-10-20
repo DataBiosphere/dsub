@@ -76,12 +76,13 @@ class JobProvider(object):
     raise NotImplementedError()
 
   @abstractmethod
-  def submit_job(self, job_resources, job_metadata, all_task_data):
+  def submit_job(self, job_resources, job_metadata, job_data, all_task_data):
     """Submit the job to be executed.
 
     Args:
       job_resources: resource parameters required by each job.
       job_metadata: job parameters such as job-id, user-id, script.
+      job_data: job parameters included in each task.
       all_task_data: list of parameters to launch each job task.
 
     job_resources contains settings related to how many resources to give each

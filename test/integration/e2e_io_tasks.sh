@@ -35,15 +35,19 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
+# Do io_task setup
+source "${SCRIPT_DIR}/io_tasks_setup.sh"
+
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipelines..."
 
-  run_dsub \
-    --script "${SCRIPT_DIR}/script_io_test.sh" \
-    --tasks "${TASKS_FILE}" \
-    --wait
+  io_tasks_setup::run_dsub \
+    "${SCRIPT_DIR}/script_io_test.sh" \
+    "${TASKS_FILE}"
 
 fi
 
-source "${SCRIPT_DIR}/io_tasks_check_output.sh"
+# Check output
+io_tasks_setup::check_output
+

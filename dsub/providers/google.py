@@ -33,7 +33,6 @@ from .._dsub_version import DSUB_VERSION
 
 import apiclient.discovery
 import apiclient.errors
-from dateutil.tz import tzlocal
 
 from ..lib import param_util
 from ..lib import providers_util
@@ -374,7 +373,7 @@ class _Pipelines(object):
 
   @classmethod
   def _build_pipeline_docker_command(cls, script_name, inputs, outputs):
-    """Return a multi-line string containg the full pipeline docker command."""
+    """Return a multi-line string of the full pipeline docker command."""
 
     # We upload the user script as an environment argument
     # and write it to SCRIPT_DIR (preserving its local file name).
@@ -548,15 +547,17 @@ class _Pipelines(object):
     # pyformat: enable
 
   @classmethod
-  def build_pipeline_args(cls, project, script, task_data, preemptible,
-                          logging_uri, scopes, keep_alive):
+  def build_pipeline_args(cls, project, script, job_data, task_data,
+                          preemptible, logging_uri, scopes, keep_alive):
     """Builds pipeline args for execution.
 
     Args:
       project: string name of project.
       script: Body of the script to execute.
-      task_data: dictionary of value for envs, inputs, and outputs for this
-          task.
+      job_data: dictionary of values for labels, envs, inputs, and outputs for
+          this job.
+      task_data: dictionary of values for labels, envs, inputs, and outputs for
+          this task.
       preemptible: use a preemptible VM for the job
       logging_uri: path for job logging output.
       scopes: list of scope.
@@ -566,12 +567,16 @@ class _Pipelines(object):
       A nested dictionary with one entry under the key pipelineArgs containing
       the pipeline arguments.
     """
+    # For the Pipelines API, envs and file inputs are all "inputs".
     inputs = {}
     inputs.update({SCRIPT_VARNAME: script})
-    inputs.update({var.name: var.value for var in task_data['envs']})
     inputs.update(
-        {var.name: var.uri
-         for var in task_data['inputs'] if not var.recursive})
+        {var.name: var.value
+         for var in job_data['envs'] + task_data['envs']})
+    inputs.update({
+        var.name: var.uri
+        for var in job_data['inputs'] + task_data['inputs'] if not var.recursive
+    })
 
     # Remove wildcard references for non-recursive output. When the pipelines
     # controller generates a delocalize call, it must point to a bare directory
@@ -579,7 +584,7 @@ class _Pipelines(object):
     # delocalize with a call similar to:
     #   gsutil cp /mnt/data/output/gs/bucket/path/*.bam gs://bucket/path/
     outputs = {}
-    for var in task_data['outputs']:
+    for var in job_data['outputs'] + task_data['outputs']:
       if var.recursive:
         continue
       if '*' in var.uri.basename:
@@ -590,7 +595,7 @@ class _Pipelines(object):
     labels = {}
     labels.update({
         label.name: label.value if label.value else ''
-        for label in task_data['labels']
+        for label in job_data['labels'] + task_data['labels']
     })
 
     # pyformat: disable
@@ -957,7 +962,8 @@ class GoogleJobProvider(base.JobProvider):
 
     return labels
 
-  def _build_pipeline_request(self, job_resources, task_metadata, task_data):
+  def _build_pipeline_request(self, job_resources, task_metadata, job_data,
+                              task_data):
     """Returns a Pipeline objects for the job."""
 
     script = task_metadata['script']
@@ -976,9 +982,9 @@ class GoogleJobProvider(base.JobProvider):
         image=job_resources.image,
         zones=job_resources.zones,
         script_name=script.name,
-        envs=task_data['envs'],
-        inputs=task_data['inputs'],
-        outputs=task_data['outputs'],
+        envs=job_data['envs'] + task_data['envs'],
+        inputs=job_data['inputs'] + task_data['inputs'],
+        outputs=job_data['outputs'] + task_data['outputs'],
         pipeline_name=task_metadata['pipeline-name'])
 
     # Build the pipelineArgs for this job.
@@ -986,9 +992,10 @@ class GoogleJobProvider(base.JobProvider):
                                                     task_metadata)
 
     pipeline.update(
-        _Pipelines.build_pipeline_args(
-            self._project, script.value, task_data, job_resources.preemptible,
-            logging_uri, job_resources.scopes, job_resources.keep_alive))
+        _Pipelines.build_pipeline_args(self._project, script.value, job_data,
+                                       task_data, job_resources.preemptible,
+                                       logging_uri, job_resources.scopes,
+                                       job_resources.keep_alive))
 
     return pipeline
 
@@ -999,13 +1006,14 @@ class GoogleJobProvider(base.JobProvider):
 
     return GoogleOperation(operation).get_field('task-id')
 
-  def submit_job(self, job_resources, job_metadata, all_task_data):
+  def submit_job(self, job_resources, job_metadata, job_data, all_task_data):
     """Submit the job (or tasks) to be executed.
 
     Args:
       job_resources: resource parameters required by each job.
       job_metadata: job parameters such as job-id, user-id, script
-      all_task_data: list of task arguments
+      job_data: arguments global to the job
+      all_task_data: list of arguments for each task
 
     Returns:
       A dictionary containing the 'user-id', 'job-id', and 'task-id' list.
@@ -1017,6 +1025,7 @@ class GoogleJobProvider(base.JobProvider):
     # Validate task data and resources.
     param_util.validate_submit_args_or_fail(
         job_resources,
+        job_data,
         all_task_data,
         provider_name=_PROVIDER_NAME,
         input_providers=_SUPPORTED_INPUT_PROVIDERS,
@@ -1031,7 +1040,7 @@ class GoogleJobProvider(base.JobProvider):
                                                        task_data.get('task-id'))
 
       request = self._build_pipeline_request(job_resources, task_metadata,
-                                             task_data)
+                                             job_data, task_data)
 
       if self._dry_run:
         requests.append(request)
@@ -1167,10 +1176,7 @@ class GoogleJobProvider(base.JobProvider):
     completion_messages = []
     for task in tasks:
       errmsg = task.error_message()
-      if errmsg:
-        completion_messages.append(errmsg)
-      else:
-        completion_messages.append(task.get_task_status_message())
+      completion_messages.append(errmsg)
     return completion_messages
 
 
@@ -1227,7 +1233,7 @@ class GoogleOperation(base.Task):
     elif field == 'outputs':
       value = metadata['request']['pipelineArgs']['outputs']
     elif field == 'create-time':
-      value = self._localize_datestamp(metadata['createTime'])
+      value = self._parse_datestamp(metadata['createTime'])
     elif field == 'start-time':
       # Look through the events list for all "start" events (only one expected).
       start_events = [
@@ -1235,10 +1241,10 @@ class GoogleOperation(base.Task):
       ]
       # Get the startTime from the last "start" event.
       if start_events:
-        value = self._localize_datestamp(start_events[-1]['startTime'])
+        value = self._parse_datestamp(start_events[-1]['startTime'])
     elif field == 'end-time':
       if 'endTime' in metadata:
-        value = self._localize_datestamp(metadata['endTime'])
+        value = self._parse_datestamp(metadata['endTime'])
     elif field == 'status':
       value = self.operation_status()
     elif field in ['status-message', 'status-detail']:
@@ -1248,7 +1254,7 @@ class GoogleOperation(base.Task):
       status, last_update = self.operation_status_message()
       value = last_update
     else:
-      raise ValueError('Unsupported display field: "%s"' % field)
+      raise ValueError('Unsupported field: "%s"' % field)
 
     return value if value else default
 
@@ -1296,7 +1302,7 @@ class GoogleOperation(base.Task):
       else:
         msg = 'Success'
 
-    return (msg, self._localize_datestamp(ds))
+    return (msg, self._parse_datestamp(ds))
 
   def get_operation_full_job_id(self):
     """Returns the job-id or job-id.task-id for the operation."""
@@ -1308,15 +1314,14 @@ class GoogleOperation(base.Task):
       return job_id
 
   @staticmethod
-  def _localize_datestamp(datestamp):
-    """Converts a datestamp from RFC3339 UTC to local time.
+  def _parse_datestamp(datestamp):
+    """Converts a datestamp from RFC3339 UTC to a datetime.
 
     Args:
-      datestamp: a datetime value in RFC3339 UTC "Zulu" format
+      datestamp: a datetime string in RFC3339 UTC "Zulu" format
 
     Returns:
-      A datestamp in local time and up to seconds, or the original string if it
-      cannot be properly parsed.
+      A datetime.
     """
 
     # The timestamp from the Google Operations are all in RFC3339 format, but
@@ -1328,13 +1333,17 @@ class GoogleOperation(base.Task):
 
     m = re.match(r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}).*Z',
                  datestamp)
+
+    # It would be unexpected to get a different date format back from Google.
+    # If we raise an exception here, we can break people completely.
+    # Instead, let's just return None and people can report that some dates
+    # are not showing up.
     if not m:
-      return datestamp
+      return None
 
     # Create a UTC datestamp from parsed components
     g = [int(val) for val in m.groups()]
-    dt = datetime(g[0], g[1], g[2], g[3], g[4], g[5], tzinfo=pytz.utc)
-    return dt.astimezone(tzlocal()).strftime('%Y-%m-%d %H:%M:%S')
+    return datetime(g[0], g[1], g[2], g[3], g[4], g[5], tzinfo=pytz.utc)
 
   @classmethod
   def _get_operation_input_field_values(cls, metadata, file_input):
