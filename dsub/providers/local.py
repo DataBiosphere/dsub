@@ -637,7 +637,6 @@ class LocalJobProvider(base.JobProvider):
             'Unable to cancel %s: docker error %s:\n%s' %
             (docker_name, cpe.returncode, cpe.output)
         ]
-        continue
 
       # The script should have quit in response. If it hasn't, kill it.
       pid = task.get_field('pid', 0)

@@ -103,8 +103,20 @@ function dsub_test-fails() {
 
 # dstat
 
+function run_dstat_age() {
+  # Call dstat, allowing the caller to set a "--age"
+  local age="${1}"
+  shift
+
+  dstat_"${DSUB_PROVIDER}" --age "${age}" "${@}"
+}
+
 function run_dstat() {
-  dstat_"${DSUB_PROVIDER}" "${@}"
+  # Call dstat and automatically add "--age 30m".
+  # This speeds up tests and helps avoid dstat calls that return jobs
+  # from other test runs.
+  # If a test takes longer than 30 minutes, then we should fix the test.
+  run_dstat_age "30m" "${@}"
 }
 
 function dstat_google() {
@@ -120,20 +132,22 @@ function dstat_local() {
     "${@}"
 }
 
-function test_dstat() {
-  # Version of dstat that automatically adds "--age 5m".
-  # This speeds up tests and helps avoid dstat calls that return jobs
-  # from other test runs.
-  # If a test takes longer than 5 minutes, then we should fix the test.
-  dstat_"${DSUB_PROVIDER}" --age "5m" "${@}"
-}
-
 # ddel
 
-function run_ddel() {
-  local provider=${DSUB_PROVIDER:-google}
+function run_ddel_age() {
+  # Call ddel, allowing the caller to set a "--age"
+  local age="${1}"
+  shift
 
-  ddel_"${provider}" "${@}"
+  ddel_"${DSUB_PROVIDER}" --age "${age}" "${@}"
+}
+
+function run_ddel() {
+  # Call ddel and automatically add "--age 30m".
+  # This speeds up tests and helps avoid ddel calls that return jobs
+  # from other test runs.
+  # If a test takes longer than 30 minutes, then we should fix the test.
+  run_ddel_age "30m" "${@}"
 }
 
 function ddel_google() {

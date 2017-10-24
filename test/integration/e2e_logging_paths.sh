@@ -30,7 +30,6 @@ function dstat_get_logging() {
     run_dstat \
       --jobs "${job_id}" \
       --status "*" \
-      --age 30m \
       --full \
       --format json)
 
