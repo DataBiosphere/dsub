@@ -20,6 +20,7 @@ import argparse
 
 from ..lib import dsub_util
 from ..lib import param_util
+from ..lib import resources
 from ..providers import provider_base
 
 
@@ -109,7 +110,7 @@ def main():
   create_time = param_util.age_to_create_time(args.age)
 
   # Set up the Genomics Pipelines service interface
-  provider = provider_base.get_provider(args)
+  provider = provider_base.get_provider(args, resources)
 
   # Make sure users were provided, or try to fill from OS user. This cannot
   # be made into a default argument since some environments lack the ability

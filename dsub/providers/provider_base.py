@@ -26,7 +26,7 @@ PROVIDER_NAME_MAP = {
 }
 
 
-def get_provider(args):
+def get_provider(args, resources):
   """Returns a provider for job submission requests."""
 
   provider = getattr(args, 'provider', 'google')
@@ -36,7 +36,7 @@ def get_provider(args):
         getattr(args, 'verbose', False),
         getattr(args, 'dry_run', False), args.project)
   elif provider == 'local':
-    return local.LocalJobProvider()
+    return local.LocalJobProvider(resources)
   elif provider == 'test-fails':
     return test_fails.FailsJobProvider()
   else:

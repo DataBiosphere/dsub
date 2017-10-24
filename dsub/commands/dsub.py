@@ -30,6 +30,7 @@ from ..lib import dsub_errors
 from ..lib import dsub_util
 from ..lib import job_util
 from ..lib import param_util
+from ..lib import resources
 from ..lib.dsub_util import print_error
 from ..providers import provider_base
 
@@ -704,7 +705,7 @@ def run_main(args):
     }]
 
   return run(
-      provider_base.get_provider(args),
+      provider_base.get_provider(args, resources),
       _get_job_resources(args),
       job_data,
       all_task_data,

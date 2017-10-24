@@ -37,6 +37,7 @@ from dateutil.tz import tzlocal
 
 from ..lib import dsub_util
 from ..lib import param_util
+from ..lib import resources
 from ..providers import provider_base
 
 import tabulate
@@ -362,7 +363,7 @@ def main():
       output_formatter = TextOutput(args.full)
 
   # Set up the Genomics Pipelines service interface
-  provider = provider_base.get_provider(args)
+  provider = provider_base.get_provider(args, resources)
 
   # Set poll interval to zero if --wait is not set.
   poll_interval = args.poll_interval if args.wait else 0
