@@ -30,6 +30,7 @@ from ..lib import dsub_errors
 from ..lib import dsub_util
 from ..lib import job_util
 from ..lib import param_util
+from ..lib import resources
 from ..lib.dsub_util import print_error
 from ..providers import provider_base
 
@@ -182,22 +183,12 @@ def _parse_arguments(prog, argv):
   # Handle version flag and exit if it was passed.
   param_util.handle_version_flag()
 
-  provider_required_args = {
-      'google': ['project', 'zones', 'logging'],
-      'test-fails': [],
-      'local': ['logging'],
-  }
-  epilog = 'Provider-required arguments:\n'
-  for provider in provider_required_args:
-    epilog += '  %s: %s\n' % (provider, provider_required_args[provider])
-  parser = argparse.ArgumentParser(
-      prog=prog,
-      formatter_class=argparse.RawDescriptionHelpFormatter,
-      epilog=epilog)
+  parser = provider_base.create_parser(prog)
 
   # Add dsub core job submission arguments
   parser.add_argument(
       '--version', '-v', default=False, help='Print the dsub version and exit.')
+
   parser.add_argument(
       '--name',
       help="""Name for pipeline. Defaults to the script name or
@@ -331,7 +322,6 @@ def _parse_arguments(prog, argv):
       ' (either a folder, or file ending in ".log")')
 
   # Add provider-specific arguments
-  provider_base.add_provider_argument(parser)
   google = parser.add_argument_group(
       title='google',
       description='Options for the Google provider (Pipelines API)')
@@ -362,13 +352,12 @@ def _parse_arguments(prog, argv):
       Allows for connecting to the VM for debugging.
       Default is 0; maximum allowed value is 86400 (1 day).""")
 
-  args = parser.parse_args(argv)
-
-  # check special flag rules
-  for arg in provider_required_args[args.provider]:
-    if not args.__getattribute__(arg):
-      parser.error('argument --%s is required' % arg)
-  return args
+  return provider_base.parse_args(
+      parser, {
+          'google': ['project', 'zones', 'logging'],
+          'test-fails': [],
+          'local': ['logging'],
+      }, argv)
 
 
 def _get_job_resources(args):
@@ -704,7 +693,7 @@ def run_main(args):
     }]
 
   return run(
-      provider_base.get_provider(args),
+      provider_base.get_provider(args, resources),
       _get_job_resources(args),
       job_data,
       all_task_data,

@@ -31,7 +31,6 @@ function dstat_get_logging() {
     run_dstat \
       --jobs "${job_id}" \
       --status "*" \
-      --age 30m \
       --full \
       --format json)
 
@@ -50,7 +49,7 @@ readonly -f ddel_task
 readonly LOGGING_BASE="$(dirname "${LOGGING}")"
 declare LOGGING_OVERRIDE
 
-readonly JOB_NAME="log-test"
+readonly JOB_NAME="log-tasks"
 readonly JOB_USER="${USER}"
 
 # Test a basic job with base logging path
@@ -64,10 +63,10 @@ JOB_ID=$(run_dsub \
 
 LOGGING_PATH=$(dstat_get_logging "${JOB_ID}" "1")
 
-if [[ ! "${LOGGING_PATH}" == "${LOGGING_OVERRIDE}/log-test"*.1.log ]]; then
+if [[ ! "${LOGGING_PATH}" == "${LOGGING_OVERRIDE}/${JOB_NAME}"*.1.log ]]; then
   echo "ERROR: Unexpected logging path."
   echo "Received: ${LOGGING_PATH}"
-  echo "Expected: ${LOGGING_OVERRIDE}/log-test*.1.log"
+  echo "Expected: ${LOGGING_OVERRIDE}/${JOB_NAME}*.1.log"
   exit 1
 fi
 

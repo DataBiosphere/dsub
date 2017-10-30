@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Interface for job providers."""
+import argparse
 
 from . import google
 from . import local
@@ -26,7 +27,7 @@ PROVIDER_NAME_MAP = {
 }
 
 
-def get_provider(args):
+def get_provider(args, resources):
   """Returns a provider for job submission requests."""
 
   provider = getattr(args, 'provider', 'google')
@@ -36,7 +37,7 @@ def get_provider(args):
         getattr(args, 'verbose', False),
         getattr(args, 'dry_run', False), args.project)
   elif provider == 'local':
-    return local.LocalJobProvider()
+    return local.LocalJobProvider(resources)
   elif provider == 'test-fails':
     return test_fails.FailsJobProvider()
   else:
@@ -48,7 +49,22 @@ def get_provider_name(provider):
   return PROVIDER_NAME_MAP[provider.__class__]
 
 
-def add_provider_argument(parser):
+class DsubHelpFormatter(argparse.ArgumentDefaultsHelpFormatter,
+                        argparse.RawDescriptionHelpFormatter):
+  """Display defaults in help and display the epilog in its raw format.
+
+  As described in https://bugs.python.org/issue13023, there is not a built-in
+  class to provide both display of defaults as well as displaying the epilog
+  just as you want it to. The recommended approach is to create a simple
+  subclass of both Formatters.
+  """
+  pass
+
+
+def create_parser(prog):
+  """Create an argument parser, adding in the list of providers."""
+  parser = argparse.ArgumentParser(prog=prog, formatter_class=DsubHelpFormatter)
+
   parser.add_argument(
       '--provider',
       default='google',
@@ -57,6 +73,28 @@ def add_provider_argument(parser):
         Pipeline API) and "local" (local Docker execution). "test-*" providers
         are for testing purposes only.""",
       metavar='PROVIDER')
+
+  return parser
+
+
+def parse_args(parser, provider_required_args, argv):
+  """Add provider required arguments epilog message, parse, and validate."""
+
+  # Add the provider required arguments epilog message
+  epilog = 'Provider-required arguments:\n'
+  for provider in provider_required_args:
+    epilog += '  %s: %s\n' % (provider, provider_required_args[provider])
+  parser.epilog = epilog
+
+  # Parse arguments
+  args = parser.parse_args(argv)
+
+  # For the selected provider, check the required arguments
+  for arg in provider_required_args[args.provider]:
+    if not args.__getattribute__(arg):
+      parser.error('argument --%s is required' % arg)
+
+  return args
 
 
 def get_dstat_provider_args(provider, project):

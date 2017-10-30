@@ -28,15 +28,16 @@ Follows the model of bjobs, sinfo, qstat, etc.
 
 from __future__ import print_function
 
-import argparse
 import collections
 from datetime import datetime
 import json
+import sys
 import time
 from dateutil.tz import tzlocal
 
 from ..lib import dsub_util
 from ..lib import param_util
+from ..lib import resources
 from ..providers import provider_base
 
 import tabulate
@@ -191,7 +192,7 @@ class JsonOutput(OutputFormatter):
     print(json.dumps(table, indent=2, default=self.serialize))
 
 
-def prepare_row(task, full):
+def _prepare_row(task, full):
   """return a dict with the task's info (more if "full" is set)."""
 
   # Would like to include the Job ID in the default set of columns, but
@@ -236,7 +237,7 @@ def prepare_row(task, full):
   return row
 
 
-def parse_arguments():
+def _parse_arguments():
   """Parses command line arguments.
 
   Returns:
@@ -245,21 +246,11 @@ def parse_arguments():
   # Handle version flag and exit if it was passed.
   param_util.handle_version_flag()
 
-  provider_required_args = {
-      'google': ['project'],
-      'test-fails': [],
-      'local': [],
-  }
-  epilog = 'Provider-required arguments:\n'
-  for provider in provider_required_args:
-    epilog += '  %s: %s\n' % (provider, provider_required_args[provider])
-  parser = argparse.ArgumentParser(
-      formatter_class=argparse.ArgumentDefaultsHelpFormatter, epilog=epilog)
+  parser = provider_base.create_parser(sys.argv[0])
+
   parser.add_argument(
       '--version', '-v', default=False, help='Print the dsub version and exit.')
-  parser.add_argument(
-      '--project',
-      help='Cloud project ID in which to query pipeline operations')
+
   parser.add_argument(
       '--jobs',
       '-j',
@@ -289,7 +280,9 @@ def parse_arguments():
       default=['RUNNING'],
       choices=['RUNNING', 'SUCCESS', 'FAILURE', 'CANCELED', '*'],
       help="""Lists only those jobs which match the specified status(es).
-          Use "*" to list jobs of any status.""")
+          Choose from {'RUNNING', 'SUCCESS', 'FAILURE', 'CANCELED'}.
+          Use "*" to list jobs of any status.""",
+      metavar='STATUS')
   parser.add_argument(
       '--age',
       help="""List only those jobs newer than the specified age. Ages can be
@@ -325,21 +318,25 @@ def parse_arguments():
       '--format',
       choices=['text', 'json', 'yaml', 'provider-json'],
       help='Set the output format.')
+
   # Add provider-specific arguments
-  provider_base.add_provider_argument(parser)
+  google = parser.add_argument_group(
+      title='google',
+      description='Options for the Google provider (Pipelines API)')
+  google.add_argument(
+      '--project',
+      help='Cloud project ID in which to find and delete the job(s)')
 
-  args = parser.parse_args()
-
-  # check special flag rules
-  for arg in provider_required_args[args.provider]:
-    if not args.__getattribute__(arg):
-      parser.error('argument --%s is required' % arg)
-  return args
+  return provider_base.parse_args(parser, {
+      'google': ['project'],
+      'test-fails': [],
+      'local': [],
+  }, sys.argv[1:])
 
 
 def main():
   # Parse args and validate
-  args = parse_arguments()
+  args = _parse_arguments()
 
   # Compute the age filter (if any)
   create_time = param_util.age_to_create_time(args.age)
@@ -362,7 +359,7 @@ def main():
       output_formatter = TextOutput(args.full)
 
   # Set up the Genomics Pipelines service interface
-  provider = provider_base.get_provider(args)
+  provider = provider_base.get_provider(args, resources)
 
   # Set poll interval to zero if --wait is not set.
   poll_interval = args.poll_interval if args.wait else 0
@@ -458,7 +455,7 @@ def dstat_job_producer(provider,
       if raw_format:
         formatted_tasks.append(task.raw_task_data())
       else:
-        formatted_tasks.append(prepare_row(task, full_output))
+        formatted_tasks.append(_prepare_row(task, full_output))
 
       # Determine if any of the jobs are running.
       if task.get_field('task-status') == 'RUNNING':

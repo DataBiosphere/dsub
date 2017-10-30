@@ -65,7 +65,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo
   echo "Sleeping 10 seconds before exercising 'ddel --age 5s'"
   sleep 10s
-  run_ddel --jobs "${JOB_ID}" --age 5s
+  run_ddel_age "5s" --jobs "${JOB_ID}"
 
   # Make sure dstat still shows the job as not canceled.
   echo

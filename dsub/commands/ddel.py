@@ -16,14 +16,15 @@
 
 Follows the model of qdel.
 """
-import argparse
+import sys
 
 from ..lib import dsub_util
 from ..lib import param_util
+from ..lib import resources
 from ..providers import provider_base
 
 
-def parse_arguments():
+def _parse_arguments():
   """Parses command line arguments.
 
   Returns:
@@ -32,25 +33,11 @@ def parse_arguments():
   # Handle version flag and exit if it was passed.
   param_util.handle_version_flag()
 
-  provider_required_args = {
-      'google': ['project'],
-      'test-fails': [],
-      'local': [],
-  }
-  epilog = 'Provider-required arguments:\n'
-  for provider in provider_required_args:
-    epilog += '  %s: %s\n' % (provider, provider_required_args[provider])
-  parser = argparse.ArgumentParser(
-      formatter_class=argparse.ArgumentDefaultsHelpFormatter, epilog=epilog)
-  provider_base.add_provider_argument(parser)
+  parser = provider_base.create_parser(sys.argv[0])
+
   parser.add_argument(
       '--version', '-v', default=False, help='Print the dsub version and exit.')
-  google = parser.add_argument_group(
-      title='google',
-      description='Options for the Google provider (Pipelines API)')
-  google.add_argument(
-      '--project',
-      help='Cloud project ID in which to find and delete the job(s)')
+
   parser.add_argument(
       '--jobs',
       '-j',
@@ -82,10 +69,23 @@ def parse_arguments():
       default=[],
       help='User labels to match. Tasks returned must match all labels.',
       metavar='KEY=VALUE')
-  return parser.parse_args()
+
+  # Add provider-specific arguments
+  google = parser.add_argument_group(
+      title='google',
+      description='Options for the Google provider (Pipelines API)')
+  google.add_argument(
+      '--project',
+      help='Cloud project ID in which to find and delete the job(s)')
+
+  return provider_base.parse_args(parser, {
+      'google': ['project'],
+      'test-fails': [],
+      'local': [],
+  }, sys.argv[1:])
 
 
-def emit_search_criteria(users, jobs, tasks, labels):
+def _emit_search_criteria(users, jobs, tasks, labels):
   """Print the filters used to delete tasks. Use raw flags as arguments."""
   print 'Delete running jobs:'
   print '  user:'
@@ -103,13 +103,13 @@ def emit_search_criteria(users, jobs, tasks, labels):
 
 def main():
   # Parse args and validate
-  args = parse_arguments()
+  args = _parse_arguments()
 
   # Compute the age filter (if any)
   create_time = param_util.age_to_create_time(args.age)
 
   # Set up the Genomics Pipelines service interface
-  provider = provider_base.get_provider(args)
+  provider = provider_base.get_provider(args, resources)
 
   # Make sure users were provided, or try to fill from OS user. This cannot
   # be made into a default argument since some environments lack the ability
@@ -121,7 +121,7 @@ def main():
 
   # Let the user know which jobs we are going to look up
   with dsub_util.replace_print():
-    emit_search_criteria(user_list, args.jobs, args.tasks, args.label)
+    _emit_search_criteria(user_list, args.jobs, args.tasks, args.label)
     # Delete the requested jobs
     deleted_tasks = ddel_tasks(provider, user_list, args.jobs, args.tasks,
                                labels, create_time)

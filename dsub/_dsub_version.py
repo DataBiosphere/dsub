@@ -20,4 +20,4 @@ is parsed as a text file by setup.py and changes to the format of this
 file could break setup.py.
 """
 
-DSUB_VERSION = '0.1.1'
+DSUB_VERSION = '0.1.2'

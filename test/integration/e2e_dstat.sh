@@ -50,7 +50,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Checking dstat (by status)..."
 
-  if ! DSTAT_OUTPUT="$(test_dstat --status 'RUNNING' --jobs "${JOBID}" --full)"; then
+  if ! DSTAT_OUTPUT="$(run_dstat --status 'RUNNING' --jobs "${JOBID}" --full)"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
@@ -65,7 +65,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Checking dstat (by job-name)..."
 
-  if ! DSTAT_OUTPUT="$(test_dstat --status '*' --full --names "${JOB_NAME}")"; then
+  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --names "${JOB_NAME}")"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
@@ -80,7 +80,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Checking dstat (by job-id: default)..."
 
-  if ! DSTAT_OUTPUT="$(test_dstat --status '*' --jobs "${JOBID}")"; then
+  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}")"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
@@ -95,7 +95,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Checking dstat (by job-id: full)..."
 
-  if ! DSTAT_OUTPUT=$(test_dstat --status '*' --full --jobs "${JOBID}"); then
+  if ! DSTAT_OUTPUT=$(run_dstat --status '*' --full --jobs "${JOBID}"); then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
@@ -111,7 +111,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Waiting 5 seconds and checking 'dstat --age 5s'..."
   sleep 5s
 
-  DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}" --age 5s --full)"
+  DSTAT_OUTPUT="$(run_dstat_age "5s" --status '*' --jobs "${JOBID}" --full)"
   if [[ "${DSTAT_OUTPUT}" != "[]" ]]; then
     echo "dstat output not empty as expected:"
     echo "${DSTAT_OUTPUT}"
@@ -120,7 +120,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Verifying that the job didn't disappear completely."
 
-  DSTAT_OUTPUT="$(test_dstat --status '*' --jobs "${JOBID}" --full)"
+  DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}" --full)"
   if [[ "$(dstat_output_job_name "${DSTAT_OUTPUT}")" != "${JOB_NAME}" ]]; then
     echo "Job ${JOB_NAME} not found in the dstat output!"
     echo "${DSTAT_OUTPUT}"

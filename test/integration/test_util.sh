@@ -103,7 +103,6 @@ function util::get_job_status() {
     run_dstat \
       --jobs "${job_id}" \
       --status "*" \
-      --age 30m \
       --full \
       --format json); then
     return 1

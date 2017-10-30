@@ -85,9 +85,7 @@ setup(
 
     # Packages to distribute.
     packages=find_packages(),
-    package_data={
-        'dsub': ['VERSION'],
-    },
+    include_package_data=True,
 
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed.

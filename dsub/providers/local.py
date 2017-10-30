@@ -97,12 +97,15 @@ import yaml
 
 _PROVIDER_NAME = 'local'
 
-DATA_SUBDIR = 'data'
+# Relative path to the runner.sh file within dsub
+_RUNNER_SH_RESOURCE = 'dsub/providers/local/runner.sh'
 
-SCRIPT_DIR = 'script'
-WORKING_DIR = 'workingdir'
+_DATA_SUBDIR = 'data'
 
-DATA_MOUNT_POINT = '/mnt/data'
+_SCRIPT_DIR = 'script'
+_WORKING_DIR = 'workingdir'
+
+_DATA_MOUNT_POINT = '/mnt/data'
 
 # Set file provider whitelist.
 _SUPPORTED_FILE_PROVIDERS = frozenset([param_util.P_GCS, param_util.P_LOCAL])
@@ -152,8 +155,15 @@ def _convert_suffix_to_docker_chars(suffix):
 class LocalJobProvider(base.JobProvider):
   """Docker jobs running locally (i.e. on the caller's computer)."""
 
-  def __init__(self):
+  def __init__(self, resources):
+    """Run jobs on your local machine.
+
+    Args:
+      resources: module providing access to files packaged with dsub
+                 (See dsub/libs/resources.py)
+    """
     self._operations = []
+    self._resources = resources
 
   def prepare_job_metadata(self, script, job_name, user_id):
     job_name_value = job_name or os.path.basename(script)
@@ -213,19 +223,20 @@ class LocalJobProvider(base.JobProvider):
         'task-id': launched_tasks
     }
 
+  def _write_source_file(self, dest, body):
+    with open(dest, 'wt') as f:
+      f.write(body)
+    os.chmod(dest, 0500)
+
   def _run_docker_via_script(self, task_dir, env, job_resources, task_metadata,
                              job_data, task_data):
     script_header = textwrap.dedent("""\
-      #!/bin/bash
-
-      # dsub-generated script to start the local Docker container
-      # and keep a running status.
-
-      set -o nounset
+      # dsub-generated script containing data for task execution
 
       readonly VOLUMES=({volumes})
       readonly NAME='{name}'
       readonly IMAGE='{image}'
+
       # Absolute path to the user's script file inside Docker.
       readonly SCRIPT_FILE='{script}'
       # Mount point for the volume on Docker.
@@ -238,8 +249,6 @@ class LocalJobProvider(base.JobProvider):
       readonly ENV_FILE='{env_file}'
       # Date format used in the logging message prefix.
       readonly DATE_FORMAT='{date_format}'
-      # Absolute path to this script's directory.
-      readonly TASK_DIR="$(dirname $0)"
       # User to run as (by default)
       readonly MY_UID='{uid}'
       # Set environment variables for recursive input directories
@@ -273,287 +282,24 @@ class LocalJobProvider(base.JobProvider):
         delocalize_logs_function "${{cp_cmd}}" "${{prefix}}"
       }}
       """)
-    script_body = textwrap.dedent("""\
-      # Delete local files
-      function cleanup() {
-        local rm_data_dir="${1:-true}"
-
-        log_info "Copying the logs before cleanup"
-        delocalize_logs
-
-        # Clean up files staged from outside Docker
-        if [[ "${rm_data_dir}" == "true" ]]; then
-          echo "cleaning up ${DATA_DIR}"
-
-          # Clean up files written from inside Docker
-          2>&1 docker run \\
-            --name "${NAME}-cleanup" \\
-            --workdir "${DATA_MOUNT_POINT}/${WORKING_DIR}" \\
-            "${VOLUMES[@]}" \\
-            --env-file "${ENV_FILE}" \\
-            "${IMAGE}" \\
-            rm -rf "${DATA_MOUNT_POINT}/*" | tee -a "${TASK_DIR}/log.txt"
-
-          rm -rf "${DATA_DIR}" || echo "sorry, unable to delete ${DATA_DIR}."
-        fi
-      }
-      readonly -f cleanup
-
-      function delocalize_logs_function() {
-        local cp_cmd="${1}"
-        local prefix="${2}"
-
-        if [[ -f "${TASK_DIR}/stdout.txt" ]]; then
-          ${cp_cmd} "${TASK_DIR}/stdout.txt" "${prefix}-stdout.log"
-        fi
-        if [[ -f "${TASK_DIR}/stderr.txt" ]]; then
-          ${cp_cmd} "${TASK_DIR}/stderr.txt" "${prefix}-stderr.log"
-        fi
-        if [[ -f "${TASK_DIR}/log.txt" ]]; then
-          ${cp_cmd} "${TASK_DIR}/log.txt" "${prefix}.log"
-        fi
-      }
-      readonly -f delocalize_logs_function
-
-      function get_datestamp() {
-        date "${DATE_FORMAT}"
-      }
-      readonly -f get_datestamp
-
-      function write_status() {
-        local status="${1}"
-        echo "${status}" > "${TASK_DIR}/status.txt"
-        case "${status}" in
-          SUCCESS|FAILURE|CANCELED)
-            # Record the finish time (with microseconds)
-            # Prepend "10#" so numbers like 0999... are not treated as octal
-            local nanos=$(echo "10#"$(date "+%N"))
-            echo $(date "+%Y-%m-%d %H:%M:%S").$((nanos/1000)) \
-              > "${TASK_DIR}/end-time.txt"
-            ;;
-          RUNNING)
-            ;;
-          *)
-            echo 2>&1 "Unexpected status: ${status}"
-            exit 1
-            ;;
-        esac
-      }
-      readonly -f write_status
-
-      function log_info() {
-        echo "$(get_datestamp) I: $@" | tee -a "${TASK_DIR}/log.txt"
-      }
-      readonly -f log_info
-
-      function log_error() {
-        echo "$(get_datestamp) E: $@" | tee -a "${TASK_DIR}/log.txt"
-      }
-      readonly -f log_error
-
-      # Correctly log failures and nounset exits
-      function error() {
-        local parent_lineno="$1"
-        local code="$2"
-        local message="${3:-Error}"
-
-        # Disable further traps
-        trap EXIT
-        trap ERR
-
-        if [[ $code != "0" ]]; then
-          write_status "FAILURE"
-          log_error "${message} on or near line ${parent_lineno}; exiting with status ${code}"
-        fi
-        cleanup "false"
-        exit "${code}"
-      }
-      readonly -f error
-
-      function fetch_image() {
-        local image="$1"
-
-        for ((attempt=0; attempt < 3; attempt++)); do
-          log_info "Using gcloud to fetch ${image}."
-          if gcloud docker -- pull "${image}"; then
-            return
-          fi
-          log_info "Sleeping 30s before the next attempt."
-          sleep 30s
-        done
-
-        log_error "FAILED to fetch ${image}"
-        exit 1
-      }
-      readonly -f fetch_image
-
-      function fetch_image_if_necessary() {
-        local image="$1"
-
-        # Remove everything from the first / on
-        local prefix="${image%%/*}"
-
-        # Check that the prefix is gcr.io or <location>.gcr.io
-        if [[ "${prefix}" == "gcr.io" ]] ||
-           [[ "${prefix}" == *.gcr.io ]]; then
-          fetch_image "${image}"
-        fi
-      }
-      readonly -f fetch_image_if_necessary
-
-      function get_docker_user() {
-        # Get the userid and groupid the Docker image is set to run as.
-        docker run \\
-          --name "${NAME}-get-docker-userid" \\
-          "${IMAGE}" \\
-          bash -c 'echo "$(id -u):$(id -g)"' 2>> "${TASK_DIR}/stderr.txt"
-      }
-      readonly -f get_docker_user
-
-      function docker_recursive_chown() {
-        # Calls, in Docker: chown -R $1 $2
-        local usergroup="$1"
-        local docker_directory="$2"
-        # Not specifying a name because Docker refuses to run if two containers
-        # have the same name, and it keeps them around for a little bit
-        # after they return.
-        docker run \\
-          --user 0 \\
-          "${VOLUMES[@]}" \\
-          "${IMAGE}" \\
-          chown -R "${usergroup}" "${docker_directory}" \\
-          >> "${TASK_DIR}/stdout.txt" 2>> "${TASK_DIR}/stderr.txt"
-      }
-      readonly -f docker_recursive_chown
-
-      function exit_if_canceled() {
-        if [[ -f die ]]; then
-          log_info "Job is canceled, stopping Docker container ${NAME}."
-          docker stop "${NAME}"
-          write_status "CANCELED"
-          log_info "Delocalize logs and cleanup"
-          cleanup "false"
-          trap EXIT
-          log_info "Canceled, exiting."
-          exit 1
-        fi
-      }
-      readonly -f exit_if_canceled
-
-
-      # This will trigger whenever a command returns an error code
-      # (exactly like set -e)
-      trap 'error ${LINENO} $? Error' ERR
-
-      # This will trigger on all other exits. We disable it before normal
-      # exit so we know if it fires it means there's a problem.
-      trap 'error ${LINENO} $? "Exit (undefined variable or kill?)"' EXIT
-
-      # Make sure that ERR traps are inherited by shell functions
-      set -o errtrace
-
-      # Beginning main execution
-
-      # Copy inputs
-      cd "${TASK_DIR}"
-      write_status "RUNNING"
-      log_info "Localizing inputs."
-      localize_data
-
-      # Handle gcr.io images
-      fetch_image_if_necessary "${IMAGE}"
-
-      log_info "Checking image userid."
-      DOCKER_USERGROUP="$(get_docker_user)"
-      if [[ "${DOCKER_USERGROUP}" != "0:0" ]]; then
-        log_info "Ensuring docker user (${DOCKER_USERGROUP} can access ${DATA_MOUNT_POINT}."
-        docker_recursive_chown "${DOCKER_USERGROUP}" "${DATA_MOUNT_POINT}"
-      fi
-
-      # Begin execution of user script
-      FAILURE_MESSAGE=''
-      # Disable ERR trap, we want to copy the logs even if Docker fails.
-      trap ERR
-      log_info "Running Docker image."
-      docker run \\
-         --detach \\
-         --name "${NAME}" \\
-         --workdir "${DATA_MOUNT_POINT}/${WORKING_DIR}" \\
-         "${VOLUMES[@]}" \\
-         --env-file "${ENV_FILE}" \\
-         "${IMAGE}" \\
-         "${SCRIPT_FILE}"
-
-      # Start a log writer in the background
-      docker logs --follow "${NAME}" \
-        >> "${TASK_DIR}/stdout.txt" 2>> "${TASK_DIR}/stderr.txt" &
-
-      # Wait for completion
-      DOCKER_EXITCODE=$(docker wait "${NAME}")
-      log_info "Docker exit code ${DOCKER_EXITCODE}."
-      if [[ "${DOCKER_EXITCODE}" != 0 ]]; then
-        FAILURE_MESSAGE="Docker exit code ${DOCKER_EXITCODE} (check stderr)."
-      fi
-
-      # If we were canceled during execution, be sure to process as such
-      exit_if_canceled
-
-      # Re-enable trap
-      trap 'error ${LINENO} $? Error' ERR
-
-      # Prepare data for delocalization.
-      HOST_USERGROUP="$(id -u):$(id -g)"
-      log_info "Ensure host user (${HOST_USERGROUP}) owns Docker-written data"
-      # Disable ERR trap, we want to copy the logs even if Docker fails.
-      trap ERR
-      docker_recursive_chown "${HOST_USERGROUP}" "${DATA_MOUNT_POINT}"
-      DOCKER_EXITCODE_2=$?
-      # Re-enable trap
-      trap 'error ${LINENO} $? Error' ERR
-      if [[ "${DOCKER_EXITCODE_2}" != 0 ]]; then
-        # Ensure we report failure at the end of the execution
-        FAILURE_MESSAGE="chown failed, Docker returned ${DOCKER_EXITCODE_2}."
-        log_error "${FAILURE_MESSAGE}"
-      fi
-
-      log_info "Copying outputs."
-      delocalize_data
-
-      # Delocalize logs & cleanup
-      #
-      # Disable further traps (if cleanup fails we don't want to call it
-      # recursively)
-      trap EXIT
-      log_info "Delocalize logs and cleanup."
-      cleanup "true"
-      if [[ -z "${FAILURE_MESSAGE}" ]]; then
-        write_status "SUCCESS"
-        log_info "Done"
-      else
-        write_status "FAILURE"
-        # we want this to be the last line in the log, for dstat to work right.
-        log_error "${FAILURE_MESSAGE}"
-        exit 1
-      fi
-      """)
 
     # Build the local runner script
-    volumes = ('-v ' + task_dir + '/' + DATA_SUBDIR + '/'
-               ':' + DATA_MOUNT_POINT)
+    volumes = ('-v ' + task_dir + '/' + _DATA_SUBDIR + '/'
+               ':' + _DATA_MOUNT_POINT)
 
-    script = script_header.format(
+    script_data = script_header.format(
         volumes=volumes,
         name=_format_task_name(
             task_metadata.get('job-id'), task_metadata.get('task-id')),
         image=job_resources.image,
-        script=DATA_MOUNT_POINT + '/' + SCRIPT_DIR + '/' +
+        script=_DATA_MOUNT_POINT + '/' + _SCRIPT_DIR + '/' +
         task_metadata['script'].name,
         env_file=task_dir + '/' + 'docker.env',
         uid=os.getuid(),
-        data_mount_point=DATA_MOUNT_POINT,
-        data_dir=task_dir + '/' + DATA_SUBDIR,
+        data_mount_point=_DATA_MOUNT_POINT,
+        data_dir=task_dir + '/' + _DATA_SUBDIR,
         date_format='+%Y-%m-%d %H:%M:%S',
-        workingdir=WORKING_DIR,
+        workingdir=_WORKING_DIR,
         export_input_dirs=providers_util.build_recursive_localize_env(
             task_dir, job_data['inputs'] + task_data['inputs']),
         recursive_localize_command=self._localize_inputs_recursive_command(
@@ -568,19 +314,19 @@ class LocalJobProvider(base.JobProvider):
             task_dir, job_data['outputs'] + task_data['outputs']),
         delocalize_logs_command=self._delocalize_logging_command(
             job_resources.logging.file_provider, task_metadata),
-    ) + script_body
+    )
 
-    # Write the local runner script
-    script_fname = task_dir + '/runner.sh'
-    f = open(script_fname, 'wt')
-    f.write(script)
-    f.close()
-    os.chmod(script_fname, 0500)
+    # Write the runner script and data file to the task_dir
+    script_path = os.path.join(task_dir, 'runner.sh')
+    script_data_path = os.path.join(task_dir, 'data.sh')
+    self._write_source_file(script_path,
+                            self._resources.get_resource(_RUNNER_SH_RESOURCE))
+    self._write_source_file(script_data_path, script_data)
 
     # Write the environment variables
     env_vars = env.items() + job_data['envs'] + task_data['envs'] + [
-        param_util.EnvParam('DATA_ROOT', DATA_MOUNT_POINT),
-        param_util.EnvParam('TMPDIR', DATA_MOUNT_POINT + '/tmp')
+        param_util.EnvParam('DATA_ROOT', _DATA_MOUNT_POINT),
+        param_util.EnvParam('TMPDIR', _DATA_MOUNT_POINT + '/tmp')
     ]
     env_fname = task_dir + '/docker.env'
     with open(env_fname, 'wt') as f:
@@ -592,7 +338,7 @@ class LocalJobProvider(base.JobProvider):
     # JOBID=$(dsub ...) doesn't block until docker returns.
     runner_log = open(task_dir + '/runner-log.txt', 'wt')
     runner = subprocess.Popen(
-        [script_fname], stderr=runner_log, stdout=runner_log)
+        [script_path, script_data_path], stderr=runner_log, stdout=runner_log)
     pid = runner.pid
     f = open(task_dir + '/task.pid', 'wt')
     f.write(str(pid) + '\n')
@@ -637,7 +383,6 @@ class LocalJobProvider(base.JobProvider):
             'Unable to cancel %s: docker error %s:\n%s' %
             (docker_name, cpe.returncode, cpe.output)
         ]
-        continue
 
       # The script should have quit in response. If it hasn't, kill it.
       pid = task.get_field('pid', 0)
@@ -979,14 +724,14 @@ class LocalJobProvider(base.JobProvider):
     """Return a dictionary of environment variables for the VM."""
     ret = {}
     for i in inputs:
-      ret[i.name] = DATA_MOUNT_POINT + '/' + i.docker_path
+      ret[i.name] = _DATA_MOUNT_POINT + '/' + i.docker_path
     for o in outputs:
-      ret[o.name] = DATA_MOUNT_POINT + '/' + o.docker_path
+      ret[o.name] = _DATA_MOUNT_POINT + '/' + o.docker_path
     return ret
 
   def _localize_inputs_recursive_command(self, task_dir, inputs):
     """Returns a command that will stage recursive inputs."""
-    data_dir = os.path.join(task_dir, DATA_SUBDIR)
+    data_dir = os.path.join(task_dir, _DATA_SUBDIR)
     provider_commands = [
         providers_util.build_recursive_localize_command(data_dir, inputs,
                                                         file_provider)
@@ -1023,7 +768,7 @@ class LocalJobProvider(base.JobProvider):
         continue
 
       source_file_path = i.uri
-      local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + i.docker_path
+      local_file_path = task_dir + '/' + _DATA_SUBDIR + '/' + i.docker_path
       dest_file_path = self._get_input_target_path(local_file_path)
 
       commands.append('mkdir -p "%s"' % os.path.dirname(local_file_path))
@@ -1042,10 +787,10 @@ class LocalJobProvider(base.JobProvider):
     return '\n'.join(commands)
 
   def _mkdir_outputs(self, task_dir, outputs):
-    os.makedirs(task_dir + '/' + DATA_SUBDIR + '/' + WORKING_DIR)
-    os.makedirs(task_dir + '/' + DATA_SUBDIR + '/tmp')
+    os.makedirs(task_dir + '/' + _DATA_SUBDIR + '/' + _WORKING_DIR)
+    os.makedirs(task_dir + '/' + _DATA_SUBDIR + '/tmp')
     for o in outputs:
-      local_file_path = task_dir + '/' + DATA_SUBDIR + '/' + o.docker_path
+      local_file_path = task_dir + '/' + _DATA_SUBDIR + '/' + o.docker_path
       # makedirs errors out if the folder already exists, so check.
       if not os.path.isdir(os.path.dirname(local_file_path)):
         os.makedirs(os.path.dirname(local_file_path))
@@ -1059,10 +804,10 @@ class LocalJobProvider(base.JobProvider):
     # Generate local and GCS delocalize commands.
     cmd_lines.append(
         providers_util.build_recursive_delocalize_command(
-            os.path.join(task_dir, DATA_SUBDIR), outputs, param_util.P_GCS))
+            os.path.join(task_dir, _DATA_SUBDIR), outputs, param_util.P_GCS))
     cmd_lines.append(
         providers_util.build_recursive_delocalize_command(
-            os.path.join(task_dir, DATA_SUBDIR), outputs, param_util.P_LOCAL))
+            os.path.join(task_dir, _DATA_SUBDIR), outputs, param_util.P_LOCAL))
     return '\n'.join(cmd_lines)
 
   def _delocalize_outputs_commands(self, task_dir, outputs):
@@ -1075,7 +820,7 @@ class LocalJobProvider(base.JobProvider):
       # The destination path is o.uri.path, which is the target directory
       # (rather than o.uri, which includes the filename or wildcard).
       dest_path = o.uri.path
-      local_path = task_dir + '/' + DATA_SUBDIR + '/' + o.docker_path
+      local_path = task_dir + '/' + _DATA_SUBDIR + '/' + o.docker_path
 
       if o.file_provider == param_util.P_LOCAL:
         commands.append('mkdir -p "%s"' % dest_path)
@@ -1087,7 +832,8 @@ class LocalJobProvider(base.JobProvider):
     return '\n'.join(commands)
 
   def _stage_script(self, task_dir, script_name, script_text):
-    path = (task_dir + '/' + DATA_SUBDIR + '/' + SCRIPT_DIR + '/' + script_name)
+    path = (
+        task_dir + '/' + _DATA_SUBDIR + '/' + _SCRIPT_DIR + '/' + script_name)
     os.makedirs(os.path.dirname(path))
     f = open(path, 'w')
     f.write(script_text)
