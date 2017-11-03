@@ -35,11 +35,15 @@ function call_dsub() {
   local zones="${3:-}"
   local preemptible="${4:-}"
   local keep_alive="${5:-}"
+  local accelerator_type="${6:-}"
+  local accelerator_count="${7:-}"
 
   ZONES="${zones}" \
   run_dsub \
     "${preemptible:+--preemptible}" \
     ${keep_alive:+"--keep-alive" "${keep_alive}"} \
+    ${accelerator_type:+--accelerator-type "${accelerator_type}"} \
+    ${accelerator_count:+--accelerator-count "${accelerator_count}"} \
     --command "${command}" \
     --script "${script}" \
     --env TEST_NAME="${TEST_NAME}" \
@@ -222,6 +226,52 @@ function test_no_keep_alive() {
 }
 readonly -f test_no_keep_alive
 
+function test_accelerator_type_and_count() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    'echo "${TEST_NAME}"' \
+    "" \
+    "us-*" \
+    "" \
+    "" \
+    "nvidia-tesla-k80" \
+    2; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].ephemeralPipeline.resources.acceleratorType" "nvidia-tesla-k80"
+    assert_err_value_equals \
+     "[0].ephemeralPipeline.resources.acceleratorCount" "2"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_keep_alive
+
+function test_no_accelerator_type_and_count() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    'echo "${TEST_NAME}"' \
+    "" \
+    "us-*"; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].ephemeralPipeline.resources.acceleratorType" "None"
+    assert_err_value_equals \
+     "[0].ephemeralPipeline.resources.acceleratorCount" "0"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_keep_alive
+
 # Run the tests
 trap "exit_handler" EXIT
 
@@ -242,3 +292,7 @@ test_no_preemptible
 echo
 test_keep_alive
 test_no_keep_alive
+
+echo
+test_accelerator_type_and_count
+test_no_accelerator_type_and_count

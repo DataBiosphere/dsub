@@ -351,6 +351,24 @@ def _parse_arguments(prog, argv):
       after a localization, docker command, or delocalization failure.
       Allows for connecting to the VM for debugging.
       Default is 0; maximum allowed value is 86400 (1 day).""")
+  google.add_argument(
+      '--accelerator-type',
+      help="""The Compute Engine accelerator type. By specifying this parameter,
+          you will download and install the following third-party software onto
+          your job's Compute Engine instances: NVIDIA(R) Tesla(R) drivers and
+          NVIDIA(R) CUDA toolkit. Please see
+          https://cloud.google.com/compute/docs/gpus/ for supported GPU types
+          and
+          https://cloud.google.com/genomics/reference/rest/v1alpha2/pipelines#pipelineresources
+          for more details.""")
+  google.add_argument(
+      '--accelerator-count',
+      type=int,
+      default=0,
+      help="""The number of accelerators of the specified type to attach.
+          By specifying this parameter, you will download and install the
+          following third-party software onto your job's Compute Engine
+          instances: NVIDIA(R) Tesla(R) drivers and NVIDIA(R) CUDA toolkit.""")
 
   return provider_base.parse_args(
       parser, {
@@ -380,7 +398,9 @@ def _get_job_resources(args):
       zones=args.zones,
       logging=logging,
       scopes=args.scopes,
-      keep_alive=args.keep_alive)
+      keep_alive=args.keep_alive,
+      accelerator_type=args.accelerator_type,
+      accelerator_count=args.accelerator_count)
 
 
 def _get_job_metadata(user_id, job_name, script, provider):

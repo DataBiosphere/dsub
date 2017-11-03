@@ -446,8 +446,9 @@ class _Pipelines(object):
 
   @classmethod
   def build_pipeline(cls, project, min_cores, min_ram, disk_size,
-                     boot_disk_size, preemptible, image, zones, script_name,
-                     envs, inputs, outputs, pipeline_name):
+                     boot_disk_size, preemptible, image, zones,
+                     accelerator_type, accelerator_count, script_name, envs,
+                     inputs, outputs, pipeline_name):
     """Builds a pipeline configuration for execution.
 
     Args:
@@ -459,6 +460,9 @@ class _Pipelines(object):
       preemptible: use a preemptible VM for the job
       image: string Docker image name in which to run.
       zones: list of zone names for jobs to be run at.
+      accelerator_type: string GCE defined accelerator type.
+      accelerator_count: int number of accelerators of the specified type to
+        attach.
       script_name: file name of the script to run.
       envs: list of EnvParam objects specifying environment variables to set
         within each job.
@@ -523,10 +527,12 @@ class _Pipelines(object):
                 'minimumRamGb': min_ram,
                 'bootDiskSizeGb': boot_disk_size,
                 'preemptible': preemptible,
+                'zones': _get_zones(zones),
+                'acceleratorType': accelerator_type,
+                'acceleratorCount': accelerator_count,
 
                 # Create a data disk that is attached to the VM and destroyed
                 # when the pipeline terminates.
-                'zones': _get_zones(zones),
                 'disks': [{
                     'name': 'datadisk',
                     'autoDelete': True,
@@ -981,6 +987,8 @@ class GoogleJobProvider(base.JobProvider):
         preemptible=job_resources.preemptible,
         image=job_resources.image,
         zones=job_resources.zones,
+        accelerator_type=job_resources.accelerator_type,
+        accelerator_count=job_resources.accelerator_count,
         script_name=script.name,
         envs=job_data['envs'] + task_data['envs'],
         inputs=job_data['inputs'] + task_data['inputs'],

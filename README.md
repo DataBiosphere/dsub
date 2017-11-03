@@ -245,20 +245,14 @@ If you use a Red Hat or CentOS Docker image, you are encouraged to use the
 
 ### Setting resource requirements
 
-By default, dsub launches a VM with a single CPU core, a default number of
-GB of memory (3.75 GB on Google Compute Engine), and a default disk size
-(200 GB).
+`dsub` tasks run using the `local` provider will use the resources available on
+your local machine.
 
-To change the minimum RAM, use the `--min-ram` flag.
+`dsub` tasks run using the `google` provider can take advantage of a wide range
+of CPU, RAM, disk, and hardware accelerator (eg. GPU) options.
 
-To change the minimum number of CPU cores, use the `--min-cores` flag.
-
-To change the disk size, use the `--disk-size` flag.
-
-Before you choose especially large or unusual values, be sure to check the
-available VM instance types and maximum disk size. On Google Cloud, the
-machine type will be selected from the best matching
-[predefined machine types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types).
+See the [Compute Resources](docs/compute_resources.md) documentation for
+details.
 
 ### Submitting a batch job
 
@@ -402,6 +396,7 @@ To delete all running jobs for the current user:
     *   [Scripts, Commands, and Docker](docs/code.md)
     *   [Input and Output File Handling](docs/input_output.md)
     *   [Logging](docs/logging.md)
+    *   [Compute Resources](docs/compute_resources.md)
     *   [Job Control](docs/job_control.md)
     *   [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
     *   [Backend providers](docs/providers/README.md)
