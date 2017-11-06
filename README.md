@@ -8,27 +8,56 @@ This is not an official Google product.
 ## Overview
 
 dsub is a command-line tool that makes it easy to submit and run batch scripts
-in the cloud. dsub uses Docker, which makes it easy to package up portable
-code that people can run anywhere Docker is supported.
+in the cloud.
 
 The dsub user experience is modeled after traditional high-performance
 computing job schedulers like Grid Engine and Slurm. You write a script and
 then submit it to a job scheduler from a shell prompt on your local machine.
 
-For now, dsub supports Google Cloud as the backend batch job runner. With help
-from the community, we'd like to add other backends, such as a local runner,
-Grid Engine, Slurm, Amazon Batch, and Azure Batch.
+Today dsub supports Google Cloud as the backend batch job runner, along with a
+local provider for development and testing. With help from the community, we'd
+like to add other backends, such as a Grid Engine, Slurm, Amazon Batch,
+and Azure Batch.
 
 If others find dsub useful, our hope is to contribute dsub to an open-source
 foundation for use by the wider batch computing community.
 
 ## Getting started
 
-1.  Create and activate a Python virtualenv (optional but strongly recommended).
+You can install `dsub` from [PyPI](pypi.python.org), or you can clone and
+install from this github repository.
+
+### Pre-installation steps
+
+1. This is optional, but whether installing from PyPI or from github,
+you are encouraged to use a [Python virtualenv](https://virtualenv.pypa.io).
+
+    If necessary, [install virtualenv](https://virtualenv.pypa.io/en/stable/installation/).
+
+1.  Create and activate a Python virtualenv.
 
         # (You can do this in a directory of your choosing.)
         virtualenv dsub_libs
         source dsub_libs/bin/activate
+
+### Install `dsub`
+
+Choose one of the following:
+
+#### Install from PyPI
+
+1.  If necessary, [install pip](https://pip.pypa.io/en/stable/installing/).
+
+1.  Install `dsub`
+
+         pip install dsub
+
+#### Install from github
+
+1.  Be sure you have git installed
+
+    Instructions for your environment can be found on the
+    [git website](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
 
 1.  Clone this repository.
 
@@ -43,7 +72,9 @@ foundation for use by the wider batch computing community.
 
         source bash_tab_complete
 
-1.  Verify the installation by running:
+### Post-installation steps
+
+1.  Minimally verify the installation by running:
 
         dsub --help
 
@@ -51,6 +82,27 @@ foundation for use by the wider batch computing community.
 
     This is necessary only if you're going to create your own Docker images or
     use the `local` provider.
+
+### Getting started with the local provider
+
+We think you'll find the `local` provider to be very helpful when building
+your pipelines. You'll get quicker turnaround times and won't incur cloud
+charges using it.
+
+1. Run a `dsub` job and wait for completion.
+
+    Here is a very simple "Hello World" test:
+
+        dsub \
+          --provider local \
+          --logging /tmp/dsub-test/logging/ \
+          --output OUT=/tmp/dsub-test/output/out.txt \
+          --command 'echo "Hello World" > "${OUT}"' \
+          --wait
+
+1. View the output file.
+
+        cat /tmp/dsub-test/output/out.txt
 
 ### Getting started on Google Cloud
 
@@ -85,21 +137,30 @@ foundation for use by the wider batch computing community.
     refine the [location](https://cloud.google.com/storage/docs/bucket-locations) setting with the
     `-l` option.)
 
-## Running a job
+1.  Run a dsub job and wait for completion.
 
-Here's the simplest example:
+    Here is a very simple "Hello World" test:
 
-    dsub \
-        --project my-cloud-project \
-        --zones "us-central1-*" \
-        --logging gs://my-bucket/logging \
-        --command 'echo hello'
+        dsub \
+          --project my-cloud-project \
+          --zones "us-central1-*" \
+          --logging gs://my-bucket/logging/ \
+          --output OUT=gs://my-bucket/output/out.txt \
+          --command 'echo "Hello World" > "${OUT}"' \
+          --wait
 
-Change `my-cloud-project` to your Google Cloud project, and `my-bucket` to
-the bucket you created above.
+    Change `my-cloud-project` to your Google Cloud project, and `my-bucket` to
+    the bucket you created above.
 
-After running dsub, the output will be a server-generated job id.
-The output of the script command will be written to the logging folder.
+    The output of the script command will be written to the `OUT` file in Cloud
+    Storage that you specify.
+
+1. View the output file.
+
+        gsutil cat gs://my-bucket/output/out.txt
+
+
+## `dsub` features
 
 The following sections show how to run more complex jobs.
 
