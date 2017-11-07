@@ -38,7 +38,9 @@ class JobUtilTest(unittest.TestCase):
         'image': None,
         'logging': None,
         'zones': None,
-        'scopes': ['https://www.googleapis.com/auth/bigquery',]
+        'scopes': ['https://www.googleapis.com/auth/bigquery',],
+        'accelerator_type': None,
+        'accelerator_count': 0,
     }, resource)
 
     # User defined job resources.
@@ -46,7 +48,9 @@ class JobUtilTest(unittest.TestCase):
         zones='us-east1-a,us-central1-a',
         min_ram=16,
         image='my-docker-img',
-        min_cores=8)
+        min_cores=8,
+        accelerator_type='nvidia-tesla-k80',
+        accelerator_count=2)
     self.check_resources({
         'min_cores': 8,
         'min_ram': 16,
@@ -56,7 +60,9 @@ class JobUtilTest(unittest.TestCase):
         'image': 'my-docker-img',
         'logging': None,
         'zones': 'us-east1-a,us-central1-a',
-        'scopes': ['https://www.googleapis.com/auth/bigquery',]
+        'scopes': ['https://www.googleapis.com/auth/bigquery',],
+        'accelerator_type': 'nvidia-tesla-k80',
+        'accelerator_count': 2,
     }, resource)
 
   def testScriptCreation(self):

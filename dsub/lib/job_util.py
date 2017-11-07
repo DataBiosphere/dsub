@@ -28,7 +28,8 @@ DEFAULT_SCOPES = [
 class JobResources(
     collections.namedtuple('JobResources', [
         'min_cores', 'min_ram', 'disk_size', 'boot_disk_size', 'preemptible',
-        'image', 'logging', 'zones', 'scopes', 'keep_alive'
+        'image', 'logging', 'zones', 'scopes', 'keep_alive', 'accelerator_type',
+        'accelerator_count'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -43,6 +44,9 @@ class JobResources(
     zones (str): location in which to run the job
     scopes (list): OAuth2 scopes for the job
     keep_alive (int): Seconds to keep VM alive on failure
+    accelerator_type (string): Accelerator type (e.g. 'nvidia-tesla-k80').
+    accelerator_count (int): Number of accelerators of the specified type to
+      attach.
   """
   __slots__ = ()
 
@@ -55,11 +59,14 @@ class JobResources(
               image=None,
               logging=None,
               zones=None,
-              scopes=DEFAULT_SCOPES,
-              keep_alive=None):
-    return super(JobResources, cls).__new__(cls, min_cores, min_ram, disk_size,
-                                            boot_disk_size, preemptible, image,
-                                            logging, zones, scopes, keep_alive)
+              scopes=None,
+              keep_alive=None,
+              accelerator_type=None,
+              accelerator_count=0):
+    return super(JobResources, cls).__new__(
+        cls, min_cores, min_ram, disk_size, boot_disk_size, preemptible, image,
+        logging, zones, scopes or DEFAULT_SCOPES, keep_alive, accelerator_type,
+        accelerator_count)
 
 
 class Script(object):

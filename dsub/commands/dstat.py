@@ -214,6 +214,7 @@ def _prepare_row(task, full):
       row_spec('status', True, None),
       row_spec('status-detail', True, None),
       row_spec('create-time', True, None),
+      row_spec('start-time', True, None),
       row_spec('end-time', True, None),
       row_spec('internal-id', True, None),
       row_spec('logging', True, None),

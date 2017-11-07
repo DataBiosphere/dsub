@@ -18,6 +18,12 @@ This must remain small and dependency-free so that any dsub module may
 import it without creating circular dependencies. Note that this module
 is parsed as a text file by setup.py and changes to the format of this
 file could break setup.py.
+
+The version should follow formatting requirements specified in PEP-440.
+ - https://www.python.org/dev/peps/pep-0440
+
+A typical release sequence will be versioned as:
+  0.1.3.dev0 -> 0.1.3 -> 0.1.4.dev0 -> ...
 """
 
-DSUB_VERSION = '0.1.2'
+DSUB_VERSION = '0.1.3'
