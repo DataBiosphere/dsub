@@ -377,7 +377,6 @@ def _parse_arguments(prog, argv):
           'local': ['logging'],
       }, argv)
 
-
 def _get_job_resources(args):
   """Extract job-global resources requirements from input args.
 
@@ -423,7 +422,7 @@ def _get_job_metadata(user_id, job_name, script, provider):
   return job_metadata
 
 
-def _wait_after(provider, jobid_list, poll_interval, stop_on_failure):
+def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
   """Print status info as we wait for those jobs.
 
   Blocks until either all of the listed jobs succeed,
@@ -431,7 +430,7 @@ def _wait_after(provider, jobid_list, poll_interval, stop_on_failure):
 
   Args:
     provider: job service provider
-    jobid_list: a list of job IDs (string) to wait for
+    job_ids: a set of job IDs (string) to wait for
     poll_interval: integer seconds to wait between iterations
     stop_on_failure: whether to stop waiting if one of the tasks fails.
 
@@ -448,19 +447,19 @@ def _wait_after(provider, jobid_list, poll_interval, stop_on_failure):
   # * stop_on_failure is TRUE AND at least one job returned an error
 
   # remove NO_JOB
-  job_set = set([j for j in jobid_list if j != NO_JOB])
+  job_ids_to_check = {j for j in job_ids if j != NO_JOB}
   error_messages = []
-  while job_set and (not error_messages or not stop_on_failure):
-    print('Waiting for: %s.' % (', '.join(job_set)))
+  while job_ids_to_check and (not error_messages or not stop_on_failure):
+    print('Waiting for: %s.' % (', '.join(job_ids_to_check)))
 
     # Poll until any remaining jobs have completed
-    jobs_left = _wait_for_any_job(provider, job_set, poll_interval)
+    jobs_left = _wait_for_any_job(provider, job_ids_to_check, poll_interval)
 
     # Calculate which jobs just completed
-    jobs_completed = job_set.difference(jobs_left)
+    jobs_completed = job_ids_to_check.difference(jobs_left)
 
     # Get all tasks for the newly completed jobs
-    tasks_completed = provider.lookup_job_tasks(['*'], job_list=jobs_completed)
+    tasks_completed = provider.lookup_job_tasks({'*'}, job_ids=jobs_completed)
 
     # We don't want to overwhelm the user with output when there are many
     # tasks per job. So we get a single "dominant" task for each of the
@@ -472,8 +471,8 @@ def _wait_after(provider, jobid_list, poll_interval, stop_on_failure):
       jobs_found = dsub_util.tasks_to_job_ids(dominant_job_tasks)
       jobs_not_found = jobs_completed.difference(jobs_found)
       for j in jobs_not_found:
-        error = '%s: not found' % (j)
-        print_error('  %s' % (error))
+        error = '%s: not found' % j
+        print_error('  %s' % error)
         error_messages += [error]
 
     # Print the dominant task for the completed jobs
@@ -484,7 +483,7 @@ def _wait_after(provider, jobid_list, poll_interval, stop_on_failure):
       if status in ['FAILURE', 'CANCELED']:
         error_messages += [provider.get_tasks_completion_messages([t])]
 
-    job_set = jobs_left
+    job_ids_to_check = jobs_left
 
   return error_messages
 
@@ -540,7 +539,7 @@ def _importance_of_task(task):
       'end-time', datetime.datetime.max))
 
 
-def _wait_for_any_job(provider, jobid_list, poll_interval):
+def _wait_for_any_job(provider, job_ids, poll_interval):
   """Waits until any of the listed jobs is not running.
 
   In particular, if any of the jobs sees one of its tasks fail,
@@ -549,18 +548,18 @@ def _wait_for_any_job(provider, jobid_list, poll_interval):
 
   Args:
     provider: job service provider
-    jobid_list: a list of job IDs (string) to wait for
+    job_ids: a list of job IDs (string) to wait for
     poll_interval: integer seconds to wait between iterations
 
   Returns:
     A set of the jobIDs with still at least one running task.
   """
-  if not jobid_list:
+  if not job_ids:
     return
   while True:
-    tasks = provider.lookup_job_tasks(['*'], job_list=jobid_list)
-    running_jobs = set([])
-    failed_jobs = set([])
+    tasks = provider.lookup_job_tasks({'*'}, job_ids=job_ids)
+    running_jobs = set()
+    failed_jobs = set()
     for t in tasks:
       status = t.get_field('task-status')
       job_id = t.get_field('job-id')
@@ -569,7 +568,7 @@ def _wait_for_any_job(provider, jobid_list, poll_interval):
       if status == 'RUNNING':
         running_jobs.add(job_id)
     remaining_jobs = running_jobs.difference(failed_jobs)
-    if failed_jobs or len(remaining_jobs) != len(jobid_list):
+    if failed_jobs or len(remaining_jobs) != len(job_ids):
       return remaining_jobs
     SLEEP_FUNCTION(poll_interval)
 
@@ -603,26 +602,26 @@ def _validate_job_and_task_arguments(job_data, all_task_data):
   # Until this use is articulated, generate an error on overlapping names.
 
   # Check labels
-  from_jobs = [label.name for label in job_data['labels']]
-  from_tasks = [label.name for label in task_data['labels']]
+  from_jobs = {label.name for label in job_data['labels']}
+  from_tasks = {label.name for label in task_data['labels']}
 
-  intersect = set(from_jobs) & set(from_tasks)
+  intersect = from_jobs & from_tasks
   if intersect:
     raise ValueError(
         'Names for labels on the command-line and in the --tasks file must not '
         'be repeated: {}'.format(','.join(intersect)))
 
   # Check envs, inputs, and outputs, all of which must not overlap each other
-  from_jobs = [
+  from_jobs = {
       item.name
-      for item in job_data['envs'] + job_data['inputs'] + job_data['outputs']
-  ]
-  from_tasks = [
+      for item in job_data['envs'] | job_data['inputs'] | job_data['outputs']
+  }
+  from_tasks = {
       item.name
-      for item in task_data['envs'] + task_data['inputs'] + task_data['outputs']
-  ]
+      for item in task_data['envs'] | task_data['inputs'] | task_data['outputs']
+  }
 
-  intersect = set(from_jobs) & set(from_tasks)
+  intersect = from_jobs & from_tasks
   if intersect:
     raise ValueError(
         'Names for envs, inputs, and outputs on the command-line and in the '
@@ -634,7 +633,7 @@ def _ensure_job_data_is_complete(job_data):
   # contains non-None 'labels', 'envs', 'inputs', and 'outputs'.
   for param in 'labels', 'envs', 'inputs', 'outputs':
     if not job_data.get(param):
-      job_data[param] = []
+      job_data[param] = set()
 
 
 def _ensure_task_data_is_complete(all_task_data):
@@ -643,7 +642,7 @@ def _ensure_task_data_is_complete(all_task_data):
   for task_data in all_task_data:
     for param in 'labels', 'envs', 'inputs', 'outputs':
       if not task_data.get(param):
-        task_data[param] = []
+        task_data[param] = set()
 
 
 def dsub_main(prog, argv):
@@ -706,10 +705,10 @@ def run_main(args):
     # Create the implicit task
     all_task_data = [{
         'task-id': None,
-        'labels': [],
-        'envs': [],
-        'inputs': [],
-        'outputs': []
+        'labels': set(),
+        'envs': set(),
+        'inputs': set(),
+        'outputs': set()
     }]
 
   return run(
@@ -783,7 +782,7 @@ def run(provider,
   # Wait for predecessor jobs (if any)
   if after:
     if dry_run:
-      print('(Pretend) waiting for: %s.' % (after))
+      print('(Pretend) waiting for: %s.' % after)
     else:
       print('Waiting for predecessor jobs to complete...')
       error_messages = _wait_after(provider, after, poll_interval, True)

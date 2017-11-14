@@ -42,20 +42,12 @@ class TestGetJob(unittest.TestCase):
     tasks = prov.lookup_job_tasks(['SUCCESS', 'FAILURE'])
     self.assertEqual(raw_ops(tasks), [job_suc, job_fail])
 
-  def test_get_star(self):
+  def test_get_star_set(self):
     prov = stub.StubJobProvider()
     job_suc = {'job-id': 'job_suc', 'status': ('SUCCESS', '123')}
     job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
     prov.set_operations([job_suc, job_fail])
-    tasks = prov.lookup_job_tasks('*')
-    self.assertEqual(raw_ops(tasks), [job_suc, job_fail])
-
-  def test_get_star_list(self):
-    prov = stub.StubJobProvider()
-    job_suc = {'job-id': 'job_suc', 'status': ('SUCCESS', '123')}
-    job_fail = {'job-id': 'job_fail', 'status': ('FAILURE', '123')}
-    prov.set_operations([job_suc, job_fail])
-    tasks = prov.lookup_job_tasks(['*'])
+    tasks = prov.lookup_job_tasks({'*'})
     self.assertEqual(raw_ops(tasks), [job_suc, job_fail])
 
   def test_get_none(self):

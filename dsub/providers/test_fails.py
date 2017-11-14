@@ -34,17 +34,20 @@ class FailsJobProvider(base.JobProvider):
     del job_resources, job_metadata, job_data, all_job_data
     raise FailsException("fails provider made submit_job fail")
 
-  def delete_jobs(self, user_list, job_list, task_list, create_time=None):
-    del user_list, job_list, task_list, create_time  # we fail unconditionally
+  def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
+    del user_ids, job_ids, task_ids, labels, create_time
     raise FailsException("fails provider made delete_jobs fail")
 
   def lookup_job_tasks(self,
-                       status_list,
-                       user_list=None,
-                       job_list=None,
-                       task_list=None,
+                       statuses,
+                       user_ids=None,
+                       job_ids=None,
+                       job_names=None,
+                       task_ids=None,
+                       labels=None,
+                       create_time=None,
                        max_tasks=0):
-    del status_list, user_list, job_list, task_list, max_tasks  # never any jobs
+    del statuses, user_ids, job_ids, job_names, task_ids, labels, max_tasks
     raise FailsException("fails provider made lookup_job_tasks fail")
 
   def get_tasks_completion_messages(self, tasks):
@@ -62,8 +65,8 @@ class FailTask(base.Task):
   def raw_task_data(self):
     return {}
 
-  def get_task_field(self, job, field, default=None):
-    del job, field  # unused
+  def get_field(self, field, default=None):
+    del field
     return default
 if __name__ == "__main__":
   pass

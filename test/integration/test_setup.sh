@@ -59,12 +59,18 @@ echo "Setting up test: ${TEST_NAME}"
 
 readonly TEST_DIR="${SCRIPT_DIR}"
 
-readonly TEST_TMP="${TEST_TMP:-/tmp/dsub_test/sh/${DSUB_PROVIDER}/${TEST_NAME}}/tmp"
+readonly TEST_TMP="${TEST_TMP:-/tmp/dsub-test/sh/${DSUB_PROVIDER}/${TEST_NAME}}/tmp"
 
 if [[ "${TEST_NAME}" == *_tasks ]]; then
   readonly TASKS_FILE_TMPL="${TEST_DIR}/${TASKS_FILE_TMPL_NAME:-${TEST_NAME}}.tsv.tmpl"
   readonly TASKS_FILE="${TEST_TMP}/${TEST_NAME}.tsv"
 fi
+
+# Generate an id for tests to use that is reasonably likely to be unique
+# (datestamp + 8 random characters).
+export TEST_TOKEN="${TEST_TOKEN:-"$(printf "%s_%s" \
+  "$(date +'%Y%m%d_%H%M%S')" \
+  "$(cat /dev/urandom | env LC_CTYPE=C tr -cd 'a-z0-9' | head -c 8)")"}"
 
 # Functions for launching dsub
 #

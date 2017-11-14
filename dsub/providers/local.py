@@ -203,14 +203,14 @@ class LocalJobProvider(base.JobProvider):
       # Set up directories
       task_dir = self._task_directory(
           task_metadata.get('job-id'), task_metadata.get('task-id'))
-      self._mkdir_outputs(task_dir, job_data['outputs'] + task_data['outputs'])
+      self._mkdir_outputs(task_dir, job_data['outputs'] | task_data['outputs'])
 
       script = task_metadata.get('script')
       self._stage_script(task_dir, script.name, script.value)
 
       # Start the task
-      env = self._make_environment(job_data['inputs'] + task_data['inputs'],
-                                   job_data['outputs'] + task_data['outputs'])
+      env = self._make_environment(job_data['inputs'] | task_data['inputs'],
+                                   job_data['outputs'] | task_data['outputs'])
       self._write_task_metadata(task_metadata, job_data, task_data, create_time)
       self._run_docker_via_script(task_dir, env, job_resources, task_metadata,
                                   job_data, task_data)
@@ -301,17 +301,17 @@ class LocalJobProvider(base.JobProvider):
         date_format='+%Y-%m-%d %H:%M:%S',
         workingdir=_WORKING_DIR,
         export_input_dirs=providers_util.build_recursive_localize_env(
-            task_dir, job_data['inputs'] + task_data['inputs']),
+            task_dir, job_data['inputs'] | task_data['inputs']),
         recursive_localize_command=self._localize_inputs_recursive_command(
-            task_dir, job_data['inputs'] + task_data['inputs']),
+            task_dir, job_data['inputs'] | task_data['inputs']),
         localize_command=self._localize_inputs_command(
-            task_dir, job_data['inputs'] + task_data['inputs']),
+            task_dir, job_data['inputs'] | task_data['inputs']),
         export_output_dirs=providers_util.build_recursive_gcs_delocalize_env(
-            task_dir, job_data['outputs'] + task_data['outputs']),
+            task_dir, job_data['outputs'] | task_data['outputs']),
         recursive_delocalize_command=self._delocalize_outputs_recursive_command(
-            task_dir, job_data['outputs'] + task_data['outputs']),
+            task_dir, job_data['outputs'] | task_data['outputs']),
         delocalize_command=self._delocalize_outputs_commands(
-            task_dir, job_data['outputs'] + task_data['outputs']),
+            task_dir, job_data['outputs'] | task_data['outputs']),
         delocalize_logs_command=self._delocalize_logging_command(
             job_resources.logging.file_provider, task_metadata),
     )
@@ -324,10 +324,10 @@ class LocalJobProvider(base.JobProvider):
     self._write_source_file(script_data_path, script_data)
 
     # Write the environment variables
-    env_vars = env.items() + job_data['envs'] + task_data['envs'] + [
+    env_vars = set(env.items()) | job_data['envs'] | task_data['envs'] | {
         param_util.EnvParam('DATA_ROOT', _DATA_MOUNT_POINT),
         param_util.EnvParam('TMPDIR', _DATA_MOUNT_POINT + '/tmp')
-    ]
+    }
     env_fname = task_dir + '/docker.env'
     with open(env_fname, 'wt') as f:
       for e in env_vars:
@@ -345,19 +345,13 @@ class LocalJobProvider(base.JobProvider):
     f.close()
     return pid
 
-  def delete_jobs(self,
-                  user_list,
-                  job_list,
-                  task_list,
-                  labels,
-                  create_time=None):
+  def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
     # As per the spec, we ignore anything not running.
     tasks = self.lookup_job_tasks(
-        status_list=['RUNNING'],
-        user_list=user_list,
-        job_list=job_list,
-        job_name_list=None,
-        task_list=task_list,
+        statuses={'RUNNING'},
+        user_ids=user_ids,
+        job_ids=job_ids,
+        task_ids=task_ids,
         labels=labels,
         create_time=create_time)
 
@@ -427,22 +421,23 @@ class LocalJobProvider(base.JobProvider):
     return datetime_utc + offset
 
   def lookup_job_tasks(self,
-                       status_list,
-                       user_list=None,
-                       job_list=None,
-                       job_name_list=None,
-                       task_list=None,
+                       statuses,
+                       user_ids=None,
+                       job_ids=None,
+                       job_names=None,
+                       task_ids=None,
                        labels=None,
                        create_time=None,
                        max_tasks=0):
+
     # 'OR' filtering arguments.
-    status_list = None if status_list == ['*'] else status_list
-    user_list = None if user_list == ['*'] else user_list
-    job_list = None if job_list == ['*'] else job_list
-    job_name_list = None if job_name_list == ['*'] else job_name_list
-    task_list = None if task_list == ['*'] else task_list
+    statuses = None if statuses == {'*'} else statuses
+    user_ids = None if user_ids == {'*'} else user_ids
+    job_ids = None if job_ids == {'*'} else job_ids
+    job_names = None if job_names == {'*'} else job_names
+    task_ids = None if task_ids == {'*'} else task_ids
     # 'AND' filtering arguments.
-    labels = labels if labels else []
+    labels = labels if labels else {}
 
     create_time_local = self._utc_int_to_local_datetime(create_time)
 
@@ -451,28 +446,28 @@ class LocalJobProvider(base.JobProvider):
     # to look up a job run by someone else (whether for dstat or for ddel).
     # If a user is passed in, we will allow it, so long as it is the current
     # user. Otherwise we explicitly error out.
-    approved_users = [dsub_util.get_os_user()]
-    if user_list:
-      if user_list != approved_users:
+    approved_users = {dsub_util.get_os_user()}
+    if user_ids:
+      if user_ids != approved_users:
         raise NotImplementedError(
             'Filtering by user is not implemented for the local provider'
-            ' (%s)' % str(user_list))
+            ' (%s)' % str(user_ids))
     else:
-      user_list = approved_users
+      user_ids = approved_users
 
     ret = []
-    if not job_list:
+    if not job_ids:
       # Default to every job we know about.
-      job_list = os.listdir(self._provider_root())
-    for j in job_list:
-      for u in user_list:
+      job_ids = os.listdir(self._provider_root())
+    for j in job_ids:
+      for u in user_ids:
         path = self._provider_root() + '/' + j
         if not os.path.isdir(path):
           continue
         for task_id in os.listdir(path):
           if task_id == 'task':
             task_id = None
-          if task_list and task_id not in task_list:
+          if task_ids and task_id not in task_ids:
             continue
 
           task = self._get_task_from_task_dir(j, u, task_id)
@@ -480,11 +475,11 @@ class LocalJobProvider(base.JobProvider):
             continue
 
           status = task.get_field('status')
-          if status_list and status not in status_list:
+          if statuses and status not in statuses:
             continue
 
           job_name = task.get_field('job-name')
-          if job_name_list and job_name not in job_name_list:
+          if job_names and job_name not in job_names:
             continue
 
           # If labels are defined, all labels must match.
@@ -501,9 +496,10 @@ class LocalJobProvider(base.JobProvider):
 
           ret.append(task)
 
-          if max_tasks > 0 and len(ret) > max_tasks:
+          if 0 < max_tasks < len(ret):
             break
 
+    ret.sort(key=lambda t: t.get_field('create-time'), reverse=True)
     return ret
 
   def get_tasks_completion_messages(self, tasks):
@@ -540,7 +536,7 @@ class LocalJobProvider(base.JobProvider):
     for key in ['inputs', 'outputs', 'envs', 'labels']:
       data_field = data.get(key, {})
 
-      for param in job_data[key] + task_data[key]:
+      for param in job_data[key] | task_data[key]:
         data_field[param.name] = param.value
       data[key] = data_field
 

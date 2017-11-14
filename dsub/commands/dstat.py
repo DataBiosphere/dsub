@@ -368,18 +368,17 @@ def main():
   # Make sure users were provided, or try to fill from OS user. This cannot
   # be made into a default argument since some environments lack the ability
   # to provide a username automatically.
-  user_list = args.users if args.users else [dsub_util.get_os_user()]
-
+  user_ids = set(args.users) if args.users else {dsub_util.get_os_user()}
   labels = param_util.parse_pair_args(args.label, param_util.LabelParam)
 
   job_producer = dstat_job_producer(
       provider=provider,
-      status_list=args.status,
-      user_list=user_list,
-      job_list=args.jobs,
-      job_name_list=args.names,
-      task_list=args.tasks,
-      label_list=labels,
+      statuses=set(args.status) if args.status else None,
+      user_ids=user_ids,
+      job_ids=set(args.jobs) if args.jobs else None,
+      job_names=set(args.names) if args.names else None,
+      task_ids=set(args.tasks) if args.tasks else None,
+      labels=labels if labels else None,
       create_time=create_time,
       max_tasks=args.limit,
       full_output=args.full,
@@ -396,12 +395,12 @@ def main():
 
 
 def dstat_job_producer(provider,
-                       status_list,
-                       user_list=None,
-                       job_list=None,
-                       job_name_list=None,
-                       task_list=None,
-                       label_list=None,
+                       statuses,
+                       user_ids=None,
+                       job_ids=None,
+                       job_names=None,
+                       task_ids=None,
+                       labels=None,
                        create_time=None,
                        max_tasks=0,
                        full_output=False,
@@ -414,12 +413,12 @@ def dstat_job_producer(provider,
 
   Args:
     provider: an instantiated dsub provider.
-    status_list: a list of status strings that eligible jobs may match.
-    user_list: a list of user strings that eligible jobs may match.
-    job_list: a list of job-id strings eligible jobs may match.
-    job_name_list: a list of job-name strings eligible jobs may match.
-    task_list: a list of task-id strings eligible tasks may match.
-    label_list: list of LabelParam that all tasks must match.
+    statuses: a set of status strings that eligible jobs may match.
+    user_ids: a set of user strings that eligible jobs may match.
+    job_ids: a set of job-id strings eligible jobs may match.
+    job_names: a set of job-name strings eligible jobs may match.
+    task_ids: a set of task-id strings eligible tasks may match.
+    labels: set of LabelParam that all tasks must match.
     create_time: a UTC value for earliest create time for a task.
     max_tasks: (int) maximum number of tasks to return per dstat job lookup.
     full_output: (bool) return all dsub fields.
@@ -439,12 +438,12 @@ def dstat_job_producer(provider,
   while some_job_running:
     # Get a batch of jobs.
     tasks = provider.lookup_job_tasks(
-        status_list,
-        user_list=user_list,
-        job_list=job_list,
-        job_name_list=job_name_list,
-        task_list=task_list,
-        labels=label_list,
+        statuses,
+        user_ids=user_ids,
+        job_ids=job_ids,
+        job_names=job_names,
+        task_ids=task_ids,
+        labels=labels,
         create_time=create_time,
         max_tasks=max_tasks)
 

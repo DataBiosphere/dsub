@@ -107,22 +107,17 @@ class JobProvider(object):
     raise NotImplementedError()
 
   @abstractmethod
-  def delete_jobs(self,
-                  user_list,
-                  job_list,
-                  task_list,
-                  labels,
-                  create_time=None):
+  def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
     """Kills the operations associated with the specified job or job.task.
 
     Some providers may provide only a "cancel" operation, which terminates the
     task but does not truly "delete" it from the "task list".
 
     Args:
-      user_list: List of user ids who "own" the job(s) to delete.
-      job_list: List of job ids to delete.
-      task_list: List of task ids to delete.
-      labels: List of LabelParam, each must match the job(s) to be cancelled.
+      user_ids: a set of user ids who "own" the job(s) to delete.
+      job_ids: a set of job ids to delete.
+      task_ids: a set of task ids to delete.
+      labels: a set of LabelParam, each must match the job(s) to be cancelled.
       create_time: a UTC value for earliest create time for a task.
 
     Returns:
@@ -135,27 +130,27 @@ class JobProvider(object):
 
   @abstractmethod
   def lookup_job_tasks(self,
-                       status_list,
-                       user_list=None,
-                       job_list=None,
-                       job_name_list=None,
-                       task_list=None,
+                       statuses,
+                       user_ids=None,
+                       job_ids=None,
+                       job_names=None,
+                       task_ids=None,
                        labels=None,
                        create_time=None,
                        max_tasks=0):
     """Return a list of tasks based on the search criteria.
 
-    If any of the filters are empty or "[*]", then no filtering is performed on
+    If any of the filters are empty or {'*'}, then no filtering is performed on
     that field. Filtering by both a job id list and job name list is
     unsupported.
 
     Args:
-      status_list: ['*'], or a list of job status strings to return. Valid
+      statuses: {'*'}, or a set of job status strings to return. Valid
         status strings are 'RUNNING', 'SUCCESS', 'FAILURE', or 'CANCELED'.
-      user_list: a list of ids for the user(s) who launched the job.
-      job_list: a list of job ids to return.
-      job_name_list: a list of job names to return.
-      task_list: a list of specific tasks within the specified job(s) to return.
+      user_ids: a set of ids for the user(s) who launched the job.
+      job_ids: a set of job ids to return.
+      job_names: a set of job names to return.
+      task_ids: a set of specific tasks within the specified job(s) to return.
       labels: a list of LabelParam, each must match the job(s) returned.
       create_time: a UTC value for earliest create time for a task.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.

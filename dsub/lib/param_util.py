@@ -672,26 +672,26 @@ def tasks_file_to_job_data(tasks, input_file_param_util,
                             (len(row), len(job_params), reader.line_num))
 
     # Each row can contain "envs", "inputs", "outputs"
-    envs = []
-    inputs = []
-    outputs = []
-    labels = []
+    envs = set()
+    inputs = set()
+    outputs = set()
+    labels = set()
 
     for i in range(0, len(job_params)):
       param = job_params[i]
       name = param.name
       if isinstance(param, EnvParam):
-        envs.append(EnvParam(name, row[i]))
+        envs.add(EnvParam(name, row[i]))
 
       elif isinstance(param, LabelParam):
-        labels.append(LabelParam(name, row[i]))
+        labels.add(LabelParam(name, row[i]))
 
       elif isinstance(param, InputFileParam):
-        inputs.append(
+        inputs.add(
             input_file_param_util.make_param(name, row[i], param.recursive))
 
       elif isinstance(param, OutputFileParam):
-        outputs.append(
+        outputs.add(
             output_file_param_util.make_param(name, row[i], param.recursive))
 
     job_data.append({
@@ -723,10 +723,10 @@ def parse_pair_args(labels, argclass):
   Returns:
     list of argclass objects.
   """
-  label_data = []
+  label_data = set()
   for arg in labels:
     name, value = split_pair(arg, '=', nullable_idx=1)
-    label_data.append(argclass(name, value))
+    label_data.add(argclass(name, value))
   return label_data
 
 
@@ -768,25 +768,23 @@ def args_to_job_data(envs, labels, inputs, inputs_recursive, outputs,
   #   * split the input into name=uri pairs (name optional)
   #   * get the environmental variable name, or automatically set if null.
   #   * create the input file param
-  input_data = []
+  input_data = set()
   for (recursive, args) in ((False, inputs), (True, inputs_recursive)):
     for arg in args:
       name, value = split_pair(arg, '=', nullable_idx=0)
       name = input_file_param_util.get_variable_name(name)
-      input_data.append(
-          input_file_param_util.make_param(name, value, recursive))
+      input_data.add(input_file_param_util.make_param(name, value, recursive))
 
   # For output files, we need to:
   #   * split the input into name=uri pairs (name optional)
   #   * get the environmental variable name, or automatically set if null.
   #   * create the output file param
-  output_data = []
+  output_data = set()
   for (recursive, args) in ((False, outputs), (True, outputs_recursive)):
     for arg in args:
       name, value = split_pair(arg, '=', 0)
       name = output_file_param_util.get_variable_name(name)
-      output_data.append(
-          output_file_param_util.make_param(name, value, recursive))
+      output_data.add(output_file_param_util.make_param(name, value, recursive))
 
   return {
       'envs': env_data,
@@ -817,11 +815,11 @@ def validate_submit_args_or_fail(job_resources, job_data, all_task_data,
 
   >>> res = type('', (object,),
   ...            {"logging": LoggingParam('gs://logtemp', P_GCS)})()
-  >>> job_data={'inputs': [], 'outputs': []}
+  >>> job_data={'inputs': set(), 'outputs': set()}
   >>> task_data = [
   ...    {'inputs': [FileParam('IN', uri='gs://in/*', file_provider=P_GCS)],
-  ...     'outputs': []},
-  ...    {'inputs': [],
+  ...     'outputs': set()},
+  ...    {'inputs': set(),
   ...     'outputs': [FileParam('OUT', uri='gs://out/*', file_provider=P_GCS)]}]
   ...
   >>> validate_submit_args_or_fail(job_resources=res,
@@ -846,7 +844,7 @@ def validate_submit_args_or_fail(job_resources, job_data, all_task_data,
   Args:
     job_resources: instance of job_util.JobResources.
     job_data: (dict) the job data to be validated
-    all_task_data: ([]dicts) the task data list to be validated.
+    all_task_data: (set(dict)) the task data list to be validated.
     provider_name: (str) the name of the execution provider.
     input_providers: (string collection) whitelist of file providers for input.
     output_providers: (string collection) whitelist of providers for output.
