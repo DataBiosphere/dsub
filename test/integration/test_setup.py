@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Setup module for dsub tests."""
 
 # test_setup.py
@@ -25,7 +24,10 @@
 # * For task file tests, set TASKS_FILE and TASKS_FILE_TMPL.
 # * Set the TEST_TMP variable for a temporary directory.
 
+import datetime
 import os
+import random
+import string
 import sys
 
 # If the DSUB_PROVIDER is not set, figure it out from the name of the script.
@@ -57,7 +59,7 @@ print 'Setting up test: %s' % TEST_NAME
 
 TEST_DIR = os.path.dirname(sys.argv[0])
 
-TEST_TMP = '%s/tmp' % os.getenv('TEST_TMP', '/tmp/dsub_test/py/%s/%s' %
+TEST_TMP = '%s/tmp' % os.getenv('TEST_TMP', '/tmp/dsub-test/py/%s/%s' %
                                 (DSUB_PROVIDER, TEST_NAME))
 
 if TEST_NAME.endswith('_tasks'):
@@ -66,3 +68,15 @@ if TEST_NAME.endswith('_tasks'):
 else:
   TASKS_FILE_TMPL = None
   TASKS_FILE = None
+
+
+def _generate_test_token():
+  # Generate an id for tests to use that is reasonably likely to be unique
+  # (timestamp + 8 random characters).
+  timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+  suffix = ''.join(
+      random.choice(string.ascii_lowercase + string.digits) for _ in range(8))
+  return '{}_{}'.format(timestamp, suffix)
+
+
+TEST_TOKEN = os.getenv('TEST_TOKEN', _generate_test_token())

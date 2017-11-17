@@ -19,8 +19,14 @@ set -o nounset
 
 # Global variables for running tests in parallel
 
+# Generate an id for tests to use that is reasonably likely to be unique
+# (datestamp + 8 random characters).
+export TEST_TOKEN="${TEST_TOKEN:-"$(printf "%s_%s" \
+  "$(date +'%Y%m%d_%H%M%S')" \
+  "$(cat /dev/urandom | env LC_CTYPE=C tr -cd 'a-z0-9' | head -c 8)")"}"
+
 # Set up a local directory for tests to write intermediate files
-readonly TEST_OUTPUT_DIR=/tmp/dsub_test/"$(date +'%Y%m%d_%H%M%S')"
+readonly TEST_OUTPUT_DIR="/tmp/dsub-test/${TEST_TOKEN}"
 readonly TEST_TIMES_FILE="${TEST_OUTPUT_DIR}"/timing.txt
 
 # We allow for the integration tests to run concurrently.
@@ -275,7 +281,7 @@ for TEST_TYPE in "${TESTS[@]}"; do
     start_test "test/unit"
 
     # for unit tests, also include the Python unit tests
-    if python -m unittest discover -s test/unit/; then
+    if python -m unittest discover -s test/unit/ -p '*_test.py'; then
       echo "Test test/unit/*: PASSED"
     else
       echo "Test test/unit/*: FAILED"

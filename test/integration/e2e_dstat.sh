@@ -19,99 +19,147 @@ set -o nounset
 
 # Test dstat.
 #
-# This test launches a single job and then verifies that dstat
+# This test launches three jobs and then verifies that dstat
 # can lookup jobs by job-id, status, age, and job-name, with
 # both default and --full output. It ensures that no error is
 # returned and the output looks minimally sane.
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
-readonly JOB_NAME="test-job"
+readonly COMPLETED_JOB_NAME="completed-job"
+readonly RUNNING_JOB_NAME="running-job"
+readonly RUNNING_JOB_NAME_2="running-job-2"
 
-function dstat_output_job_name() {
+function verify_dstat_output() {
   local dstat_out="${1}"
 
-  python "${SCRIPT_DIR}"/get_data_value.py \
-    "yaml" "${dstat_out}" "[0].job-name"
+  # Verify that that the jobs are found and are in the expected order.
+  # dstat sort ordering is by create-time (descending), so job 0 here should be the last started.
+  FIRST_JOB_NAME="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[0].job-name")"
+  SECOND_JOB_NAME="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[1].job-name")"
+  THIRD_JOB_NAME="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[2].job-name")"
+
+  if [[ "${FIRST_JOB_NAME}" != "${RUNNING_JOB_NAME_2}" ]]; then
+    echo "Job ${RUNNING_JOB_NAME_2} not found in the correct location in the dstat output! "
+    echo "${dstat_out}"
+    exit 1
+  fi
+
+  if [[ "${SECOND_JOB_NAME}" != "${RUNNING_JOB_NAME}" ]]; then
+    echo "Job ${RUNNING_JOB_NAME} not found in the correct location in the dstat output!"
+    echo "${dstat_out}"
+    exit 1
+  fi
+
+  if [[ "${THIRD_JOB_NAME}" != "${COMPLETED_JOB_NAME}" ]]; then
+    echo "Job ${COMPLETED_JOB_NAME} not found in the correct location in the dstat output!"
+    echo "${dstat_out}"
+    exit 1
+  fi
 }
-readonly -f dstat_output_job_name
+readonly -f verify_dstat_output
+
 
 # This test is not sensitive to the output of the dsub job.
 # Set the ALLOW_DIRTY_TESTS environment variable to 1 in your shell to
 # run this test without first emptying the output and logging directories.
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
+
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
-  JOBID="$(run_dsub \
-    --name "${JOB_NAME}" \
+  COMPLETED_JOB_ID="$(run_dsub \
+    --name "${COMPLETED_JOB_NAME}" \
+    --command 'echo TEST' \
+    --label test-token="${TEST_TOKEN}" \
+    --wait)"
+
+  RUNNING_JOB_ID="$(run_dsub \
+    --name "${RUNNING_JOB_NAME}" \
+    --label test-token="${TEST_TOKEN}" \
+    --command 'sleep 1m')"
+
+  RUNNING_JOB_ID_2="$(run_dsub \
+    --name "${RUNNING_JOB_NAME_2}" \
+    --label test-token="${TEST_TOKEN}" \
     --command 'sleep 1m')"
 
   echo "Checking dstat (by status)..."
 
-  if ! DSTAT_OUTPUT="$(run_dstat --status 'RUNNING' --jobs "${JOBID}" --full)"; then
+  if ! DSTAT_OUTPUT="$(run_dstat --status 'RUNNING' 'SUCCESS' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
     exit 1
   fi
 
-  if [[ "$(dstat_output_job_name "${DSTAT_OUTPUT}")" != "${JOB_NAME}" ]]; then
-    echo "Job ${JOB_NAME} not found in the dstat output!"
-    echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
+  verify_dstat_output "${DSTAT_OUTPUT}"
 
   echo "Checking dstat (by job-name)..."
 
-  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --names "${JOB_NAME}")"; then
+  if ! DSTAT_OUTPUT="$(run_dstat --status 'RUNNING' 'SUCCESS' --full --names "${RUNNING_JOB_NAME_2}" "${RUNNING_JOB_NAME}" "${COMPLETED_JOB_NAME}" --label "test-token=${TEST_TOKEN}")"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
     exit 1
   fi
 
-  if [[ "$(dstat_output_job_name "${DSTAT_OUTPUT}")" != "${JOB_NAME}" ]]; then
-    echo "Job ${JOB_NAME} not found in the dstat output!"
-    echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
+  verify_dstat_output "${DSTAT_OUTPUT}"
 
   echo "Checking dstat (by job-id: default)..."
 
-  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}")"; then
+  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
     exit 1
   fi
 
-  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${JOB_NAME}"; then
-    echo "Job ${JOB_NAME} not found in the dstat output!"
+  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${RUNNING_JOB_NAME}"; then
+    echo "Job ${RUNNING_JOB_NAME} not found in the dstat output!"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${RUNNING_JOB_NAME_2}"; then
+    echo "Job ${RUNNING_JOB_NAME} not found in the dstat output!"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${COMPLETED_JOB_NAME}"; then
+    echo "Job ${RUNNING_JOB_NAME} not found in the dstat output!"
     echo "${DSTAT_OUTPUT}"
     exit 1
   fi
 
   echo "Checking dstat (by job-id: full)..."
 
-  if ! DSTAT_OUTPUT=$(run_dstat --status '*' --full --jobs "${JOBID}"); then
+  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
     echo "${DSTAT_OUTPUT}"
     exit 1
   fi
 
-  if [[ "$(dstat_output_job_name "${DSTAT_OUTPUT}")" != "${JOB_NAME}" ]]; then
-    echo "Job ${JOB_NAME} not found in the dstat output!"
+  verify_dstat_output "${DSTAT_OUTPUT}"
+
+  echo "Checking dstat (by repeated job-ids: full)..."
+
+  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
+    echo "dstat exited with a non-zero exit code!"
+    echo "Output:"
     echo "${DSTAT_OUTPUT}"
     exit 1
   fi
 
+  verify_dstat_output "${DSTAT_OUTPUT}"
+
   echo "Waiting 5 seconds and checking 'dstat --age 5s'..."
   sleep 5s
 
-  DSTAT_OUTPUT="$(run_dstat_age "5s" --status '*' --jobs "${JOBID}" --full)"
+  DSTAT_OUTPUT="$(run_dstat_age "5s" --status '*' --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}" --full)"
   if [[ "${DSTAT_OUTPUT}" != "[]" ]]; then
     echo "dstat output not empty as expected:"
     echo "${DSTAT_OUTPUT}"
@@ -120,12 +168,8 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Verifying that the job didn't disappear completely."
 
-  DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}" --full)"
-  if [[ "$(dstat_output_job_name "${DSTAT_OUTPUT}")" != "${JOB_NAME}" ]]; then
-    echo "Job ${JOB_NAME} not found in the dstat output!"
-    echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
+  DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}" --full)"
+  verify_dstat_output "${DSTAT_OUTPUT}"
 
   echo "SUCCESS"
 

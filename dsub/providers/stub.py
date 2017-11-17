@@ -28,12 +28,7 @@ class StubJobProvider(base.JobProvider):
   def submit_job(self, job_resources, job_metadata, job_data, all_job_data):
     pass
 
-  def delete_jobs(self,
-                  user_list,
-                  job_list,
-                  task_list,
-                  labels,
-                  create_time=None):
+  def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
     pass
 
   # 2) Methods that manipulate the state of the fictional operations.
@@ -69,38 +64,20 @@ class StubJobProvider(base.JobProvider):
     raise BaseException('Not implemented')
 
   def lookup_job_tasks(self,
-                       status_list,
-                       user_list=None,
-                       job_list=None,
-                       job_name_list=None,
-                       task_list=None,
+                       statuses,
+                       user_ids=None,
+                       job_ids=None,
+                       job_names=None,
+                       task_ids=None,
                        labels=None,
                        create_time=None,
                        max_tasks=0):
-    """Return a list of operations based on the input criteria.
-
-    If any of the filters are empty or "[*]", then no filtering is performed on
-    that field.
-
-    Args:
-      status_list: ['*'], or a list of job status strings to return. Valid
-        status strings are 'RUNNING', 'SUCCESS', 'FAILURE', or 'CANCELED'.
-      user_list: a list of ids for the user(s) who launched the job.
-      job_list: a list of job ids to return.
-      task_list: a list of specific tasks within the specified job(s) to return.
-      create_time: a UTC value for earliest create time for a job.
-      max_tasks: the maximum number of job tasks to return or 0 for no limit.
-
-    Returns:
-      A list of Genomics API Operations objects.
-    """
-
-    if status_list and len(status_list) == 1 and status_list[0] == '*':
-      status_list = None
-    user_list = None if user_list == '*' else user_list
-    job_list = None if job_list == '*' else job_list
-    job_name_list = None if job_name_list == '*' else job_name_list
-    task_list = None if task_list == '*' else task_list
+    """Return a list of operations. See base.py for additional detail."""
+    statuses = None if statuses == {'*'} else statuses
+    user_ids = None if user_ids == {'*'} else user_ids
+    job_ids = None if job_ids == {'*'} else job_ids
+    job_names = None if job_names == {'*'} else job_names
+    task_ids = None if task_ids == {'*'} else task_ids
 
     if labels or create_time:
       raise NotImplementedError(
@@ -108,12 +85,11 @@ class StubJobProvider(base.JobProvider):
 
     operations = [
         x for x in self._operations
-        if ((not status_list or x.get_field('status',
-                                            (None, None))[0] in status_list) and
-            (not user_list or x.get_field('user', None) in user_list) and
-            (not job_list or x.get_field('job-id', None) in job_list) and
-            (not job_name_list or x.get_field('job-name', None) in job_name_list
-            ) and (not task_list or x.get_field('task-id', None) in task_list))
+        if ((not statuses or x.get_field('status', (None, None))[0] in statuses
+            ) and (not user_ids or x.get_field('user', None) in user_ids) and
+            (not job_ids or x.get_field('job-id', None) in job_ids) and
+            (not job_names or x.get_field('job-name', None) in job_names) and
+            (not task_ids or x.get_field('task-id', None) in task_ids))
     ]
     if max_tasks > 0:
       operations = operations[:max_tasks]

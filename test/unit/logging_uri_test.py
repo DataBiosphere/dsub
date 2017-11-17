@@ -84,5 +84,10 @@ class TestLoggingPath(unittest.TestCase):
        task_data, '/tmp/dir/path/user--id/job--name/job--id/task--id.log'),
   ])
   def test_logging_path(self, unused_name, logging_uri, metadata, expected):
+    del unused_name
     formatted = providers_util.format_logging_uri(logging_uri, metadata)
     self.assertEqual(expected, formatted)
+
+
+if __name__ == '__main__':
+  unittest.main()

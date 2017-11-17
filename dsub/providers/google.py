@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Provider for running jobs on Google Cloud Platform.
 
 This module implements job creation, listing, and canceling using the
@@ -34,13 +33,14 @@ from .._dsub_version import DSUB_VERSION
 import apiclient.discovery
 import apiclient.errors
 
+# TODO(b/68858502) Fix the use of relative imports throughout this library
 from ..lib import param_util
 from ..lib import providers_util
+from ..lib import sorting_util
 from oauth2client.client import GoogleCredentials
 from oauth2client.client import HttpAccessTokenRefreshError
 import pytz
 import retrying
-
 
 _PROVIDER_NAME = 'google'
 
@@ -189,6 +189,9 @@ _ZONES = [
     'asia-northeast1-a',
     'asia-northeast1-b',
     'asia-northeast1-c',
+    'asia-south1-a',
+    'asia-south1-b',
+    'asia-south1-c',
     'asia-southeast1-a',
     'asia-southeast1-b',
     'australia-southeast1-a',
@@ -413,14 +416,16 @@ class _Pipelines(object):
       copy_output_dirs = providers_util.build_recursive_delocalize_command(
           DATA_MOUNT_POINT, outputs, param_util.P_GCS)
 
-    mkdirs = '\n'.join([
-        'mkdir -p {0}/{1}'.format(DATA_MOUNT_POINT, var.docker_path if
-                                  var.recursive else
-                                  os.path.dirname(var.docker_path))
+    docker_paths = [
+        var.docker_path if var.recursive else os.path.dirname(var.docker_path)
         for var in outputs
+    ]
+
+    mkdirs = '\n'.join([
+        'mkdir -p {0}/{1}'.format(DATA_MOUNT_POINT, path)
+        for path in docker_paths
     ])
 
-    export_inputs_with_wildcards = ''
     inputs_with_wildcards = [
         var for var in inputs
         if not var.recursive and '*' in os.path.basename(var.docker_path)
@@ -578,10 +583,11 @@ class _Pipelines(object):
     inputs.update({SCRIPT_VARNAME: script})
     inputs.update(
         {var.name: var.value
-         for var in job_data['envs'] + task_data['envs']})
+         for var in job_data['envs'] | task_data['envs']})
     inputs.update({
         var.name: var.uri
-        for var in job_data['inputs'] + task_data['inputs'] if not var.recursive
+        for var in job_data['inputs'] | task_data['inputs']
+        if not var.recursive
     })
 
     # Remove wildcard references for non-recursive output. When the pipelines
@@ -590,7 +596,7 @@ class _Pipelines(object):
     # delocalize with a call similar to:
     #   gsutil cp /mnt/data/output/gs/bucket/path/*.bam gs://bucket/path/
     outputs = {}
-    for var in job_data['outputs'] + task_data['outputs']:
+    for var in job_data['outputs'] | task_data['outputs']:
       if var.recursive:
         continue
       if '*' in var.uri.basename:
@@ -601,7 +607,7 @@ class _Pipelines(object):
     labels = {}
     labels.update({
         label.name: label.value if label.value else ''
-        for label in job_data['labels'] + task_data['labels']
+        for label in job_data['labels'] | task_data['labels']
     })
 
     # pyformat: disable
@@ -728,28 +734,26 @@ class _Operations(object):
     return True
 
   @classmethod
-  def list(cls, service, ops_filter, max_ops=0):
+  def list(cls, service, ops_filter, page_size=0):
     """Gets the list of operations for the specified filter.
 
     Args:
       service: Google Genomics API service object
       ops_filter: string filter of operations to return
-      max_ops: maximum number of operations to return (0 indicates no maximum)
+      page_size: the number of operations to requested on each list operation to
+        the pipelines API (None indicates no maximum specified)
 
-    Returns:
-      A list of operations matching the filter criteria.
+    Yields:
+      Operations matching the filter criteria.
     """
 
-    operations = []
     page_token = None
-    page_size = None
+    more_operations = True
+    documented_default_page_size = 256
+    page_size = min(page_size,
+                    documented_default_page_size) if page_size else None
 
-    while not max_ops or len(operations) < max_ops:
-      if max_ops:
-        # If a maximum number of operations is requested, limit the requested
-        # pageSize to the documented default (256) or less if we can.
-        page_size = min(max_ops - len(operations), 256)
-
+    while more_operations:
       api = service.operations().list(
           name='operations',
           filter=ops_filter,
@@ -757,22 +761,13 @@ class _Operations(object):
           pageSize=page_size)
       response = _Api.execute(api)
 
-      ops = response['operations'] if 'operations' in response else None
-      if ops:
-        for op in ops:
-          if cls.is_dsub_operation(op):
-            operations.append(op)
+      ops = response.get('operations', [])
+      for op in ops:
+        if cls.is_dsub_operation(op):
+          yield GoogleOperation(op)
 
-      # Exit if there are no more operations
-      if 'nextPageToken' not in response or not response['nextPageToken']:
-        break
-
-      page_token = response['nextPageToken']
-
-    if max_ops and len(operations) > max_ops:
-      del operations[max_ops:]
-
-    return [GoogleOperation(o) for o in operations]
+      page_token = response.get('nextPageToken')
+      more_operations = bool(page_token)
 
   @classmethod
   def _cancel_batch(cls, service, ops):
@@ -958,13 +953,13 @@ class GoogleJobProvider(base.JobProvider):
     }
 
   def _build_pipeline_labels(self, task_metadata):
-    labels = [
+    labels = {
         _Label(name, task_metadata[name])
         for name in ['job-name', 'job-id', 'user-id', 'dsub-version']
-    ]
+    }
 
     if task_metadata.get('task-id') is not None:
-      labels.append(_Label('task-id', 'task-%d' % task_metadata.get('task-id')))
+      labels.add(_Label('task-id', 'task-%d' % task_metadata.get('task-id')))
 
     return labels
 
@@ -973,7 +968,7 @@ class GoogleJobProvider(base.JobProvider):
     """Returns a Pipeline objects for the job."""
 
     script = task_metadata['script']
-    task_data['labels'].extend(self._build_pipeline_labels(task_metadata))
+    task_data['labels'] |= self._build_pipeline_labels(task_metadata)
 
     # Build the ephemeralPipeline for this job.
     # The ephemeralPipeline definition changes for each job because file
@@ -990,9 +985,9 @@ class GoogleJobProvider(base.JobProvider):
         accelerator_type=job_resources.accelerator_type,
         accelerator_count=job_resources.accelerator_count,
         script_name=script.name,
-        envs=job_data['envs'] + task_data['envs'],
-        inputs=job_data['inputs'] + task_data['inputs'],
-        outputs=job_data['outputs'] + task_data['outputs'],
+        envs=job_data['envs'] | task_data['envs'],
+        inputs=job_data['inputs'] | task_data['inputs'],
+        outputs=job_data['outputs'] | task_data['outputs'],
         pipeline_name=task_metadata['pipeline-name'])
 
     # Build the pipelineArgs for this job.
@@ -1068,27 +1063,27 @@ class GoogleJobProvider(base.JobProvider):
     }
 
   def lookup_job_tasks(self,
-                       status_list,
-                       user_list=None,
-                       job_list=None,
-                       job_name_list=None,
-                       task_list=None,
+                       statuses,
+                       user_ids=None,
+                       job_ids=None,
+                       job_names=None,
+                       task_ids=None,
                        labels=None,
                        create_time=None,
                        max_tasks=0):
     """Return a list of operations based on the input criteria.
 
-    If any of the filters are empty or ["*"], then no filtering is performed on
+    If any of the filters are empty or {'*'}, then no filtering is performed on
     that field. Filtering by both a job id list and job name list is
     unsupported.
 
     Args:
-      status_list: ['*'], or a list of job status strings to return. Valid
+      statuses: {'*'}, or a list of job status strings to return. Valid
         status strings are 'RUNNING', 'SUCCESS', 'FAILURE', or 'CANCELED'.
-      user_list: a list of ids for the user(s) who launched the job.
-      job_list: a list of job ids to return.
-      job_name_list: a list of job names to return.
-      task_list: a list of specific tasks within the specified job(s) to return.
+      user_ids: a list of ids for the user(s) who launched the job.
+      job_ids: a list of job ids to return.
+      job_names: a list of job names to return.
+      task_ids: a list of specific tasks within the specified job(s) to return.
       labels: a list of LabelParam with user-added labels. All labels must
         match the task being fetched.
       create_time: a UTC value for earliest create time for a task.
@@ -1102,32 +1097,40 @@ class GoogleJobProvider(base.JobProvider):
     """
 
     # Server-side, we can filter on status, job_id, user_id, task_id, but there
-    # is no OR filter (only AND), and so we can't handle lists server side.
-    # In practice we don't expect combinations of user lists and job lists.
-    # For now, do the most brain-dead thing and if we find a common use-case
-    # that performs poorly, we can re-evaluate.
-
-    status_list = status_list if status_list else ['*']
-    user_list = user_list if user_list else ['*']
-    job_list = job_list if job_list else ['*']
-    job_name_list = job_name_list if job_name_list else ['*']
-    task_list = task_list if task_list else ['*']
+    # is no OR filter (only AND), so we can't handle lists server side.
+    # Therefore we construct a set of queries for each possible combination of
+    # these criteria.
+    statuses = statuses if statuses else {'*'}
+    user_ids = user_ids if user_ids else {'*'}
+    job_ids = job_ids if job_ids else {'*'}
+    job_names = job_names if job_names else {'*'}
+    task_ids = task_ids if task_ids else {'*'}
 
     # The task-id label value of "task-n" instead of just "n" is a hold-over
     # from early label value character restrictions.
     # Accept both forms, "task-n" and "n", for lookups by task-id.
-    task_list = ['task-{}'.format(t) if t.isdigit() else t for t in task_list]
+    task_ids = {'task-{}'.format(t) if t.isdigit() else t for t in task_ids}
 
-    if set(job_list) != set(['*']) and set(job_name_list) != set(['*']):
+    if job_ids != {'*'} and job_names != {'*'}:
       raise ValueError(
           'Filtering by both job IDs and job names is not supported')
 
     # AND filter rule arguments.
-    labels = labels if labels else []
+    labels = labels if labels else set()
 
-    tasks = []
+    # The results of all these queries need to be sorted by create-time
+    # (descending). To accomplish this, each query stream (already sorted by
+    # create-time) is added to a SortedGeneratorIterator which is a wrapper
+    # around a PriorityQueue of iterators (sorted by each stream's newest task's
+    # create-time). A sorted list can then be built by stepping through this
+    # iterator and adding tasks until none are left or we hit max_tasks.
+
+    def _desc_date_sort_key(t):
+      return datetime.now() - t.get_field('create-time').replace(tzinfo=None)
+
+    query_queue = sorting_util.SortedGeneratorIterator(key=_desc_date_sort_key)
     for status, job_id, job_name, user_id, task_id in itertools.product(
-        status_list, job_list, job_name_list, user_list, task_list):
+        statuses, job_ids, job_names, user_ids, task_ids):
       ops_filter = _Operations.get_filter(
           self._project,
           status=status,
@@ -1138,29 +1141,27 @@ class GoogleJobProvider(base.JobProvider):
           task_id=task_id,
           create_time=create_time)
 
-      ops = _Operations.list(self._service, ops_filter, max_tasks)
+      # The pipelines API returns operations sorted by create-time date. We can
+      # use this sorting guarantee to merge-sort the streams together and only
+      # retrieve more tasks as needed.
+      stream = _Operations.list(self._service, ops_filter, page_size=max_tasks)
+      query_queue.add_generator(stream)
 
-      if ops:
-        tasks.extend(ops)
-
-      if max_tasks and len(tasks) > max_tasks:
-        del tasks[max_tasks:]
-        return tasks
+    tasks = []
+    for task in query_queue:
+      tasks.append(task)
+      if 0 < max_tasks < len(tasks):
+        break
 
     return tasks
 
-  def delete_jobs(self,
-                  user_list,
-                  job_list,
-                  task_list,
-                  labels,
-                  create_time=None):
+  def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
     """Kills the operations associated with the specified job or job.task.
 
     Args:
-      user_list: List of user ids who "own" the job(s) to cancel.
-      job_list: List of job_ids to cancel.
-      task_list: List of task-ids to cancel.
+      user_ids: List of user ids who "own" the job(s) to cancel.
+      job_ids: List of job_ids to cancel.
+      task_ids: List of task-ids to cancel.
       labels: List of LabelParam, each must match the job(s) to be canceled.
       create_time: a UTC value for earliest create time for a task.
 
@@ -1169,10 +1170,10 @@ class GoogleJobProvider(base.JobProvider):
     """
     # Look up the job(s)
     tasks = self.lookup_job_tasks(
-        ['RUNNING'],
-        user_list=user_list,
-        job_list=job_list,
-        task_list=task_list,
+        {'RUNNING'},
+        user_ids=user_ids,
+        job_ids=job_ids,
+        task_ids=task_ids,
         labels=labels,
         create_time=create_time)
 
@@ -1234,8 +1235,11 @@ class GoogleOperation(base.Task):
       value = self._get_operation_input_field_values(metadata, False)
     elif field == 'labels':
       # Reserved labels are filtered from dsub task output.
-      value = {k: v for k, v in metadata['labels'].items()
-               if k not in param_util.RESERVED_LABELS}
+      value = {
+          k: v
+          for k, v in metadata['labels'].items()
+          if k not in param_util.RESERVED_LABELS
+      }
     elif field == 'inputs':
       value = self._get_operation_input_field_values(metadata, True)
     elif field == 'outputs':
@@ -1394,8 +1398,9 @@ class GoogleOperation(base.Task):
         job_id = self._op['metadata']['labels']['task-id']
       else:
         job_id = self._op['metadata']['labels']['job-id']
-      return 'Error in job %s - code %s: %s' % (
-          job_id, self._op['error']['code'], self._op['error']['message'])
+      return 'Error in job %s - code %s: %s' % (job_id,
+                                                self._op['error']['code'],
+                                                self._op['error']['message'])
     else:
       return ''
 
