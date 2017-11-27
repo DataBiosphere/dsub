@@ -83,8 +83,7 @@ TMP_DIR = '%s/tmp' % DATA_MOUNT_POINT
 WORKING_DIR = '%s/workingdir' % DATA_MOUNT_POINT
 
 MK_RUNTIME_DIRS_COMMAND = '\n'.join(
-    'mkdir --mode=777 -p "%s" ' % dir
-    for dir in [SCRIPT_DIR, TMP_DIR, WORKING_DIR])
+    'mkdir -m 777 -p "%s" ' % dir for dir in [SCRIPT_DIR, TMP_DIR, WORKING_DIR])
 
 DOCKER_COMMAND = textwrap.dedent("""\
   set -o errexit
@@ -510,13 +509,15 @@ class _Pipelines(object):
 
     input_files = [
         cls._build_pipeline_input_file_param(var.name, var.docker_path)
-        for var in inputs if not var.recursive
+        for var in inputs
+        if not var.recursive
     ]
 
     # Outputs are an array of file parameters
     output_files = [
         cls._build_pipeline_file_param(var.name, var.docker_path)
-        for var in outputs if not var.recursive
+        for var in outputs
+        if not var.recursive
     ]
 
     # The ephemeralPipeline provides the template for the pipeline.
