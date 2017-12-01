@@ -65,3 +65,45 @@ function io_setup::check_output() {
   echo "SUCCESS"
 }
 readonly -f io_setup::check_output
+
+function io_setup::check_dstat() {
+  local job_id="${1}"
+
+  echo
+  echo "Checking dstat output..."
+
+  local dstat_output=$(run_dstat --status '*' --jobs "${job_id}" --full)
+
+  echo "  Checking user-id"
+  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].user-id" "${USER}"
+
+  echo "  Checking logging"
+  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].logging" "${LOGGING}"
+
+  echo "  Checking status"
+  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].status" "SUCCESS"
+
+  echo "  Checking datetime fields..."
+  for field in 'create-time' 'end-time' 'start-time' 'last-update'; do
+    if ! util::dstat_yaml_job_has_valid_datetime_field "${dstat_output}" "[0].${field}"; then
+      echo "dstat output for ${job_id} does not include a valid ${field}."
+      echo "${dstat_output}"
+      exit 1
+    fi
+  done
+
+  echo "  Checking envs..."
+  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].envs.TASK_ID" "task"
+  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].envs.TEST_NAME" "${TEST_NAME}"
+
+  echo "  Checking inputs..."
+  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].inputs.INPUT_PATH" "${INPUT_BAM}"
+  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].inputs.POPULATION_FILE" "${POPULATION_FILE}"
+
+  echo "  Checking outputs..."
+  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].outputs.OUTPUT_PATH" "${OUTPUTS}/task/*.md5"
+  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].outputs.OUTPUT_POPULATION_FILE" "${OUTPUTS}/*"
+
+  echo "SUCCESS"
+}
+readonly -f io_setup::check_dstat

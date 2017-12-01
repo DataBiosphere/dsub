@@ -82,7 +82,7 @@ EOF
 
   echo "Launching pipeline..."
 
-  JOB_ID=$(io_setup::run_dsub)
+  JOB_ID="$(io_setup::run_dsub)"
 
   if [[ "${DSUB_PROVIDER}" == "local" ]]; then
     # Cleanup is more challenging when the Docker user isn't root,
@@ -92,5 +92,6 @@ EOF
 
 fi
 
-# Check output
+# Do validation
 io_setup::check_output
+io_setup::check_dstat "${JOB_ID}"

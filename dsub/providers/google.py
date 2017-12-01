@@ -1244,7 +1244,7 @@ class GoogleOperation(base.Task):
     elif field == 'inputs':
       value = self._get_operation_input_field_values(metadata, True)
     elif field == 'outputs':
-      value = metadata['request']['pipelineArgs']['outputs']
+      value = self._get_operation_output_field_values(metadata)
     elif field == 'create-time':
       value = self._parse_datestamp(metadata['createTime'])
     elif field == 'start-time':
@@ -1358,8 +1358,7 @@ class GoogleOperation(base.Task):
     g = [int(val) for val in m.groups()]
     return datetime(g[0], g[1], g[2], g[3], g[4], g[5], tzinfo=pytz.utc)
 
-  @classmethod
-  def _get_operation_input_field_values(cls, metadata, file_input):
+  def _get_operation_input_field_values(self, metadata, file_input):
     """Returns a dictionary of envs or file inputs for an operation.
 
     Args:
@@ -1383,6 +1382,23 @@ class GoogleOperation(base.Task):
 
     # Build the return dict
     return {name: vals_dict[name] for name in names if name in vals_dict}
+
+  def _get_operation_output_field_values(self, metadata):
+    # When outputs with wildcards are constructed, the "value" has the
+    # basename removed (see build_pipeline_args).
+    # We can recover the basename from the docker path.
+    output_params = metadata['request']['ephemeralPipeline']['outputParameters']
+    output_args = metadata['request']['pipelineArgs']['outputs']
+
+    outputs = {}
+    for key, value in output_args.items():
+      if value.endswith('/'):
+        param = next(p for p in output_params if p['name'] == key)
+        docker_path = param['localCopy']['path']
+        value = os.path.join(value, os.path.basename(docker_path))
+      outputs[key] = value
+
+    return outputs
 
   def error_message(self):
     """Returns an error message if the operation failed for any reason.

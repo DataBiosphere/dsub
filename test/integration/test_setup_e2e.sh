@@ -127,7 +127,9 @@ if [[ -n "${TASKS_FILE:-}" ]]; then
   # This should really be a feature of dsub directly...
   echo "Setting up task file ${TASKS_FILE}"
   mkdir -p "$(dirname "${TASKS_FILE}")"
-  cat "${TASKS_FILE_TMPL}" \
-    | util::expand_tsv_fields \
-    > "${TASKS_FILE}"
+  if [[ -e "${TASKS_FILE_TMPL}" ]]; then
+    cat "${TASKS_FILE_TMPL}" \
+      | util::expand_tsv_fields \
+      > "${TASKS_FILE}"
+  fi
 fi

@@ -40,14 +40,18 @@ source "${SCRIPT_DIR}/io_tasks_setup.sh"
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
+  io_tasks_setup::write_tasks_file
+
   echo "Launching pipelines..."
 
-  io_tasks_setup::run_dsub \
-    "${SCRIPT_DIR}/script_io_test.sh" \
-    "${TASKS_FILE}"
+  JOB_ID="$(
+    io_tasks_setup::run_dsub \
+      "${SCRIPT_DIR}/script_io_test.sh" \
+      "${TASKS_FILE}")"
 
 fi
 
-# Check output
+# Do validation
 io_tasks_setup::check_output
+io_tasks_setup::check_dstat "${JOB_ID}"
 
