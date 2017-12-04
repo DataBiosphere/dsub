@@ -104,8 +104,6 @@ TEST_GCS_DOCKER_ROOT = "gs/%s/dsub/py/%s/%s" % (DSUB_BUCKET, DSUB_PROVIDER,
 
 if TASKS_FILE:
   # For task file tests, the logging path is a directory.
-  # Eventually each job should have its own sub-directory,
-  # and named logging files but we need to add dsub support for that.
   LOGGING = "%s/logging" % TEST_GCS_ROOT
 else:
   # For regular tests, the logging path is a named file.

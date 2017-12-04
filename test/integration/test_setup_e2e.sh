@@ -83,9 +83,7 @@ readonly TEST_LOCAL_DOCKER_ROOT="file${TEST_LOCAL_ROOT}"
 
 if [[ -n "${TASKS_FILE:-}" ]]; then
   # For task file tests, the logging path is a directory.
-  # Eventually each job should have its own sub-directory,
-  # and named logging files but we need to add dsub support for that.
-  readonly LOGGING="${TEST_GCS_ROOT}/${TEST_NAME}/logging"
+  readonly LOGGING="${TEST_GCS_ROOT}/logging"
 else
   # For regular tests, the logging path is a named file.
   readonly LOGGING="${TEST_GCS_ROOT}/logging/${TEST_NAME}.log"
