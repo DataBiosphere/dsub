@@ -1126,8 +1126,10 @@ class GoogleJobProvider(base.JobProvider):
     # create-time). A sorted list can then be built by stepping through this
     # iterator and adding tasks until none are left or we hit max_tasks.
 
+    now = datetime.now()
+
     def _desc_date_sort_key(t):
-      return datetime.now() - t.get_field('create-time').replace(tzinfo=None)
+      return now - t.get_field('create-time').replace(tzinfo=None)
 
     query_queue = sorting_util.SortedGeneratorIterator(key=_desc_date_sort_key)
     for status, job_id, job_name, user_id, task_id in itertools.product(
