@@ -111,7 +111,8 @@ class ParamUtilTest(unittest.TestCase):
     self.assertTrue(job_params[2].recursive)
 
   def testTasksFileToJobData(self):
-    expected_tsv_file = 'test/testdata/params_tasks.tsv'
+    testpath = os.path.dirname(__file__)
+    expected_tsv_file = os.path.join(testpath, '../testdata/params_tasks.tsv')
     input_file_param_util = param_util.InputFileParamUtil('input')
     output_file_param_util = param_util.OutputFileParamUtil('output')
     all_job_data = param_util.tasks_file_to_job_data({
