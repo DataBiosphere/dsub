@@ -648,6 +648,16 @@ class _Operations(object):
   """Utilty methods for querying and canceling pipeline operations."""
 
   @staticmethod
+  def _datetime_to_utc_int(date):
+    """Convert the integer UTC time value into a local datetime."""
+    if date is None:
+      return None
+
+    # Convert localized datetime to a UTC integer
+    epoch = datetime.utcfromtimestamp(0).replace(tzinfo=pytz.utc)
+    return (date - epoch).total_seconds()
+
+  @staticmethod
   def get_filter(project,
                  status=None,
                  user_id=None,
@@ -655,11 +665,11 @@ class _Operations(object):
                  job_name=None,
                  labels=None,
                  task_id=None,
-                 create_time=None):
+                 create_time_min=None,
+                 create_time_max=None):
     """Return a filter string for operations.list()."""
 
-    ops_filter = []
-    ops_filter.append('projectId = %s' % project)
+    ops_filter = ['projectId = %s' % project]
     if status and status != '*':
       ops_filter.append('status = %s' % status)
 
@@ -678,8 +688,13 @@ class _Operations(object):
       for l in labels:
         ops_filter.append('labels.%s = %s' % (l.name, l.value))
 
-    if create_time:
-      ops_filter.append('createTime >= %s' % create_time)
+    epoch = datetime.utcfromtimestamp(0).replace(tzinfo=pytz.utc)
+    if create_time_min:
+      create_time_min_utc_int = (create_time_min - epoch).total_seconds()
+      ops_filter.append('createTime >= %d' % create_time_min_utc_int)
+    if create_time_max:
+      create_time_max_utc_int = (create_time_max - epoch).total_seconds()
+      ops_filter.append('createTime <= %d' % create_time_max_utc_int)
 
     return ' AND '.join(ops_filter)
 
@@ -1070,7 +1085,8 @@ class GoogleJobProvider(base.JobProvider):
                        job_names=None,
                        task_ids=None,
                        labels=None,
-                       create_time=None,
+                       create_time_min=None,
+                       create_time_max=None,
                        max_tasks=0):
     """Return a list of operations based on the input criteria.
 
@@ -1086,8 +1102,11 @@ class GoogleJobProvider(base.JobProvider):
       job_names: a list of job names to return.
       task_ids: a list of specific tasks within the specified job(s) to return.
       labels: a list of LabelParam with user-added labels. All labels must
-        match the task being fetched.
-      create_time: a UTC value for earliest create time for a task.
+              match the task being fetched.
+      create_time_min: a timezone-aware datetime value for the earliest create
+                       time of a task, inclusive.
+      create_time_max: a timezone-aware datetime value for the most recent
+                       create time of a task, inclusive.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
 
     Raises:
@@ -1142,7 +1161,8 @@ class GoogleJobProvider(base.JobProvider):
           job_name=job_name,
           labels=labels,
           task_id=task_id,
-          create_time=create_time)
+          create_time_min=create_time_min,
+          create_time_max=create_time_max)
 
       # The pipelines API returns operations sorted by create-time date. We can
       # use this sorting guarantee to merge-sort the streams together and only
@@ -1158,7 +1178,13 @@ class GoogleJobProvider(base.JobProvider):
 
     return tasks
 
-  def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
+  def delete_jobs(self,
+                  user_ids,
+                  job_ids,
+                  task_ids,
+                  labels,
+                  create_time_min=None,
+                  create_time_max=None):
     """Kills the operations associated with the specified job or job.task.
 
     Args:
@@ -1166,7 +1192,10 @@ class GoogleJobProvider(base.JobProvider):
       job_ids: List of job_ids to cancel.
       task_ids: List of task-ids to cancel.
       labels: List of LabelParam, each must match the job(s) to be canceled.
-      create_time: a UTC value for earliest create time for a task.
+      create_time_min: a timezone-aware datetime value for the earliest create
+                       time of a task, inclusive.
+      create_time_max: a timezone-aware datetime value for the most recent
+                       create time of a task, inclusive.
 
     Returns:
       A list of tasks canceled and a list of error messages.
@@ -1178,7 +1207,8 @@ class GoogleJobProvider(base.JobProvider):
         job_ids=job_ids,
         task_ids=task_ids,
         labels=labels,
-        create_time=create_time)
+        create_time_min=create_time_min,
+        create_time_max=create_time_max)
 
     print 'Found %d tasks to delete.' % len(tasks)
 

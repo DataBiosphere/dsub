@@ -340,7 +340,7 @@ def main():
   args = _parse_arguments()
 
   # Compute the age filter (if any)
-  create_time = param_util.age_to_create_time(args.age)
+  create_time_min = param_util.age_to_create_time(args.age)
 
   # Set up the output formatter
   if args.format == 'json':
@@ -379,7 +379,7 @@ def main():
       job_names=set(args.names) if args.names else None,
       task_ids=set(args.tasks) if args.tasks else None,
       labels=labels if labels else None,
-      create_time=create_time,
+      create_time_min=create_time_min,
       max_tasks=args.limit,
       full_output=args.full,
       poll_interval=poll_interval,
@@ -401,7 +401,8 @@ def dstat_job_producer(provider,
                        job_names=None,
                        task_ids=None,
                        labels=None,
-                       create_time=None,
+                       create_time_min=None,
+                       create_time_max=None,
                        max_tasks=0,
                        full_output=False,
                        poll_interval=0,
@@ -419,7 +420,10 @@ def dstat_job_producer(provider,
     job_names: a set of job-name strings eligible jobs may match.
     task_ids: a set of task-id strings eligible tasks may match.
     labels: set of LabelParam that all tasks must match.
-    create_time: a UTC value for earliest create time for a task.
+    create_time_min: a timezone-aware datetime value for the earliest create
+                     time of a task, inclusive.
+    create_time_max: a timezone-aware datetime value for the most recent create
+                     time of a task, inclusive.
     max_tasks: (int) maximum number of tasks to return per dstat job lookup.
     full_output: (bool) return all dsub fields.
     poll_interval: (int) wait time between poll events, dstat will poll jobs
@@ -444,7 +448,8 @@ def dstat_job_producer(provider,
         job_names=job_names,
         task_ids=task_ids,
         labels=labels,
-        create_time=create_time,
+        create_time_min=create_time_min,
+        create_time_max=create_time_max,
         max_tasks=max_tasks)
 
     some_job_running = False

@@ -24,6 +24,7 @@ import unittest
 from dsub.lib import job_util
 from dsub.lib import param_util
 import parameterized
+import pytz
 
 
 # Fixed values for age_to_create_time
@@ -135,12 +136,12 @@ class ParamUtilTest(unittest.TestCase):
                        output.docker_path)
 
   @parameterized.parameterized.expand([
-      ('simple_second', '1s', FIXED_TIME_UTC - 1),
-      ('simple_minute', '1m', FIXED_TIME_UTC - (1 * 60)),
-      ('simple_hour', '1h', FIXED_TIME_UTC - (1 * 60 * 60)),
-      ('simple_day', '1d', FIXED_TIME_UTC - (24 * 60 * 60)),
-      ('simple_week', '1w', FIXED_TIME_UTC - (7 * 24 * 60 * 60)),
-      ('simple_now', str(FIXED_TIME_UTC), FIXED_TIME_UTC),
+      ('simple_second', '1s', FIXED_TIME - datetime.timedelta(seconds=1)),
+      ('simple_minute', '1m', FIXED_TIME - datetime.timedelta(minutes=1)),
+      ('simple_hour', '1h', FIXED_TIME - datetime.timedelta(hours=1)),
+      ('simple_day', '1d', FIXED_TIME - datetime.timedelta(days=1)),
+      ('simple_week', '1w', FIXED_TIME - datetime.timedelta(weeks=1)),
+      ('simple_now', str(FIXED_TIME_UTC), FIXED_TIME.replace(tzinfo=pytz.utc)),
   ])
   def test_compute_create_time(self, unused_name, age, expected):
     del unused_name

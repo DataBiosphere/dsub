@@ -107,7 +107,13 @@ class JobProvider(object):
     raise NotImplementedError()
 
   @abstractmethod
-  def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
+  def delete_jobs(self,
+                  user_ids,
+                  job_ids,
+                  task_ids,
+                  labels,
+                  create_time_min=None,
+                  create_time_max=None):
     """Kills the operations associated with the specified job or job.task.
 
     Some providers may provide only a "cancel" operation, which terminates the
@@ -118,7 +124,10 @@ class JobProvider(object):
       job_ids: a set of job ids to delete.
       task_ids: a set of task ids to delete.
       labels: a set of LabelParam, each must match the job(s) to be cancelled.
-      create_time: a UTC value for earliest create time for a task.
+      create_time_min: a timezone-aware datetime value for the earliest create
+                       time of a task, inclusive.
+      create_time_max: a timezone-aware datetime value for the most recent
+                       create time of a task, inclusive.
 
     Returns:
       (list of tasks canceled,
@@ -136,7 +145,8 @@ class JobProvider(object):
                        job_names=None,
                        task_ids=None,
                        labels=None,
-                       create_time=None,
+                       create_time_min=None,
+                       create_time_max=None,
                        max_tasks=0):
     """Return a list of tasks based on the search criteria.
 
@@ -152,7 +162,10 @@ class JobProvider(object):
       job_names: a set of job names to return.
       task_ids: a set of specific tasks within the specified job(s) to return.
       labels: a list of LabelParam, each must match the job(s) returned.
-      create_time: a UTC value for earliest create time for a task.
+      create_time_min: a timezone-aware datetime value for the earliest create
+                       time of a task, inclusive.
+      create_time_max: a timezone-aware datetime value for the most recent
+                       create time of a task, inclusive.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
 
     Returns:

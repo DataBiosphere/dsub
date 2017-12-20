@@ -51,20 +51,20 @@ submitted will run concurrently.
 """
 
 from collections import namedtuple
-from datetime import datetime
-from datetime import timedelta
+import datetime
 import os
 import signal
 import string
 import subprocess
 import tempfile
 import textwrap
-import time
 from . import base
 from .._dsub_version import DSUB_VERSION
+from dateutil.tz import tzlocal
 from ..lib import dsub_util
 from ..lib import param_util
 from ..lib import providers_util
+import pytz
 import yaml
 
 # The local runner allocates space on the host under
@@ -178,7 +178,7 @@ class LocalJobProvider(base.JobProvider):
     }
 
   def submit_job(self, job_resources, job_metadata, job_data, all_task_data):
-    create_time = datetime.now()
+    create_time = datetime.datetime.now()
 
     # Validate inputs.
     param_util.validate_submit_args_or_fail(
@@ -345,7 +345,13 @@ class LocalJobProvider(base.JobProvider):
     f.close()
     return pid
 
-  def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
+  def delete_jobs(self,
+                  user_ids,
+                  job_ids,
+                  task_ids,
+                  labels,
+                  create_time_min=None,
+                  create_time_max=None):
     # As per the spec, we ignore anything not running.
     tasks = self.lookup_job_tasks(
         statuses={'RUNNING'},
@@ -353,7 +359,8 @@ class LocalJobProvider(base.JobProvider):
         job_ids=job_ids,
         task_ids=task_ids,
         labels=labels,
-        create_time=create_time)
+        create_time_min=create_time_min,
+        create_time_max=create_time_max)
 
     canceled = []
     cancel_errors = []
@@ -361,9 +368,8 @@ class LocalJobProvider(base.JobProvider):
       # Try to cancel it for real.
       # First, tell the runner script to skip delocalization
       task_dir = self._task_directory(
-          task.get_field('job-id'),
-          task.get_field('task-id'))
-      today = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+          task.get_field('job-id'), task.get_field('task-id'))
+      today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
       with open(os.path.join(task_dir, 'die'), 'wt') as f:
         f.write('Operation canceled at %s\n' % today)
 
@@ -393,7 +399,7 @@ class LocalJobProvider(base.JobProvider):
       canceled += [task]
 
       # Mark the job as 'CANCELED' for the benefit of dstat
-      today = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+      today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
       with open(os.path.join(task_dir, 'status.txt'), 'wt') as f:
         f.write('CANCELED\n')
       with open(os.path.join(task_dir, 'end-time.txt'), 'wt') as f:
@@ -404,22 +410,6 @@ class LocalJobProvider(base.JobProvider):
 
     return (canceled, cancel_errors)
 
-  @classmethod
-  def _utc_int_to_local_datetime(cls, utc_int):
-    """Convert the integer UTC time value into a local datetime."""
-    if utc_int is None:
-      return None
-
-    # Convert from a UTC integer (seconds since the epoch) to a UTC datetime
-    datetime_utc = datetime.utcfromtimestamp(0) + timedelta(seconds=utc_int)
-    # Get the offset from UTC to local
-    timestamp = time.mktime(datetime_utc.timetuple())
-    offset = datetime.fromtimestamp(timestamp) - datetime.utcfromtimestamp(
-        timestamp)
-
-    # Convert from a UTC datetime to a local datetime
-    return datetime_utc + offset
-
   def lookup_job_tasks(self,
                        statuses,
                        user_ids=None,
@@ -427,7 +417,8 @@ class LocalJobProvider(base.JobProvider):
                        job_names=None,
                        task_ids=None,
                        labels=None,
-                       create_time=None,
+                       create_time_min=None,
+                       create_time_max=None,
                        max_tasks=0):
 
     # 'OR' filtering arguments.
@@ -438,8 +429,6 @@ class LocalJobProvider(base.JobProvider):
     task_ids = None if task_ids == {'*'} else task_ids
     # 'AND' filtering arguments.
     labels = labels if labels else {}
-
-    create_time_local = self._utc_int_to_local_datetime(create_time)
 
     # The local provider is intended for local, single-user development. There
     # is no shared queue (jobs run immediately) and hence it makes no sense
@@ -488,11 +477,11 @@ class LocalJobProvider(base.JobProvider):
               [k in task_labels and task_labels[k] == v for k, v in labels])
           if labels and not labels_match:
             continue
-          # Check that the job is not too old.
-          if create_time_local:
-            task_create_time = task.get_field('create-time')
-            if task_create_time < create_time_local:
-              continue
+          # Check that the job is in the requested age range.
+          task_create_time = task.get_field('create-time')
+          if not self._datetime_in_range(task_create_time, create_time_min,
+                                         create_time_max):
+            continue
 
           ret.append(task)
 
@@ -506,11 +495,25 @@ class LocalJobProvider(base.JobProvider):
     return [task.get_field('status-message') for task in tasks]
 
   # Private methods
+  def _datetime_in_range(self, dt, dt_min=None, dt_max=None):
+    """Determine if the provided time is within the range, inclusive."""
+    # The pipelines API stores operation create-time with second granularity.
+    # We mimic this behavior in the local provider by truncating to seconds.
+    dt = dt.replace(microsecond=0)
+    if dt_min:
+      dt_min = dt_min.replace(microsecond=0)
+    else:
+      dt_min = datetime.datetime.min.replace(tzinfo=pytz.utc)
+    if dt_max:
+      dt_max = dt_max.replace(microsecond=0)
+    else:
+      dt_max = datetime.datetime.max.replace(tzinfo=pytz.utc)
+
+    return dt_min <= dt <= dt_max
 
   def _write_task_metadata(self, task_metadata, job_data, task_data,
                            create_time):
     """Write a file with the data needed for dstat."""
-
     # Build up a dict to dump a YAML file with relevant task details:
     #   job-id: <id>
     #   task-id: <id>
@@ -553,8 +556,9 @@ class LocalJobProvider(base.JobProvider):
         meta = yaml.load('\n'.join(f.readlines()))
 
       # Make sure that create-time string is turned into a datetime
-      meta['create-time'] = datetime.strptime(meta['create-time'],
-                                              '%Y-%m-%d %H:%M:%S.%f')
+      meta['create-time'] = datetime.datetime.strptime(
+          meta['create-time'],
+          '%Y-%m-%d %H:%M:%S.%f').replace(tzinfo=tzlocal())
 
       return meta
     except (IOError, OSError):
@@ -565,7 +569,9 @@ class LocalJobProvider(base.JobProvider):
   def _get_end_time_from_task_dir(self, task_dir):
     try:
       with open(os.path.join(task_dir, 'end-time.txt'), 'r') as f:
-        return datetime.strptime(f.readline().strip(), '%Y-%m-%d %H:%M:%S.%f')
+        return datetime.datetime.strptime(
+            f.readline().strip(),
+            '%Y-%m-%d %H:%M:%S.%f').replace(tzinfo=tzlocal())
     except (IOError, OSError):
       return None
 
@@ -578,7 +584,8 @@ class LocalJobProvider(base.JobProvider):
       except (IOError, OSError):
         pass
 
-    return last_update
+    return datetime.datetime.fromtimestamp(last_update).replace(
+        tzinfo=tzlocal()) if last_update > 0 else None
 
   def _get_status_from_task_dir(self, task_dir):
     try:
@@ -640,8 +647,7 @@ class LocalJobProvider(base.JobProvider):
         job_name=meta.get('job-name'),
         create_time=meta.get('create-time'),
         end_time=end_time,
-        last_update=datetime.fromtimestamp(last_update)
-        if last_update > 0 else None,
+        last_update=last_update,
         logging=meta.get('logging'),
         envs=meta.get('envs'),
         labels=meta.get('labels'),
@@ -709,7 +715,7 @@ class LocalJobProvider(base.JobProvider):
     # The full job-id is:
     #   <job-name>--<user-id>--<timestamp>
     return '%s--%s--%s' % (job_name_value[:10], user_id,
-                           datetime.now().strftime('%y%m%d-%H%M%S-%f'))
+                           datetime.datetime.now().strftime('%y%m%d-%H%M%S-%f'))
 
   def _task_directory(self, job_id, task_id):
     """The local dir for staging files for that particular task."""

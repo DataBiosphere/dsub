@@ -129,7 +129,7 @@ def main():
         job_ids=set(args.jobs) if args.jobs else None,
         task_ids=set(args.tasks) if args.tasks else None,
         labels=labels,
-        create_time=create_time)
+        create_time_min=create_time)
     # Emit the count of deleted jobs.
     # Only emit anything about tasks if any of the jobs contains a task-id.
     deleted_jobs = dsub_util.tasks_to_job_ids(deleted_tasks)
@@ -153,7 +153,8 @@ def ddel_tasks(provider,
                job_ids=None,
                task_ids=None,
                labels=None,
-               create_time=None):
+               create_time_min=None,
+               create_time_max=None):
   """Kill jobs or job tasks.
 
   This function separates ddel logic from flag parsing and user output. Users
@@ -165,14 +166,17 @@ def ddel_tasks(provider,
     job_ids: a set of job ids to delete.
     task_ids: a set of task ids to delete.
     labels: a set of LabelParam, each must match the job(s) to be cancelled.
-    create_time: a UTC value for earliest create time for a task.
+    create_time_min: a timezone-aware datetime value for the earliest create
+                     time of a task, inclusive.
+    create_time_max: a timezone-aware datetime value for the most recent create
+                     time of a task, inclusive.
 
   Returns:
     list of job ids which were deleted.
   """
   # Delete the requested jobs
   deleted_tasks, error_messages = provider.delete_jobs(
-      user_ids, job_ids, task_ids, labels, create_time)
+      user_ids, job_ids, task_ids, labels, create_time_min, create_time_max)
 
   # Emit any errors canceling jobs
   for msg in error_messages:
