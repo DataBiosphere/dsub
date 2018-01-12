@@ -152,7 +152,8 @@ class JobProvider(object):
                        labels=None,
                        create_time_min=None,
                        create_time_max=None,
-                       max_tasks=0):
+                       max_tasks=0,
+                       page_size=0):
     """Return a list of tasks based on the search criteria.
 
     If any of the filters are empty or {'*'}, then no filtering is performed on
@@ -172,6 +173,8 @@ class JobProvider(object):
       create_time_max: a timezone-aware datetime value for the most recent
                        create time of a task, inclusive.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
+      page_size: the page size to use for each query to the backend. May be
+                 ignored by provider implementations.
 
     Returns:
       A list of Task objects.

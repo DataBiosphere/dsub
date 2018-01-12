@@ -152,6 +152,11 @@ def _convert_suffix_to_docker_chars(suffix):
   return ''.join(label_char_transform(c) for c in suffix)
 
 
+def _replace_timezone(date, tz):
+  # pylint: disable=g-tzinfo-replace
+  return date.replace(tzinfo=tz)
+
+
 class LocalJobProvider(base.JobProvider):
   """Docker jobs running locally (i.e. on the caller's computer)."""
 
@@ -425,16 +430,19 @@ class LocalJobProvider(base.JobProvider):
 
     return (canceled, cancel_errors)
 
-  def lookup_job_tasks(self,
-                       statuses,
-                       user_ids=None,
-                       job_ids=None,
-                       job_names=None,
-                       task_ids=None,
-                       labels=None,
-                       create_time_min=None,
-                       create_time_max=None,
-                       max_tasks=0):
+  def lookup_job_tasks(
+      self,
+      statuses,
+      user_ids=None,
+      job_ids=None,
+      job_names=None,
+      task_ids=None,
+      labels=None,
+      create_time_min=None,
+      create_time_max=None,
+      max_tasks=0,
+      # page_size is ignored for the LocalJobProvider
+      page_size=0):
 
     # 'OR' filtering arguments.
     statuses = None if statuses == {'*'} else statuses
@@ -518,11 +526,11 @@ class LocalJobProvider(base.JobProvider):
     if dt_min:
       dt_min = dt_min.replace(microsecond=0)
     else:
-      dt_min = datetime.datetime.min.replace(tzinfo=pytz.utc)
+      dt_min = _replace_timezone(datetime.datetime.min, pytz.utc)
     if dt_max:
       dt_max = dt_max.replace(microsecond=0)
     else:
-      dt_max = datetime.datetime.max.replace(tzinfo=pytz.utc)
+      dt_max = _replace_timezone(datetime.datetime.max, pytz.utc)
 
     return dt_min <= dt <= dt_max
 
@@ -571,9 +579,9 @@ class LocalJobProvider(base.JobProvider):
         meta = yaml.load('\n'.join(f.readlines()))
 
       # Make sure that create-time string is turned into a datetime
-      meta['create-time'] = datetime.datetime.strptime(
-          meta['create-time'],
-          '%Y-%m-%d %H:%M:%S.%f').replace(tzinfo=tzlocal())
+      meta['create-time'] = _replace_timezone(
+          datetime.datetime.strptime(meta['create-time'],
+                                     '%Y-%m-%d %H:%M:%S.%f'), tzlocal())
 
       return meta
     except (IOError, OSError):
@@ -584,9 +592,9 @@ class LocalJobProvider(base.JobProvider):
   def _get_end_time_from_task_dir(self, task_dir):
     try:
       with open(os.path.join(task_dir, 'end-time.txt'), 'r') as f:
-        return datetime.datetime.strptime(
-            f.readline().strip(),
-            '%Y-%m-%d %H:%M:%S.%f').replace(tzinfo=tzlocal())
+        return _replace_timezone(
+            datetime.datetime.strptime(f.readline().strip(),
+                                       '%Y-%m-%d %H:%M:%S.%f'), tzlocal())
     except (IOError, OSError):
       return None
 

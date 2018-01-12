@@ -447,7 +447,8 @@ def dstat_job_producer(provider,
         labels=labels,
         create_time_min=create_time_min,
         create_time_max=create_time_max,
-        max_tasks=max_tasks)
+        max_tasks=max_tasks,
+        page_size=max_tasks)
 
     some_job_running = False
 
@@ -480,7 +481,8 @@ def lookup_job_tasks(provider,
                      labels=None,
                      create_time_min=None,
                      create_time_max=None,
-                     max_tasks=0):
+                     max_tasks=0,
+                     page_size=0):
   """Generate formatted jobs individually, in order of create-time.
 
   Args:
@@ -496,6 +498,8 @@ def lookup_job_tasks(provider,
     create_time_max: a timezone-aware datetime value for the most recent create
                      time of a task, inclusive.
     max_tasks: (int) maximum number of tasks to return per dstat job lookup.
+    page_size: the page size to use for each query to the backend. May be
+               ignored by some provider implementations.
 
   Yields:
     Individual task dictionaries with associated metadata
@@ -509,7 +513,8 @@ def lookup_job_tasks(provider,
       labels=labels,
       create_time_min=create_time_min,
       create_time_max=create_time_max,
-      max_tasks=max_tasks)
+      max_tasks=max_tasks,
+      page_size=page_size)
 
   # Yield formatted tasks.
   for task in tasks_generator:

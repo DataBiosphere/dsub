@@ -273,6 +273,11 @@ def _print_error(msg):
   print >> sys.stderr, msg
 
 
+def _replace_timezone(date, tz):
+  # pylint: disable=g-tzinfo-replace
+  return date.replace(tzinfo=tz)
+
+
 class _Label(param_util.LabelParam):
   """Name/value label metadata for a pipeline.
 
@@ -655,7 +660,7 @@ class _Operations(object):
       return None
 
     # Convert localized datetime to a UTC integer
-    epoch = datetime.utcfromtimestamp(0).replace(tzinfo=pytz.utc)
+    epoch = _replace_timezone(datetime.utcfromtimestamp(0), pytz.utc)
     return (date - epoch).total_seconds()
 
   @staticmethod
@@ -689,7 +694,7 @@ class _Operations(object):
       for l in labels:
         ops_filter.append('labels.%s = %s' % (l.name, l.value))
 
-    epoch = datetime.utcfromtimestamp(0).replace(tzinfo=pytz.utc)
+    epoch = _replace_timezone(datetime.utcfromtimestamp(0), pytz.utc)
     if create_time_min:
       create_time_min_utc_int = (create_time_min - epoch).total_seconds()
       ops_filter.append('createTime >= %d' % create_time_min_utc_int)
@@ -758,7 +763,7 @@ class _Operations(object):
       service: Google Genomics API service object
       ops_filter: string filter of operations to return
       page_size: the number of operations to requested on each list operation to
-        the pipelines API (None indicates no maximum specified)
+        the pipelines API (if 0 or None, the API default is used)
 
     Yields:
       Operations matching the filter criteria.
@@ -767,8 +772,11 @@ class _Operations(object):
     page_token = None
     more_operations = True
     documented_default_page_size = 256
-    page_size = min(page_size,
-                    documented_default_page_size) if page_size else None
+    documented_max_page_size = 2048
+
+    if not page_size:
+      page_size = documented_default_page_size
+    page_size = min(page_size, documented_max_page_size)
 
     while more_operations:
       api = service.operations().list(
@@ -1100,8 +1108,9 @@ class GoogleJobProvider(base.JobProvider):
                        labels=None,
                        create_time_min=None,
                        create_time_max=None,
-                       max_tasks=0):
-    """Return a list of operations based on the input criteria.
+                       max_tasks=0,
+                       page_size=0):
+    """Yields operations based on the input criteria.
 
     If any of the filters are empty or {'*'}, then no filtering is performed on
     that field. Filtering by both a job id list and job name list is
@@ -1121,12 +1130,13 @@ class GoogleJobProvider(base.JobProvider):
       create_time_max: a timezone-aware datetime value for the most recent
                        create time of a task, inclusive.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
+      page_size: the page size to use for each query to the pipelins API.
 
     Raises:
       ValueError: if both a job id list and a job name list are provided
 
-    Returns:
-      A list of Genomics API Operations objects.
+    Yeilds:
+      Genomics API Operations objects.
     """
 
     # Server-side, we can filter on status, job_id, user_id, task_id, but there
@@ -1161,7 +1171,7 @@ class GoogleJobProvider(base.JobProvider):
     now = datetime.now()
 
     def _desc_date_sort_key(t):
-      return now - t.get_field('create-time').replace(tzinfo=None)
+      return now - _replace_timezone(t.get_field('create-time'), None)
 
     query_queue = sorting_util.SortedGeneratorIterator(key=_desc_date_sort_key)
     for status, job_id, job_name, user_id, task_id in itertools.product(
@@ -1180,16 +1190,15 @@ class GoogleJobProvider(base.JobProvider):
       # The pipelines API returns operations sorted by create-time date. We can
       # use this sorting guarantee to merge-sort the streams together and only
       # retrieve more tasks as needed.
-      stream = _Operations.list(self._service, ops_filter, page_size=max_tasks)
+      stream = _Operations.list(self._service, ops_filter, page_size=page_size)
       query_queue.add_generator(stream)
 
-    tasks = []
+    tasks_yielded = 0
     for task in query_queue:
-      tasks.append(task)
-      if 0 < max_tasks < len(tasks):
+      yield task
+      tasks_yielded += 1
+      if 0 < max_tasks < tasks_yielded:
         break
-
-    return tasks
 
   def delete_jobs(self,
                   user_ids,
@@ -1214,14 +1223,15 @@ class GoogleJobProvider(base.JobProvider):
       A list of tasks canceled and a list of error messages.
     """
     # Look up the job(s)
-    tasks = self.lookup_job_tasks(
-        {'RUNNING'},
-        user_ids=user_ids,
-        job_ids=job_ids,
-        task_ids=task_ids,
-        labels=labels,
-        create_time_min=create_time_min,
-        create_time_max=create_time_max)
+    tasks = list(
+        self.lookup_job_tasks(
+            {'RUNNING'},
+            user_ids=user_ids,
+            job_ids=job_ids,
+            task_ids=task_ids,
+            labels=labels,
+            create_time_min=create_time_min,
+            create_time_max=create_time_max))
 
     print 'Found %d tasks to delete.' % len(tasks)
 
