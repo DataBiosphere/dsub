@@ -47,8 +47,7 @@ SLEEP_FUNCTION = time.sleep  # so we can replace it in tests
 #   dsub ... --after $JOB_ID
 #
 # "NO_JOB" will be treated as having completed.
-NO_JOB = 'NO_JOB'
-
+#
 # The job created by dsub will automatically include a data disk,
 # Each provider sets a different DATA_ROOT environment variable.
 # The DATA_ROOT is the root directory for the data disk.
@@ -447,7 +446,7 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
   # * stop_on_failure is TRUE AND at least one job returned an error
 
   # remove NO_JOB
-  job_ids_to_check = {j for j in job_ids if j != NO_JOB}
+  job_ids_to_check = {j for j in job_ids if j != dsub_util.NO_JOB}
   error_messages = []
   while job_ids_to_check and (not error_messages or not stop_on_failure):
     print('Waiting for: %s.' % (', '.join(job_ids_to_check)))
@@ -573,21 +572,6 @@ def _wait_for_any_job(provider, job_ids, poll_interval):
     SLEEP_FUNCTION(poll_interval)
 
 
-def _job_outputs_are_present(job_data):
-  """True if each output contains at least one file."""
-  # See reference args_to_job_data in param_util.py for a description
-  # of what's in job_data.
-  outputs = job_data['outputs']
-  for o in outputs:
-    if o.recursive:
-      if not dsub_util.folder_exists(o.value):
-        return False
-    else:
-      if not dsub_util.simple_pattern_exists_in_gcs(o.value):
-        return False
-  return True
-
-
 def _validate_job_and_task_arguments(job_data, all_task_data):
   """Validates that job and task argument names do not overlap."""
 
@@ -679,10 +663,6 @@ def run_main(args):
 
   provider_base.check_for_unsupported_flag(args)
 
-  if args.tasks and args.skip:
-    raise ValueError('Output skipping (--skip) not supported for --task '
-                     'commands.')
-
   # Set up job parameters and job data from a tasks file or flags.
   input_file_param_util = param_util.InputFileParamUtil(
       DEFAULT_INPUT_LOCAL_PATH)
@@ -748,9 +728,6 @@ def run(provider,
   if not disable_warning:
     raise ValueError('Do not user this unstable API component!')
 
-  if len(all_task_data) > 1 and skip:
-    raise ValueError('The skip option is not supported with multiple tasks')
-
   if command and script:
     raise ValueError('Cannot supply both a command and script value.')
 
@@ -793,17 +770,14 @@ def run(provider,
             'One or more predecessor jobs completed but did not succeed.',
             error_messages)
 
-  # If requested, skip running this job if its outputs already exist
-  if skip and not dry_run:
-    if _job_outputs_are_present(job_data):
-      print('Job output already present, skipping new job submission.')
-      return {'job-id': NO_JOB}
-
   # Launch all the job tasks!
   launched_job = provider.submit_job(job_resources, job_metadata, job_data,
-                                     all_task_data)
+                                     all_task_data, skip)
 
   if not dry_run:
+    if launched_job['job-id'] == dsub_util.NO_JOB:
+      print('Job output already present, skipping new job submission.')
+      return {'job-id': dsub_util.NO_JOB}
     print('Launched job-id: %s' % launched_job['job-id'])
     if launched_job.get('task-id'):
       print('%s task(s)' % len(launched_job['task-id']))

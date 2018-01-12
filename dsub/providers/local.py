@@ -177,7 +177,8 @@ class LocalJobProvider(base.JobProvider):
         'dsub-version': DSUB_VERSION,
     }
 
-  def submit_job(self, job_resources, job_metadata, job_data, all_task_data):
+  def submit_job(self, job_resources, job_metadata, job_data, all_task_data,
+                 skip_if_output_present):
     create_time = datetime.datetime.now()
 
     # Validate inputs.
@@ -193,6 +194,16 @@ class LocalJobProvider(base.JobProvider):
     # Launch tasks!
     launched_tasks = []
     for task_data in all_task_data:
+
+      inputs = job_data['inputs'] | task_data['inputs']
+      outputs = job_data['outputs'] | task_data['outputs']
+
+      if skip_if_output_present:
+        # check whether the output's already there
+        if dsub_util.outputs_are_present(outputs):
+          print 'Skipping task because its outputs are present.'
+          continue
+
       task_metadata = providers_util.get_task_metadata(job_metadata,
                                                        task_data.get('task-id'))
 
@@ -203,24 +214,28 @@ class LocalJobProvider(base.JobProvider):
       # Set up directories
       task_dir = self._task_directory(
           task_metadata.get('job-id'), task_metadata.get('task-id'))
-      self._mkdir_outputs(task_dir, job_data['outputs'] | task_data['outputs'])
+      self._mkdir_outputs(task_dir, outputs)
 
       script = task_metadata.get('script')
       self._stage_script(task_dir, script.name, script.value)
 
       # Start the task
-      env = self._make_environment(job_data['inputs'] | task_data['inputs'],
-                                   job_data['outputs'] | task_data['outputs'])
+      env = self._make_environment(inputs, outputs)
       self._write_task_metadata(task_metadata, job_data, task_data, create_time)
       self._run_docker_via_script(task_dir, env, job_resources, task_metadata,
                                   job_data, task_data)
       if task_metadata.get('task-id') is not None:
         launched_tasks.append(str(task_metadata.get('task-id')))
+      else:
+        launched_tasks.append(None)
+
+    if not launched_tasks:
+      return {'job-id': dsub_util.NO_JOB}
 
     return {
         'job-id': job_metadata.get('job-id'),
         'user-id': job_metadata.get('user-id'),
-        'task-id': launched_tasks
+        'task-id': [task_id for task_id in launched_tasks if task_id],
     }
 
   def _write_source_file(self, dest, body):

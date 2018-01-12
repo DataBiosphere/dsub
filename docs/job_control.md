@@ -131,3 +131,11 @@ When wildcards are used for `--output` parameters or `--output-recursive`
 parameters are used, there is no way for `dsub` to verify that *all* output is
 present. The best that `dsub` can do is to verify that *some* output was created
 for each such parameter.
+
+While it's allowed to specify `--output` and `--tasks` on the command line
+at the same time (for example if output has wildcards and each task writes
+a different file that matches the pattern), note that in this scenario
+`--skip` will dutifully skip all tasks if any output matching the pattern is
+present. In practice this means that it's generally unwise to use all three
+of `--output`, `--tasks`, and `--skip` on the command line. Instead, specify
+a different output for each task, in the tasks file.

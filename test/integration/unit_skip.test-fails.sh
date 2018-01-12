@@ -37,6 +37,7 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
+readonly NOT_EXISTING="${OUTPUTS}/does_not_exist"
 readonly EXISTING="${OUTPUTS}/exists"
 readonly EXISTING_2="${OUTPUTS}/exists_too"
 readonly EXISTING_PATTERN_1="${OUTPUTS}/exist*"
@@ -171,6 +172,56 @@ SKIP_JOBID=$(run_dsub \
 
 if [[ "${SKIP_JOBID}" != "NO_JOB" ]]; then
   echo "Job 8 wasn't skipped, should have been."
+  echo "Expected: NO_JOB"
+  echo "Actual:   ${SKIP_JOBID}"
+  exit 1
+fi
+
+#
+# Now test with tasks file
+#
+
+echo "Job 9 (should run)..."
+
+# Do not skip because --output file does not exist
+mkdir -p "${TEST_TMP}"
+# Create a simple TSV file
+readonly TSV_FILE="${TEST_TMP}/${TEST_NAME}.tsv"
+util::write_tsv_file "${TSV_FILE}" \
+"
+  --output OUTPUT_PATH
+  ${NOT_EXISTING}
+"
+SKIP_JOBID=$(run_dsub \
+  --command 'echo "Job 9" > ${OUTPUT_PATH}/job_9' \
+  --tasks "${TSV_FILE}"
+  --skip \
+  --wait || echo "ran")
+
+if [[ "${SKIP_JOBID}" = "NO_JOB" ]]; then
+  echo "Job 9 was skipped, shouldn't have been."
+  echo "Expected: not NO_JOB"
+  echo "Actual:   ${SKIP_JOBID}"
+  exit 1
+fi
+
+echo "Job 10..."
+
+# Should skip: file exists
+mkdir -p "${TEST_TMP}"
+util::write_tsv_file "${TSV_FILE}" \
+"
+  --output OUTPUT_PATH
+  ${EXISTING}
+"
+SKIP_JOBID=$(run_dsub \
+  --command 'echo "Job 10" > ${OUTPUT_PATH}/job_10' \
+  --tasks "${TSV_FILE}" \
+  --skip \
+  --wait || echo "ran")
+
+if [[ "${SKIP_JOBID}" != "NO_JOB" ]]; then
+  echo "Job 10 wasn't skipped, should have been."
   echo "Expected: NO_JOB"
   echo "Actual:   ${SKIP_JOBID}"
   exit 1

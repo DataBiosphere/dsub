@@ -18,6 +18,7 @@
 """
 
 from . import base
+from ..lib import dsub_util
 
 
 class FailsException(Exception):
@@ -30,9 +31,20 @@ class FailsJobProvider(base.JobProvider):
   def __init__(self):
     self._operations = []
 
-  def submit_job(self, job_resources, job_metadata, job_data, all_job_data):
-    del job_resources, job_metadata, job_data, all_job_data
-    raise FailsException("fails provider made submit_job fail")
+  def submit_job(self, job_resources, job_metadata, job_data, all_task_data,
+                 skip_if_output_present):
+    """Fails if there's anything to submit (so, not skipped)."""
+    del job_resources, job_metadata
+    if not skip_if_output_present:
+      raise FailsException("fails provider made submit_job fail")
+    for task_data in all_task_data:
+      outputs = job_data["outputs"] | task_data["outputs"]
+      if dsub_util.outputs_are_present(outputs):
+        print "Skipping task because its outputs are present"
+        continue
+      # if any task is allowed to run, then we fail.
+      raise FailsException("fails provider made submit_job fail")
+    return {"job-id": dsub_util.NO_JOB}
 
   def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
     del user_ids, job_ids, task_ids, labels, create_time

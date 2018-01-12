@@ -34,6 +34,7 @@ import apiclient.discovery
 import apiclient.errors
 
 # TODO(b/68858502) Fix the use of relative imports throughout this library
+from ..lib import dsub_util
 from ..lib import param_util
 from ..lib import providers_util
 from ..lib import sorting_util
@@ -1025,7 +1026,8 @@ class GoogleJobProvider(base.JobProvider):
 
     return GoogleOperation(operation).get_field('task-id')
 
-  def submit_job(self, job_resources, job_metadata, job_data, all_task_data):
+  def submit_job(self, job_resources, job_metadata, job_data, all_task_data,
+                 skip_if_output_present):
     """Submit the job (or tasks) to be executed.
 
     Args:
@@ -1033,6 +1035,8 @@ class GoogleJobProvider(base.JobProvider):
       job_metadata: job parameters such as job-id, user-id, script
       job_data: arguments global to the job
       all_task_data: list of arguments for each task
+      skip_if_output_present: (boolean) if true, skip tasks whose output
+        is present (see --skip flag for more explanation).
 
     Returns:
       A dictionary containing the 'user-id', 'job-id', and 'task-id' list.
@@ -1055,6 +1059,13 @@ class GoogleJobProvider(base.JobProvider):
     launched_tasks = []
     requests = []
     for task_data in all_task_data:
+
+      outputs = job_data['outputs'] | task_data['outputs']
+      if skip_if_output_present:
+        # check whether the output's already there
+        if dsub_util.outputs_are_present(outputs):
+          print 'Skipping task because its outputs are present'
+          continue
       task_metadata = providers_util.get_task_metadata(job_metadata,
                                                        task_data.get('task-id'))
 
@@ -1064,18 +1075,20 @@ class GoogleJobProvider(base.JobProvider):
       if self._dry_run:
         requests.append(request)
       else:
-        task = self._submit_pipeline(request)
-        if task:
-          launched_tasks.append(task)
+        task_id = self._submit_pipeline(request)
+        launched_tasks.append(task_id)
 
     # If this is a dry-run, emit all the pipeline request objects
     if self._dry_run:
       print json.dumps(requests, indent=2, sort_keys=True)
 
+    if not requests and not launched_tasks:
+      return {'job-id': dsub_util.NO_JOB}
+
     return {
         'job-id': job_metadata['job-id'],
         'user-id': job_metadata['user-id'],
-        'task-id': launched_tasks
+        'task-id': [task_id for task_id in launched_tasks if task_id],
     }
 
   def lookup_job_tasks(self,

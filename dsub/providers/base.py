@@ -76,7 +76,8 @@ class JobProvider(object):
     raise NotImplementedError()
 
   @abstractmethod
-  def submit_job(self, job_resources, job_metadata, job_data, all_task_data):
+  def submit_job(self, job_resources, job_metadata, job_data, all_task_data,
+                 skip_if_output_present):
     """Submit the job to be executed.
 
     Args:
@@ -84,6 +85,8 @@ class JobProvider(object):
       job_metadata: job parameters such as job-id, user-id, script.
       job_data: job parameters included in each task.
       all_task_data: list of parameters to launch each job task.
+      skip_if_output_present: (boolean) if true, skip tasks whose output
+        is present (see --skip flag for more explanation).
 
     job_resources contains settings related to how many resources to give each
     task. Its fields include: min_cores, min_ram, disk_size, boot_disk_size,
@@ -98,6 +101,8 @@ class JobProvider(object):
     Returns:
       A dictionary containing the 'user-id', 'job-id', and 'task-id' list.
       For jobs that are not task array jobs, the task-id list should be empty.
+      If all tasks were skipped, then the job-id is dsub_lib.NO_JOB.
+
 
     Raises:
       ValueError: submit job may validate any of the parameters and raise
