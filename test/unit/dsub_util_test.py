@@ -16,6 +16,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+import os
 import unittest
 from dsub.lib import dsub_util
 
@@ -23,7 +24,8 @@ from dsub.lib import dsub_util
 class TestDsubUtil(unittest.TestCase):
 
   def testLoadFile(self):
-    tsv_file = 'test/testdata/params_tasks.tsv'
+    testpath = os.path.dirname(__file__)
+    tsv_file = os.path.join(testpath, '../testdata/params_tasks.tsv')
     self.assertTrue(dsub_util.load_file(tsv_file))
 
 

@@ -52,7 +52,7 @@ function util::write_tsv_file() {
   local file_name="${1}"
   local contents="${2}"
 
-  printf "${contents}" | grep -v '^$' | sed -e 's#^ *##' > "${file_name}"
+  printf -- "${contents}" | grep -v '^$' | sed -e 's#^ *##' > "${file_name}"
 }
 readonly -f util::write_tsv_file
 
@@ -163,19 +163,39 @@ datetime.datetime.strptime(sys.argv[1], "%Y-%m-%d %H:%M:%S.%f")
 }
 readonly -f util::is_valid_dstat_datetime
 
-function util::dstat_yaml_output_end_time() {
+function util::dstat_yaml_output_value() {
   local dstat_out="${1}"
+  local field="${2}"
 
   python "${SCRIPT_DIR}"/get_data_value.py \
-    "yaml" "${dstat_out}" "[0].end-time"
+    "yaml" "${dstat_out}" "${field}"
 }
-readonly -f util::dstat_yaml_output_end_time
+readonly -f util::dstat_yaml_output_value
+
+function util::dstat_yaml_job_has_valid_datetime_field() {
+  local dstat_out="${1}"
+  local field="${2}"
+
+  local value="$(util::dstat_yaml_output_value "${dstat_out}" "${field}")"
+  util::is_valid_dstat_datetime "${value}"
+}
+readonly -f util::dstat_yaml_job_has_valid_datetime_field
 
 function util::dstat_yaml_job_has_valid_end_time() {
-  local dstat_out="${1}"
-
-  local end_time="$(util::dstat_yaml_output_end_time "${dstat_out}")"
-  util::is_valid_dstat_datetime "${end_time}"
+  util::dstat_yaml_job_has_valid_datetime_field "${1}" "[0].end-time"
 }
 readonly -f util::dstat_yaml_job_has_valid_end_time
 
+function util::dstat_yaml_assert_field_equal() {
+  local dstat_out="${1}"
+  local field="${2}"
+  local expected="${3}"
+
+  actual=$(util::dstat_yaml_output_value "${dstat_output}" "${field}")
+  if [[ "${actual}" != "${expected}" ]]; then
+    2>&1 echo "Assert: actual value for ${field}, ${actual}, does not match expected: ${expected}"
+    2>&1 echo "${dstat_output}"
+    exit 1
+  fi
+}
+readonly -f util::dstat_yaml_assert_field_equal

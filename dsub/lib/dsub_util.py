@@ -31,6 +31,10 @@ from apiclient.http import MediaIoBaseDownload
 from oauth2client.client import GoogleCredentials
 
 
+# this is the Job ID for jobs that are skipped.
+NO_JOB = 'NO_JOB'
+
+
 class _Printer(object):
   """File-like stream object that redirects stdout to a file object."""
 
@@ -257,3 +261,20 @@ def simple_pattern_exists_in_gcs(file_pattern, credentials=None):
     return False
   items_list = [i['name'] for i in response['items']]
   return any(fnmatch.fnmatch(i, prefix) for i in items_list)
+
+
+def outputs_are_present(outputs):
+  """True if each output contains at least one file."""
+  # outputs are OutputFileParam (see param_util.py)
+
+  # If outputs contain a pattern, then there is no way for `dsub` to verify
+  # that *all* output is present. The best that `dsub` can do is to verify
+  # that *some* output was created for each such parameter.
+  for o in outputs:
+    if o.recursive:
+      if not folder_exists(o.value):
+        return False
+    else:
+      if not simple_pattern_exists_in_gcs(o.value):
+        return False
+  return True

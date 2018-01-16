@@ -27,7 +27,28 @@ import test_util
 POPULATION_FILE = 'gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/20131219.superpopulations.tsv'
 POPULATION_MD5 = '68a73f849b82071afe11888bac1aa8a7'
 
+INPUT_BAMS_PATH = 'gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment'
+
+INPUT_BAMS = (INPUT_BAMS_PATH +
+              '/NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam',
+              INPUT_BAMS_PATH +
+              '/NA06986.chrom21.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam',
+              INPUT_BAMS_PATH +
+              '/NA06986.chrom18.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam')
+
+INPUT_BAMS_MD5 = ('4afb9b8908959dbd4e2d5c54bf254c93',
+                  '0dc006ed39ddad2790034ca497631234',
+                  '36e37a0dab5926dbf5a1b8afc0cdac8b')
+
 if not os.environ.get('CHECK_RESULTS_ONLY'):
+
+  # Build up an array of lines for the TSV.
+  with open(test.TASKS_FILE, 'w') as f:
+    f.write('--env TASK_ID\t--input INPUT_PATH\t--output OUTPUT_PATH\n')
+    for i in range(len(INPUT_BAMS)):
+      f.write('TASK_{task}\t{input}\t{output_path}/{task}/*.md5\n'.format(
+          task=i + 1, input=INPUT_BAMS[i], output_path=test.OUTPUTS))
+
   print 'Launching pipeline...'
 
   # pyformat: disable
@@ -65,24 +86,17 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
 print
 print 'Checking output...'
 
-INPUT_BAMS = ('NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam',
-              'NA06986.chrom21.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam',
-              'NA06986.chrom18.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam')
-
-RESULTS_EXPECTED = ('4afb9b8908959dbd4e2d5c54bf254c93',
-                    '0dc006ed39ddad2790034ca497631234',
-                    '36e37a0dab5926dbf5a1b8afc0cdac8b')
-
 TASKS_COUNT = len(INPUT_BAMS)
 
 for i in range(TASKS_COUNT):
   INPUT_BAM = INPUT_BAMS[i]
-  RESULT_EXPECTED = RESULTS_EXPECTED[i]
+  RESULT_EXPECTED = INPUT_BAMS_MD5[i]
 
   OUTPUT_PATH = test_util.get_field_from_tsv(
-      test.TASKS_FILE, '--input INPUT_PATH', r'^.*/%s$' % INPUT_BAM,
+      test.TASKS_FILE, '--input INPUT_PATH', r'^%s$' % INPUT_BAM,
       '--output OUTPUT_PATH')
-  OUTPUT_FILE = '%s/%s.md5' % (OUTPUT_PATH[:-len('/*.md5')], INPUT_BAM)
+  OUTPUT_FILE = '%s/%s.md5' % (OUTPUT_PATH[:-len('/*.md5')],
+                               os.path.basename(INPUT_BAM))
   RESULT = test_util.gsutil_cat(OUTPUT_FILE)
 
   if not test_util.diff(RESULT_EXPECTED.strip(), RESULT.strip()):

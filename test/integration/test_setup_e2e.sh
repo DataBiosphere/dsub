@@ -83,9 +83,7 @@ readonly TEST_LOCAL_DOCKER_ROOT="file${TEST_LOCAL_ROOT}"
 
 if [[ -n "${TASKS_FILE:-}" ]]; then
   # For task file tests, the logging path is a directory.
-  # Eventually each job should have its own sub-directory,
-  # and named logging files but we need to add dsub support for that.
-  readonly LOGGING="${TEST_GCS_ROOT}/${TEST_NAME}/logging"
+  readonly LOGGING="${TEST_GCS_ROOT}/logging"
 else
   # For regular tests, the logging path is a named file.
   readonly LOGGING="${TEST_GCS_ROOT}/logging/${TEST_NAME}.log"
@@ -127,7 +125,9 @@ if [[ -n "${TASKS_FILE:-}" ]]; then
   # This should really be a feature of dsub directly...
   echo "Setting up task file ${TASKS_FILE}"
   mkdir -p "$(dirname "${TASKS_FILE}")"
-  cat "${TASKS_FILE_TMPL}" \
-    | util::expand_tsv_fields \
-    > "${TASKS_FILE}"
+  if [[ -e "${TASKS_FILE_TMPL}" ]]; then
+    cat "${TASKS_FILE_TMPL}" \
+      | util::expand_tsv_fields \
+      > "${TASKS_FILE}"
+  fi
 fi

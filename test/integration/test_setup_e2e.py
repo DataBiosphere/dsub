@@ -104,8 +104,6 @@ TEST_GCS_DOCKER_ROOT = "gs/%s/dsub/py/%s/%s" % (DSUB_BUCKET, DSUB_PROVIDER,
 
 if TASKS_FILE:
   # For task file tests, the logging path is a directory.
-  # Eventually each job should have its own sub-directory,
-  # and named logging files but we need to add dsub support for that.
   LOGGING = "%s/logging" % TEST_GCS_ROOT
 else:
   # For regular tests, the logging path is a named file.
@@ -133,10 +131,11 @@ if not os.environ.get("CHECK_RESULTS_ONLY"):
 
 if TASKS_FILE:
   # For a task file test, set up the task file from its template
-  # This should really be a feature of dsub directly...
   print "Setting up task file %s" % TASKS_FILE
-  os.makedirs(os.path.dirname(TASKS_FILE))
-  test_util.expand_tsv_fields(_environ(), TASKS_FILE_TMPL, TASKS_FILE)
+  if not os.path.exists(os.path.dirname(TASKS_FILE)):
+    os.makedirs(os.path.dirname(TASKS_FILE))
+  if os.path.exists(TASKS_FILE_TMPL):
+    test_util.expand_tsv_fields(_environ(), TASKS_FILE_TMPL, TASKS_FILE)
 
 
 # Functions for launching dsub

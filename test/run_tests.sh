@@ -237,6 +237,16 @@ The optional argument picks between:
 - unit: run test/integration/unit_*
 - e2e: run test/integration/e2e_*
 - pythonunit: run test/unit/*
+
+For tests in integration/, you can set the DSUB_PROVIDER
+environment variable to test only a specific provider;
+otherwise all are tested.
+
+You can run these tests individually, like e.g.:
+
+$ export DSUB_PROVIDER=local
+$ test/integration/e2e_skip.sh
+
 EOF
   exit 0
 fi

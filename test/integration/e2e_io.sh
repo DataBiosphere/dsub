@@ -42,9 +42,10 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
-  io_setup::run_dsub
+  JOB_ID=$(io_setup::run_dsub)
 
 fi
 
-# Check output
+# Do validation
 io_setup::check_output
+io_setup::check_dstat "${JOB_ID}"

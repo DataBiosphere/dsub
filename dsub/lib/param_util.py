@@ -22,9 +22,10 @@ import datetime
 import os
 import re
 import sys
-
 from . import dsub_util
 from .._dsub_version import DSUB_VERSION
+from dateutil.tz import tzlocal
+import pytz
 
 AUTO_PREFIX_INPUT = 'INPUT_'  # Prefix for auto-generated input names
 AUTO_PREFIX_OUTPUT = 'OUTPUT_'  # Prefix for auto-generated output names
@@ -941,45 +942,45 @@ def handle_version_flag():
     sys.exit()
 
 
-def age_to_create_time(age, from_time=datetime.datetime.utcnow()):
+def age_to_create_time(age, from_time=None):
   """Compute the create time (UTC) for the list filter.
 
   If the age is an integer value it is treated as a UTC date.
   Otherwise the value must be of the form "<integer><unit>" where supported
-  units are s, m, h, d, w (seconds, months, hours, days, weeks).
+  units are s, m, h, d, w (seconds, minutes, hours, days, weeks).
 
   Args:
     age: A "<integer><unit>" string or integer value.
     from_time:
 
   Returns:
-    A date value in UTC or None if age parameter is empty.
+    A timezone-aware datetime or None if age parameter is empty.
   """
 
   if not age:
     return None
 
+  if not from_time:
+    from_time = datetime.datetime.now().replace(tzinfo=tzlocal())
+
   try:
     last_char = age[-1]
 
-    if last_char in 'smhdw':
-      if last_char == 's':
-        interval = datetime.timedelta(seconds=int(age[:-1]))
-      elif last_char == 'm':
-        interval = datetime.timedelta(minutes=int(age[:-1]))
-      elif last_char == 'h':
-        interval = datetime.timedelta(hours=int(age[:-1]))
-      elif last_char == 'd':
-        interval = datetime.timedelta(days=int(age[:-1]))
-      elif last_char == 'w':
-        interval = datetime.timedelta(weeks=int(age[:-1]))
-
-      start = from_time - interval
-      epoch = datetime.datetime.utcfromtimestamp(0)
-
-      return int((start - epoch).total_seconds())
+    if last_char == 's':
+      return from_time - datetime.timedelta(seconds=int(age[:-1]))
+    elif last_char == 'm':
+      return from_time - datetime.timedelta(minutes=int(age[:-1]))
+    elif last_char == 'h':
+      return from_time - datetime.timedelta(hours=int(age[:-1]))
+    elif last_char == 'd':
+      return from_time - datetime.timedelta(days=int(age[:-1]))
+    elif last_char == 'w':
+      return from_time - datetime.timedelta(weeks=int(age[:-1]))
     else:
-      return int(age)
+      # If no unit is given treat the age as seconds from epoch, otherwise apply
+      # the correct time unit.
+      return datetime.datetime.utcfromtimestamp(
+          int(age)).replace(tzinfo=pytz.utc)
 
   except (ValueError, OverflowError) as e:
     raise ValueError('Unable to parse age string %s: %s' % (age, e))

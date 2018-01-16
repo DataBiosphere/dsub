@@ -19,8 +19,11 @@ import datetime
 import parameterized
 
 
+now = datetime.datetime.now()
+
+
 def _desc_date_sort_key(task):
-  return datetime.datetime.now() - task['create-time'].replace(tzinfo=None)
+  return now - task['create-time'].replace(tzinfo=None)
 
 
 JOB_STREAM_MULTI_1 = [

@@ -28,7 +28,13 @@ class StubJobProvider(base.JobProvider):
   def submit_job(self, job_resources, job_metadata, job_data, all_job_data):
     pass
 
-  def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
+  def delete_jobs(self,
+                  user_ids,
+                  job_ids,
+                  task_ids,
+                  labels,
+                  create_time_min=None,
+                  create_time_max=None):
     pass
 
   # 2) Methods that manipulate the state of the fictional operations.
@@ -70,7 +76,8 @@ class StubJobProvider(base.JobProvider):
                        job_names=None,
                        task_ids=None,
                        labels=None,
-                       create_time=None,
+                       create_time_min=None,
+                       create_time_max=None,
                        max_tasks=0):
     """Return a list of operations. See base.py for additional detail."""
     statuses = None if statuses == {'*'} else statuses
@@ -79,7 +86,7 @@ class StubJobProvider(base.JobProvider):
     job_names = None if job_names == {'*'} else job_names
     task_ids = None if task_ids == {'*'} else task_ids
 
-    if labels or create_time:
+    if labels or create_time_min or create_time_max:
       raise NotImplementedError(
           'Lookup by labels and create_time not yet supported by stub.')
 

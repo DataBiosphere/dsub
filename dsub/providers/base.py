@@ -76,7 +76,8 @@ class JobProvider(object):
     raise NotImplementedError()
 
   @abstractmethod
-  def submit_job(self, job_resources, job_metadata, job_data, all_task_data):
+  def submit_job(self, job_resources, job_metadata, job_data, all_task_data,
+                 skip_if_output_present):
     """Submit the job to be executed.
 
     Args:
@@ -84,6 +85,8 @@ class JobProvider(object):
       job_metadata: job parameters such as job-id, user-id, script.
       job_data: job parameters included in each task.
       all_task_data: list of parameters to launch each job task.
+      skip_if_output_present: (boolean) if true, skip tasks whose output
+        is present (see --skip flag for more explanation).
 
     job_resources contains settings related to how many resources to give each
     task. Its fields include: min_cores, min_ram, disk_size, boot_disk_size,
@@ -98,6 +101,8 @@ class JobProvider(object):
     Returns:
       A dictionary containing the 'user-id', 'job-id', and 'task-id' list.
       For jobs that are not task array jobs, the task-id list should be empty.
+      If all tasks were skipped, then the job-id is dsub_lib.NO_JOB.
+
 
     Raises:
       ValueError: submit job may validate any of the parameters and raise
@@ -107,7 +112,13 @@ class JobProvider(object):
     raise NotImplementedError()
 
   @abstractmethod
-  def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
+  def delete_jobs(self,
+                  user_ids,
+                  job_ids,
+                  task_ids,
+                  labels,
+                  create_time_min=None,
+                  create_time_max=None):
     """Kills the operations associated with the specified job or job.task.
 
     Some providers may provide only a "cancel" operation, which terminates the
@@ -118,7 +129,10 @@ class JobProvider(object):
       job_ids: a set of job ids to delete.
       task_ids: a set of task ids to delete.
       labels: a set of LabelParam, each must match the job(s) to be cancelled.
-      create_time: a UTC value for earliest create time for a task.
+      create_time_min: a timezone-aware datetime value for the earliest create
+                       time of a task, inclusive.
+      create_time_max: a timezone-aware datetime value for the most recent
+                       create time of a task, inclusive.
 
     Returns:
       (list of tasks canceled,
@@ -136,8 +150,10 @@ class JobProvider(object):
                        job_names=None,
                        task_ids=None,
                        labels=None,
-                       create_time=None,
-                       max_tasks=0):
+                       create_time_min=None,
+                       create_time_max=None,
+                       max_tasks=0,
+                       page_size=0):
     """Return a list of tasks based on the search criteria.
 
     If any of the filters are empty or {'*'}, then no filtering is performed on
@@ -152,8 +168,13 @@ class JobProvider(object):
       job_names: a set of job names to return.
       task_ids: a set of specific tasks within the specified job(s) to return.
       labels: a list of LabelParam, each must match the job(s) returned.
-      create_time: a UTC value for earliest create time for a task.
+      create_time_min: a timezone-aware datetime value for the earliest create
+                       time of a task, inclusive.
+      create_time_max: a timezone-aware datetime value for the most recent
+                       create time of a task, inclusive.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
+      page_size: the page size to use for each query to the backend. May be
+                 ignored by provider implementations.
 
     Returns:
       A list of Task objects.
