@@ -23,7 +23,7 @@
 # * Automatically pick up a bucket name for tests.
 #
 # * Automatically set environment variables:
-#   * LOGGING=gs://${DSUB_BUCKET}/dsub/py/${DSUB_PROVIDER}/${TEST_NAME}/logging/
+#   * LOGGING=gs://${DSUB_BUCKET}/dsub/py/${DSUB_PROVIDER}/${TEST_NAME}/logging
 #     (task file tests)
 #   * LOGGING=gs://${DSUB_BUCKET}/dsub/py/${DSUB_PROVIDER}/${TEST_NAME}/logging/${TEST_NAME}.log
 #     (non-task file tests)

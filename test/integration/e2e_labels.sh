@@ -44,18 +44,19 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # run this test without first emptying the output and logging directories.
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-# Set up for running the tests
-mkdir -p "${TEST_TMP}"
-
-# Create a simple TSV file
 readonly TASKS_FILE="${TEST_TMP}/${TEST_NAME}.tsv"
-util::write_tsv_file "${TASKS_FILE}" '
---label item-number
-1
-2
-'
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+
+  # Set up for running the tests
+  mkdir -p "${TEST_TMP}"
+
+  # Create a simple TSV file
+  util::write_tsv_file "${TASKS_FILE}" '
+    --label item-number
+    1
+    2
+  '
 
   echo "Launching pipeline..."
 

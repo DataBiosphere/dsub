@@ -19,9 +19,9 @@ set -o nounset
 
 # script_env_test.sh
 #
-# Basic pipeline command, which exercises Setting of environment variables.
+# Basic pipeline command, which exercises setting of environment variables.
 #
-# The script must be run with one or more environment variables named "VAR*"
-# (such as "VAR1"). The script will emit the variable names and values.
+# The script simply emits (sorted) any environment variables named
+# TASK_VAR* or VAR*.
 
-env | grep ^VAR | sort
+env | grep "^TASK_VAR\|^VAR" | sort
