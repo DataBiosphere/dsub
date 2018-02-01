@@ -115,6 +115,9 @@ DOCKER_COMMAND = textwrap.dedent("""\
   # Set environment variables for recursive output directories
   {export_output_dirs}
 
+  # Set empty environment variables
+  {export_empty_envs}
+
   # Set TMPDIR
   export TMPDIR="{tmpdir}"
 
@@ -380,7 +383,7 @@ class _Pipelines(object):
     }
 
   @classmethod
-  def _build_pipeline_docker_command(cls, script_name, inputs, outputs):
+  def _build_pipeline_docker_command(cls, script_name, inputs, outputs, envs):
     """Return a multi-line string of the full pipeline docker command."""
 
     # We upload the user script as an environment argument
@@ -441,6 +444,9 @@ class _Pipelines(object):
         for var in inputs_with_wildcards
     ])
 
+    export_empty_envs = '\n'.join(
+        ['export {0}=""'.format(var.name) for var in envs if not var.value])
+
     return DOCKER_COMMAND.format(
         mk_runtime_dirs=MK_RUNTIME_DIRS_COMMAND,
         script_path='%s/%s' % (SCRIPT_DIR, script_name),
@@ -450,6 +456,7 @@ class _Pipelines(object):
         copy_input_dirs=copy_input_dirs,
         mk_output_dirs=mkdirs,
         export_output_dirs=export_output_dirs,
+        export_empty_envs=export_empty_envs,
         tmpdir=TMP_DIR,
         working_dir=WORKING_DIR,
         copy_output_dirs=copy_output_dirs)
@@ -488,7 +495,7 @@ class _Pipelines(object):
     """
     # Format the docker command
     docker_command = cls._build_pipeline_docker_command(script_name, inputs,
-                                                        outputs)
+                                                        outputs, envs)
 
     # Pipelines inputParameters can be both simple name/value pairs which get
     # set as environment variables, as well as input file paths which the
@@ -507,11 +514,13 @@ class _Pipelines(object):
     # their environment variables will be set in the docker command, and
     # recursive copy code will be generated there as well.
 
+    # The Pipelines API does not accept empty environment variables. Set them to
+    # empty in DOCKER_COMMAND instead.
     input_envs = [{
         'name': SCRIPT_VARNAME
     }] + [{
         'name': env.name
-    } for env in envs]
+    } for env in envs if env.value]
 
     input_files = [
         cls._build_pipeline_input_file_param(var.name, var.docker_path)
@@ -588,9 +597,12 @@ class _Pipelines(object):
     # For the Pipelines API, envs and file inputs are all "inputs".
     inputs = {}
     inputs.update({SCRIPT_VARNAME: script})
-    inputs.update(
-        {var.name: var.value
-         for var in job_data['envs'] | task_data['envs']})
+
+    inputs.update({
+        var.name: var.value
+        for var in job_data['envs'] | task_data['envs']
+        if var.value
+    })
     inputs.update({
         var.name: var.uri
         for var in job_data['inputs'] | task_data['inputs']
