@@ -35,6 +35,7 @@ import apiclient.errors
 
 # TODO(b/68858502) Fix the use of relative imports throughout this library
 from ..lib import dsub_util
+from ..lib import job_model
 from ..lib import param_util
 from ..lib import providers_util
 from ..lib import sorting_util
@@ -46,7 +47,7 @@ import retrying
 _PROVIDER_NAME = 'google'
 
 # Create file provider whitelist.
-_SUPPORTED_FILE_PROVIDERS = frozenset([param_util.P_GCS])
+_SUPPORTED_FILE_PROVIDERS = frozenset([job_model.P_GCS])
 _SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
@@ -276,12 +277,7 @@ def _print_error(msg):
   print >> sys.stderr, msg
 
 
-def _replace_timezone(date, tz):
-  # pylint: disable=g-tzinfo-replace
-  return date.replace(tzinfo=tz)
-
-
-class _Label(param_util.LabelParam):
+class _Label(job_model.LabelParam):
   """Name/value label metadata for a pipeline.
 
   Attributes:
@@ -414,7 +410,7 @@ class _Pipelines(object):
       export_input_dirs = providers_util.build_recursive_localize_env(
           DATA_MOUNT_POINT, inputs)
       copy_input_dirs = providers_util.build_recursive_localize_command(
-          DATA_MOUNT_POINT, inputs, param_util.P_GCS)
+          DATA_MOUNT_POINT, inputs, job_model.P_GCS)
 
     export_output_dirs = ''
     copy_output_dirs = ''
@@ -422,7 +418,7 @@ class _Pipelines(object):
       export_output_dirs = providers_util.build_recursive_gcs_delocalize_env(
           DATA_MOUNT_POINT, outputs)
       copy_output_dirs = providers_util.build_recursive_delocalize_command(
-          DATA_MOUNT_POINT, outputs, param_util.P_GCS)
+          DATA_MOUNT_POINT, outputs, job_model.P_GCS)
 
     docker_paths = [
         var.docker_path if var.recursive else os.path.dirname(var.docker_path)
@@ -462,24 +458,24 @@ class _Pipelines(object):
         copy_output_dirs=copy_output_dirs)
 
   @classmethod
-  def build_pipeline(cls, project, min_cores, min_ram, disk_size,
-                     boot_disk_size, preemptible, image, zones,
-                     accelerator_type, accelerator_count, script_name, envs,
-                     inputs, outputs, pipeline_name):
+  def build_pipeline(cls, project, zones, min_cores, min_ram, disk_size,
+                     boot_disk_size, preemptible, accelerator_type,
+                     accelerator_count, image, script_name, envs, inputs,
+                     outputs, pipeline_name):
     """Builds a pipeline configuration for execution.
 
     Args:
       project: string name of project.
+      zones: list of zone names for jobs to be run at.
       min_cores: int number of CPU cores required per job.
       min_ram: int GB of RAM required per job.
       disk_size: int GB of disk to attach under /mnt/data.
       boot_disk_size: int GB of disk for boot.
       preemptible: use a preemptible VM for the job
-      image: string Docker image name in which to run.
-      zones: list of zone names for jobs to be run at.
       accelerator_type: string GCE defined accelerator type.
       accelerator_count: int number of accelerators of the specified type to
         attach.
+      image: string Docker image name in which to run.
       script_name: file name of the script to run.
       envs: list of EnvParam objects specifying environment variables to set
         within each job.
@@ -493,6 +489,17 @@ class _Pipelines(object):
       A nested dictionary with one entry under the key emphemeralPipeline
       containing the pipeline configuration.
     """
+    if min_cores is None:
+      min_cores = job_model.DEFAULT_MIN_CORES
+    if min_ram is None:
+      min_ram = job_model.DEFAULT_MIN_RAM
+    if disk_size is None:
+      disk_size = job_model.DEFAULT_DISK_SIZE
+    if boot_disk_size is None:
+      boot_disk_size = job_model.DEFAULT_BOOT_DISK_SIZE
+    if preemptible is None:
+      preemptible = job_model.DEFAULT_PREEMPTIBLE
+
     # Format the docker command
     docker_command = cls._build_pipeline_docker_command(script_name, inputs,
                                                         outputs, envs)
@@ -574,17 +581,17 @@ class _Pipelines(object):
     # pyformat: enable
 
   @classmethod
-  def build_pipeline_args(cls, project, script, job_data, task_data,
+  def build_pipeline_args(cls, project, script, job_params, task_params,
                           preemptible, logging_uri, scopes, keep_alive):
     """Builds pipeline args for execution.
 
     Args:
       project: string name of project.
       script: Body of the script to execute.
-      job_data: dictionary of values for labels, envs, inputs, and outputs for
-          this job.
-      task_data: dictionary of values for labels, envs, inputs, and outputs for
-          this task.
+      job_params: dictionary of values for labels, envs, inputs, and outputs
+          for this job.
+      task_params: dictionary of values for labels, envs, inputs, and outputs
+          for this task.
       preemptible: use a preemptible VM for the job
       logging_uri: path for job logging output.
       scopes: list of scope.
@@ -597,15 +604,14 @@ class _Pipelines(object):
     # For the Pipelines API, envs and file inputs are all "inputs".
     inputs = {}
     inputs.update({SCRIPT_VARNAME: script})
-
     inputs.update({
         var.name: var.value
-        for var in job_data['envs'] | task_data['envs']
+        for var in job_params['envs'] | task_params['envs']
         if var.value
     })
     inputs.update({
         var.name: var.uri
-        for var in job_data['inputs'] | task_data['inputs']
+        for var in job_params['inputs'] | task_params['inputs']
         if not var.recursive
     })
 
@@ -615,7 +621,7 @@ class _Pipelines(object):
     # delocalize with a call similar to:
     #   gsutil cp /mnt/data/output/gs/bucket/path/*.bam gs://bucket/path/
     outputs = {}
-    for var in job_data['outputs'] | task_data['outputs']:
+    for var in job_params['outputs'] | task_params['outputs']:
       if var.recursive:
         continue
       if '*' in var.uri.basename:
@@ -626,7 +632,7 @@ class _Pipelines(object):
     labels = {}
     labels.update({
         label.name: label.value if label.value else ''
-        for label in job_data['labels'] | task_data['labels']
+        for label in job_params['labels'] | task_params['labels']
     })
 
     # pyformat: disable
@@ -672,7 +678,7 @@ class _Operations(object):
       return None
 
     # Convert localized datetime to a UTC integer
-    epoch = _replace_timezone(datetime.utcfromtimestamp(0), pytz.utc)
+    epoch = dsub_util.replace_timezone(datetime.utcfromtimestamp(0), pytz.utc)
     return (date - epoch).total_seconds()
 
   @staticmethod
@@ -706,7 +712,7 @@ class _Operations(object):
       for l in labels:
         ops_filter.append('labels.%s = %s' % (l.name, l.value))
 
-    epoch = _replace_timezone(datetime.utcfromtimestamp(0), pytz.utc)
+    epoch = dsub_util.replace_timezone(datetime.utcfromtimestamp(0), pytz.utc)
     if create_time_min:
       create_time_min_utc_int = (create_time_min - epoch).total_seconds()
       ops_filter.append('createTime >= %d' % create_time_min_utc_int)
@@ -945,7 +951,7 @@ class GoogleJobProvider(base.JobProvider):
       credentials = GoogleCredentials.get_application_default()
     return cls._do_setup_service(credentials)
 
-  def prepare_job_metadata(self, script, job_name, user_id):
+  def prepare_job_metadata(self, script, job_name, user_id, create_time):
     """Returns a dictionary of metadata fields for the job."""
 
     # The name of the pipeline gets set into the ephemeralPipeline.name as-is.
@@ -976,7 +982,7 @@ class GoogleJobProvider(base.JobProvider):
     # The full job-id is:
     #   <job-name>--<user-id>--<timestamp>
     job_id = '%s--%s--%s' % (job_name_value[:10], user_id,
-                             datetime.now().strftime('%y%m%d-%H%M%S-%f')[:16])
+                             create_time.strftime('%y%m%d-%H%M%S-%f')[:16])
 
     # Standard version is MAJOR.MINOR(.PATCH). This will convert the version
     # string to "vMAJOR-MINOR(-PATCH)". Example; "0.1.0" -> "v0-1-0".
@@ -989,9 +995,9 @@ class GoogleJobProvider(base.JobProvider):
         'dsub-version': version,
     }
 
-  def _build_pipeline_labels(self, task_metadata):
+  def _build_pipeline_labels(self, job_metadata, task_metadata):
     labels = {
-        _Label(name, task_metadata[name])
+        _Label(name, job_metadata[name])
         for name in ['job-name', 'job-id', 'user-id', 'dsub-version']
     }
 
@@ -1000,41 +1006,46 @@ class GoogleJobProvider(base.JobProvider):
 
     return labels
 
-  def _build_pipeline_request(self, job_resources, task_metadata, job_data,
-                              task_data):
+  def _build_pipeline_request(self, task_view):
     """Returns a Pipeline objects for the job."""
+    job_metadata = task_view.job_metadata
+    job_params = task_view.job_params
+    job_resources = task_view.job_resources
+    task_metadata = task_view.task_descriptors[0].task_metadata
+    task_params = task_view.task_descriptors[0].task_params
+    task_resources = task_view.task_descriptors[0].task_resources
 
-    script = task_metadata['script']
-    task_data['labels'] |= self._build_pipeline_labels(task_metadata)
+    script = task_view.job_metadata['script']
+    task_params['labels'] |= self._build_pipeline_labels(
+        job_metadata, task_metadata)
 
     # Build the ephemeralPipeline for this job.
     # The ephemeralPipeline definition changes for each job because file
     # parameters localCopy.path changes based on the remote_uri.
     pipeline = _Pipelines.build_pipeline(
         project=self._project,
+        zones=job_resources.zones,
         min_cores=job_resources.min_cores,
         min_ram=job_resources.min_ram,
         disk_size=job_resources.disk_size,
         boot_disk_size=job_resources.boot_disk_size,
         preemptible=job_resources.preemptible,
-        image=job_resources.image,
-        zones=job_resources.zones,
         accelerator_type=job_resources.accelerator_type,
         accelerator_count=job_resources.accelerator_count,
+        image=job_resources.image,
         script_name=script.name,
-        envs=job_data['envs'] | task_data['envs'],
-        inputs=job_data['inputs'] | task_data['inputs'],
-        outputs=job_data['outputs'] | task_data['outputs'],
-        pipeline_name=task_metadata['pipeline-name'])
+        envs=job_params['envs'] | task_params['envs'],
+        inputs=job_params['inputs'] | task_params['inputs'],
+        outputs=job_params['outputs'] | task_params['outputs'],
+        pipeline_name=job_metadata['pipeline-name'])
 
     # Build the pipelineArgs for this job.
-    logging_uri = providers_util.format_logging_uri(job_resources.logging.uri,
-                                                    task_metadata)
-
+    logging_uri = task_resources.logging_path.uri
+    scopes = job_resources.scopes or job_model.DEFAULT_SCOPES
     pipeline.update(
-        _Pipelines.build_pipeline_args(self._project, script.value, job_data,
-                                       task_data, job_resources.preemptible,
-                                       logging_uri, job_resources.scopes,
+        _Pipelines.build_pipeline_args(self._project, script.value, job_params,
+                                       task_params, job_resources.preemptible,
+                                       logging_uri, scopes,
                                        job_resources.keep_alive))
 
     return pipeline
@@ -1046,15 +1057,11 @@ class GoogleJobProvider(base.JobProvider):
 
     return GoogleOperation(operation).get_field('task-id')
 
-  def submit_job(self, job_resources, job_metadata, job_data, all_task_data,
-                 skip_if_output_present):
+  def submit_job(self, job_descriptor, skip_if_output_present):
     """Submit the job (or tasks) to be executed.
 
     Args:
-      job_resources: resource parameters required by each job.
-      job_metadata: job parameters such as job-id, user-id, script
-      job_data: arguments global to the job
-      all_task_data: list of arguments for each task
+      job_descriptor: all parameters needed to launch all job tasks
       skip_if_output_present: (boolean) if true, skip tasks whose output
         is present (see --skip flag for more explanation).
 
@@ -1067,9 +1074,7 @@ class GoogleJobProvider(base.JobProvider):
     """
     # Validate task data and resources.
     param_util.validate_submit_args_or_fail(
-        job_resources,
-        job_data,
-        all_task_data,
+        job_descriptor,
         provider_name=_PROVIDER_NAME,
         input_providers=_SUPPORTED_INPUT_PROVIDERS,
         output_providers=_SUPPORTED_OUTPUT_PROVIDERS,
@@ -1078,19 +1083,19 @@ class GoogleJobProvider(base.JobProvider):
     # Prepare and submit jobs.
     launched_tasks = []
     requests = []
-    for task_data in all_task_data:
+    for task_view in job_model.task_view_generator(job_descriptor):
 
-      outputs = job_data['outputs'] | task_data['outputs']
+      job_params = task_view.job_params
+      task_params = task_view.task_descriptors[0].task_params
+
+      outputs = job_params['outputs'] | task_params['outputs']
       if skip_if_output_present:
         # check whether the output's already there
         if dsub_util.outputs_are_present(outputs):
           print 'Skipping task because its outputs are present'
           continue
-      task_metadata = providers_util.get_task_metadata(job_metadata,
-                                                       task_data.get('task-id'))
 
-      request = self._build_pipeline_request(job_resources, task_metadata,
-                                             job_data, task_data)
+      request = self._build_pipeline_request(task_view)
 
       if self._dry_run:
         requests.append(request)
@@ -1106,8 +1111,8 @@ class GoogleJobProvider(base.JobProvider):
       return {'job-id': dsub_util.NO_JOB}
 
     return {
-        'job-id': job_metadata['job-id'],
-        'user-id': job_metadata['user-id'],
+        'job-id': job_descriptor.job_metadata['job-id'],
+        'user-id': job_descriptor.job_metadata['user-id'],
         'task-id': [task_id for task_id in launched_tasks if task_id],
     }
 
@@ -1183,7 +1188,7 @@ class GoogleJobProvider(base.JobProvider):
     now = datetime.now()
 
     def _desc_date_sort_key(t):
-      return now - _replace_timezone(t.get_field('create-time'), None)
+      return now - dsub_util.replace_timezone(t.get_field('create-time'), None)
 
     query_queue = sorting_util.SortedGeneratorIterator(key=_desc_date_sort_key)
     for status, job_id, job_name, user_id, task_id in itertools.product(
@@ -1287,14 +1292,16 @@ class GoogleOperation(base.Task):
     value = None
     if field == 'internal-id':
       value = self._op['name']
-    elif field == 'job-name':
-      value = metadata['labels'].get('job-name')
     elif field == 'job-id':
       value = metadata['labels'].get('job-id')
+    elif field == 'job-name':
+      value = metadata['labels'].get('job-name')
     elif field == 'task-id':
       value = metadata['labels'].get('task-id')
     elif field == 'user-id':
       value = metadata['labels'].get('user-id')
+    elif field == 'dsub-version':
+      value = metadata['labels'].get('dsub-version')
     elif field == 'task-status':
       value = self.operation_status()
     elif field == 'logging':
@@ -1306,7 +1313,7 @@ class GoogleOperation(base.Task):
       value = {
           k: v
           for k, v in metadata['labels'].items()
-          if k not in param_util.RESERVED_LABELS
+          if k not in job_model.RESERVED_LABELS
       }
     elif field == 'inputs':
       value = self._get_operation_input_field_values(metadata, True)

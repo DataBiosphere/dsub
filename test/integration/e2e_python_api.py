@@ -21,7 +21,7 @@ import time
 
 from dsub.commands import dstat
 from dsub.commands import dsub
-from dsub.lib import job_util
+from dsub.lib import job_model
 from dsub.lib import param_util
 from dsub.lib import resources
 from dsub.providers import google
@@ -62,11 +62,11 @@ def dsub_start_job(command,
   labels['test-name'] = test_setup.TEST_NAME
 
   logging = param_util.build_logging_param(test.LOGGING)
-  job_resources = job_util.JobResources(
+  job_resources = job_model.Resources(
       image='ubuntu', logging=logging, zones=['us-central1-*'])
 
-  env_data = {param_util.EnvParam(k, v) for (k, v) in envs.items()}
-  label_data = {param_util.LabelParam(k, v) for (k, v) in labels.items()}
+  env_data = {job_model.EnvParam(k, v) for (k, v) in envs.items()}
+  label_data = {job_model.LabelParam(k, v) for (k, v) in labels.items()}
 
   input_file_param_util = param_util.InputFileParamUtil('input')
   input_data = set()
@@ -84,24 +84,28 @@ def dsub_start_job(command,
       name = output_file_param_util.get_variable_name(name)
       output_data.add(output_file_param_util.make_param(name, value, recursive))
 
-  job_data = {
+  job_params = {
       'envs': env_data,
       'inputs': input_data,
       'outputs': output_data,
       'labels': label_data,
   }
-  all_task_data = [{
-      'envs': env_data,
-      'labels': label_data,
-      'inputs': input_data,
-      'outputs': output_data,
-  }]
+  task_descriptors = [
+      job_model.TaskDescriptor({
+          'task-id': None
+      }, {
+          'envs': set(),
+          'labels': set(),
+          'inputs': set(),
+          'outputs': set(),
+      }, job_model.Resources())
+  ]
 
   return dsub.run(
       get_dsub_provider(),
       job_resources,
-      job_data,
-      all_task_data,
+      job_params,
+      task_descriptors,
       name=job_name,
       command=command,
       wait=wait,
@@ -118,7 +122,7 @@ def dstat_get_jobs(statuses=None,
   labels = labels or {}
   labels['test-token'] = test_setup.TEST_TOKEN
   labels['test-name'] = test_setup.TEST_NAME
-  labels_set = {param_util.LabelParam(k, v) for (k, v) in labels.items()}
+  labels_set = {job_model.LabelParam(k, v) for (k, v) in labels.items()}
 
   return dstat.dstat_job_producer(
       provider=get_dsub_provider(),

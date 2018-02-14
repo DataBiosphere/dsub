@@ -14,6 +14,7 @@
 
 """Interface for job providers."""
 import argparse
+import os
 
 from . import google
 from . import local
@@ -122,6 +123,68 @@ def check_for_unsupported_flag(args):
   if args.label and args.provider not in ['test-fails', 'local', 'google']:
     raise ValueError(
         '--label is not supported by the "%s" provider.' % args.provider)
+
+
+def _format_task_uri(fmt, job_metadata, task_metadata):
+  """Returns a URI with placeholders replaced by metadata values."""
+
+  values = {
+      'job-id': None,
+      'task-id': 'task',
+      'job-name': None,
+      'user-id': None
+  }
+  for key in values:
+    values[key] = task_metadata.get(key) or job_metadata.get(key) or values[key]
+
+  return fmt.format(**values)
+
+
+def format_logging_uri(uri, job_metadata, task_metadata):
+  """Inserts task metadata into the logging URI.
+
+  The core behavior is inspired by the Google Pipelines API:
+    (1) If a the uri ends in ".log", then that is the logging path.
+    (2) Otherwise, the uri is treated as "directory" for logs and a filename
+        needs to be automatically generated.
+
+  For (1), if the job is a --tasks job, then the {task-id} is inserted
+  before ".log".
+
+  For (2), the file name generated is {job-id}, or for --tasks jobs, it is
+  {job-id}.{task-id}.
+
+  In addition, full task metadata subsitition is supported. The URI
+  may include substitution strings such as
+  "{job-id}", "{task-id}", "{job-name}", and "{user-id}".
+
+  Args:
+    uri: User-specified logging URI which may contain substitution fields.
+    job_metadata: job-global metadata.
+    task_metadata: tasks-specific metadata.
+
+  Returns:
+    The logging_uri formatted as described above.
+  """
+
+  task_id = task_metadata.get('task-id')
+
+  # If the user specifies any formatting (with curly braces), then use that
+  # as the format string unchanged.
+  fmt = str(uri)
+  if '{' not in fmt:
+    if uri.endswith('.log'):
+      if task_id is not None:
+        parts = os.path.splitext(uri)
+        fmt = '%s.{task-id}.log' % parts[0]
+    else:
+      # The path is a directory - generate the file name
+      if task_id is not None:
+        fmt = os.path.join(uri, '{job-id}.{task-id}.log')
+      else:
+        fmt = os.path.join(uri, '{job-id}.log')
+
+  return _format_task_uri(fmt, job_metadata, task_metadata)
 
 
 if __name__ == '__main__':

@@ -25,7 +25,7 @@ class StubJobProvider(base.JobProvider):
   # 1) Methods that are supposed to do something. Use mocks
   #    if you need to check that they are called.
 
-  def submit_job(self, job_resources, job_metadata, job_data, all_job_data):
+  def submit_job(self, job_descriptor):
     pass
 
   def delete_jobs(self,
@@ -65,8 +65,8 @@ class StubJobProvider(base.JobProvider):
   #    Meant to be called by the code under test, they rely on the fake
   #    state set via group (2) above.
 
-  def prepare_job_metadata(self, script, job_name, user_id):
-    del script, job_name, user_id  # pacify linter
+  def prepare_job_metadata(self, script, job_name, user_id, create_time):
+    del script, job_name, user_id, create_time  # pacify linter
     raise BaseException('Not implemented')
 
   def lookup_job_tasks(self,

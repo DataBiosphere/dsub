@@ -19,6 +19,7 @@ Follows the model of qdel.
 import sys
 
 from ..lib import dsub_util
+from ..lib import job_model
 from ..lib import param_util
 from ..lib import resources
 from ..providers import provider_base
@@ -117,7 +118,7 @@ def main():
   user_ids = set(args.users) if args.users else {dsub_util.get_os_user()}
 
   # Process user labels.
-  labels = param_util.parse_pair_args(args.label, param_util.LabelParam)
+  labels = param_util.parse_pair_args(args.label, job_model.LabelParam)
 
   # Let the user know which jobs we are going to look up
   with dsub_util.replace_print():
