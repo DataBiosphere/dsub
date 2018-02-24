@@ -1,0 +1,38 @@
+Hello I am a test input file, line 1
+Hello I am a test input file, line 2
+Hello I am a test input file, line 3
+Hello I am a test input file, line 4
+Hello I am a test input file, line 5
+
+L'Assemblée générale proclame la présente Déclaration universelle des droits de
+l'homme comme l'idéal commun à atteindre par tous les peuples et toutes les
+nations afin que tous les individus et tous les organes de la société, ayant
+cette Déclaration constamment à l'esprit, s'efforcent, par l'enseignement et
+l'éducation, de développer le respect de ces droits et libertés et d'en assurer,
+par des mesures progressives d'ordre national et international, la
+reconnaissance et l'application universelles et effectives, tant parmi les
+populations des Etats Membres eux-mêmes que parmi celles des territoires placés
+sous leur juridiction.
+
+Article premier
+
+Tous les êtres humains naissent libres et égaux en dignité et en droits. Ils
+sont doués de raison et de conscience et doivent agir les uns envers les autres
+dans un esprit de fraternité.
+
+Article 2
+
+1. Chacun peut se prévaloir de tous les droits et de toutes les libertés
+proclamés dans la présente Déclaration, sans distinction aucune, notamment de
+race, de couleur, de sexe, de langue, de religion, d'opinion politique ou de
+toute autre opinion, d'origine nationale ou sociale, de fortune, de naissance ou
+de toute autre situation.
+
+2. De plus, il ne sera fait aucune distinction fondée sur le statut politique,
+juridique ou international du pays ou du territoire dont une personne est
+ressortissante, que ce pays ou territoire soit indépendant, sous tutelle, non
+autonome ou soumis à une limitation quelconque de souveraineté.
+
+Article 3
+
+Tout individu a droit à la vie, à la liberté et à la sûreté de sa personne.
