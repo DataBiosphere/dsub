@@ -17,12 +17,14 @@ import argparse
 import os
 
 from . import google
+from . import google_v2
 from . import local
 from . import test_fails
 
 
 PROVIDER_NAME_MAP = {
     google.GoogleJobProvider: 'google',
+    google_v2.GoogleV2JobProvider: 'google-v2',
     local.LocalJobProvider: 'local',
     test_fails.FailsJobProvider: 'test-fails',
 }
@@ -37,6 +39,8 @@ def get_provider(args, resources):
     return google.GoogleJobProvider(
         getattr(args, 'verbose', False),
         getattr(args, 'dry_run', False), args.project)
+  elif provider == 'google-v2':
+    return google_v2.GoogleV2JobProvider()
   elif provider == 'local':
     return local.LocalJobProvider(resources)
   elif provider == 'test-fails':
@@ -69,9 +73,10 @@ def create_parser(prog):
   parser.add_argument(
       '--provider',
       default='google',
-      choices=['local', 'google', 'test-fails'],
+      choices=['local', 'google', 'google-v2', 'test-fails'],
       help="""Job service provider. Valid values are "google" (Google's
-        Pipeline API) and "local" (local Docker execution). "test-*" providers
+        Pipeline API) and "local" (local Docker execution). "google-v2"
+        (Google's Pipelines API v2alpha1 is in development). "test-*" providers
         are for testing purposes only.""",
       metavar='PROVIDER')
 
@@ -102,6 +107,8 @@ def get_dstat_provider_args(provider, project):
   """A string with the arguments to point dstat to the same provider+project."""
   provider_name = get_provider_name(provider)
   if provider_name == 'google':
+    return ' --project %s' % project
+  elif provider_name == 'google-v2':
     return ' --project %s' % project
   elif provider_name == 'local':
     return ' --provider local'
