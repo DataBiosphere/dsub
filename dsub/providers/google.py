@@ -33,7 +33,7 @@ from .._dsub_version import DSUB_VERSION
 import apiclient.discovery
 import apiclient.errors
 
-# TODO(b/68858502) Fix the use of relative imports throughout this library
+# TODO(b/68858502) Remove the use of relative imports throughout this library
 from ..lib import dsub_util
 from ..lib import job_model
 from ..lib import param_util
