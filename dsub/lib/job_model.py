@@ -174,7 +174,7 @@ class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
   Subclasses of LabelParam may flip the _allow_reserved_keys attribute in order
   to allow reserved label values to be used. The check against reserved keys
   ensures that providers can rely on the label system to track dsub-related
-  values without allowing users to accidentially overwrite the labels.
+  values without allowing users to accidentally overwrite the labels.
 
   Attributes:
     name (str): the label name.
@@ -562,7 +562,7 @@ class JobDescriptor(object):
   def to_yaml(self):
     """Return a YAML string representing the job and task data.
 
-    A provider's internal represesentation of a dsub task typically does not map
+    A provider's internal representation of a dsub task typically does not map
     1-1 to the dsub representation. For example, the Google Genomics Pipeline
     does not natively support "input-recursive" or "output-recursive", so the
     google provider cannot easily reconstruct the user inputs from the

@@ -161,7 +161,7 @@ def format_logging_uri(uri, job_metadata, task_metadata):
   For (2), the file name generated is {job-id}, or for --tasks jobs, it is
   {job-id}.{task-id}.
 
-  In addition, full task metadata subsitition is supported. The URI
+  In addition, full task metadata substitution is supported. The URI
   may include substitution strings such as
   "{job-id}", "{task-id}", "{job-name}", and "{user-id}".
 
