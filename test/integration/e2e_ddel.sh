@@ -61,19 +61,25 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Pipeline started."
   echo "job id: ${JOB_ID}"
 
-  # Test ddel with an age that is too soon
-  echo
-  echo "Sleeping 10 seconds before exercising 'ddel --age 5s'"
-  sleep 10s
-  run_ddel_age "5s" --jobs "${JOB_ID}"
+  if [[ "${DSUB_PROVIDER}" != "google" ]]; then
+    # v1alpha2 of the Google Pipelines API can take a long time to fully cancel
+    # a pipeline if it has already started running.
+    # So skip the "fake cancel and wait" for the google provider for now.
 
-  # Make sure dstat still shows the job as not canceled.
-  echo
-  echo "Check that the job is not canceled."
-  if util::wait_for_canceled_status "${JOB_ID}"; then
-    echo "ERROR: Operation is canceled, but ddel should not have canceled it."
-    util::get_job_status "${JOB_ID}"
-    exit 1
+    # Test ddel with an age that is too soon
+    echo
+    echo "Sleeping 10 seconds before exercising 'ddel --age 5s'"
+    sleep 10s
+    run_ddel_age "5s" --jobs "${JOB_ID}"
+
+    # Make sure dstat still shows the job as not canceled.
+    echo
+    echo "Check that the job is not canceled."
+    if util::wait_for_canceled_status "${JOB_ID}"; then
+      echo "ERROR: Operation is canceled, but ddel should not have canceled it."
+      util::get_job_status "${JOB_ID}"
+      exit 1
+    fi
   fi
 
   echo

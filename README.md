@@ -27,6 +27,8 @@ foundation for use by the wider batch computing community.
 You can install `dsub` from [PyPI](pypi.python.org), or you can clone and
 install from this github repository.
 
+Note: `dsub`, `dstat`, and `ddel` must be run under Python 2.
+
 ### Pre-installation steps
 
 1. This is optional, but whether installing from PyPI or from github,

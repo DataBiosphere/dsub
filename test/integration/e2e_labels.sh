@@ -44,18 +44,19 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # run this test without first emptying the output and logging directories.
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-# Set up for running the tests
-mkdir -p "${TEST_TMP}"
-
-# Create a simple TSV file
 readonly TASKS_FILE="${TEST_TMP}/${TEST_NAME}.tsv"
-util::write_tsv_file "${TASKS_FILE}" '
---label item-number
-1
-2
-'
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+
+  # Set up for running the tests
+  mkdir -p "${TEST_TMP}"
+
+  # Create a simple TSV file
+  util::write_tsv_file "${TASKS_FILE}" '
+    --label item-number
+    1
+    2
+  '
 
   echo "Launching pipeline..."
 
@@ -76,16 +77,22 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   check_label "batch: hello-world"
   check_label "item-number: '1'"
 
-  echo
-  echo "Running ddel against a non-matching label - should not kill pipeline."
-  run_ddel --jobs "${JOBID}" --label "batch=hello-world" --label "item-number=2"
+  if [[ "${DSUB_PROVIDER}" != "google" ]]; then
+    # v1alpha2 of the Google Pipelines API can take a long time to fully cancel
+    # a pipeline if it has already started running.
+    # So skip the "fake cancel and wait" for the google provider for now.
 
-  echo
-  echo "Check that the job is not canceled."
-  if util::wait_for_canceled_status "${JOBID}"; then
-    echo "ERROR: Operation is canceled, but ddel should not have canceled it."
-    util::get_job_status "${JOBID}"
-    exit 1
+    echo
+    echo "Running ddel against a non-matching label - should not kill pipeline."
+    run_ddel --jobs "${JOBID}" --label "batch=hello-world" --label "item-number=2"
+
+    echo
+    echo "Check that the job is not canceled."
+    if util::wait_for_canceled_status "${JOBID}"; then
+      echo "ERROR: Operation is canceled, but ddel should not have canceled it."
+      util::get_job_status "${JOBID}"
+      exit 1
+    fi
   fi
 
   echo

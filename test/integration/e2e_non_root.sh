@@ -64,7 +64,7 @@ trap "exit_handler" EXIT
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Enabling Google Container Builder"
-  gcloud service-management enable cloudbuild.googleapis.com
+  gcloud services enable cloudbuild.googleapis.com
 
   echo "Creating image using Google Container Builder"
 

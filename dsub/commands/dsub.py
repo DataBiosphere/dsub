@@ -25,10 +25,11 @@ import os
 import re
 import sys
 import time
+from dateutil.tz import tzlocal
 
 from ..lib import dsub_errors
 from ..lib import dsub_util
-from ..lib import job_util
+from ..lib import job_model
 from ..lib import param_util
 from ..lib import resources
 from ..lib.dsub_util import print_error
@@ -301,17 +302,17 @@ def _parse_arguments(prog, argv):
   # Add dsub resource requirement arguments
   parser.add_argument(
       '--min-cores',
-      default=job_util.DEFAULT_MIN_CORES,
+      default=job_model.DEFAULT_MIN_CORES,
       type=int,
       help='Minimum CPU cores for each job')
   parser.add_argument(
       '--min-ram',
-      default=job_util.DEFAULT_MIN_RAM,
+      default=job_model.DEFAULT_MIN_RAM,
       type=float,
       help='Minimum RAM per job in GB')
   parser.add_argument(
       '--disk-size',
-      default=job_util.DEFAULT_DISK_SIZE,
+      default=job_model.DEFAULT_DISK_SIZE,
       type=int,
       help='Size (in GB) of data disk to attach for each job')
 
@@ -328,7 +329,7 @@ def _parse_arguments(prog, argv):
       '--project', help='Cloud project ID in which to run the pipeline')
   google.add_argument(
       '--boot-disk-size',
-      default=job_util.DEFAULT_BOOT_DISK_SIZE,
+      default=job_model.DEFAULT_BOOT_DISK_SIZE,
       type=int,
       help='Size (in GB) of the boot disk')
   google.add_argument(
@@ -340,7 +341,7 @@ def _parse_arguments(prog, argv):
       '--zones', nargs='+', help='List of Google Compute Engine zones.')
   google.add_argument(
       '--scopes',
-      default=job_util.DEFAULT_SCOPES,
+      default=job_model.DEFAULT_SCOPES,
       nargs='+',
       help='Space-separated scopes for GCE instances.')
   google.add_argument(
@@ -376,6 +377,7 @@ def _parse_arguments(prog, argv):
           'local': ['logging'],
       }, argv)
 
+
 def _get_job_resources(args):
   """Extract job-global resources requirements from input args.
 
@@ -383,10 +385,12 @@ def _get_job_resources(args):
     args: parsed command-line arguments
 
   Returns:
-    JobResources object containing the requested resources for the job
+    Resources object containing the requested resources for the job
   """
-  logging = param_util.build_logging_param(args.logging)
-  return job_util.JobResources(
+  logging = param_util.build_logging_param(
+      args.logging) if args.logging else None
+
+  return job_model.Resources(
       min_cores=args.min_cores,
       min_ram=args.min_ram,
       disk_size=args.disk_size,
@@ -395,30 +399,81 @@ def _get_job_resources(args):
       image=args.image,
       zones=args.zones,
       logging=logging,
+      logging_path=None,
       scopes=args.scopes,
       keep_alive=args.keep_alive,
       accelerator_type=args.accelerator_type,
       accelerator_count=args.accelerator_count)
 
 
-def _get_job_metadata(user_id, job_name, script, provider):
+def _get_job_metadata(provider, user_id, job_name, script, task_ids):
   """Allow provider to extract job-specific metadata from command-line args.
 
   Args:
+    provider: job service provider
     user_id: user submitting the job
     job_name: name for the job
     script: the script to run
-    provider: job service provider
+    task_ids: a set of the task-ids for all tasks in the job
 
   Returns:
     A dictionary of job-specific metadata (such as job id, name, etc.)
   """
+  create_time = dsub_util.replace_timezone(datetime.datetime.now(), tzlocal())
   user_id = user_id or dsub_util.get_os_user()
-  job_metadata = provider.prepare_job_metadata(script.name, job_name, user_id)
+  job_metadata = provider.prepare_job_metadata(script.name, job_name, user_id,
+                                               create_time)
 
+  job_metadata['create-time'] = create_time
   job_metadata['script'] = script
+  if task_ids:
+    job_metadata['task-ids'] = dsub_util.compact_interval_string(list(task_ids))
 
   return job_metadata
+
+
+def _resolve_task_logging(job_metadata, job_resources, task_descriptors):
+  """Resolve the logging path from job and task properties.
+
+  Args:
+    job_metadata: Job metadata, such as job-id, job-name, and user-id.
+    job_resources: Resources specified such as ram, cpu, and logging path.
+    task_descriptors: Task metadata, parameters, and resources.
+
+  Resolve the logging path, which may have substitution parameters such as
+  job-id, task-id, user-id, and job-name.
+  """
+  if not job_resources.logging:
+    return
+
+  for task_descriptor in task_descriptors:
+    logging_uri = provider_base.format_logging_uri(
+        job_resources.logging.uri, job_metadata, task_descriptor.task_metadata)
+    logging_path = job_model.LoggingParam(logging_uri,
+                                          job_resources.logging.file_provider)
+
+    if task_descriptor.task_resources:
+      task_descriptor.task_resources = task_descriptor.task_resources._replace(
+          logging_path=logging_path)
+    else:
+      task_descriptor.task_resources = job_model.Resources(
+          logging_path=logging_path)
+
+
+def _resolve_task_resources(job_metadata, job_resources, task_descriptors):
+  """Resolve task properties (such as the logging path) from job properties.
+
+  Args:
+    job_metadata: Job metadata, such as job-id, job-name, and user-id.
+    job_resources: Resources specified such as ram, cpu, and logging path.
+    task_descriptors: Task metadata, parameters, and resources.
+
+  This function exists to be called at the point that all job properties have
+  been validated and resolved. The only property to be resolved right now is
+  the logging path, which may have substitution parameters such as
+  job-id, task-id, user-id, and job-name.
+  """
+  _resolve_task_logging(job_metadata, job_resources, task_descriptors)
 
 
 def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
@@ -572,13 +627,13 @@ def _wait_for_any_job(provider, job_ids, poll_interval):
     SLEEP_FUNCTION(poll_interval)
 
 
-def _validate_job_and_task_arguments(job_data, all_task_data):
+def _validate_job_and_task_arguments(job_params, task_descriptors):
   """Validates that job and task argument names do not overlap."""
 
-  if not all_task_data:
+  if not task_descriptors:
     return
 
-  task_data = all_task_data[0]
+  task_params = task_descriptors[0].task_params
 
   # The use case for specifying a label or env/input/output parameter on
   # the command-line and also including it in the --tasks file is not obvious.
@@ -586,8 +641,8 @@ def _validate_job_and_task_arguments(job_data, all_task_data):
   # Until this use is articulated, generate an error on overlapping names.
 
   # Check labels
-  from_jobs = {label.name for label in job_data['labels']}
-  from_tasks = {label.name for label in task_data['labels']}
+  from_jobs = {label.name for label in job_params['labels']}
+  from_tasks = {label.name for label in task_params['labels']}
 
   intersect = from_jobs & from_tasks
   if intersect:
@@ -598,11 +653,13 @@ def _validate_job_and_task_arguments(job_data, all_task_data):
   # Check envs, inputs, and outputs, all of which must not overlap each other
   from_jobs = {
       item.name
-      for item in job_data['envs'] | job_data['inputs'] | job_data['outputs']
+      for item in job_params['envs'] | job_params['inputs']
+      | job_params['outputs']
   }
   from_tasks = {
       item.name
-      for item in task_data['envs'] | task_data['inputs'] | task_data['outputs']
+      for item in task_params['envs'] | task_params['inputs']
+      | task_params['outputs']
   }
 
   intersect = from_jobs & from_tasks
@@ -610,23 +667,6 @@ def _validate_job_and_task_arguments(job_data, all_task_data):
     raise ValueError(
         'Names for envs, inputs, and outputs on the command-line and in the '
         '--tasks file must not be repeated: {}'.format(','.join(intersect)))
-
-
-def _ensure_job_data_is_complete(job_data):
-  # The contract with providers and downstream code is that the job_data
-  # contains non-None 'labels', 'envs', 'inputs', and 'outputs'.
-  for param in 'labels', 'envs', 'inputs', 'outputs':
-    if not job_data.get(param):
-      job_data[param] = set()
-
-
-def _ensure_task_data_is_complete(all_task_data):
-  # The contract with providers and downstream code is that all task_data
-  # contain non-None 'labels', 'envs', 'inputs', and 'outputs'.
-  for task_data in all_task_data:
-    for param in 'labels', 'envs', 'inputs', 'outputs':
-      if not task_data.get(param):
-        task_data[param] = set()
 
 
 def dsub_main(prog, argv):
@@ -670,32 +710,35 @@ def run_main(args):
       DEFAULT_OUTPUT_LOCAL_PATH)
 
   # Get job arguments from the command line
-  job_data = param_util.args_to_job_data(
+  job_params = param_util.args_to_job_params(
       args.env, args.label, args.input, args.input_recursive, args.output,
       args.output_recursive, input_file_param_util, output_file_param_util)
 
   # If --tasks is on the command-line, then get task-specific data
   if args.tasks:
-    all_task_data = param_util.tasks_file_to_job_data(
+    task_descriptors = param_util.tasks_file_to_task_descriptors(
         args.tasks, input_file_param_util, output_file_param_util)
 
     # Validate job data + task data
-    _validate_job_and_task_arguments(job_data, all_task_data)
+    _validate_job_and_task_arguments(job_params, task_descriptors)
   else:
     # Create the implicit task
-    all_task_data = [{
-        'task-id': None,
-        'labels': set(),
-        'envs': set(),
-        'inputs': set(),
-        'outputs': set()
-    }]
+    task_descriptors = [
+        job_model.TaskDescriptor({
+            'task-id': None
+        }, {
+            'labels': set(),
+            'envs': set(),
+            'inputs': set(),
+            'outputs': set()
+        }, job_model.Resources())
+    ]
 
   return run(
       provider_base.get_provider(args, resources),
       _get_job_resources(args),
-      job_data,
-      all_task_data,
+      job_params,
+      task_descriptors,
       name=args.name,
       dry_run=args.dry_run,
       command=args.command,
@@ -711,8 +754,8 @@ def run_main(args):
 
 def run(provider,
         job_resources,
-        job_data,
-        all_task_data,
+        job_params,
+        task_descriptors,
         name=None,
         dry_run=False,
         command=None,
@@ -738,21 +781,33 @@ def run(provider,
       command_name = _name_for_command(command)
 
     # Add the shebang line to ensure the command is treated as Bash
-    script = job_util.Script(command_name, '#!/bin/bash\n' + command)
+    script = job_model.Script(command_name, '#!/bin/bash\n' + command)
   elif script:
     # Read the script file
     script_file = dsub_util.load_file(script)
-    script = job_util.Script(os.path.basename(script), script_file.read())
+    script = job_model.Script(os.path.basename(script), script_file.read())
   else:
     raise ValueError('One of --command or a script name must be supplied')
 
-  # The contract with providers and downstream code is that the job_data
-  # and task_data contain 'labels', 'envs', 'inputs', and 'outputs'.
-  _ensure_job_data_is_complete(job_data)
-  _ensure_task_data_is_complete(all_task_data)
+  # The contract with providers and downstream code is that the job_params
+  # and task_params contain 'labels', 'envs', 'inputs', and 'outputs'.
+  job_model.ensure_job_params_are_complete(job_params)
+  job_model.ensure_task_params_are_complete(task_descriptors)
 
-  job_metadata = _get_job_metadata(user, name, script, provider)
+  task_ids = {
+      task_descriptor.task_metadata.get('task-id')
+      for task_descriptor in task_descriptors
+      if task_descriptor.task_metadata.get('task-id') is not None
+  }
 
+  # Job and task parameters from the user have been validated.
+  # We can now compute some job and task properties, including:
+  #  job_metadata such as the job-id, create-time, user-id, etc.
+  #  task_resources such as the logging_path (which may include job-id, task-id)
+  job_metadata = _get_job_metadata(provider, user, name, script, task_ids)
+  _resolve_task_resources(job_metadata, job_resources, task_descriptors)
+
+  # Job and task properties are now all resolved. Begin execution!
   if not dry_run:
     print('Job: %s' % job_metadata['job-id'])
 
@@ -771,8 +826,9 @@ def run(provider,
             error_messages)
 
   # Launch all the job tasks!
-  launched_job = provider.submit_job(job_resources, job_metadata, job_data,
-                                     all_task_data, skip)
+  launched_job = provider.submit_job(
+      job_model.JobDescriptor(job_metadata, job_params, job_resources,
+                              task_descriptors), skip)
 
   if not dry_run:
     if launched_job['job-id'] == dsub_util.NO_JOB:

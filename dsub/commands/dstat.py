@@ -36,6 +36,7 @@ import time
 from dateutil.tz import tzlocal
 
 from ..lib import dsub_util
+from ..lib import job_model
 from ..lib import param_util
 from ..lib import resources
 from ..providers import provider_base
@@ -104,7 +105,7 @@ class TextOutput(OutputFormatter):
       return status
     return self.trim_display_field(status, self._MAX_ERROR_MESSAGE_LENGTH)
 
-  def format_inputs_outputs(self, values):
+  def format_pairs(self, values):
     """Returns a string of comma-delimited key=value pairs."""
     return ', '.join('%s=%s' % (key, value)
                      for key, value in sorted(values.iteritems()))
@@ -131,8 +132,10 @@ class TextOutput(OutputFormatter):
         ('user-id', 'User'),
         ('internal-id', 'Internal ID'),
         ('logging', 'Logging'),
-        ('inputs', 'Inputs', self.format_inputs_outputs),
-        ('outputs', 'Outputs', self.format_inputs_outputs),
+        ('labels', 'Labels', self.format_pairs),
+        ('inputs', 'Inputs', self.format_pairs),
+        ('outputs', 'Outputs', self.format_pairs),
+        ('dsub-version', 'Version'),
     ]
 
     new_row = collections.OrderedDict()
@@ -222,6 +225,7 @@ def _prepare_row(task, full):
       row_spec('outputs', True, {}),
       row_spec('envs', True, {}),
       row_spec('labels', True, {}),
+      row_spec('dsub-version', False, None),
   ]
   # pyformat: enable
 
@@ -369,7 +373,7 @@ def main():
   # be made into a default argument since some environments lack the ability
   # to provide a username automatically.
   user_ids = set(args.users) if args.users else {dsub_util.get_os_user()}
-  labels = param_util.parse_pair_args(args.label, param_util.LabelParam)
+  labels = param_util.parse_pair_args(args.label, job_model.LabelParam)
 
   job_producer = dstat_job_producer(
       provider=provider,

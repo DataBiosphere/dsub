@@ -4,10 +4,14 @@ File is based on this template: https://github.com/pypa/sampleproject
 """
 
 import os
+import sys
 import unittest
 # Always prefer setuptools over distutils
 from setuptools import find_packages
 from setuptools import setup
+
+if sys.version_info[0] != 2:
+  sys.exit('ERROR: Python 2 is currently required for this package')
 
 
 def unittest_suite():

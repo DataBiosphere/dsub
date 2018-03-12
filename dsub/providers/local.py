@@ -62,10 +62,10 @@ from . import base
 from .._dsub_version import DSUB_VERSION
 from dateutil.tz import tzlocal
 from ..lib import dsub_util
+from ..lib import job_model
 from ..lib import param_util
 from ..lib import providers_util
 import pytz
-import yaml
 
 # The local runner allocates space on the host under
 #   ${TMPDIR}/dsub-local/
@@ -108,7 +108,7 @@ _WORKING_DIR = 'workingdir'
 _DATA_MOUNT_POINT = '/mnt/data'
 
 # Set file provider whitelist.
-_SUPPORTED_FILE_PROVIDERS = frozenset([param_util.P_GCS, param_util.P_LOCAL])
+_SUPPORTED_FILE_PROVIDERS = frozenset([job_model.P_GCS, job_model.P_LOCAL])
 _SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
@@ -152,11 +152,6 @@ def _convert_suffix_to_docker_chars(suffix):
   return ''.join(label_char_transform(c) for c in suffix)
 
 
-def _replace_timezone(date, tz):
-  # pylint: disable=g-tzinfo-replace
-  return date.replace(tzinfo=tz)
-
-
 class LocalJobProvider(base.JobProvider):
   """Docker jobs running locally (i.e. on the caller's computer)."""
 
@@ -170,27 +165,22 @@ class LocalJobProvider(base.JobProvider):
     self._operations = []
     self._resources = resources
 
-  def prepare_job_metadata(self, script, job_name, user_id):
+  def prepare_job_metadata(self, script, job_name, user_id, create_time):
     job_name_value = job_name or os.path.basename(script)
     if user_id != dsub_util.get_os_user():
       raise ValueError('If specified, the local provider\'s "--user" flag must '
                        'match the current logged-in user.')
     return {
-        'job-id': self._make_job_id(job_name_value, user_id),
+        'job-id': self._make_job_id(job_name_value, user_id, create_time),
         'job-name': job_name_value,
         'user-id': user_id,
         'dsub-version': DSUB_VERSION,
     }
 
-  def submit_job(self, job_resources, job_metadata, job_data, all_task_data,
-                 skip_if_output_present):
-    create_time = datetime.datetime.now()
-
+  def submit_job(self, job_descriptor, skip_if_output_present):
     # Validate inputs.
     param_util.validate_submit_args_or_fail(
-        job_resources,
-        job_data,
-        all_task_data,
+        job_descriptor,
         provider_name=_PROVIDER_NAME,
         input_providers=_SUPPORTED_FILE_PROVIDERS,
         output_providers=_SUPPORTED_FILE_PROVIDERS,
@@ -198,10 +188,22 @@ class LocalJobProvider(base.JobProvider):
 
     # Launch tasks!
     launched_tasks = []
-    for task_data in all_task_data:
+    for task_view in job_model.task_view_generator(job_descriptor):
+      job_metadata = job_descriptor.job_metadata
+      job_params = job_descriptor.job_params
+      job_resources = job_descriptor.job_resources
 
-      inputs = job_data['inputs'] | task_data['inputs']
-      outputs = job_data['outputs'] | task_data['outputs']
+      task_descriptor = task_view.task_descriptors[0]
+
+      task_metadata = task_descriptor.task_metadata
+      task_params = task_descriptor.task_params
+      task_resources = task_descriptor.task_resources
+
+      task_metadata['create-time'] = dsub_util.replace_timezone(
+          datetime.datetime.now(), tzlocal())
+
+      inputs = job_params['inputs'] | task_params['inputs']
+      outputs = job_params['outputs'] | task_params['outputs']
 
       if skip_if_output_present:
         # check whether the output's already there
@@ -209,26 +211,22 @@ class LocalJobProvider(base.JobProvider):
           print 'Skipping task because its outputs are present.'
           continue
 
-      task_metadata = providers_util.get_task_metadata(job_metadata,
-                                                       task_data.get('task-id'))
-
-      # Format the logging path and set it into the task metadata
-      task_metadata['logging'] = providers_util.format_logging_uri(
-          job_resources.logging.uri, task_metadata)
-
       # Set up directories
       task_dir = self._task_directory(
-          task_metadata.get('job-id'), task_metadata.get('task-id'))
-      self._mkdir_outputs(task_dir, outputs)
+          job_metadata.get('job-id'), task_metadata.get('task-id'))
+      self._mkdir_outputs(task_dir,
+                          job_params['outputs'] | task_params['outputs'])
 
-      script = task_metadata.get('script')
+      script = job_metadata.get('script')
       self._stage_script(task_dir, script.name, script.value)
 
       # Start the task
       env = self._make_environment(inputs, outputs)
-      self._write_task_metadata(task_metadata, job_data, task_data, create_time)
-      self._run_docker_via_script(task_dir, env, job_resources, task_metadata,
-                                  job_data, task_data)
+
+      self._write_task_metadata(task_dir, task_view)
+      self._run_docker_via_script(task_dir, env, job_metadata, job_params,
+                                  job_resources, task_metadata, task_params,
+                                  task_resources)
       if task_metadata.get('task-id') is not None:
         launched_tasks.append(str(task_metadata.get('task-id')))
       else:
@@ -248,8 +246,9 @@ class LocalJobProvider(base.JobProvider):
       f.write(body)
     os.chmod(dest, 0500)
 
-  def _run_docker_via_script(self, task_dir, env, job_resources, task_metadata,
-                             job_data, task_data):
+  def _run_docker_via_script(self, task_dir, env, job_metadata, job_params,
+                             job_resources, task_metadata, task_params,
+                             task_resources):
     script_header = textwrap.dedent("""\
       # dsub-generated script containing data for task execution
 
@@ -310,10 +309,10 @@ class LocalJobProvider(base.JobProvider):
     script_data = script_header.format(
         volumes=volumes,
         name=_format_task_name(
-            task_metadata.get('job-id'), task_metadata.get('task-id')),
+            job_metadata.get('job-id'), task_metadata.get('task-id')),
         image=job_resources.image,
         script=_DATA_MOUNT_POINT + '/' + _SCRIPT_DIR + '/' +
-        task_metadata['script'].name,
+        job_metadata['script'].name,
         env_file=task_dir + '/' + 'docker.env',
         uid=os.getuid(),
         data_mount_point=_DATA_MOUNT_POINT,
@@ -321,19 +320,19 @@ class LocalJobProvider(base.JobProvider):
         date_format='+%Y-%m-%d %H:%M:%S',
         workingdir=_WORKING_DIR,
         export_input_dirs=providers_util.build_recursive_localize_env(
-            task_dir, job_data['inputs'] | task_data['inputs']),
+            task_dir, job_params['inputs'] | task_params['inputs']),
         recursive_localize_command=self._localize_inputs_recursive_command(
-            task_dir, job_data['inputs'] | task_data['inputs']),
+            task_dir, job_params['inputs'] | task_params['inputs']),
         localize_command=self._localize_inputs_command(
-            task_dir, job_data['inputs'] | task_data['inputs']),
+            task_dir, job_params['inputs'] | task_params['inputs']),
         export_output_dirs=providers_util.build_recursive_gcs_delocalize_env(
-            task_dir, job_data['outputs'] | task_data['outputs']),
+            task_dir, job_params['outputs'] | task_params['outputs']),
         recursive_delocalize_command=self._delocalize_outputs_recursive_command(
-            task_dir, job_data['outputs'] | task_data['outputs']),
+            task_dir, job_params['outputs'] | task_params['outputs']),
         delocalize_command=self._delocalize_outputs_commands(
-            task_dir, job_data['outputs'] | task_data['outputs']),
+            task_dir, job_params['outputs'] | task_params['outputs']),
         delocalize_logs_command=self._delocalize_logging_command(
-            job_resources.logging.file_provider, task_metadata),
+            task_resources.logging_path),
     )
 
     # Write the runner script and data file to the task_dir
@@ -344,9 +343,9 @@ class LocalJobProvider(base.JobProvider):
     self._write_source_file(script_data_path, script_data)
 
     # Write the environment variables
-    env_vars = set(env.items()) | job_data['envs'] | task_data['envs'] | {
-        param_util.EnvParam('DATA_ROOT', _DATA_MOUNT_POINT),
-        param_util.EnvParam('TMPDIR', _DATA_MOUNT_POINT + '/tmp')
+    env_vars = set(env.items()) | job_params['envs'] | task_params['envs'] | {
+        job_model.EnvParam('DATA_ROOT', _DATA_MOUNT_POINT),
+        job_model.EnvParam('TMPDIR', _DATA_MOUNT_POINT + '/tmp')
     }
     env_fname = task_dir + '/docker.env'
     with open(env_fname, 'wt') as f:
@@ -526,73 +525,26 @@ class LocalJobProvider(base.JobProvider):
     if dt_min:
       dt_min = dt_min.replace(microsecond=0)
     else:
-      dt_min = _replace_timezone(datetime.datetime.min, pytz.utc)
+      dt_min = dsub_util.replace_timezone(datetime.datetime.min, pytz.utc)
     if dt_max:
       dt_max = dt_max.replace(microsecond=0)
     else:
-      dt_max = _replace_timezone(datetime.datetime.max, pytz.utc)
+      dt_max = dsub_util.replace_timezone(datetime.datetime.max, pytz.utc)
 
     return dt_min <= dt <= dt_max
 
-  def _write_task_metadata(self, task_metadata, job_data, task_data,
-                           create_time):
-    """Write a file with the data needed for dstat."""
-    # Build up a dict to dump a YAML file with relevant task details:
-    #   job-id: <id>
-    #   task-id: <id>
-    #   job-name: <name>
-    #   inputs:
-    #     name: value
-    #   outputs:
-    #     name: value
-    #   envs:
-    #     name: value
-    #   labels:
-    #     name: value
-    data = {
-        'job-id': task_metadata.get('job-id'),
-        'task-id': task_metadata.get('task-id'),
-        'job-name': task_metadata.get('job-name'),
-        'create-time': create_time.strftime('%Y-%m-%d %H:%M:%S.%f'),
-        'logging': task_metadata.get('logging'),
-        'labels': {
-            'dsub-version': task_metadata.get('dsub-version', '0')
-        },
-    }
-    for key in ['inputs', 'outputs', 'envs', 'labels']:
-      data_field = data.get(key, {})
-
-      for param in job_data[key] | task_data[key]:
-        data_field[param.name] = param.value
-      data[key] = data_field
-
-    task_dir = self._task_directory(
-        task_metadata.get('job-id'), task_metadata.get('task-id'))
+  def _write_task_metadata(self, task_dir, job_descriptor):
     with open(os.path.join(task_dir, 'meta.yaml'), 'wt') as f:
-      f.write(yaml.dump(data))
+      f.write(job_descriptor.to_yaml())
 
   def _read_task_metadata(self, task_dir):
-    """Read the meta file containing core fields for dstat."""
-
-    try:
-      with open(os.path.join(task_dir, 'meta.yaml'), 'r') as f:
-        meta = yaml.load('\n'.join(f.readlines()))
-
-      # Make sure that create-time string is turned into a datetime
-      meta['create-time'] = _replace_timezone(
-          datetime.datetime.strptime(meta['create-time'],
-                                     '%Y-%m-%d %H:%M:%S.%f'), tzlocal())
-
-      return meta
-    except (IOError, OSError):
-      # lookup_job_tasks may try to read the task metadata as a task is being
-      # created. In that case, just catch the exception and return None.
-      return None
+    with open(os.path.join(task_dir, 'meta.yaml'), 'rt') as f:
+      return job_model.JobDescriptor.from_yaml(f.read())
 
   def _get_end_time_from_task_dir(self, task_dir):
     try:
       with open(os.path.join(task_dir, 'end-time.txt'), 'r') as f:
-        return _replace_timezone(
+        return dsub_util.replace_timezone(
             datetime.datetime.strptime(f.readline().strip(),
                                        '%Y-%m-%d %H:%M:%S.%f'), tzlocal())
     except (IOError, OSError):
@@ -607,8 +559,9 @@ class LocalJobProvider(base.JobProvider):
       except (IOError, OSError):
         pass
 
-    return datetime.datetime.fromtimestamp(last_update).replace(
-        tzinfo=tzlocal()) if last_update > 0 else None
+    return dsub_util.replace_timezone(
+        datetime.datetime.fromtimestamp(last_update),
+        tzlocal()) if last_update > 0 else None
 
   def _get_status_from_task_dir(self, task_dir):
     try:
@@ -631,16 +584,21 @@ class LocalJobProvider(base.JobProvider):
     # of the task directory. The directory could be changing because a new
     # task is being created. The directory could be changing because a task
     # is ending.
-
+    #
+    # If the meta.yaml does not exist, the task does not yet exist.
     # If the meta.yaml exists, it means the task is scheduled. It does not mean
     # it is yet running.
     # If the task.pid file exists, it means that the runner.sh was started.
+
     task_dir = self._task_directory(job_id, task_id)
 
-    # If the metadata does not exist, the task does not yet exist.
-    meta = self._read_task_metadata(task_dir)
-    if not meta:
+    job_descriptor = self._read_task_metadata(task_dir)
+    if not job_descriptor:
       return None
+
+    # If we read up an old task, the user-id will not be in the job_descriptor.
+    if not job_descriptor.job_metadata.get('user-id'):
+      job_descriptor.job_metadata['user-id'] = user_id
 
     # Get the pid of the runner
     pid = -1
@@ -663,44 +621,34 @@ class LocalJobProvider(base.JobProvider):
       log_detail = ['Pending']
 
     return LocalTask(
-        job_id=job_id,
-        task_id=task_id,
         task_status=status,
         log_detail=log_detail,
-        job_name=meta.get('job-name'),
-        create_time=meta.get('create-time'),
+        job_descriptor=job_descriptor,
         end_time=end_time,
         last_update=last_update,
-        logging=meta.get('logging'),
-        envs=meta.get('envs'),
-        labels=meta.get('labels'),
-        inputs=meta.get('inputs'),
-        outputs=meta.get('outputs'),
-        user_id=user_id,
         pid=pid)
 
   def _provider_root(self):
     return tempfile.gettempdir() + '/dsub-local'
 
-  def _delocalize_logging_command(self, file_provider, task_metadata):
+  def _delocalize_logging_command(self, logging_path):
     """Returns a command to delocalize logs.
 
     Args:
-      file_provider: a file provider from param_util.
-      task_metadata: dictionary of values such as job-id and task-id.
+      logging_path: location of log files.
 
     Returns:
       eg. 'gs://bucket/path/myfile' or 'gs://bucket/script-foobar-12'
     """
 
     # Get the logging prefix (everything up to ".log")
-    logging_prefix = os.path.splitext(task_metadata.get('logging'))[0]
+    logging_prefix = os.path.splitext(logging_path.uri)[0]
 
     # Set the provider-specific mkdir and file copy commands
-    if file_provider == param_util.P_LOCAL:
+    if logging_path.file_provider == job_model.P_LOCAL:
       mkdir_cmd = 'mkdir -p "%s"\n' % os.path.dirname(logging_prefix)
       cp_cmd = 'cp'
-    elif file_provider == param_util.P_GCS:
+    elif logging_path.file_provider == job_model.P_GCS:
       mkdir_cmd = ''
       cp_cmd = 'gsutil -q cp'
     else:
@@ -722,7 +670,7 @@ class LocalJobProvider(base.JobProvider):
 
     return body
 
-  def _make_job_id(self, job_name_value, user_id):
+  def _make_job_id(self, job_name_value, user_id, create_time):
     """Return a job-id string."""
 
     # We want the job-id to be expressive while also
@@ -738,7 +686,7 @@ class LocalJobProvider(base.JobProvider):
     # The full job-id is:
     #   <job-name>--<user-id>--<timestamp>
     return '%s--%s--%s' % (job_name_value[:10], user_id,
-                           datetime.datetime.now().strftime('%y%m%d-%H%M%S-%f'))
+                           create_time.strftime('%y%m%d-%H%M%S-%f'))
 
   def _task_directory(self, job_id, task_id):
     """The local dir for staging files for that particular task."""
@@ -798,7 +746,7 @@ class LocalJobProvider(base.JobProvider):
 
       commands.append('mkdir -p "%s"' % os.path.dirname(local_file_path))
 
-      if i.file_provider in [param_util.P_LOCAL, param_util.P_GCS]:
+      if i.file_provider in [job_model.P_LOCAL, job_model.P_GCS]:
         # The semantics that we expect here are implemented consistently in
         # "gsutil cp", and are a bit different than "cp" when it comes to
         # wildcard handling, so use it for both local and GCS:
@@ -824,15 +772,15 @@ class LocalJobProvider(base.JobProvider):
     cmd_lines = []
     # Generate commands to create any required local output directories.
     for var in outputs:
-      if var.recursive and var.file_provider == param_util.P_LOCAL:
+      if var.recursive and var.file_provider == job_model.P_LOCAL:
         cmd_lines.append('  mkdir -p "%s"' % var.uri.path)
     # Generate local and GCS delocalize commands.
     cmd_lines.append(
         providers_util.build_recursive_delocalize_command(
-            os.path.join(task_dir, _DATA_SUBDIR), outputs, param_util.P_GCS))
+            os.path.join(task_dir, _DATA_SUBDIR), outputs, job_model.P_GCS))
     cmd_lines.append(
         providers_util.build_recursive_delocalize_command(
-            os.path.join(task_dir, _DATA_SUBDIR), outputs, param_util.P_LOCAL))
+            os.path.join(task_dir, _DATA_SUBDIR), outputs, job_model.P_LOCAL))
     return '\n'.join(cmd_lines)
 
   def _delocalize_outputs_commands(self, task_dir, outputs):
@@ -847,11 +795,11 @@ class LocalJobProvider(base.JobProvider):
       dest_path = o.uri.path
       local_path = task_dir + '/' + _DATA_SUBDIR + '/' + o.docker_path
 
-      if o.file_provider == param_util.P_LOCAL:
+      if o.file_provider == job_model.P_LOCAL:
         commands.append('mkdir -p "%s"' % dest_path)
 
       # Use gsutil even for local files (explained in _localize_inputs_command).
-      if o.file_provider in [param_util.P_LOCAL, param_util.P_GCS]:
+      if o.file_provider in [job_model.P_LOCAL, job_model.P_GCS]:
         commands.append('gsutil -q cp "%s" "%s"' % (local_path, dest_path))
 
     return '\n'.join(commands)
@@ -871,20 +819,11 @@ class LocalJobProvider(base.JobProvider):
 
 # The task object for this provider.
 _RawTask = namedtuple('_RawTask', [
-    'job_id',
-    'task_id',
+    'job_descriptor',
     'task_status',
     'log_detail',
-    'job_name',
-    'create_time',
     'end_time',
     'last_update',
-    'logging',
-    'envs',
-    'labels',
-    'inputs',
-    'outputs',
-    'user_id',
     'pid',
 ])
 
@@ -903,35 +842,72 @@ class LocalTask(base.Task):
     """
     return self._raw._asdict()
 
+  def _get_job_and_task_param(self, job_params, task_params, field):
+    return job_params.get(field, set()) | task_params.get(field, set())
+
   def get_field(self, field, default=None):
-    # Convert the incoming Task object to a dict.
-    # With the exception of "status', the dsub "field" names map directly to the
-    # Task members where "-" in the field name is "_" in the Task member name.
-    tad = {
-        key.replace('_', '-'): value
-        for key, value in self._raw._asdict().iteritems()
-    }
+
+    # Most fields should be satisfied from the job descriptor
+    job_metadata = self._raw.job_descriptor.job_metadata
+    job_params = self._raw.job_descriptor.job_params
+    task_metadata = self._raw.job_descriptor.task_descriptors[0].task_metadata
+    task_resources = self._raw.job_descriptor.task_descriptors[0].task_resources
+    task_params = self._raw.job_descriptor.task_descriptors[0].task_params
 
     value = None
-    if field == 'status':
-      value = tad.get('task-status')
-    elif field == 'status-message':
-      if tad.get('task-status') == 'SUCCESS':
-        value = 'Success'
-      else:
-        # Return the last line of output
-        value = self._last_lines(tad.get('log-detail'), 1)
-    elif field == 'status-detail':
-      # Return the last three lines of output
-      value = self._last_lines(tad.get('log-detail'), 3)
+    if field in [
+        'job-id', 'job-name', 'user-id', 'create-time', 'dsub-version'
+    ]:
+      value = job_metadata.get(field)
     elif field == 'start-time':
       # There's no delay between creation and start since we launch docker
       # immediately for local runs.
-      value = tad.get('create-time')
+      value = job_metadata.get('create-time')
+    elif field in ['task-id']:
+      value = task_metadata.get(field)
+    elif field == 'logging':
+      # The job_resources will contain the "--logging" value.
+      # The task_resources will contain the resolved logging path.
+      # get_field('logging') should currently return the resolved logging path.
+      value = task_resources.logging_path
+    elif field in ['labels', 'envs']:
+      items = self._get_job_and_task_param(job_params, task_params, field)
+      value = {item.name: item.value for item in items}
+    elif field == 'inputs':
+      value = {}
+      for field in ['inputs', 'input-recursives']:
+        items = self._get_job_and_task_param(job_params, task_params, field)
+        value.update({item.name: item.value for item in items})
+    elif field == 'outputs':
+      value = {}
+      for field in ['outputs', 'output-recursives']:
+        items = self._get_job_and_task_param(job_params, task_params, field)
+        value.update({item.name: item.value for item in items})
     else:
-      value = tad.get(field)
+      # Convert the raw Task object to a dict.
+      # With the exception of the "status' fields, the dsub field names map
+      # directly to the Task members (where "-" in the field name is "_" in the
+      # Task member name).
+      tad = {
+          key.replace('_', '-'): value
+          for key, value in self._raw._asdict().iteritems()
+      }
 
-    return value if value else default
+      if field == 'status':
+        value = tad.get('task-status')
+      elif field == 'status-message':
+        if tad.get('task-status') == 'SUCCESS':
+          value = 'Success'
+        else:
+          # Return the last line of output
+          value = self._last_lines(tad.get('log-detail'), 1)
+      elif field == 'status-detail':
+        # Return the last three lines of output
+        value = self._last_lines(tad.get('log-detail'), 3)
+      else:
+        value = tad.get(field)
+
+    return value if value is not None else default
 
   def get_docker_name_for_task(self):
     return _format_task_name(

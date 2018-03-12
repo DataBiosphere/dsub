@@ -11,42 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Utility functions and classes for input, output, and script parameters."""
+"""Utility functions and classes for dsub command-line parameters."""
+
 from __future__ import absolute_import
 from __future__ import print_function
 
 import argparse
-import collections
 import csv
 import datetime
 import os
 import re
 import sys
 from . import dsub_util
+from . import job_model
 from .._dsub_version import DSUB_VERSION
 from dateutil.tz import tzlocal
 import pytz
 
 AUTO_PREFIX_INPUT = 'INPUT_'  # Prefix for auto-generated input names
 AUTO_PREFIX_OUTPUT = 'OUTPUT_'  # Prefix for auto-generated output names
-
-P_LOCAL = 'local'
-P_GCS = 'google-cloud-storage'
-FILE_PROVIDERS = frozenset([P_LOCAL, P_GCS])
-
-RESERVED_LABELS = frozenset(
-    ['job-name', 'job-id', 'user-id', 'task-id', 'dsub-version'])
-
-
-def validate_param_name(name, param_type):
-  """Validate that the name follows posix conventions for env variables."""
-  # http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_235
-  #
-  # 3.235 Name
-  # In the shell command language, a word consisting solely of underscores,
-  # digits, and alphabetics from the portable character set.
-  if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name):
-    raise ValueError('Invalid %s: %s' % (param_type, name))
 
 
 class ListParamAction(argparse.Action):
@@ -80,198 +63,6 @@ class ListParamAction(argparse.Action):
     setattr(namespace, self.dest, params)
 
 
-class UriParts(str):
-  """Subclass string for multipart URIs.
-
-  This string subclass is used for URI references. The path and basename
-  attributes are used to maintain separation of this information in cases where
-  it might otherwise be ambiguous. The value of a UriParts string is a URI.
-
-  Attributes:
-    path: Strictly speaking, the path attribute is the entire leading part of
-      a URI (including scheme, host, and path). This attribute defines the
-      hierarchical location of a resource. Path must end in a forward
-      slash. Local file URIs are represented as relative URIs (path only).
-    basename: The last token of a path that follows a forward slash. Generally
-      this defines a specific resource or a pattern that matches resources. In
-      the case of URI's that consist only of a path, this will be empty.
-
-  Examples:
-    | uri                         |  uri.path              | uri.basename  |
-    +-----------------------------+------------------------+---------------|
-    | gs://bucket/folder/file.txt | 'gs://bucket/folder/'  | 'file.txt'    |
-    | http://example.com/1.htm    | 'http://example.com/'  | '1.htm'       |
-    | /tmp/tempdir1/              | '/tmp/tempdir1/'       | ''            |
-    | /tmp/ab.txt                 | '/tmp/'                | 'ab.txt'      |
-  """
-
-  def __new__(cls, path, basename):
-    basename = basename if basename is not None else ''
-    newuri = str.__new__(cls, path + basename)
-    newuri.path = path
-    newuri.basename = basename
-    return newuri
-
-
-class EnvParam(collections.namedtuple('EnvParam', ['name', 'value'])):
-  """Name/value input parameter to a pipeline.
-
-  Attributes:
-    name (str): the input parameter and environment variable name.
-    value (str): the variable value (optional).
-  """
-  __slots__ = ()
-
-  def __new__(cls, name, value=None):
-    validate_param_name(name, 'Environment variable')
-    return super(EnvParam, cls).__new__(cls, name, value)
-
-
-class LoggingParam(
-    collections.namedtuple('LoggingParam', ['uri', 'file_provider'])):
-  """File parameter used for logging.
-
-  Attributes:
-    uri (UriParts): A uri or local file path.
-    file_provider (enum): Service or infrastructure hosting the file.
-  """
-  pass
-
-
-class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
-  """Name/value label parameter to a pipeline.
-
-  Subclasses of LabelParam may flip the _allow_reserved_keys attribute in order
-  to allow reserved label values to be used. The check against reserved keys
-  ensures that providers can rely on the label system to track dsub-related
-  values without allowing users to accidentially overwrite the labels.
-
-  Attributes:
-    name (str): the label name.
-    value (str): the label value (optional).
-  """
-  _allow_reserved_keys = False
-  __slots__ = ()
-
-  def __new__(cls, name, value=None):
-    cls.validate_label(name, value)
-    return super(LabelParam, cls).__new__(cls, name, value)
-
-  @classmethod
-  def validate_label(cls, name, value):
-    """Raise ValueError if the label is invalid."""
-    # Rules for labels are described in:
-    #  https://cloud.google.com/compute/docs/labeling-resources#restrictions
-
-    # * Keys and values cannot be longer than 63 characters each.
-    # * Keys and values can only contain lowercase letters, numeric characters,
-    #   underscores, and dashes.
-    # * International characters are allowed.
-    # * Label keys must start with a lowercase letter and international
-    #   characters are allowed.
-    # * Label keys cannot be empty.
-    cls._check_label_name(name)
-    cls._check_label_value(value)
-
-    # Ensure that reserved labels are not being used.
-    if not cls._allow_reserved_keys and name in RESERVED_LABELS:
-      raise ValueError('Label flag (%s=...) must not use reserved keys: %r' % (
-          name, list(RESERVED_LABELS)))
-
-  @staticmethod
-  def _check_label_name(name):
-    if len(name) < 1 or len(name) > 63:
-      raise ValueError('Label name must be 1-63 characters long: "%s"' % name)
-    if not re.match(r'^[a-z]([-_a-z0-9]*)?$', name):
-      raise ValueError(
-          'Invalid name for label: "%s". Must start with a lowercase letter '
-          'and contain only lowercase letters, numeric characters, '
-          'underscores, and dashes.' % name)
-
-  @staticmethod
-  def _check_label_value(value):
-    if not value:
-      return
-
-    if len(value) > 63:
-      raise ValueError(
-          'Label values must not be longer than 63 characters: "%s"' % value)
-
-    if not re.match(r'^([-_a-z0-9]*)?$', value):
-      raise ValueError(
-          'Invalid value for label: "%s". Must contain only lowercase letters, '
-          'numeric characters, underscores, and dashes.' % value)
-
-
-class FileParam(
-    collections.namedtuple('FileParam', [
-        'name',
-        'value',
-        'docker_path',
-        'uri',
-        'recursive',
-        'file_provider',
-    ])):
-  """File parameter to be automatically localized or de-localized.
-
-  Input files are automatically localized to the pipeline VM's local disk.
-
-  Output files are automatically de-localized to a remote URI from the
-  pipeline VM's local disk.
-
-  Attributes:
-    name (str): the parameter and environment variable name.
-    value (str): the original value given by the user on the command line or
-                 in the TSV file.
-    docker_path (str): the on-VM location; also set as the environment variable
-                       value.
-    uri (UriParts): A uri or local file path.
-    recursive (bool): Whether recursive copy is wanted.
-    file_provider (enum): Service or infrastructure hosting the file.
-  """
-  __slots__ = ()
-
-  def __new__(cls,
-              name,
-              value=None,
-              docker_path=None,
-              uri=None,
-              recursive=False,
-              file_provider=None):
-    return super(FileParam, cls).__new__(cls, name, value, docker_path, uri,
-                                         recursive, file_provider)
-
-
-class InputFileParam(FileParam):
-  """Simple typed-derivative of a FileParam."""
-
-  def __new__(cls,
-              name,
-              value=None,
-              docker_path=None,
-              uri=None,
-              recursive=False,
-              file_provider=None):
-    validate_param_name(name, 'Input parameter')
-    return super(InputFileParam, cls).__new__(cls, name, value, docker_path,
-                                              uri, recursive, file_provider)
-
-
-class OutputFileParam(FileParam):
-  """Simple typed-derivative of a FileParam."""
-
-  def __new__(cls,
-              name,
-              value=None,
-              docker_path=None,
-              uri=None,
-              recursive=False,
-              file_provider=None):
-    validate_param_name(name, 'Output parameter')
-    return super(OutputFileParam, cls).__new__(cls, name, value, docker_path,
-                                               uri, recursive, file_provider)
-
-
 class FileParamUtil(object):
   """Base class helper for producing FileParams from args or a tasks file.
 
@@ -285,7 +76,7 @@ class FileParamUtil(object):
   """
 
   def __init__(self, auto_prefix, relative_path):
-    self.param_class = FileParam
+    self.param_class = job_model.FileParam
     self._auto_prefix = auto_prefix
     self._auto_index = 0
     self._relative_path = relative_path
@@ -314,25 +105,26 @@ class FileParamUtil(object):
 
     Rewrite output for the docker path:
       >>> out_util = FileParamUtil('AUTO_', 'output')
-      >>> out_util.rewrite_uris('gs://mybucket/myfile.txt', P_GCS)[1]
+      >>> out_util.rewrite_uris('gs://mybucket/myfile.txt', job_model.P_GCS)[1]
       'output/gs/mybucket/myfile.txt'
-      >>> out_util.rewrite_uris('./data/myfolder/', P_LOCAL)[1]
+      >>> out_util.rewrite_uris('./data/myfolder/', job_model.P_LOCAL)[1]
       'output/file/data/myfolder/'
 
     When normalizing the URI for cloud buckets, no rewrites are done. For local
     files, the user directory will be expanded and relative paths will be
     converted to absolute:
       >>> in_util = FileParamUtil('AUTO_', 'input')
-      >>> in_util.rewrite_uris('gs://mybucket/gcs_dir/', P_GCS)[0]
+      >>> in_util.rewrite_uris('gs://mybucket/gcs_dir/', job_model.P_GCS)[0]
       'gs://mybucket/gcs_dir/'
-      >>> in_util.rewrite_uris('/data/./dir_a/../myfile.txt', P_LOCAL)[0]
+      >>> in_util.rewrite_uris('/data/./dir_a/../myfile.txt',
+      ...   job_model.P_LOCAL)[0]
       '/data/myfile.txt'
-      >>> in_util.rewrite_uris('file:///tmp/data/*.bam', P_LOCAL)[0]
+      >>> in_util.rewrite_uris('file:///tmp/data/*.bam', job_model.P_LOCAL)[0]
       '/tmp/data/*.bam'
 
     Args:
       raw_uri: (str) the path component of the raw URI.
-      file_provider: a valid provider (contained in FILE_PROVIDERS).
+      file_provider: a valid provider (contained in job_model.FILE_PROVIDERS).
 
     Returns:
       normalized: a cleaned version of the uri provided by command line.
@@ -342,9 +134,9 @@ class FileParamUtil(object):
     Raises:
       ValueError: if file_provider is not valid.
     """
-    if file_provider == P_GCS:
+    if file_provider == job_model.P_GCS:
       normalized, docker_path = self._gcs_uri_rewriter(raw_uri)
-    elif file_provider == P_LOCAL:
+    elif file_provider == job_model.P_LOCAL:
       normalized, docker_path = self._local_uri_rewriter(raw_uri)
     else:
       raise ValueError('File provider not supported: %r' % file_provider)
@@ -433,7 +225,7 @@ class FileParamUtil(object):
   @staticmethod
   def parse_file_provider(uri):
     """Find the file provider for a URI."""
-    providers = {'gs': P_GCS, 'file': P_LOCAL}
+    providers = {'gs': job_model.P_GCS, 'file': job_model.P_LOCAL}
     # URI scheme detector uses a range up to 30 since none of the IANA
     # registered schemes are longer than this.
     provider_found = re.match(r'^([A-Za-z][A-Za-z0-9+.-]{0,29})://', uri)
@@ -492,7 +284,7 @@ class FileParamUtil(object):
     file_provider = self.parse_file_provider(raw_uri)
     self._validate_paths_or_fail(raw_uri, recursive)
     uri, docker_uri = self.rewrite_uris(raw_uri, file_provider)
-    uri_parts = UriParts(
+    uri_parts = job_model.UriParts(
         directory_fmt(os.path.dirname(uri)), os.path.basename(uri))
     return docker_uri, uri_parts, file_provider
 
@@ -508,7 +300,7 @@ class InputFileParamUtil(FileParamUtil):
 
   def __init__(self, docker_path):
     super(InputFileParamUtil, self).__init__(AUTO_PREFIX_INPUT, docker_path)
-    self.param_class = InputFileParam
+    self.param_class = job_model.InputFileParam
 
 
 class OutputFileParamUtil(FileParamUtil):
@@ -516,19 +308,19 @@ class OutputFileParamUtil(FileParamUtil):
 
   def __init__(self, docker_path):
     super(OutputFileParamUtil, self).__init__(AUTO_PREFIX_OUTPUT, docker_path)
-    self.param_class = OutputFileParam
+    self.param_class = job_model.OutputFileParam
 
 
 def build_logging_param(logging_uri, util_class=OutputFileParamUtil):
   """Convenience function simplifies construction of the logging uri."""
   if not logging_uri:
-    return LoggingParam(None, None)
+    return job_model.LoggingParam(None, None)
   recursive = not logging_uri.endswith('.log')
   oututil = util_class('')
   _, uri, provider = oututil.parse_uri(logging_uri, recursive)
   if '*' in uri.basename:
     raise ValueError('Wildcards not allowed in logging URI: %s' % uri)
-  return LoggingParam(uri, provider)
+  return job_model.LoggingParam(uri, provider)
 
 
 def split_pair(pair_string, separator, nullable_idx=1):
@@ -597,26 +389,26 @@ def parse_tasks_file_header(header, input_file_param_util,
       col_type, col_value = split_pair(col, ' ', 1)
 
     if col_type == '--env':
-      job_params.append(EnvParam(col_value))
+      job_params.append(job_model.EnvParam(col_value))
 
     elif col_type == '--label':
-      job_params.append(LabelParam(col_value))
+      job_params.append(job_model.LabelParam(col_value))
 
     elif col_type == '--input' or col_type == '--input-recursive':
       name = input_file_param_util.get_variable_name(col_value)
       job_params.append(
-          InputFileParam(
+          job_model.InputFileParam(
               name,
               recursive=(col_type.endswith('recursive')),
-              file_provider=P_GCS))
+              file_provider=job_model.P_GCS))
 
     elif col_type == '--output' or col_type == '--output-recursive':
       name = output_file_param_util.get_variable_name(col_value)
       job_params.append(
-          OutputFileParam(
+          job_model.OutputFileParam(
               name,
               recursive=(col_type.endswith('recursive')),
-              file_provider=P_GCS))
+              file_provider=job_model.P_GCS))
 
     else:
       raise ValueError('Unrecognized column header: %s' % col)
@@ -624,8 +416,8 @@ def parse_tasks_file_header(header, input_file_param_util,
   return job_params
 
 
-def tasks_file_to_job_data(tasks, input_file_param_util,
-                           output_file_param_util):
+def tasks_file_to_task_descriptors(tasks, input_file_param_util,
+                                   output_file_param_util):
   """Parses task parameters from a TSV.
 
   Args:
@@ -636,14 +428,14 @@ def tasks_file_to_job_data(tasks, input_file_param_util,
     output_file_param_util: Utility for producing OutputFileParam objects.
 
   Returns:
-    job_data: an array of records, each containing a dictionary of
+    task_descriptors: an array of records, each containing the task-id,
     'envs', 'inputs', 'outputs', 'labels' that defines the set of parameters
-    and data for each job.
+    for each task of the job.
 
   Raises:
     ValueError: If no job records were provided
   """
-  job_data = []
+  task_descriptors = []
 
   path = tasks['path']
   task_min = tasks.get('min')
@@ -681,33 +473,35 @@ def tasks_file_to_job_data(tasks, input_file_param_util,
     for i in range(0, len(job_params)):
       param = job_params[i]
       name = param.name
-      if isinstance(param, EnvParam):
-        envs.add(EnvParam(name, row[i]))
+      if isinstance(param, job_model.EnvParam):
+        envs.add(job_model.EnvParam(name, row[i]))
 
-      elif isinstance(param, LabelParam):
-        labels.add(LabelParam(name, row[i]))
+      elif isinstance(param, job_model.LabelParam):
+        labels.add(job_model.LabelParam(name, row[i]))
 
-      elif isinstance(param, InputFileParam):
+      elif isinstance(param, job_model.InputFileParam):
         inputs.add(
             input_file_param_util.make_param(name, row[i], param.recursive))
 
-      elif isinstance(param, OutputFileParam):
+      elif isinstance(param, job_model.OutputFileParam):
         outputs.add(
             output_file_param_util.make_param(name, row[i], param.recursive))
 
-    job_data.append({
-        'task-id': task_id,
-        'labels': labels,
-        'envs': envs,
-        'inputs': inputs,
-        'outputs': outputs
-    })
+    task_descriptors.append(
+        job_model.TaskDescriptor({
+            'task-id': task_id
+        }, {
+            'labels': labels,
+            'envs': envs,
+            'inputs': inputs,
+            'outputs': outputs
+        }, job_model.Resources()))
 
   # Ensure that there are jobs to execute (and not just a header)
-  if not job_data:
+  if not task_descriptors:
     raise ValueError('No tasks added from %s' % path)
 
-  return job_data
+  return task_descriptors
 
 
 def parse_pair_args(labels, argclass):
@@ -731,9 +525,9 @@ def parse_pair_args(labels, argclass):
   return label_data
 
 
-def args_to_job_data(envs, labels, inputs, inputs_recursive, outputs,
-                     outputs_recursive, input_file_param_util,
-                     output_file_param_util):
+def args_to_job_params(envs, labels, inputs, inputs_recursive, outputs,
+                       outputs_recursive, input_file_param_util,
+                       output_file_param_util):
   """Parse env, input, and output parameters into a job parameters and data.
 
   Passing arguments on the command-line allows for launching a single job.
@@ -758,12 +552,12 @@ def args_to_job_data(envs, labels, inputs, inputs_recursive, outputs,
     output_file_param_util: Utility for producing OutputFileParam objects.
 
   Returns:
-    job_data: a dictionary of 'envs', 'inputs', and 'outputs' that defines the
+    job_params: a dictionary of 'envs', 'inputs', and 'outputs' that defines the
     set of parameters and data for a job.
   """
   # Parse environmental variables and labels.
-  env_data = parse_pair_args(envs, EnvParam)
-  label_data = parse_pair_args(labels, LabelParam)
+  env_data = parse_pair_args(envs, job_model.EnvParam)
+  label_data = parse_pair_args(labels, job_model.LabelParam)
 
   # For input files, we need to:
   #   * split the input into name=uri pairs (name optional)
@@ -805,8 +599,7 @@ def _validate_providers(fileparams, argname, providers, provider_name):
               argname=argname, path=fileparam.uri, provider=provider_name))
 
 
-def validate_submit_args_or_fail(job_resources, job_data, all_task_data,
-                                 provider_name, input_providers,
+def validate_submit_args_or_fail(job_descriptor, provider_name, input_providers,
                                  output_providers, logging_providers):
   """Validate that arguments passed to submit_job have valid file providers.
 
@@ -814,38 +607,40 @@ def validate_submit_args_or_fail(job_resources, job_data, all_task_data,
   in the base provider. This function will fail with a value error if any of the
   parameters are not valid. See the following example;
 
-  >>> res = type('', (object,),
-  ...            {"logging": LoggingParam('gs://logtemp', P_GCS)})()
-  >>> job_data={'inputs': set(), 'outputs': set()}
-  >>> task_data = [
-  ...    {'inputs': [FileParam('IN', uri='gs://in/*', file_provider=P_GCS)],
-  ...     'outputs': set()},
-  ...    {'inputs': set(),
-  ...     'outputs': [FileParam('OUT', uri='gs://out/*', file_provider=P_GCS)]}]
+  >>> job_resources = type('', (object,),
+  ...    {"logging": job_model.LoggingParam('gs://logtemp', job_model.P_GCS)})()
+  >>> job_params={'inputs': set(), 'outputs': set()}
+  >>> task_descriptors = [
+  ...     job_model.TaskDescriptor(None, {
+  ...       'inputs': {
+  ...           job_model.FileParam('IN', uri='gs://in/*',
+  ...                               file_provider=job_model.P_GCS)},
+  ...       'outputs': set()}, None),
+  ...     job_model.TaskDescriptor(None, {
+  ...       'inputs': set(),
+  ...       'outputs': {
+  ...           job_model.FileParam('OUT', uri='gs://out/*',
+  ...                               file_provider=job_model.P_GCS)}}, None)]
   ...
-  >>> validate_submit_args_or_fail(job_resources=res,
-  ...                              job_data=job_data,
-  ...                              all_task_data=task_data,
+  >>> validate_submit_args_or_fail(job_model.JobDescriptor(None, job_params,
+  ...                              job_resources, task_descriptors),
   ...                              provider_name='MYPROVIDER',
-  ...                              input_providers=[P_GCS],
-  ...                              output_providers=[P_GCS],
-  ...                              logging_providers=[P_GCS])
+  ...                              input_providers=[job_model.P_GCS],
+  ...                              output_providers=[job_model.P_GCS],
+  ...                              logging_providers=[job_model.P_GCS])
   ...
-  >>> validate_submit_args_or_fail(job_resources=res,
-  ...                              job_data=job_data,
-  ...                              all_task_data=task_data,
+  >>> validate_submit_args_or_fail(job_model.JobDescriptor(None, job_params,
+  ...                              job_resources, task_descriptors),
   ...                              provider_name='MYPROVIDER',
-  ...                              input_providers=[P_GCS],
-  ...                              output_providers=[P_LOCAL],
-  ...                              logging_providers=[P_GCS])
+  ...                              input_providers=[job_model.P_GCS],
+  ...                              output_providers=[job_model.P_LOCAL],
+  ...                              logging_providers=[job_model.P_GCS])
   Traceback (most recent call last):
        ...
   ValueError: Unsupported output path (gs://out/*) for provider 'MYPROVIDER'.
 
   Args:
-    job_resources: instance of job_util.JobResources.
-    job_data: (dict) the job data to be validated
-    all_task_data: (set(dict)) the task data list to be validated.
+    job_descriptor: instance of job_model.JobDescriptor.
     provider_name: (str) the name of the execution provider.
     input_providers: (string collection) whitelist of file providers for input.
     output_providers: (string collection) whitelist of providers for output.
@@ -854,21 +649,26 @@ def validate_submit_args_or_fail(job_resources, job_data, all_task_data,
   Raises:
     ValueError: if any file providers do not match the whitelists.
   """
+  job_resources = job_descriptor.job_resources
+  job_params = job_descriptor.job_params
+  task_descriptors = job_descriptor.task_descriptors
+
   # Validate logging file provider.
   _validate_providers([job_resources.logging], 'logging', logging_providers,
                       provider_name)
 
   # Validate job input and output file providers
-  _validate_providers(job_data['inputs'], 'input', input_providers,
+  _validate_providers(job_params['inputs'], 'input', input_providers,
                       provider_name)
-  _validate_providers(job_data['outputs'], 'output', output_providers,
+  _validate_providers(job_params['outputs'], 'output', output_providers,
                       provider_name)
 
   # Validate input and output file providers.
-  for task in all_task_data:
-    _validate_providers(task['inputs'], 'input', input_providers, provider_name)
-    _validate_providers(task['outputs'], 'output', output_providers,
-                        provider_name)
+  for task_descriptor in task_descriptors:
+    _validate_providers(task_descriptor.task_params['inputs'], 'input',
+                        input_providers, provider_name)
+    _validate_providers(task_descriptor.task_params['outputs'], 'output',
+                        output_providers, provider_name)
 
 
 def directory_fmt(directory):
@@ -961,7 +761,7 @@ def age_to_create_time(age, from_time=None):
     return None
 
   if not from_time:
-    from_time = datetime.datetime.now().replace(tzinfo=tzlocal())
+    from_time = dsub_util.replace_timezone(datetime.datetime.now(), tzlocal())
 
   try:
     last_char = age[-1]
@@ -979,8 +779,8 @@ def age_to_create_time(age, from_time=None):
     else:
       # If no unit is given treat the age as seconds from epoch, otherwise apply
       # the correct time unit.
-      return datetime.datetime.utcfromtimestamp(
-          int(age)).replace(tzinfo=pytz.utc)
+      return dsub_util.replace_timezone(
+          datetime.datetime.utcfromtimestamp(int(age)), pytz.utc)
 
   except (ValueError, OverflowError) as e:
     raise ValueError('Unable to parse age string %s: %s' % (age, e))

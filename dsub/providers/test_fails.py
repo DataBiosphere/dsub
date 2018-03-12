@@ -19,6 +19,7 @@
 
 from . import base
 from ..lib import dsub_util
+from ..lib import job_model
 
 
 class FailsException(Exception):
@@ -31,19 +32,23 @@ class FailsJobProvider(base.JobProvider):
   def __init__(self):
     self._operations = []
 
-  def submit_job(self, job_resources, job_metadata, job_data, all_task_data,
-                 skip_if_output_present):
+  def submit_job(self, job_descriptor, skip_if_output_present):
     """Fails if there's anything to submit (so, not skipped)."""
-    del job_resources, job_metadata
     if not skip_if_output_present:
       raise FailsException("fails provider made submit_job fail")
-    for task_data in all_task_data:
-      outputs = job_data["outputs"] | task_data["outputs"]
+
+    for task_view in job_model.task_view_generator(job_descriptor):
+      job_params = task_view.job_params
+      task_params = task_view.task_descriptors[0].task_params
+
+      outputs = job_params["outputs"] | task_params["outputs"]
       if dsub_util.outputs_are_present(outputs):
         print "Skipping task because its outputs are present"
         continue
+
       # if any task is allowed to run, then we fail.
       raise FailsException("fails provider made submit_job fail")
+
     return {"job-id": dsub_util.NO_JOB}
 
   def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
@@ -66,8 +71,8 @@ class FailsJobProvider(base.JobProvider):
     del tasks  # doesn't matter either
     return ["Fail provider never completes a job"]
 
-  def prepare_job_metadata(self, script, job_name, user_id):
-    del script, job_name, user_id  # all the same
+  def prepare_job_metadata(self, script, job_name, user_id, create_time):
+    del script, job_name, user_id, create_time  # all the same
     return {"job-id": "DOOMED_JOB"}
 
 

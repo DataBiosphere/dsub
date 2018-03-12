@@ -39,7 +39,7 @@ class JobProvider(object):
   __metaclass__ = ABCMeta
 
   @abstractmethod
-  def prepare_job_metadata(self, script, job_name, user_id):
+  def prepare_job_metadata(self, script, job_name, user_id, create_time):
     """Returns a dictionary of metadata fields for the job.
 
     Call this before calling submit_job.
@@ -70,33 +70,22 @@ class JobProvider(object):
 
     Args:
       script: path to the job script
-      job_name: ?
+      job_name: user-supplied job name, if any
       user_id: user whose jobs to look for
+      create_time: create time for the job
     """
     raise NotImplementedError()
 
   @abstractmethod
-  def submit_job(self, job_resources, job_metadata, job_data, all_task_data,
-                 skip_if_output_present):
+  def submit_job(self, job_descriptor, skip_if_output_present):
     """Submit the job to be executed.
 
     Args:
-      job_resources: resource parameters required by each job.
-      job_metadata: job parameters such as job-id, user-id, script.
-      job_data: job parameters included in each task.
-      all_task_data: list of parameters to launch each job task.
+      job_descriptor (job_model.JobDescriptor): parameters needed to launch all
+      job tasks
       skip_if_output_present: (boolean) if true, skip tasks whose output
         is present (see --skip flag for more explanation).
 
-    job_resources contains settings related to how many resources to give each
-    task. Its fields include: min_cores, min_ram, disk_size, boot_disk_size,
-    preemptible, image, zones.
-
-    job_metadata is a dictionary. Its fields include: 'script', 'pipeline-name',
-    'job-name', 'job-id', 'user-id', 'is_table'.
-
-    task_parameters is a list of dictionaries, one per task to execute.
-    Each contains the following fields: 'envs', 'inputs', 'outputs'.
 
     Returns:
       A dictionary containing the 'user-id', 'job-id', and 'task-id' list.
@@ -105,7 +94,7 @@ class JobProvider(object):
 
 
     Raises:
-      ValueError: submit job may validate any of the parameters and raise
+      ValueError: submit_job may validate any of the parameters and raise
         a value error if any parameter (or specific combination of parameters)
         is not supported by the provider.
     """

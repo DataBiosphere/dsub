@@ -15,77 +15,80 @@
 """
 
 import unittest
-from dsub.lib import providers_util
+from dsub.providers import provider_base
 import parameterized
 
 
 class TestLoggingPath(unittest.TestCase):
 
-  task_data_no_task = {
+  job_metadata = {
       'job-id': 'job--id',
       'job-name': 'job--name',
       'user-id': 'user--id',
   }
-  task_data = {
-      'job-id': 'job--id',
+  task_metadata_no_task = {}
+  task_metadata = {
       'task-id': 'task--id',
-      'job-name': 'job--name',
-      'user-id': 'user--id',
   }
 
   @parameterized.parameterized.expand([
       # Directory paths
-      ('1PG', 'gs://bucket/', task_data_no_task, 'gs://bucket/job--id.log'),
-      ('1PL', '/tmp/dir/', task_data_no_task, '/tmp/dir/job--id.log'),
-      ('2PG', 'gs://bucket/', task_data, 'gs://bucket/job--id.task--id.log'),
-      ('2PL', '/tmp/dir/', task_data, '/tmp/dir/job--id.task--id.log'),
-      ('3PG', 'gs://bucket/folder', task_data_no_task,
+      ('1PG', 'gs://bucket/', task_metadata_no_task, 'gs://bucket/job--id.log'),
+      ('1PL', '/tmp/dir/', task_metadata_no_task, '/tmp/dir/job--id.log'),
+      ('2PG', 'gs://bucket/', task_metadata,
+       'gs://bucket/job--id.task--id.log'),
+      ('2PL', '/tmp/dir/', task_metadata, '/tmp/dir/job--id.task--id.log'),
+      ('3PG', 'gs://bucket/folder', task_metadata_no_task,
        'gs://bucket/folder/job--id.log'),
-      ('3PL', '/tmp/dir/folder', task_data_no_task,
+      ('3PL', '/tmp/dir/folder', task_metadata_no_task,
        '/tmp/dir/folder/job--id.log'),
-      ('4PG', 'gs://bucket/folder', task_data,
+      ('4PG', 'gs://bucket/folder', task_metadata,
        'gs://bucket/folder/job--id.task--id.log'),
-      ('4PL', '/tmp/dir/folder', task_data,
+      ('4PL', '/tmp/dir/folder', task_metadata,
        '/tmp/dir/folder/job--id.task--id.log'),
-      ('5PG', 'gs://bucket/isitafile.txt', task_data_no_task,
+      ('5PG', 'gs://bucket/isitafile.txt', task_metadata_no_task,
        'gs://bucket/isitafile.txt/job--id.log'),
-      ('5PL', '/tmp/dir/isitafile.txt', task_data_no_task,
+      ('5PL', '/tmp/dir/isitafile.txt', task_metadata_no_task,
        '/tmp/dir/isitafile.txt/job--id.log'),
-      ('6PG', 'gs://bucket/isitafile.txt', task_data,
+      ('6PG', 'gs://bucket/isitafile.txt', task_metadata,
        'gs://bucket/isitafile.txt/job--id.task--id.log'),
-      ('6PL', '/tmp/dir/isitafile.txt', task_data,
+      ('6PL', '/tmp/dir/isitafile.txt', task_metadata,
        '/tmp/dir/isitafile.txt/job--id.task--id.log'),
 
       # .log paths
-      ('1FG', 'gs://bucket/file.log', task_data_no_task,
+      ('1FG', 'gs://bucket/file.log', task_metadata_no_task,
        'gs://bucket/file.log'),
-      ('1FL', '/tmp/dir/file.log', task_data_no_task, '/tmp/dir/file.log'),
-      ('2FG', 'gs://bucket/file.log', task_data,
+      ('1FL', '/tmp/dir/file.log', task_metadata_no_task, '/tmp/dir/file.log'),
+      ('2FG', 'gs://bucket/file.log', task_metadata,
        'gs://bucket/file.task--id.log'),
-      ('2FL', '/tmp/dir/file.log', task_data, '/tmp/dir/file.task--id.log'),
+      ('2FL', '/tmp/dir/file.log', task_metadata, '/tmp/dir/file.task--id.log'),
 
       # Custom paths
-      ('1CG', 'gs://bucket/path/{job-id}/{task-id}.log', task_data_no_task,
+      ('1CG', 'gs://bucket/path/{job-id}/{task-id}.log', task_metadata_no_task,
        'gs://bucket/path/job--id/task.log'),
-      ('1CL', '/tmp/dir/path/{job-id}/{task-id}.log', task_data_no_task,
+      ('1CL', '/tmp/dir/path/{job-id}/{task-id}.log', task_metadata_no_task,
        '/tmp/dir/path/job--id/task.log'),
-      ('2CG', 'gs://bucket/path/{job-id}/{task-id}.log', task_data,
+      ('2CG', 'gs://bucket/path/{job-id}/{task-id}.log', task_metadata,
        'gs://bucket/path/job--id/task--id.log'),
-      ('2CL', '/tmp/dir/path/{job-id}/{task-id}.log', task_data,
+      ('2CL', '/tmp/dir/path/{job-id}/{task-id}.log', task_metadata,
        '/tmp/dir/path/job--id/task--id.log'),
       ('3CG', 'gs://bucket/path/{user-id}/{job-name}/{job-id}/{task-id}.log',
-       task_data_no_task,
+       task_metadata_no_task,
        'gs://bucket/path/user--id/job--name/job--id/task.log'),
       ('3CL', '/tmp/dir/path/{user-id}/{job-name}/{job-id}/{task-id}.log',
-       task_data_no_task, '/tmp/dir/path/user--id/job--name/job--id/task.log'),
+       task_metadata_no_task,
+       '/tmp/dir/path/user--id/job--name/job--id/task.log'),
       ('4CG', 'gs://bucket/path/{user-id}/{job-name}/{job-id}/{task-id}.log',
-       task_data, 'gs://bucket/path/user--id/job--name/job--id/task--id.log'),
+       task_metadata,
+       'gs://bucket/path/user--id/job--name/job--id/task--id.log'),
       ('4CL', '/tmp/dir/path/{user-id}/{job-name}/{job-id}/{task-id}.log',
-       task_data, '/tmp/dir/path/user--id/job--name/job--id/task--id.log'),
+       task_metadata, '/tmp/dir/path/user--id/job--name/job--id/task--id.log'),
   ])
-  def test_logging_path(self, unused_name, logging_uri, metadata, expected):
+  def test_logging_path(self, unused_name, logging_uri, task_metadata,
+                        expected):
     del unused_name
-    formatted = providers_util.format_logging_uri(logging_uri, metadata)
+    formatted = provider_base.format_logging_uri(logging_uri, self.job_metadata,
+                                                 task_metadata)
     self.assertEqual(expected, formatted)
 
 

@@ -18,21 +18,26 @@ from __future__ import print_function
 from contextlib import contextmanager
 import fnmatch
 import io
-import oauth2client.client
 import os
 import pwd
-import retrying
 from StringIO import StringIO
 import sys
 
 from apiclient import discovery
 from apiclient import errors
 from apiclient.http import MediaIoBaseDownload
+import oauth2client.client
 from oauth2client.client import GoogleCredentials
+import retrying
 
 
 # this is the Job ID for jobs that are skipped.
 NO_JOB = 'NO_JOB'
+
+
+def replace_timezone(dt, tz):
+  # pylint: disable=g-tzinfo-replace
+  return dt.replace(tzinfo=tz)
 
 
 class _Printer(object):
@@ -86,6 +91,42 @@ def tasks_to_job_ids(task_list):
   return set([t.get_field('job-id') for t in task_list])
 
 
+def compact_interval_string(value_list):
+  """Compact a list of integers into a comma-separated string of intervals.
+
+  Args:
+    value_list: A list of sortable integers such as a list of numbers
+
+  Returns:
+    A compact string representation, such as "1-5,8,12-15"
+  """
+
+  if not value_list:
+    return ''
+
+  value_list.sort()
+
+  # Start by simply building up a list of separate contiguous intervals
+  interval_list = []
+  curr = []
+  for val in value_list:
+    if curr and (val > curr[-1] + 1):
+      interval_list.append((curr[0], curr[-1]))
+      curr = [val]
+    else:
+      curr.append(val)
+
+  if curr:
+    interval_list.append((curr[0], curr[-1]))
+
+  # For each interval collapse it down to "first, last" or just "first" if
+  # if first == last.
+  return ','.join([
+      '{}-{}'.format(pair[0], pair[1]) if pair[0] != pair[1] else str(pair[0])
+      for pair in interval_list
+  ])
+
+
 def _get_storage_service(credentials):
   """Get a storage client using the provided credentials or defaults."""
   if credentials is None:
@@ -94,7 +135,7 @@ def _get_storage_service(credentials):
 
 
 def _retry_download_check(exception):
-  """Return True if we should retry, False otherwise"""
+  """Return True if we should retry, False otherwise."""
   print_error('Exception during download: %s' % str(exception))
   return isinstance(exception, oauth2client.client.HttpAccessTokenRefreshError)
 
