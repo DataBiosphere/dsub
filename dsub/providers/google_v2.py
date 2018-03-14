@@ -1,4 +1,4 @@
-# Copyright 2018 Verily Life Sciences. All Rights Reserved.
+# Copyright 2018 Verily Life Sciences Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ from __future__ import division
 from __future__ import print_function
 
 from . import base
+from . import google_base
 
 _PROVIDER_NAME = 'google-v2'
 
@@ -28,8 +29,13 @@ _PROVIDER_NAME = 'google-v2'
 class GoogleV2JobProvider(base.JobProvider):
   """dsub provider implementation managing Jobs on Google Cloud."""
 
-  def __init__(self):
-    pass
+  def __init__(self, project, regions=None, zones=None, credentials=None):
+    self._project = project
+    self._regions = regions
+    self._zones = zones
+
+    self._service = google_base.setup_service('genomics', 'v2alpha1',
+                                              credentials)
 
   def submit_job(self, job_descriptor):
     pass

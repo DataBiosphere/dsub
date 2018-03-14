@@ -23,15 +23,11 @@ import itertools
 import json
 import os
 import re
-import socket
-import string
-import sys
 import textwrap
-from . import base
-from .._dsub_version import DSUB_VERSION
 
-import apiclient.discovery
-import apiclient.errors
+from . import base
+from . import google_base
+from .._dsub_version import DSUB_VERSION
 
 # TODO(b/68858502) Remove the use of relative imports throughout this library
 from ..lib import dsub_util
@@ -39,10 +35,7 @@ from ..lib import job_model
 from ..lib import param_util
 from ..lib import providers_util
 from ..lib import sorting_util
-from oauth2client.client import GoogleCredentials
-from oauth2client.client import HttpAccessTokenRefreshError
 import pytz
-import retrying
 
 _PROVIDER_NAME = 'google'
 
@@ -160,15 +153,6 @@ INSTALL_CLOUD_SDK = textwrap.dedent("""\
   fi
 """)
 
-# Transient errors for the Google APIs should not cause them to fail.
-# There are a set of HTTP and socket errors which we automatically retry.
-#  429: too frequent polling
-#  50x: backend error
-TRANSIENT_HTTP_ERROR_CODES = set([429, 500, 503, 504])
-
-# Socket error 104 (connection reset) should also be retried
-TRANSIENT_SOCKET_ERROR_CODES = set([104])
-
 # When attempting to cancel an operation that is already completed
 # (succeeded, failed, or canceled), the response will include:
 # "error": {
@@ -177,178 +161,6 @@ TRANSIENT_SOCKET_ERROR_CODES = set([104])
 # }
 FAILED_PRECONDITION_CODE = 400
 FAILED_PRECONDITION_STATUS = 'FAILED_PRECONDITION'
-
-# List of Compute Engine zones, which enables simple wildcard expansion.
-# We could look this up dynamically, but new zones come online
-# infrequently enough, this is easy to keep up with.
-# Also - the Pipelines API may one day directly support zone wildcards.
-#
-# To refresh this list:
-#   gcloud compute zones list --format='value(name)' \
-#     | sort | awk '{ printf "    '\''%s'\'',\n", $1 }'
-_ZONES = [
-    'asia-east1-a',
-    'asia-east1-b',
-    'asia-east1-c',
-    'asia-northeast1-a',
-    'asia-northeast1-b',
-    'asia-northeast1-c',
-    'asia-south1-a',
-    'asia-south1-b',
-    'asia-south1-c',
-    'asia-southeast1-a',
-    'asia-southeast1-b',
-    'australia-southeast1-a',
-    'australia-southeast1-b',
-    'australia-southeast1-c',
-    'europe-west1-b',
-    'europe-west1-c',
-    'europe-west1-d',
-    'europe-west2-a',
-    'europe-west2-b',
-    'europe-west2-c',
-    'europe-west3-a',
-    'europe-west3-b',
-    'europe-west3-c',
-    'europe-west4-b',
-    'europe-west4-c',
-    'northamerica-northeast1-a',
-    'northamerica-northeast1-b',
-    'northamerica-northeast1-c',
-    'southamerica-east1-a',
-    'southamerica-east1-b',
-    'southamerica-east1-c',
-    'us-central1-a',
-    'us-central1-b',
-    'us-central1-c',
-    'us-central1-f',
-    'us-east1-b',
-    'us-east1-c',
-    'us-east1-d',
-    'us-east4-a',
-    'us-east4-b',
-    'us-east4-c',
-    'us-west1-a',
-    'us-west1-b',
-    'us-west1-c',
-]
-
-
-def _get_zones(input_list):
-  """Returns a list of zones based on any wildcard input.
-
-  This function is intended to provide an easy method for producing a list
-  of desired zones for a pipeline to run in.
-
-  The Pipelines API default zone list is "any zone". The problem with
-  "any zone" is that it can lead to incurring Cloud Storage egress charges
-  if the GCE zone selected is in a different region than the GCS bucket.
-  See https://cloud.google.com/storage/pricing#network-egress.
-
-  A user with a multi-region US bucket would want to pipelines to run in
-  a "us-*" zone.
-  A user with a regional bucket in US would want to restrict pipelines to
-  run in a zone in that region.
-
-  Rarely does the specific zone matter for a pipeline.
-
-  This function allows for a simple short-hand such as:
-     [ "us-*" ]
-     [ "us-central1-*" ]
-  These examples will expand out to the full list of US and us-central1 zones
-  respectively.
-
-  Args:
-    input_list: list of zone names/patterns
-
-  Returns:
-    A list of zones, with any wildcard zone specifications expanded.
-  """
-
-  output_list = []
-
-  for zone in input_list:
-    if zone.endswith('*'):
-      prefix = zone[:-1]
-      output_list.extend([z for z in _ZONES if z.startswith(prefix)])
-    else:
-      output_list.append(zone)
-
-  return output_list
-
-
-def _print_error(msg):
-  """Utility routine to emit messages to stderr."""
-  print >> sys.stderr, msg
-
-
-class _Label(job_model.LabelParam):
-  """Name/value label metadata for a pipeline.
-
-  Attributes:
-    name (str): the label name.
-    value (str): the label value (optional).
-  """
-  _allow_reserved_keys = True
-  __slots__ = ()
-
-  @staticmethod
-  def convert_to_label_chars(s):
-    """Turn the specified name and value into a valid Google label."""
-
-    # We want the results to be user-friendly, not just functional.
-    # So we can't base-64 encode it.
-    #   * If upper-case: lower-case it
-    #   * If the char is not a standard letter or digit. make it a dash
-    accepted_characters = string.ascii_lowercase + string.digits + '-'
-
-    def label_char_transform(char):
-      if char in accepted_characters:
-        return char
-      if char in string.ascii_uppercase:
-        return char.lower()
-      return '-'
-
-    return ''.join(label_char_transform(c) for c in s)
-
-
-def _retry_api_check(exception):
-  """Return True if we should retry. False otherwise.
-
-  Args:
-    exception: An exception to test for transience.
-
-  Returns:
-    True if we should retry. False otherwise.
-  """
-  _print_error('Exception %s: %s' % (type(exception).__name__, str(exception)))
-
-  if isinstance(exception, apiclient.errors.HttpError):
-    if exception.resp.status in TRANSIENT_HTTP_ERROR_CODES:
-      return True
-
-  if isinstance(exception, socket.error):
-    if exception.errno in TRANSIENT_SOCKET_ERROR_CODES:
-      return True
-
-  if isinstance(exception, HttpAccessTokenRefreshError):
-    return True
-
-  return False
-
-
-class _Api(object):
-
-  # Exponential backoff retrying API execution.
-  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
-  @staticmethod
-  @retrying.retry(
-      stop_max_attempt_number=23,
-      retry_on_exception=_retry_api_check,
-      wait_exponential_multiplier=1000,
-      wait_exponential_max=64000)
-  def execute(api):
-    return api.execute()
 
 
 class _Pipelines(object):
@@ -560,7 +372,7 @@ class _Pipelines(object):
                 'minimumRamGb': min_ram,
                 'bootDiskSizeGb': boot_disk_size,
                 'preemptible': preemptible,
-                'zones': _get_zones(zones),
+                'zones': google_base.get_zones(zones),
                 'acceleratorType': accelerator_type,
                 'acceleratorCount': accelerator_count,
 
@@ -670,7 +482,7 @@ class _Pipelines(object):
 
   @staticmethod
   def run_pipeline(service, pipeline):
-    return _Api.execute(service.pipelines().run(body=pipeline))
+    return google_base.Api.execute(service.pipelines().run(body=pipeline))
 
 
 class _Operations(object):
@@ -807,7 +619,7 @@ class _Operations(object):
           filter=ops_filter,
           pageToken=page_token,
           pageSize=page_size)
-      response = _Api.execute(api)
+      response = google_base.Api.execute(api)
 
       ops = response.get('operations', [])
       for op in ops:
@@ -928,33 +740,8 @@ class GoogleJobProvider(base.JobProvider):
     self._project = project
     self._zones = zones
 
-    self._service = self._setup_service(credentials)
-
-  # Exponential backoff retrying API discovery.
-  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
-  @classmethod
-  @retrying.retry(
-      stop_max_attempt_number=23,
-      retry_on_exception=_retry_api_check,
-      wait_exponential_multiplier=1000,
-      wait_exponential_max=64000)
-  def _do_setup_service(cls, credentials):
-    return apiclient.discovery.build(
-        'genomics', 'v1alpha2', credentials=credentials)
-
-  @classmethod
-  def _setup_service(cls, credentials=None):
-    """Configures genomics API client.
-
-    Args:
-      credentials: credentials to be used for the gcloud API calls.
-
-    Returns:
-      A configured Google Genomics API client with appropriate credentials.
-    """
-    if not credentials:
-      credentials = GoogleCredentials.get_application_default()
-    return cls._do_setup_service(credentials)
+    self._service = google_base.setup_service('genomics', 'v1alpha2',
+                                              credentials)
 
   def prepare_job_metadata(self, script, job_name, user_id, create_time):
     """Returns a dictionary of metadata fields for the job."""
@@ -965,14 +752,14 @@ class GoogleJobProvider(base.JobProvider):
     # 'job-name' label (and so the value must be normalized).
     if job_name:
       pipeline_name = job_name
-      job_name_value = _Label.convert_to_label_chars(job_name)
+      job_name_value = job_model.convert_to_label_chars(job_name)
     else:
       pipeline_name = os.path.basename(script)
-      job_name_value = _Label.convert_to_label_chars(
+      job_name_value = job_model.convert_to_label_chars(
           pipeline_name.split('.', 1)[0])
 
     # The user-id will get set as a label
-    user_id = _Label.convert_to_label_chars(user_id)
+    user_id = job_model.convert_to_label_chars(user_id)
 
     # Now build the job-id. We want the job-id to be expressive while also
     # having a low-likelihood of collisions.
@@ -991,7 +778,7 @@ class GoogleJobProvider(base.JobProvider):
 
     # Standard version is MAJOR.MINOR(.PATCH). This will convert the version
     # string to "vMAJOR-MINOR(-PATCH)". Example; "0.1.0" -> "v0-1-0".
-    version = _Label.convert_to_label_chars('v%s' % DSUB_VERSION)
+    version = job_model.convert_to_label_chars('v%s' % DSUB_VERSION)
     return {
         'pipeline-name': pipeline_name,
         'job-name': job_name_value,
@@ -1002,12 +789,14 @@ class GoogleJobProvider(base.JobProvider):
 
   def _build_pipeline_labels(self, job_metadata, task_metadata):
     labels = {
-        _Label(name, job_metadata[name])
+        google_base.Label(name, job_metadata[name])
         for name in ['job-name', 'job-id', 'user-id', 'dsub-version']
     }
 
     if task_metadata.get('task-id') is not None:
-      labels.add(_Label('task-id', 'task-%d' % task_metadata.get('task-id')))
+      labels.add(
+          google_base.Label('task-id',
+                            'task-%d' % task_metadata.get('task-id')))
 
     return labels
 

@@ -55,6 +55,8 @@ from __future__ import print_function
 import collections
 import datetime
 import re
+import string
+
 from . import dsub_util
 from dateutil.tz import tzlocal
 import pytz
@@ -166,6 +168,25 @@ class LoggingParam(
     file_provider (enum): Service or infrastructure hosting the file.
   """
   pass
+
+
+def convert_to_label_chars(s):
+  """Turn the specified name and value into a valid Google label."""
+
+  # We want the results to be user-friendly, not just functional.
+  # So we can't base-64 encode it.
+  #   * If upper-case: lower-case it
+  #   * If the char is not a standard letter or digit. make it a dash
+  accepted_characters = string.ascii_lowercase + string.digits + '-'
+
+  def label_char_transform(char):
+    if char in accepted_characters:
+      return char
+    if char in string.ascii_uppercase:
+      return char.lower()
+    return '-'
+
+  return ''.join(label_char_transform(c) for c in s)
 
 
 class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
