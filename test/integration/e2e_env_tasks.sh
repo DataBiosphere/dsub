@@ -41,10 +41,10 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   # Also include 0 to make sure it is passed through correctly as
   # a string ("0") and not dropped as int (0).
   util::write_tsv_file "${TASKS_FILE}" '
-  --env TASK_VAR1\t--env TASK_VAR2\t--env TASK_VAR_ZERO\t--env TASK_VAR3
-  \tVAL2_TASK1\t0\tVAL3_TASK1
-  VAL1_TASK2\t\t0\tVAL3_TASK2
-  VAL1_TASK3\tVAL2_TASK3\t0\t
+  --env TASK_VAR1\t--env TASK_VAR2\t--env TASK_VAR_ZERO\t--input TASK_VAR_IO1\t--input-recursive TASK_VAR_IO2\t--output TASK_VAR_IO3\t--output-recursive TASK_VAR_IO4\t--env TASK_VAR3
+  \tVAL2_TASK1\t0\t\t\t\t\tVAL3_TASK1
+  VAL1_TASK2\t\t0\t\t\t\t\tVAL3_TASK2
+  VAL1_TASK3\tVAL2_TASK3\t0\t\t\t\t\t
   '
 
   echo "Launching pipeline..."
@@ -58,6 +58,10 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --env VAR4="VAL4 (four)" \
     --env VAR5="VAL5" \
     --env VAR6= \
+    --input VAR_IO1= \
+    --input-recursive VAR_IO2= \
+    --output VAR_IO3= \
+    --output-recursive VAR_IO4= \
     --env VAR_ZERO=0 \
     --tasks "${TASKS_FILE}" \
     --wait
@@ -81,6 +85,10 @@ for ((TASK_ID=1; TASK_ID <= NUM_TASKS; TASK_ID++)); do
       TASK_VAR1=%s
       TASK_VAR2=%s
       TASK_VAR3=%s
+      TASK_VAR_IO1=
+      TASK_VAR_IO2=
+      TASK_VAR_IO3=
+      TASK_VAR_IO4=
       TASK_VAR_ZERO=0
       VAR1=VAL1
       VAR2=VAL2
@@ -88,6 +96,10 @@ for ((TASK_ID=1; TASK_ID <= NUM_TASKS; TASK_ID++)); do
       VAR4=VAL4 (four)
       VAR5=VAL5
       VAR6=
+      VAR_IO1=
+      VAR_IO2=
+      VAR_IO3=
+      VAR_IO4=
       VAR_ZERO=0
       ' "${TASK_VAR1}" "${TASK_VAR2}" "${TASK_VAR3}" | \
     grep -v '^$' | \

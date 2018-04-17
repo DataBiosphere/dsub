@@ -213,8 +213,12 @@ class _Pipelines(object):
     # * sets the working directory to ${DATA_ROOT}
     # * executes the user script
     # * recursively copies output directories
-    recursive_input_dirs = [var for var in inputs if var.recursive]
-    recursive_output_dirs = [var for var in outputs if var.recursive]
+    recursive_input_dirs = [
+        var for var in inputs if var.recursive and var.value
+    ]
+    recursive_output_dirs = [
+        var for var in outputs if var.recursive and var.value
+    ]
 
     install_cloud_sdk = ''
     if recursive_input_dirs or recursive_output_dirs:
@@ -239,6 +243,7 @@ class _Pipelines(object):
     docker_paths = [
         var.docker_path if var.recursive else os.path.dirname(var.docker_path)
         for var in outputs
+        if var.value
     ]
 
     mkdirs = '\n'.join([
@@ -247,8 +252,8 @@ class _Pipelines(object):
     ])
 
     inputs_with_wildcards = [
-        var for var in inputs
-        if not var.recursive and '*' in os.path.basename(var.docker_path)
+        var for var in inputs if not var.recursive and var.docker_path and
+        '*' in os.path.basename(var.docker_path)
     ]
     export_inputs_with_wildcards = '\n'.join([
         'export {0}="{1}/{2}"'.format(var.name, DATA_MOUNT_POINT,
@@ -256,8 +261,11 @@ class _Pipelines(object):
         for var in inputs_with_wildcards
     ])
 
-    export_empty_envs = '\n'.join(
-        ['export {0}=""'.format(var.name) for var in envs if not var.value])
+    export_empty_envs = '\n'.join([
+        'export {0}=""'.format(var.name)
+        for var in envs | inputs | outputs
+        if not var.value
+    ])
 
     return DOCKER_COMMAND.format(
         mk_runtime_dirs=MK_RUNTIME_DIRS_COMMAND,
@@ -348,14 +356,14 @@ class _Pipelines(object):
     input_files = [
         cls._build_pipeline_input_file_param(var.name, var.docker_path)
         for var in inputs
-        if not var.recursive
+        if not var.recursive and var.value
     ]
 
     # Outputs are an array of file parameters
     output_files = [
         cls._build_pipeline_file_param(var.name, var.docker_path)
         for var in outputs
-        if not var.recursive
+        if not var.recursive and var.value
     ]
 
     # The ephemeralPipeline provides the template for the pipeline.
@@ -428,7 +436,7 @@ class _Pipelines(object):
     inputs.update({
         var.name: var.uri
         for var in job_params['inputs'] | task_params['inputs']
-        if not var.recursive
+        if not var.recursive and var.value
     })
 
     # Remove wildcard references for non-recursive output. When the pipelines
@@ -438,7 +446,7 @@ class _Pipelines(object):
     #   gsutil cp /mnt/data/output/gs/bucket/path/*.bam gs://bucket/path/
     outputs = {}
     for var in job_params['outputs'] | task_params['outputs']:
-      if var.recursive:
+      if var.recursive or not var.value:
         continue
       if '*' in var.uri.basename:
         outputs[var.name] = var.uri.path

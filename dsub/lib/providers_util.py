@@ -35,10 +35,10 @@ def build_recursive_localize_env(destination, inputs):
     corresponding to the inputs.
   """
   export_input_dirs = '\n'.join([
-      'export {0}={1}/{2}'.format(var.name,
-                                  destination.rstrip('/'),
-                                  var.docker_path.rstrip('/')) for var in inputs
-      if var.recursive
+      'export {0}={1}/{2}'.format(var.name, destination.rstrip('/'),
+                                  var.docker_path.rstrip('/'))
+      for var in inputs
+      if var.recursive and var.docker_path
   ])
   return export_input_dirs
 

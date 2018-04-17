@@ -697,9 +697,9 @@ class LocalJobProvider(base.JobProvider):
     """Return a dictionary of environment variables for the VM."""
     ret = {}
     for i in inputs:
-      ret[i.name] = _DATA_MOUNT_POINT + '/' + i.docker_path
+      ret[i.name] = _DATA_MOUNT_POINT + '/' + i.docker_path if i.value else ''
     for o in outputs:
-      ret[o.name] = _DATA_MOUNT_POINT + '/' + o.docker_path
+      ret[o.name] = _DATA_MOUNT_POINT + '/' + o.docker_path if o.value else ''
     return ret
 
   def _localize_inputs_recursive_command(self, task_dir, inputs):
@@ -737,7 +737,7 @@ class LocalJobProvider(base.JobProvider):
     """Returns a command that will stage inputs."""
     commands = []
     for i in inputs:
-      if i.recursive:
+      if i.recursive or not i.value:
         continue
 
       source_file_path = i.uri
@@ -763,6 +763,8 @@ class LocalJobProvider(base.JobProvider):
     os.makedirs(task_dir + '/' + _DATA_SUBDIR + '/' + _WORKING_DIR)
     os.makedirs(task_dir + '/' + _DATA_SUBDIR + '/tmp')
     for o in outputs:
+      if not o.value:
+        continue
       local_file_path = task_dir + '/' + _DATA_SUBDIR + '/' + o.docker_path
       # makedirs errors out if the folder already exists, so check.
       if not os.path.isdir(os.path.dirname(local_file_path)):
@@ -787,7 +789,7 @@ class LocalJobProvider(base.JobProvider):
     """Copy outputs from local disk to GCS."""
     commands = []
     for o in outputs:
-      if o.recursive:
+      if o.recursive or not o.value:
         continue
 
       # The destination path is o.uri.path, which is the target directory

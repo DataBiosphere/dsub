@@ -269,7 +269,7 @@ class FileParamUtil(object):
       raise ValueError('Path characters ".." and "." not supported '
                        'for file names: %s' % uri)
 
-    # Do not allow non-recurssive IO to reference directories.
+    # Do not allow non-recursive IO to reference directories.
     if not recursive and not filename:
       raise ValueError('Input or output values that are not recursive must '
                        'reference a filename or wildcard: %s' % uri)
@@ -290,6 +290,8 @@ class FileParamUtil(object):
 
   def make_param(self, name, raw_uri, recursive):
     """Return a *FileParam given an input uri."""
+    if not raw_uri:
+      return self.param_class(name, None, None, None, recursive, None)
     docker_path, uri_parts, provider = self.parse_uri(raw_uri, recursive)
     return self.param_class(name, raw_uri, docker_path, uri_parts, recursive,
                             provider)
@@ -398,17 +400,13 @@ def parse_tasks_file_header(header, input_file_param_util,
       name = input_file_param_util.get_variable_name(col_value)
       job_params.append(
           job_model.InputFileParam(
-              name,
-              recursive=(col_type.endswith('recursive')),
-              file_provider=job_model.P_GCS))
+              name, recursive=(col_type.endswith('recursive'))))
 
     elif col_type == '--output' or col_type == '--output-recursive':
       name = output_file_param_util.get_variable_name(col_value)
       job_params.append(
           job_model.OutputFileParam(
-              name,
-              recursive=(col_type.endswith('recursive')),
-              file_provider=job_model.P_GCS))
+              name, recursive=(col_type.endswith('recursive'))))
 
     else:
       raise ValueError('Unrecognized column header: %s' % col)
@@ -593,6 +591,8 @@ def _validate_providers(fileparams, argname, providers, provider_name):
   error_message = ('Unsupported {argname} path ({path}) for '
                    'provider {provider!r}.')
   for fileparam in fileparams:
+    if not fileparam.uri:
+      continue
     if fileparam.file_provider not in providers:
       raise ValueError(
           error_message.format(
