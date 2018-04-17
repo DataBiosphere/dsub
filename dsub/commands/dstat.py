@@ -225,6 +225,8 @@ def _prepare_row(task, full):
       row_spec('outputs', True, {}),
       row_spec('envs', True, {}),
       row_spec('labels', True, {}),
+      row_spec('provider', True, None),
+      row_spec('provider-attributes', True, {}),
       row_spec('dsub-version', False, None),
   ]
   # pyformat: enable

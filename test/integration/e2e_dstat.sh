@@ -59,6 +59,39 @@ function verify_dstat_output() {
 readonly -f verify_dstat_output
 
 
+function verify_dstat_google_provider_fields() {
+   local dstat_out="${1}"
+   for (( job=0; job < 3; job++ )); do
+     # Skip the test if the job's state is not yet running or completed.
+     local status="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${job}].status")"
+     if ! [[ "${status}" =~ ^(RUNNING|SUCCESS)$ ]]; then
+       echo "  - NOTICE: status '${status}' may not have compute metadata,"
+       echo "            skipping provider fields tests."
+       exit 0
+     fi
+
+     # Run the provider test.
+     local job_name="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${job}].job-name")"
+     local job_provider="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${job}].provider")"
+
+     # Validate provider.
+     if [[ "${job_provider}" != "${DSUB_PROVIDER}" ]]; then
+       echo "  - FAILURE: provider ${job_provider} does not match '${DSUB_PROVIDER}'"
+       echo "${dstat_out}"
+       exit 1
+     fi
+     local job_zone=$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${job}].provider-attributes.zone")
+     if ! [[ "${job_zone}" =~ ^[a-z]{1,4}-[a-z]{2,15}[0-9]-[a-z]$ ]]; then
+       echo "  - FAILURE: Job zone ${job_zone} for job ${job_name} not valid."
+       echo "${dstat_out}"
+       exit 1
+     fi
+   done
+   echo "  - google provider fields verified"
+}
+readonly -f verify_dstat_google_provider_fields
+
+
 # This test is not sensitive to the output of the dsub job.
 # Set the ALLOW_DIRTY_TESTS environment variable to 1 in your shell to
 # run this test without first emptying the output and logging directories.
@@ -98,6 +131,12 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Checking dstat (by job-name)..."
 
+  # For the google provider, sleep briefly to allow the Pipelines v1
+  # to set the compute properties, which occurs shortly after pipeline submit.
+  if [[ "${DSUB_PROVIDER}" == "google" ]]; then
+    sleep 2
+  fi
+
   if ! DSTAT_OUTPUT="$(run_dstat --status 'RUNNING' 'SUCCESS' --full --names "${RUNNING_JOB_NAME_2}" "${RUNNING_JOB_NAME}" "${COMPLETED_JOB_NAME}" --label "test-token=${TEST_TOKEN}")"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"
@@ -106,6 +145,10 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   fi
 
   verify_dstat_output "${DSTAT_OUTPUT}"
+  if [[ "${DSUB_PROVIDER}" == "google" ]]; then
+    echo "Checking dstat google provider fields"
+    verify_dstat_google_provider_fields "${DSTAT_OUTPUT}"
+  fi
 
   echo "Checking dstat (by job-id: default)..."
 
@@ -144,6 +187,10 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   fi
 
   verify_dstat_output "${DSTAT_OUTPUT}"
+  if [[ "${DSUB_PROVIDER}" == "google" ]]; then
+    echo "Checking dstat google provider fields"
+    verify_dstat_google_provider_fields "${DSTAT_OUTPUT}"
+  fi
 
   echo "Checking dstat (by repeated job-ids: full)..."
 

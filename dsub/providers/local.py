@@ -885,6 +885,10 @@ class LocalTask(base.Task):
       for field in ['outputs', 'output-recursives']:
         items = self._get_job_and_task_param(job_params, task_params, field)
         value.update({item.name: item.value for item in items})
+    elif field == 'provider':
+      return _PROVIDER_NAME
+    elif field == 'provider-attributes':
+      value = {}
     else:
       # Convert the raw Task object to a dict.
       # With the exception of the "status' fields, the dsub field names map

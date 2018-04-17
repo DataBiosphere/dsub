@@ -1089,6 +1089,23 @@ class GoogleOperation(base.Task):
     elif field == 'last-update':
       status, last_update = self.operation_status_message()
       value = last_update
+    elif field == 'provider':
+      return _PROVIDER_NAME
+    elif field == 'provider-attributes':
+      # Use soft getting of keys to address a race condition and to
+      # pull the null values found in jobs that fail prior to scheduling.
+      gce_data = metadata.get('runtimeMetadata', {}).get('computeEngine', {})
+      if 'machineType' in gce_data:
+        machine_type = gce_data.get('machineType').rpartition('/')[2]
+      else:
+        machine_type = None
+      instance_name = gce_data.get('instanceName')
+      instance_zone = gce_data.get('zone')
+      value = {
+          'machine-type': machine_type,
+          'instance-name': instance_name,
+          'zone': instance_zone,
+      }
     else:
       raise ValueError('Unsupported field: "%s"' % field)
 
