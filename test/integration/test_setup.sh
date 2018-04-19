@@ -94,6 +94,14 @@ function dsub_google() {
     "${@}"
 }
 
+function dsub_google-v2() {
+  dsub \
+    --provider google-v2 \
+    --project "${PROJECT_ID}" \
+    --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
+    "${@}"
+}
+
 function dsub_local() {
   dsub \
     --provider local \

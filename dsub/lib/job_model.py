@@ -55,6 +55,8 @@ from __future__ import print_function
 import collections
 import datetime
 import re
+import string
+
 from . import dsub_util
 from dateutil.tz import tzlocal
 import pytz
@@ -62,6 +64,7 @@ import yaml
 
 DEFAULT_MIN_CORES = 1
 DEFAULT_MIN_RAM = 3.75
+DEFAULT_MACHINE_TYPE = 'n1-standard-1'
 DEFAULT_DISK_SIZE = 200
 DEFAULT_BOOT_DISK_SIZE = 10
 DEFAULT_PREEMPTIBLE = False
@@ -168,13 +171,32 @@ class LoggingParam(
   pass
 
 
+def convert_to_label_chars(s):
+  """Turn the specified name and value into a valid Google label."""
+
+  # We want the results to be user-friendly, not just functional.
+  # So we can't base-64 encode it.
+  #   * If upper-case: lower-case it
+  #   * If the char is not a standard letter or digit. make it a dash
+  accepted_characters = string.ascii_lowercase + string.digits + '-'
+
+  def label_char_transform(char):
+    if char in accepted_characters:
+      return char
+    if char in string.ascii_uppercase:
+      return char.lower()
+    return '-'
+
+  return ''.join(label_char_transform(c) for c in s)
+
+
 class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
   """Name/value label parameter to a pipeline.
 
   Subclasses of LabelParam may flip the _allow_reserved_keys attribute in order
   to allow reserved label values to be used. The check against reserved keys
   ensures that providers can rely on the label system to track dsub-related
-  values without allowing users to accidentially overwrite the labels.
+  values without allowing users to accidentally overwrite the labels.
 
   Attributes:
     name (str): the label name.
@@ -304,23 +326,25 @@ class OutputFileParam(FileParam):
 
 class Resources(
     collections.namedtuple('Resources', [
-        'min_cores', 'min_ram', 'disk_size', 'boot_disk_size', 'preemptible',
-        'image', 'logging', 'logging_path', 'zones', 'scopes', 'keep_alive',
-        'accelerator_type', 'accelerator_count'
+        'min_cores', 'min_ram', 'machine_type', 'disk_size', 'boot_disk_size',
+        'preemptible', 'image', 'logging', 'logging_path', 'regions', 'zones',
+        'scopes', 'keep_alive', 'accelerator_type', 'accelerator_count'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
   Attributes:
     min_cores (int): number of CPU cores
     min_ram (float): amount of memory (in GB)
+    machine_type (str): machine type (e.g. 'n1-standard-1', 'custom-1-4096')
     disk_size (int): size of the data disk (in GB)
     boot_disk_size (int): size of the boot disk (in GB)
     preemptible (bool): use a preemptible VM for the job
     image (str): Docker image name
     logging (param_util.LoggingParam): user-specified location for jobs logs
     logging_path (param_util.LoggingParam): resolved location for jobs logs
-    zones (str): location in which to run the job
-    scopes (list): OAuth2 scopes for the job
+    regions (List[str]): region list in which to run the job
+    zones (List[str]): zone list in which to run the job
+    scopes (List[str]): OAuth2 scopes for the job
     keep_alive (int): Seconds to keep VM alive on failure
     accelerator_type (string): Accelerator type (e.g. 'nvidia-tesla-k80').
     accelerator_count (int): Number of accelerators of the specified type to
@@ -331,21 +355,23 @@ class Resources(
   def __new__(cls,
               min_cores=None,
               min_ram=None,
+              machine_type=None,
               disk_size=None,
               boot_disk_size=None,
               preemptible=None,
               image=None,
               logging=None,
               logging_path=None,
+              regions=None,
               zones=None,
               scopes=None,
               keep_alive=None,
               accelerator_type=None,
               accelerator_count=0):
     return super(Resources, cls).__new__(
-        cls, min_cores, min_ram, disk_size, boot_disk_size, preemptible, image,
-        logging, logging_path, zones, scopes, keep_alive, accelerator_type,
-        accelerator_count)
+        cls, min_cores, min_ram, machine_type, disk_size, boot_disk_size,
+        preemptible, image, logging, logging_path, regions, zones, scopes,
+        keep_alive, accelerator_type, accelerator_count)
 
 
 def ensure_job_params_are_complete(job_params):
@@ -562,7 +588,7 @@ class JobDescriptor(object):
   def to_yaml(self):
     """Return a YAML string representing the job and task data.
 
-    A provider's internal represesentation of a dsub task typically does not map
+    A provider's internal representation of a dsub task typically does not map
     1-1 to the dsub representation. For example, the Google Genomics Pipeline
     does not natively support "input-recursive" or "output-recursive", so the
     google provider cannot easily reconstruct the user inputs from the

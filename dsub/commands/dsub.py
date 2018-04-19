@@ -169,6 +169,12 @@ class TaskParamAction(argparse.Action):
     setattr(namespace, self.dest, tasks)
 
 
+def _google_v2_parse_arguments(args):
+  """Validated google-v2 arguments."""
+  if (args.zones and args.regions) or (not args.zones and not args.regions):
+    raise ValueError('Exactly one of --regions and --zones must be specified')
+
+
 def _parse_arguments(prog, argv):
   """Parses command line arguments.
 
@@ -322,28 +328,34 @@ def _parse_arguments(prog, argv):
       ' (either a folder, or file ending in ".log")')
 
   # Add provider-specific arguments
-  google = parser.add_argument_group(
-      title='google',
-      description='Options for the Google provider (Pipelines API)')
-  google.add_argument(
+
+  # Shared arguments between the "google" and "google-v2" providers
+  google_common = parser.add_argument_group(
+      title='google-common',
+      description='Options common to the "google" and "google-v2" providers')
+  google_common.add_argument(
       '--project', help='Cloud project ID in which to run the pipeline')
-  google.add_argument(
+  google_common.add_argument(
       '--boot-disk-size',
       default=job_model.DEFAULT_BOOT_DISK_SIZE,
       type=int,
       help='Size (in GB) of the boot disk')
-  google.add_argument(
+  google_common.add_argument(
       '--preemptible',
       default=False,
       action='store_true',
       help='Use a preemptible VM for the job')
-  google.add_argument(
+  google_common.add_argument(
       '--zones', nargs='+', help='List of Google Compute Engine zones.')
-  google.add_argument(
+  google_common.add_argument(
       '--scopes',
       default=job_model.DEFAULT_SCOPES,
       nargs='+',
       help='Space-separated scopes for GCE instances.')
+
+  google = parser.add_argument_group(
+      title='"google" provider options',
+      description='See also the "google-common" options listed above')
   google.add_argument(
       '--keep-alive',
       type=int,
@@ -370,12 +382,29 @@ def _parse_arguments(prog, argv):
           following third-party software onto your job's Compute Engine
           instances: NVIDIA(R) Tesla(R) drivers and NVIDIA(R) CUDA toolkit.""")
 
-  return provider_base.parse_args(
+  google_v2 = parser.add_argument_group(
+      title='"google-v2" provider options',
+      description='See also the "google-common" options listed above')
+  google_v2.add_argument(
+      '--regions',
+      nargs='+',
+      help="""List of Google Compute Engine regions.
+          Only one of --zones and --regions may be specified.""")
+  google_v2.add_argument(
+      '--machine-type', help='Provider-specific machine type')
+
+  args = provider_base.parse_args(
       parser, {
           'google': ['project', 'zones', 'logging'],
+          'google-v2': ['project', 'logging'],
           'test-fails': [],
           'local': ['logging'],
       }, argv)
+
+  if args.provider == 'google-v2':
+    _google_v2_parse_arguments(args)
+
+  return args
 
 
 def _get_job_resources(args):
@@ -393,10 +422,12 @@ def _get_job_resources(args):
   return job_model.Resources(
       min_cores=args.min_cores,
       min_ram=args.min_ram,
+      machine_type=args.machine_type,
       disk_size=args.disk_size,
       boot_disk_size=args.boot_disk_size,
       preemptible=args.preemptible,
       image=args.image,
+      regions=args.regions,
       zones=args.zones,
       logging=logging,
       logging_path=None,

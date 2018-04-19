@@ -138,11 +138,14 @@ class FileParamUtilTest(unittest.TestCase):
       ('wc', False, 'gs://bucket/f/*', 'gs/bucket/f/*', job_model.P_GCS),
       ('wc', False, '*.bam', 'file/*.bam', job_model.P_LOCAL),
       ('wc', False, '../*', 'file/_dotdot_/*', job_model.P_LOCAL),
+      ('nl', False, '', None, None),
+      ('nl', True, '', None, None),
   ])
   def test_input_file_docker_rewrite(self, unused_name, recursive, uri, docker,
                                      provider):
     del unused_name
-    docker = os.path.join('input', docker)
+    if docker:
+      docker = os.path.join('input', docker)
     file_param_util = param_util.InputFileParamUtil('input')
     param = file_param_util.make_param('TEST', uri, recursive)
     self.assertIsInstance(param, job_model.InputFileParam)
@@ -182,11 +185,14 @@ class FileParamUtilTest(unittest.TestCase):
       ('wc', False, 'gs://bucket/f/*', 'gs/bucket/f/*', job_model.P_GCS),
       ('wc', False, '*.bam', 'file/*.bam', job_model.P_LOCAL),
       ('wc', False, '../*', 'file/_dotdot_/*', job_model.P_LOCAL),
+      ('nl', False, '', None, None),
+      ('nl', True, '', None, None),
   ])
   def test_out_file_docker_rewrite(self, unused_name, recursive, uri, docker,
                                    provider):
     del unused_name
-    docker = os.path.join('output', docker)
+    if docker:
+      docker = os.path.join('output', docker)
     file_param_util = param_util.OutputFileParamUtil('output')
     param = file_param_util.make_param('TEST', uri, recursive)
     self.assertIsInstance(param, job_model.OutputFileParam)
