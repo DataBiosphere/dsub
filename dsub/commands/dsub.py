@@ -33,6 +33,7 @@ from ..lib import job_model
 from ..lib import param_util
 from ..lib import resources
 from ..lib.dsub_util import print_error
+from ..providers import google_base
 from ..providers import provider_base
 
 SLEEP_FUNCTION = time.sleep  # so we can replace it in tests
@@ -349,9 +350,10 @@ def _parse_arguments(prog, argv):
       '--zones', nargs='+', help='List of Google Compute Engine zones.')
   google_common.add_argument(
       '--scopes',
-      default=job_model.DEFAULT_SCOPES,
       nargs='+',
-      help='Space-separated scopes for GCE instances.')
+      help="""Space-separated scopes for Google Compute Engine instances.
+          If unspecified, provider will use '%s'""" % ','.join(
+              google_base.DEFAULT_SCOPES))
 
   google = parser.add_argument_group(
       title='"google" provider options',
@@ -360,9 +362,9 @@ def _parse_arguments(prog, argv):
       '--keep-alive',
       type=int,
       help="""Time (in seconds) to keep a tasks's virtual machine (VM) running
-      after a localization, docker command, or delocalization failure.
-      Allows for connecting to the VM for debugging.
-      Default is 0; maximum allowed value is 86400 (1 day).""")
+          after a localization, docker command, or delocalization failure.
+          Allows for connecting to the VM for debugging.
+          Default is 0; maximum allowed value is 86400 (1 day).""")
   google.add_argument(
       '--accelerator-type',
       help="""The Compute Engine accelerator type. By specifying this parameter,

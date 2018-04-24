@@ -68,9 +68,6 @@ DEFAULT_MACHINE_TYPE = 'n1-standard-1'
 DEFAULT_DISK_SIZE = 200
 DEFAULT_BOOT_DISK_SIZE = 10
 DEFAULT_PREEMPTIBLE = False
-DEFAULT_SCOPES = [
-    'https://www.googleapis.com/auth/bigquery',
-]
 
 # Users may specify their own labels, however dsub also uses an implicit set of
 # labels (in the google provider). Reserve these labels such that users do

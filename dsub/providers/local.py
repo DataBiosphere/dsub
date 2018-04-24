@@ -105,8 +105,6 @@ _DATA_SUBDIR = 'data'
 _SCRIPT_DIR = 'script'
 _WORKING_DIR = 'workingdir'
 
-_DATA_MOUNT_POINT = '/mnt/data'
-
 # Set file provider whitelist.
 _SUPPORTED_FILE_PROVIDERS = frozenset([job_model.P_GCS, job_model.P_LOCAL])
 _SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
@@ -304,18 +302,18 @@ class LocalJobProvider(base.JobProvider):
 
     # Build the local runner script
     volumes = ('-v ' + task_dir + '/' + _DATA_SUBDIR + '/'
-               ':' + _DATA_MOUNT_POINT)
+               ':' + providers_util.DATA_MOUNT_POINT)
 
     script_data = script_header.format(
         volumes=volumes,
         name=_format_task_name(
             job_metadata.get('job-id'), task_metadata.get('task-id')),
         image=job_resources.image,
-        script=_DATA_MOUNT_POINT + '/' + _SCRIPT_DIR + '/' +
+        script=providers_util.DATA_MOUNT_POINT + '/' + _SCRIPT_DIR + '/' +
         job_metadata['script'].name,
         env_file=task_dir + '/' + 'docker.env',
         uid=os.getuid(),
-        data_mount_point=_DATA_MOUNT_POINT,
+        data_mount_point=providers_util.DATA_MOUNT_POINT,
         data_dir=task_dir + '/' + _DATA_SUBDIR,
         date_format='+%Y-%m-%d %H:%M:%S',
         workingdir=_WORKING_DIR,
@@ -344,8 +342,8 @@ class LocalJobProvider(base.JobProvider):
 
     # Write the environment variables
     env_vars = set(env.items()) | job_params['envs'] | task_params['envs'] | {
-        job_model.EnvParam('DATA_ROOT', _DATA_MOUNT_POINT),
-        job_model.EnvParam('TMPDIR', _DATA_MOUNT_POINT + '/tmp')
+        job_model.EnvParam('DATA_ROOT', providers_util.DATA_MOUNT_POINT),
+        job_model.EnvParam('TMPDIR', providers_util.DATA_MOUNT_POINT + '/tmp')
     }
     env_fname = task_dir + '/docker.env'
     with open(env_fname, 'wt') as f:
@@ -694,13 +692,11 @@ class LocalJobProvider(base.JobProvider):
     return self._provider_root() + '/' + job_id + '/' + dir_name
 
   def _make_environment(self, inputs, outputs):
-    """Return a dictionary of environment variables for the VM."""
-    ret = {}
-    for i in inputs:
-      ret[i.name] = _DATA_MOUNT_POINT + '/' + i.docker_path if i.value else ''
-    for o in outputs:
-      ret[o.name] = _DATA_MOUNT_POINT + '/' + o.docker_path if o.value else ''
-    return ret
+    """Return a dictionary of environment variables for the container."""
+    env = {}
+    env.update(providers_util.get_file_environment_variables(inputs))
+    env.update(providers_util.get_file_environment_variables(outputs))
+    return env
 
   def _localize_inputs_recursive_command(self, task_dir, inputs):
     """Returns a command that will stage recursive inputs."""

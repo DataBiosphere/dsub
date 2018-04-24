@@ -96,6 +96,25 @@ def build_resources(project=None,
   }
 
 
+def build_mount(disk=None, path=None, read_only=None):
+  """Build a Mount object for a Pipeline request.
+
+  Args:
+    disk (str): Name of disk to mount, as specified in the resources section.
+    path (str): Path to mount the disk at inside the container.
+    read_only (boolean): If true,  disk is mounted read only in the container.
+
+  Returns:
+    An object representing a Mount.
+  """
+
+  return {
+      'disk': disk,
+      'path': path,
+      'readOnly': read_only,
+  }
+
+
 def build_action(name=None,
                  image_uri=None,
                  commands=None,

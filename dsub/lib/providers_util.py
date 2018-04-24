@@ -13,13 +13,27 @@
 # limitations under the License.
 """Helpers for providers."""
 
+import os
 import textwrap
+
 from . import job_model
 
 _LOCALIZE_COMMAND_MAP = {
     job_model.P_GCS: 'gsutil -m rsync -r',
     job_model.P_LOCAL: 'rsync -r',
 }
+
+# Mount point for the data disk in the user's Docker container
+DATA_MOUNT_POINT = '/mnt/data'
+
+
+def get_file_environment_variables(file_params):
+  """Return a dictionary of environment variables for the user container."""
+  env = {}
+  for param in file_params:
+    env[param.name] = os.path.join(DATA_MOUNT_POINT,
+                                   param.docker_path) if param.value else ''
+  return env
 
 
 def build_recursive_localize_env(destination, inputs):

@@ -47,9 +47,6 @@ _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 # Environment variable name for the script body
 SCRIPT_VARNAME = '_SCRIPT'
 
-# Mount point for the data disk on the VM and in the Docker container
-DATA_MOUNT_POINT = '/mnt/data'
-
 # Special dsub directories within the Docker container
 #
 # Attempt to keep the dsub runtime environment sane by being very prescriptive.
@@ -72,9 +69,9 @@ DATA_MOUNT_POINT = '/mnt/data'
 #               This is also the explicit working directory set before the
 #               user script runs.
 
-SCRIPT_DIR = '%s/script' % DATA_MOUNT_POINT
-TMP_DIR = '%s/tmp' % DATA_MOUNT_POINT
-WORKING_DIR = '%s/workingdir' % DATA_MOUNT_POINT
+SCRIPT_DIR = '%s/script' % providers_util.DATA_MOUNT_POINT
+TMP_DIR = '%s/tmp' % providers_util.DATA_MOUNT_POINT
+WORKING_DIR = '%s/workingdir' % providers_util.DATA_MOUNT_POINT
 
 MK_RUNTIME_DIRS_COMMAND = '\n'.join(
     'mkdir -m 777 -p "%s" ' % dir for dir in [SCRIPT_DIR, TMP_DIR, WORKING_DIR])
@@ -228,17 +225,17 @@ class _Pipelines(object):
     copy_input_dirs = ''
     if recursive_input_dirs:
       export_input_dirs = providers_util.build_recursive_localize_env(
-          DATA_MOUNT_POINT, inputs)
+          providers_util.DATA_MOUNT_POINT, inputs)
       copy_input_dirs = providers_util.build_recursive_localize_command(
-          DATA_MOUNT_POINT, inputs, job_model.P_GCS)
+          providers_util.DATA_MOUNT_POINT, inputs, job_model.P_GCS)
 
     export_output_dirs = ''
     copy_output_dirs = ''
     if recursive_output_dirs:
       export_output_dirs = providers_util.build_recursive_gcs_delocalize_env(
-          DATA_MOUNT_POINT, outputs)
+          providers_util.DATA_MOUNT_POINT, outputs)
       copy_output_dirs = providers_util.build_recursive_delocalize_command(
-          DATA_MOUNT_POINT, outputs, job_model.P_GCS)
+          providers_util.DATA_MOUNT_POINT, outputs, job_model.P_GCS)
 
     docker_paths = [
         var.docker_path if var.recursive else os.path.dirname(var.docker_path)
@@ -247,7 +244,7 @@ class _Pipelines(object):
     ]
 
     mkdirs = '\n'.join([
-        'mkdir -p {0}/{1}'.format(DATA_MOUNT_POINT, path)
+        'mkdir -p {0}/{1}'.format(providers_util.DATA_MOUNT_POINT, path)
         for path in docker_paths
     ])
 
@@ -256,7 +253,7 @@ class _Pipelines(object):
         '*' in os.path.basename(var.docker_path)
     ]
     export_inputs_with_wildcards = '\n'.join([
-        'export {0}="{1}/{2}"'.format(var.name, DATA_MOUNT_POINT,
+        'export {0}="{1}/{2}"'.format(var.name, providers_util.DATA_MOUNT_POINT,
                                       var.docker_path)
         for var in inputs_with_wildcards
     ])
@@ -389,7 +386,7 @@ class _Pipelines(object):
                     'name': 'datadisk',
                     'autoDelete': True,
                     'sizeGb': disk_size,
-                    'mountPoint': DATA_MOUNT_POINT,
+                    'mountPoint': providers_util.DATA_MOUNT_POINT,
                 }],
             },
 
@@ -790,7 +787,7 @@ class GoogleJobProvider(base.JobProvider):
 
     # Build the pipelineArgs for this job.
     logging_uri = task_resources.logging_path.uri
-    scopes = job_resources.scopes or job_model.DEFAULT_SCOPES
+    scopes = job_resources.scopes or google_base.DEFAULT_SCOPES
     pipeline.update(
         _Pipelines.build_pipeline_args(self._project, script.value, job_params,
                                        task_params, job_resources.preemptible,

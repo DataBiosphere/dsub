@@ -30,6 +30,26 @@ from oauth2client.client import GoogleCredentials
 from oauth2client.client import HttpAccessTokenRefreshError
 import retrying
 
+# The google v1 provider directly added the bigquery scope, but the v1alpha2
+# API automatically added:
+# - https://www.googleapis.com/auth/compute
+# - https://www.googleapis.com/auth/devstorage.full_control
+# - https://www.googleapis.com/auth/genomics
+# - https://www.googleapis.com/auth/logging.write
+# - https://www.googleapis.com/auth/monitoring.write
+#
+# With the addition of the google v2 provider, we explicitly set all of these
+# scopes such that existing user code continues to work.
+DEFAULT_SCOPES = [
+    'https://www.googleapis.com/auth/bigquery',
+    'https://www.googleapis.com/auth/compute',
+    'https://www.googleapis.com/auth/devstorage.full_control',
+    'https://www.googleapis.com/auth/genomics',
+    'https://www.googleapis.com/auth/logging.write',
+    'https://www.googleapis.com/auth/monitoring.write',
+]
+
+
 # Transient errors for the Google APIs should not cause them to fail.
 # There are a set of HTTP and socket errors which we automatically retry.
 #  429: too frequent polling
