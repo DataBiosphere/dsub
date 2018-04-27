@@ -648,7 +648,7 @@ class LocalJobProvider(base.JobProvider):
       cp_cmd = 'cp'
     elif logging_path.file_provider == job_model.P_GCS:
       mkdir_cmd = ''
-      cp_cmd = 'gsutil -q cp'
+      cp_cmd = 'gsutil -mq cp'
     else:
       assert False
 
