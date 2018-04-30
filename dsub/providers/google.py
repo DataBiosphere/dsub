@@ -17,12 +17,10 @@ This module implements job creation, listing, and canceling using the
 Google Genomics Pipelines and Operations APIs.
 """
 
-# pylint: disable=g-tzinfo-datetime
 from datetime import datetime
 import itertools
 import json
 import os
-import re
 import textwrap
 
 from . import base
@@ -47,34 +45,10 @@ _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 # Environment variable name for the script body
 SCRIPT_VARNAME = '_SCRIPT'
 
-# Special dsub directories within the Docker container
-#
-# Attempt to keep the dsub runtime environment sane by being very prescriptive.
-# Assume a single disk for everything that needs to be written by the dsub
-# runtime environment or the user.
-#
-# Backends like the Google Pipelines API, allow for the user to set both
-# a boot-disk-size and a disk-size. But the boot-disk-size is not something
-# that users should have to worry about, so don't put anything extra there.
-#
-# Put everything meaningful on the data disk:
-#
-#   input: files localized from object storage
-#   output: files to de-localize to object storage
-#
-#   script: any code that dsub writes (like the user script)
-#   tmp: set TMPDIR in the environment to point here
-#
-#   workingdir: A workspace directory for user code.
-#               This is also the explicit working directory set before the
-#               user script runs.
-
-SCRIPT_DIR = '%s/script' % providers_util.DATA_MOUNT_POINT
-TMP_DIR = '%s/tmp' % providers_util.DATA_MOUNT_POINT
-WORKING_DIR = '%s/workingdir' % providers_util.DATA_MOUNT_POINT
-
-MK_RUNTIME_DIRS_COMMAND = '\n'.join(
-    'mkdir -m 777 -p "%s" ' % dir for dir in [SCRIPT_DIR, TMP_DIR, WORKING_DIR])
+MK_RUNTIME_DIRS_COMMAND = '\n'.join('mkdir -m 777 -p "%s" ' % dir for dir in [
+    providers_util.SCRIPT_DIR, providers_util.TMP_DIR,
+    providers_util.WORKING_DIR
+])
 
 DOCKER_COMMAND = textwrap.dedent("""\
   set -o errexit
@@ -266,7 +240,7 @@ class _Pipelines(object):
 
     return DOCKER_COMMAND.format(
         mk_runtime_dirs=MK_RUNTIME_DIRS_COMMAND,
-        script_path='%s/%s' % (SCRIPT_DIR, script_name),
+        script_path='%s/%s' % (providers_util.SCRIPT_DIR, script_name),
         install_cloud_sdk=install_cloud_sdk,
         export_inputs_with_wildcards=export_inputs_with_wildcards,
         export_input_dirs=export_input_dirs,
@@ -274,8 +248,8 @@ class _Pipelines(object):
         mk_output_dirs=mkdirs,
         export_output_dirs=export_output_dirs,
         export_empty_envs=export_empty_envs,
-        tmpdir=TMP_DIR,
-        working_dir=WORKING_DIR,
+        tmpdir=providers_util.TMP_DIR,
+        working_dir=providers_util.WORKING_DIR,
         copy_output_dirs=copy_output_dirs)
 
   @classmethod
@@ -763,7 +737,7 @@ class GoogleJobProvider(base.JobProvider):
 
     script = task_view.job_metadata['script']
     task_params['labels'] |= google_base.build_pipeline_labels(
-        job_metadata, task_metadata)
+        job_metadata, task_metadata, task_id_pattern='task-%d')
 
     # Build the ephemeralPipeline for this job.
     # The ephemeralPipeline definition changes for each job because file
@@ -1013,8 +987,8 @@ class GoogleOperation(base.Task):
 
   def __init__(self, operation_data):
     self._op = operation_data
-    # Sanity check for operation_status().
-    unused_status = self.operation_status()
+    # Sanity check for _operation_status().
+    unused_status = self._operation_status()
 
   def raw_task_data(self):
     return self._op
@@ -1049,7 +1023,7 @@ class GoogleOperation(base.Task):
     elif field == 'dsub-version':
       value = metadata['labels'].get('dsub-version')
     elif field == 'task-status':
-      value = self.operation_status()
+      value = self._operation_status()
     elif field == 'logging':
       value = metadata['request']['pipelineArgs']['logging']['gcsPath']
     elif field == 'envs':
@@ -1066,7 +1040,7 @@ class GoogleOperation(base.Task):
     elif field == 'outputs':
       value = self._get_operation_output_field_values(metadata)
     elif field == 'create-time':
-      value = self._parse_datestamp(metadata['createTime'])
+      value = google_base.parse_rfc3339_utc_string(metadata['createTime'])
     elif field == 'start-time':
       # Look through the events list for all "start" events (only one expected).
       start_events = [
@@ -1074,17 +1048,18 @@ class GoogleOperation(base.Task):
       ]
       # Get the startTime from the last "start" event.
       if start_events:
-        value = self._parse_datestamp(start_events[-1]['startTime'])
+        value = google_base.parse_rfc3339_utc_string(
+            start_events[-1]['startTime'])
     elif field == 'end-time':
       if 'endTime' in metadata:
-        value = self._parse_datestamp(metadata['endTime'])
+        value = google_base.parse_rfc3339_utc_string(metadata['endTime'])
     elif field == 'status':
-      value = self.operation_status()
+      value = self._operation_status()
     elif field in ['status-message', 'status-detail']:
-      status, last_update = self.operation_status_message()
+      status, last_update = self._operation_status_message()
       value = status
     elif field == 'last-update':
-      status, last_update = self.operation_status_message()
+      status, last_update = self._operation_status_message()
       value = last_update
     elif field == 'provider':
       return _PROVIDER_NAME
@@ -1108,7 +1083,7 @@ class GoogleOperation(base.Task):
 
     return value if value else default
 
-  def operation_status(self):
+  def _operation_status(self):
     """Returns the status of this operation.
 
     ie. RUNNING, SUCCESS, CANCELED or FAILURE.
@@ -1124,7 +1099,7 @@ class GoogleOperation(base.Task):
       return 'CANCELED'
     return 'FAILURE'
 
-  def operation_status_message(self):
+  def _operation_status_message(self):
     """Returns the most relevant status string and last updated date string.
 
     This string is meant for display only.
@@ -1147,12 +1122,11 @@ class GoogleOperation(base.Task):
       ds = metadata['endTime']
 
       if 'error' in self._op:
-        # Shorten message if it's too long.
         msg = self._op['error']['message']
       else:
         msg = 'Success'
 
-    return (msg, self._parse_datestamp(ds))
+    return (msg, google_base.parse_rfc3339_utc_string(ds))
 
   def get_operation_full_job_id(self):
     """Returns the job-id or job-id.task-id for the operation."""
@@ -1162,38 +1136,6 @@ class GoogleOperation(base.Task):
       return '%s.%s' % (job_id, task_id)
     else:
       return job_id
-
-  @staticmethod
-  def _parse_datestamp(datestamp):
-    """Converts a datestamp from RFC3339 UTC to a datetime.
-
-    Args:
-      datestamp: a datetime string in RFC3339 UTC "Zulu" format
-
-    Returns:
-      A datetime.
-    """
-
-    # The timestamp from the Google Operations are all in RFC3339 format, but
-    # they are sometimes formatted to nanoseconds and sometimes only seconds.
-    # Parse both:
-    # * 2016-11-14T23:04:55Z
-    # * 2016-11-14T23:05:56.010429380Z
-    # And any sub-second precision in-between.
-
-    m = re.match(r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}).*Z',
-                 datestamp)
-
-    # It would be unexpected to get a different date format back from Google.
-    # If we raise an exception here, we can break people completely.
-    # Instead, let's just return None and people can report that some dates
-    # are not showing up.
-    if not m:
-      return None
-
-    # Create a UTC datestamp from parsed components
-    g = [int(val) for val in m.groups()]
-    return datetime(g[0], g[1], g[2], g[3], g[4], g[5], tzinfo=pytz.utc)
 
   def _get_operation_input_field_values(self, metadata, file_input):
     """Returns a dictionary of envs or file inputs for an operation.

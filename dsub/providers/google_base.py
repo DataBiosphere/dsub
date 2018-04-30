@@ -18,7 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# pylint: disable=g-tzinfo-datetime
+from datetime import datetime
 import os
+import re
 import socket
 import sys
 
@@ -28,6 +31,7 @@ import apiclient.errors
 from ..lib import job_model
 from oauth2client.client import GoogleCredentials
 from oauth2client.client import HttpAccessTokenRefreshError
+import pytz
 import retrying
 
 # The google v1 provider directly added the bigquery scope, but the v1alpha2
@@ -177,15 +181,29 @@ class Label(job_model.LabelParam):
   __slots__ = ()
 
 
-def build_pipeline_labels(job_metadata, task_metadata):
-  """Build a dictionary of standard job and task labels."""
+def build_pipeline_labels(job_metadata, task_metadata, task_id_pattern=None):
+  """Build a set() of standard job and task labels.
+
+  Args:
+    job_metadata: Job metadata, such as job-id, job-name, and user-id.
+    task_metadata: Task metadata, such as the task-id.
+    task_id_pattern: A pattern for the task-id value, such as "task-%d"; the
+      original google label values could not be strictly numeric, so "task-"
+      was prepended.
+
+  Returns:
+    A set of standard dsub Label() objects to attach to a pipeline.
+  """
   labels = {
       Label(name, job_metadata[name])
       for name in ['job-name', 'job-id', 'user-id', 'dsub-version']
   }
 
-  if task_metadata.get('task-id') is not None:
-    labels.add(Label('task-id', 'task-%d' % task_metadata.get('task-id')))
+  task_id = task_metadata.get('task-id')
+  if task_id is not None:  # Check for None (as 0 is conceivably valid)
+    if task_id_pattern:
+      task_id = task_id_pattern % task_id
+    labels.add(Label('task-id', task_id))
 
   return labels
 
@@ -233,6 +251,38 @@ def prepare_job_metadata(script, job_name, user_id, create_time):
       'user-id': user_id,
       'dsub-version': version,
   }
+
+
+def parse_rfc3339_utc_string(rfc3339_utc_string):
+  """Converts a datestamp from RFC3339 UTC to a datetime.
+
+  Args:
+    rfc3339_utc_string: a datetime string in RFC3339 UTC "Zulu" format
+
+  Returns:
+    A datetime.
+  """
+
+  # The timestamp from the Google Operations are all in RFC3339 format, but
+  # they are sometimes formatted to nanoseconds and sometimes only seconds.
+  # Parse both:
+  # * 2016-11-14T23:04:55Z
+  # * 2016-11-14T23:05:56.010429380Z
+  # And any sub-second precision in-between.
+
+  m = re.match(r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}).*Z',
+               rfc3339_utc_string)
+
+  # It would be unexpected to get a different date format back from Google.
+  # If we raise an exception here, we can break people completely.
+  # Instead, let's just return None and people can report that some dates
+  # are not showing up.
+  if not m:
+    return None
+
+  # Create a UTC datestamp from parsed components
+  g = [int(val) for val in m.groups()]
+  return datetime(g[0], g[1], g[2], g[3], g[4], g[5], tzinfo=pytz.utc)
 
 
 def retry_api_check(exception):

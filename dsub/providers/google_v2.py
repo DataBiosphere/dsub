@@ -32,6 +32,7 @@ import textwrap
 
 from . import base
 from . import google_base
+from . import google_v2_operations
 from . import google_v2_pipelines
 
 from ..lib import dsub_util
@@ -57,11 +58,6 @@ _PYTHON_IMAGE = 'python:2.7-slim'
 
 # Name of the data disk
 _DATA_DISK_NAME = 'datadisk'
-
-# Special dsub directories within the Docker container
-_SCRIPT_DIR = '%s/script' % providers_util.DATA_MOUNT_POINT
-_TMP_DIR = '%s/tmp' % providers_util.DATA_MOUNT_POINT
-_WORKING_DIR = '%s/workingdir' % providers_util.DATA_MOUNT_POINT
 
 # The logging in v2alpha1 is different than in v1alpha2.
 # v1alpha2 would provide:
@@ -97,9 +93,10 @@ _CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
 """)
 
 # Command to create the directories for the dsub user environment
-_MK_RUNTIME_DIRS_CMD = '\n'.join(
-    'mkdir -m 777 -p "%s" ' % dir
-    for dir in [_SCRIPT_DIR, _TMP_DIR, _WORKING_DIR])
+_MK_RUNTIME_DIRS_CMD = '\n'.join('mkdir -m 777 -p "%s" ' % dir for dir in [
+    providers_util.SCRIPT_DIR, providers_util.TMP_DIR,
+    providers_util.WORKING_DIR
+])
 
 # The user's script or command is made available to the container in
 #   /mnt/data/script/<script-name>
@@ -147,6 +144,11 @@ class GoogleV2JobProvider(base.JobProvider):
 
     self._service = google_base.setup_service('genomics', 'v2alpha1',
                                               credentials)
+
+  def prepare_job_metadata(self, script, job_name, user_id, create_time):
+    """Returns a dictionary of metadata fields for the job."""
+    return google_base.prepare_job_metadata(script, job_name, user_id,
+                                            create_time)
 
   def _get_logging_command(self, user_container, logging_uri):
     """Returns the base command for copying logging files."""
@@ -202,7 +204,7 @@ class GoogleV2JobProvider(base.JobProvider):
     outputs = job_params['outputs'] | task_params['outputs']
     user_environment = self._build_user_environment(envs, inputs, outputs)
 
-    script_path = os.path.join(_SCRIPT_DIR, script.name)
+    script_path = os.path.join(providers_util.SCRIPT_DIR, script.name)
     prepare_command = _PREPARE_CMD.format(
         mk_runtime_dirs=_MK_RUNTIME_DIRS_CMD,
         script_var=_SCRIPT_VARNAME,
@@ -343,22 +345,130 @@ class GoogleV2JobProvider(base.JobProvider):
         'task-id': [task_id for task_id in launched_tasks if task_id],
     }
 
-  def delete_jobs(self,
-                  user_ids,
-                  job_ids,
-                  task_ids,
-                  labels,
-                  create_time_min=None,
-                  create_time_max=None):
-    pass
-
   def get_tasks_completion_messages(self, tasks):
     pass
 
-  def prepare_job_metadata(self, script, job_name, user_id, create_time):
-    """Returns a dictionary of metadata fields for the job."""
-    return google_base.prepare_job_metadata(script, job_name, user_id,
-                                            create_time)
+  def _get_status_filters(self, statuses):
+    if not statuses or statuses == {'*'}:
+      return None
+
+    return [google_v2_operations.STATUS_FILTER_MAP[s] for s in statuses]
+
+  def _get_label_filters(self, label_key, values):
+    if not values or values == {'*'}:
+      return None
+
+    return [google_v2_operations.label_filter(label_key, v) for v in values]
+
+  def _get_labels_filters(self, labels):
+    if not labels:
+      return None
+
+    return [google_v2_operations.label_filter(l.name, l.value) for l in labels]
+
+  def _get_create_time_filters(self, create_time_min, create_time_max):
+    filters = []
+    for create_time, comparator in [(create_time_min, '>='), (create_time_max,
+                                                              '<=')]:
+      if not create_time:
+        continue
+
+      filters.append(
+          google_v2_operations.create_time_filter(create_time, comparator))
+    return filters
+
+  def _build_query_filter(self,
+                          statuses,
+                          user_ids=None,
+                          job_ids=None,
+                          job_names=None,
+                          task_ids=None,
+                          labels=None,
+                          create_time_min=None,
+                          create_time_max=None):
+    # The Pipelines v2 API allows for building fairly elaborate filter
+    # clauses. We can group (). We can AND, OR, and NOT.
+    #
+    # The first set of filters, labeled here as OR filters are elements
+    # where more than one value cannot be true at the same time. For example,
+    # an operation cannot have a status of both RUNNING and CANCELED.
+    #
+    # The second set of filters, labeled here as AND filters are elements
+    # where more than one value can be true. For example,
+    # an operation can have a label with key1=value2 AND key2=value2.
+
+    # Translate the semantic requests into a v2alpha1-specific filter.
+
+    # 'OR' filtering arguments.
+    status_filters = self._get_status_filters(statuses)
+    user_id_filters = self._get_label_filters('user-id', user_ids)
+    job_id_filters = self._get_label_filters('job-id', job_ids)
+    job_name_filters = self._get_label_filters('job-name', job_names)
+    task_id_filters = self._get_label_filters('task-id', task_ids)
+    # 'AND' filtering arguments.
+    label_filters = self._get_labels_filters(labels)
+    create_time_filters = self._get_create_time_filters(create_time_min,
+                                                        create_time_max)
+
+    if job_id_filters and job_name_filters:
+      raise ValueError(
+          'Filtering by both job IDs and job names is not supported')
+
+    # Now build up the full text filter.
+    # OR all of the OR filter arguments together.
+    # AND all of the AND arguments together.
+    or_arguments = []
+    for or_filters in [
+        status_filters, user_id_filters, job_id_filters, job_name_filters,
+        task_id_filters
+    ]:
+      if or_filters:
+        or_arguments.append('(' + ' OR '.join(or_filters) + ')')
+
+    and_arguments = []
+    for and_filters in [label_filters, create_time_filters]:
+      if and_filters:
+        and_arguments.append('(' + ' AND '.join(and_filters) + ')')
+
+    # Now and all of these arguments together.
+    return ' AND '.join(or_arguments + and_arguments)
+
+  def _operations_list(self, ops_filter, page_size=0):
+    """Gets the list of operations for the specified filter.
+
+    Args:
+      ops_filter: string filter of operations to return
+      page_size: the number of operations to requested on each list operation to
+        the pipelines API (if 0 or None, the API default is used)
+
+    Yields:
+      Operations matching the filter criteria.
+    """
+
+    page_token = None
+    more_operations = True
+    documented_default_page_size = 256
+    documented_max_page_size = 2048
+
+    if not page_size:
+      page_size = documented_default_page_size
+    page_size = min(page_size, documented_max_page_size)
+
+    while more_operations:
+      api = self._service.projects().operations().list(
+          name='projects/{}/operations'.format(self._project),
+          filter=ops_filter,
+          pageToken=page_token,
+          pageSize=page_size)
+      response = google_base.Api.execute(api)
+
+      ops = response.get('operations', [])
+      for op in ops:
+        if google_v2_operations.is_dsub_operation(op):
+          yield GoogleOperation(op)
+
+      page_token = response.get('nextPageToken')
+      more_operations = bool(page_token)
 
   def lookup_job_tasks(self,
                        statuses,
@@ -369,7 +479,60 @@ class GoogleV2JobProvider(base.JobProvider):
                        labels=None,
                        create_time_min=None,
                        create_time_max=None,
-                       max_tasks=0):
+                       max_tasks=0,
+                       page_size=0):
+    """Yields operations based on the input criteria.
+
+    If any of the filters are empty or {'*'}, then no filtering is performed on
+    that field. Filtering by both a job id list and job name list is
+    unsupported.
+
+    Args:
+      statuses: {'*'}, or a list of job status strings to return. Valid
+        status strings are 'RUNNING', 'SUCCESS', 'FAILURE', or 'CANCELED'.
+      user_ids: a list of ids for the user(s) who launched the job.
+      job_ids: a list of job ids to return.
+      job_names: a list of job names to return.
+      task_ids: a list of specific tasks within the specified job(s) to return.
+      labels: a list of LabelParam with user-added labels. All labels must
+              match the task being fetched.
+      create_time_min: a timezone-aware datetime value for the earliest create
+                       time of a task, inclusive.
+      create_time_max: a timezone-aware datetime value for the most recent
+                       create time of a task, inclusive.
+      max_tasks: the maximum number of job tasks to return or 0 for no limit.
+      page_size: the page size to use for each query to the pipelins API.
+
+    Raises:
+      ValueError: if both a job id list and a job name list are provided
+
+    Yeilds:
+      Genomics API Operations objects.
+    """
+
+    ops_filter = self._build_query_filter(statuses, user_ids, job_ids,
+                                          job_names, task_ids, labels,
+                                          create_time_min, create_time_max)
+
+    # The pipelines API returns operations sorted by create-time date. We can
+    # use this sorting guarantee to merge-sort the streams together and only
+    # retrieve more tasks as needed.
+    stream = self._operations_list(ops_filter, page_size=page_size)
+
+    tasks_yielded = 0
+    for task in stream:
+      yield task
+      tasks_yielded += 1
+      if 0 < max_tasks < tasks_yielded:
+        break
+
+  def delete_jobs(self,
+                  user_ids,
+                  job_ids,
+                  task_ids,
+                  labels,
+                  create_time_min=None,
+                  create_time_max=None):
     pass
 
 
@@ -378,6 +541,50 @@ class GoogleOperation(base.Task):
 
   def __init__(self, operation_data):
     self._op = operation_data
+
+  def _operation_status(self):
+    """Returns the status of this operation.
+
+    Raises:
+      ValueError: if the operation status cannot be determined.
+
+    Returns:
+      A printable status string (RUNNING, SUCCESS, CANCELED or FAILURE).
+    """
+    if not google_v2_operations.is_done(self._op):
+      return 'RUNNING'
+    if google_v2_operations.is_success(self._op):
+      return 'SUCCESS'
+    if google_v2_operations.is_canceled(self._op):
+      return 'CANCELED'
+    if google_v2_operations.is_failed(self._op):
+      return 'FAILURE'
+
+    raise ValueError('Status for operation {} could not be determined'.format(
+        self._op['name']))
+
+  def _operation_status_message(self):
+    """Returns the most relevant status string and last updated date string.
+
+    This string is meant for display only.
+
+    Returns:
+      A printable status string and date string.
+    """
+    if not google_v2_operations.is_done(self._op):
+      last_event = google_v2_operations.get_last_event(self._op)
+      if last_event:
+        msg = last_event['description']
+      else:
+        msg = 'Pending'
+    else:
+      error = google_v2_operations.get_error(self._op)
+      if error:
+        msg = error['message']
+      else:
+        msg = 'Success'
+
+    return msg
 
   def get_field(self, field, default=None):
     """Returns a value from the operation for a specific set of field names.
@@ -393,7 +600,56 @@ class GoogleOperation(base.Task):
       ValueError: if the field label is not supported by the operation
     """
 
-    return 'not implemented'
+    value = None
+    if field == 'internal-id':
+      value = self._op['name']
+    elif field in ['job-id', 'job-name', 'task-id', 'user-id', 'dsub-version']:
+      value = google_v2_operations.get_label(self._op, field)
+    elif field == 'task-status':
+      value = self._operation_status()
+    elif field == 'logging':
+      value = 'TODO'
+    elif field == 'envs':
+      value = 'TODO'
+    elif field == 'labels':
+      # Reserved labels are filtered from dsub task output.
+      value = {
+          k: v
+          for k, v in google_v2_operations.get_labels(self._op).items()
+          if k not in job_model.RESERVED_LABELS
+      }
+    elif field == 'inputs':
+      value = 'TODO'
+    elif field == 'outputs':
+      value = 'TODO'
+    elif field == 'create-time':
+      ds = google_v2_operations.get_create_time(self._op)
+      value = google_base.parse_rfc3339_utc_string(ds)
+    elif field == 'start-time':
+      ds = google_v2_operations.get_start_time(self._op)
+      if ds:
+        value = google_base.parse_rfc3339_utc_string(ds)
+    elif field == 'end-time':
+      ds = google_v2_operations.get_end_time(self._op)
+      if ds:
+        value = google_base.parse_rfc3339_utc_string(ds)
+    elif field == 'status':
+      value = self._operation_status()
+    elif field in ['status-message', 'status-detail']:
+      status = self._operation_status_message()
+      value = status
+    elif field == 'last-update':
+      last_update = google_v2_operations.get_last_update(self._op)
+      if last_update:
+        value = google_base.parse_rfc3339_utc_string(last_update)
+    elif field == 'provider':
+      return _PROVIDER_NAME
+    elif field == 'provider-attributes':
+      value = 'TODO'
+    else:
+      raise ValueError('Unsupported field: "%s"' % field)
+
+    return value if value else default
 
 
 if __name__ == '__main__':
