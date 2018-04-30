@@ -750,8 +750,8 @@ class LocalJobProvider(base.JobProvider):
         # - `cp path/* dest/` will error if "path" has subdirectories.
         # - `cp "path/*" "dest/"` will fail (it expects wildcard expansion
         #   to come from shell).
-        commands.append('gsutil -q cp "%s" "%s"' % (source_file_path,
-                                                    dest_file_path))
+        commands.append(
+            'gsutil -mq cp "%s" "%s"' % (source_file_path, dest_file_path))
 
     return '\n'.join(commands)
 
@@ -798,7 +798,7 @@ class LocalJobProvider(base.JobProvider):
 
       # Use gsutil even for local files (explained in _localize_inputs_command).
       if o.file_provider in [job_model.P_LOCAL, job_model.P_GCS]:
-        commands.append('gsutil -q cp "%s" "%s"' % (local_path, dest_path))
+        commands.append('gsutil -mq cp "%s" "%s"' % (local_path, dest_path))
 
     return '\n'.join(commands)
 
