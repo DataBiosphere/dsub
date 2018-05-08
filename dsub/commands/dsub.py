@@ -918,6 +918,8 @@ def _name_for_command(command):
   'sort'
   >>> _name_for_command('# This should be ignored')
   'command'
+  >>> _name_for_command('\\\n\\\n# Bad continuations, but ignore.\necho hello.')
+  'echo'
 
   Arguments:
     command: the user-provided command
@@ -928,7 +930,7 @@ def _name_for_command(command):
   lines = command.splitlines()
   for line in lines:
     line = line.strip()
-    if line and not line.startswith('#'):
+    if line and not line.startswith('#') and line != '\\':
       return os.path.basename(re.split(r'\s', line)[0])
 
   return 'command'
