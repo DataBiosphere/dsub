@@ -63,7 +63,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   JOBID="$(run_dsub \
     --name "${JOB_NAME}" \
-    --command 'sleep 1m' \
+    --command 'sleep 2m' \
     --tasks "${TASKS_FILE}")"
 
   # Get a count of the number of lines in the tasks file.
