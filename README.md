@@ -421,6 +421,24 @@ each job includes:
 
 Metadata can be used to cancel a job or individual tasks within a batch job.
 
+#### Summarizing job status
+
+By default, dstat outputs one line per task. If you're using a batch job with
+many tasks then you may benefit from `--summary`.
+
+```
+$ dstat --project my-project --summary
+
+Job Name        Status         Task Count
+-------------   -------------  -------------
+my-job-name     RUNNING        2
+my-job-name     SUCCESS        1
+```
+
+In this mode, dstat prints one line per (job name, task status) pair. You can
+see at a glance how many tasks are finished, how many are still running, and
+how many are failed/canceled.
+
 ### Deleting a job
 
 The `ddel` command will delete running jobs.

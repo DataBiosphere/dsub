@@ -33,6 +33,10 @@ specified in a TSV file. The job id is omitted from the default output
 for brevity. To see the job id, use `--full` flag as is described in
 [Getting detailed job information](#getting-detailed-job-information).
 
+To group together all the tasks from the same job with the same status,
+use the `--summary` flag as described in the
+[README](../README.md#summarizing-job-status).
+
 ### Check one of my jobs
 
 If you are running multiple jobs concurrently, you may want to check status on
