@@ -26,7 +26,7 @@ dsub jobs are made up of:
 - resources: logging-uri, min-cpu, min-ram, etc.
 
 tasks are made up of
-- metadata: task-id
+- metadata: task-id, task-attempt (only when retries!=0)
 - params: labels, envs, inputs, outputs
 - resources: logging-uri, min-cpu, min-ram, etc.
 
@@ -72,8 +72,9 @@ DEFAULT_PREEMPTIBLE = False
 # Users may specify their own labels, however dsub also uses an implicit set of
 # labels (in the google provider). Reserve these labels such that users do
 # not attempt to set them.
-RESERVED_LABELS = frozenset(
-    ['job-name', 'job-id', 'user-id', 'task-id', 'dsub-version'])
+RESERVED_LABELS = frozenset([
+    'job-name', 'job-id', 'user-id', 'task-id', 'dsub-version', 'task-attempt'
+])
 
 P_LOCAL = 'local'
 P_GCS = 'google-cloud-storage'
@@ -460,6 +461,7 @@ class TaskDescriptor(object):
 
     task = {'task-id': task_id}
     task['create-time'] = task_metadata.get('create-time')
+    task['task-attempt'] = task_metadata.get('task-attempt')
 
     if task_resources.logging_path:
       task['logging-path'] = str(task_resources.logging_path.uri)
@@ -753,6 +755,9 @@ class JobDescriptor(object):
         task_metadata['create-time'] = dsub_util.replace_timezone(
             create_time, pytz.utc)
 
+      if task.get('task-attempt') is not None:
+        task_metadata['task-attempt'] = task.get('task-attempt')
+
       task_params = {}
       task_params['labels'] = cls._label_params_from_dict(
           task.get('labels', {}))
@@ -772,6 +777,16 @@ class JobDescriptor(object):
     return JobDescriptor(job_metadata, job_params, job_resources,
                          task_descriptors)
 
+  def find_task_descriptor(self, task_id):
+    """Returns the task_descriptor corresponding to task_id."""
+
+    # It is not guaranteed that the index will be task_id - 1 when --tasks is
+    # used with a min/max range.
+    for task_descriptor in self.task_descriptors:
+      if task_descriptor.task_metadata.get('task-id') == task_id:
+        return task_descriptor
+    return None
+
 
 def task_view_generator(job_descriptor):
   """Generator that yields a task-specific view of the job.
@@ -789,3 +804,25 @@ def task_view_generator(job_descriptor):
     jd = JobDescriptor(job_descriptor.job_metadata, job_descriptor.job_params,
                        job_descriptor.job_resources, [task_descriptor])
     yield jd
+
+
+def numeric_task_id(task_id):
+  """Converts a task-id to the numeric task-id.
+
+  Args:
+    task_id: task-id in either task-n or n format
+
+  Returns:
+    n
+  """
+
+  # This function exists to support the legacy "task-id" format in the "google"
+  # provider. Google labels originally could not be numeric. When the google
+  # provider is completely replaced by the google-v2 provider, this function can
+  # go away.
+
+  if task_id is not None:
+    if task_id.startswith('task-'):
+      return int(task_id[len('task-'):])
+    else:
+      return int(task_id)

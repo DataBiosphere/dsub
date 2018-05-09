@@ -379,8 +379,13 @@ on how to specify your logging path, see [Logging](docs/logging.md).
 
 ### Job control
 
-It's possible to wait for a job to complete before starting another, see [job
-control with dsub](docs/job_control.md).
+It's possible to wait for a job to complete before starting another.
+For details, see [job control with dsub](docs/job_control.md).
+
+### Retries
+
+It is possible for `dsub` to automatically retry failed tasks.
+For details, see [retries with dsub](docs/retries.md).
 
 ### Labeling jobs and tasks
 
@@ -479,5 +484,6 @@ To delete all running jobs for the current user:
     *   [Logging](docs/logging.md)
     *   [Compute Resources](docs/compute_resources.md)
     *   [Job Control](docs/job_control.md)
+    *   [Retries](docs/retries.md)
     *   [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
     *   [Backend providers](docs/providers/README.md)

@@ -383,6 +383,7 @@ class GoogleV2JobProvider(base.JobProvider):
                           job_ids=None,
                           job_names=None,
                           task_ids=None,
+                          task_attempts=None,
                           labels=None,
                           create_time_min=None,
                           create_time_max=None):
@@ -405,6 +406,8 @@ class GoogleV2JobProvider(base.JobProvider):
     job_id_filters = self._get_label_filters('job-id', job_ids)
     job_name_filters = self._get_label_filters('job-name', job_names)
     task_id_filters = self._get_label_filters('task-id', task_ids)
+    task_attempt_filters = self._get_label_filters('task-attempt',
+                                                   task_attempts)
     # 'AND' filtering arguments.
     label_filters = self._get_labels_filters(labels)
     create_time_filters = self._get_create_time_filters(create_time_min,
@@ -420,7 +423,7 @@ class GoogleV2JobProvider(base.JobProvider):
     or_arguments = []
     for or_filters in [
         status_filters, user_id_filters, job_id_filters, job_name_filters,
-        task_id_filters
+        task_id_filters, task_attempt_filters
     ]:
       if or_filters:
         or_arguments.append('(' + ' OR '.join(or_filters) + ')')
@@ -476,6 +479,7 @@ class GoogleV2JobProvider(base.JobProvider):
                        job_ids=None,
                        job_names=None,
                        task_ids=None,
+                       task_attempts=None,
                        labels=None,
                        create_time_min=None,
                        create_time_max=None,
@@ -494,6 +498,8 @@ class GoogleV2JobProvider(base.JobProvider):
       job_ids: a list of job ids to return.
       job_names: a list of job names to return.
       task_ids: a list of specific tasks within the specified job(s) to return.
+      task_attempts: a list of specific attempts within the specified tasks(s)
+        to return.
       labels: a list of LabelParam with user-added labels. All labels must
               match the task being fetched.
       create_time_min: a timezone-aware datetime value for the earliest create
@@ -510,9 +516,9 @@ class GoogleV2JobProvider(base.JobProvider):
       Genomics API Operations objects.
     """
 
-    ops_filter = self._build_query_filter(statuses, user_ids, job_ids,
-                                          job_names, task_ids, labels,
-                                          create_time_min, create_time_max)
+    ops_filter = self._build_query_filter(
+        statuses, user_ids, job_ids, job_names, task_ids, task_attempts, labels,
+        create_time_min, create_time_max)
 
     # The pipelines API returns operations sorted by create-time date. We can
     # use this sorting guarantee to merge-sort the streams together and only

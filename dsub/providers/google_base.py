@@ -205,6 +205,10 @@ def build_pipeline_labels(job_metadata, task_metadata, task_id_pattern=None):
       task_id = task_id_pattern % task_id
     labels.add(Label('task-id', task_id))
 
+  task_attempt = task_metadata.get('task-attempt')
+  if task_attempt is not None:
+    labels.add(Label('task-attempt', str(task_attempt)))
+
   return labels
 
 

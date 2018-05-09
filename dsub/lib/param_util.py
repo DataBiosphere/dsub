@@ -414,7 +414,7 @@ def parse_tasks_file_header(header, input_file_param_util,
   return job_params
 
 
-def tasks_file_to_task_descriptors(tasks, input_file_param_util,
+def tasks_file_to_task_descriptors(tasks, retries, input_file_param_util,
                                    output_file_param_util):
   """Parses task parameters from a TSV.
 
@@ -422,13 +422,14 @@ def tasks_file_to_task_descriptors(tasks, input_file_param_util,
     tasks: Dict containing the path to a TSV file and task numbers to run
     variables, input, and output parameters as column headings. Subsequent
     lines specify parameter values, one row per job.
+    retries: Number of retries allowed.
     input_file_param_util: Utility for producing InputFileParam objects.
     output_file_param_util: Utility for producing OutputFileParam objects.
 
   Returns:
     task_descriptors: an array of records, each containing the task-id,
-    'envs', 'inputs', 'outputs', 'labels' that defines the set of parameters
-    for each task of the job.
+    task-attempt, 'envs', 'inputs', 'outputs', 'labels' that defines the set of
+    parameters for each task of the job.
 
   Raises:
     ValueError: If no job records were provided
@@ -487,7 +488,8 @@ def tasks_file_to_task_descriptors(tasks, input_file_param_util,
 
     task_descriptors.append(
         job_model.TaskDescriptor({
-            'task-id': task_id
+            'task-id': task_id,
+            'task-attempt': 1 if retries else None
         }, {
             'labels': labels,
             'envs': envs,

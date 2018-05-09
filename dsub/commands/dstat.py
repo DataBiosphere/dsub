@@ -71,11 +71,17 @@ class OutputFormatter(object):
     return self.format_date_micro(dt)
 
   def prepare_output(self, row):
+    """Convert types of task fields."""
     date_fields = ['last-update', 'create-time', 'start-time', 'end-time']
+    int_fields = ['task-attempt']
 
     for col in date_fields:
       if col in row:
         row[col] = self.default_format_date(row[col])
+
+    for col in int_fields:
+      if col in row and row[col] is not None:
+        row[col] = int(row[col])
 
     return row
 
@@ -123,6 +129,7 @@ class TextOutput(OutputFormatter):
         ('job-id', 'Job ID'),
         ('job-name', 'Job Name'),
         ('task-id', 'Task'),
+        ('task-attempt', 'Attempt'),
         ('status-message', 'Status', self.format_status),
         ('status-detail', 'Status Details'),
         ('last-update', 'Last Update', self.text_format_date),
@@ -269,6 +276,7 @@ def _prepare_row(task, full, summary):
       row_spec('user-id', True, None),
       row_spec('status', True, None),
       row_spec('status-detail', True, None),
+      row_spec('task-attempt', False, None),
       row_spec('create-time', True, None),
       row_spec('start-time', True, None),
       row_spec('end-time', True, None),
@@ -338,6 +346,10 @@ def _parse_arguments():
       '-t',
       nargs='*',
       help='A list of task IDs on which to check status')
+  parser.add_argument(
+      '--attempts',
+      nargs='*',
+      help='A list of task attempts on which to check status')
   parser.add_argument(
       '--users',
       '-u',
@@ -455,6 +467,7 @@ def main():
       job_ids=set(args.jobs) if args.jobs else None,
       job_names=set(args.names) if args.names else None,
       task_ids=set(args.tasks) if args.tasks else None,
+      task_attempts=set(args.attempts) if args.attempts else None,
       labels=labels if labels else None,
       create_time_min=create_time_min,
       max_tasks=args.limit,
@@ -482,6 +495,7 @@ def dstat_job_producer(provider,
                        job_ids=None,
                        job_names=None,
                        task_ids=None,
+                       task_attempts=None,
                        labels=None,
                        create_time_min=None,
                        create_time_max=None,
@@ -499,6 +513,7 @@ def dstat_job_producer(provider,
     job_ids: a set of job-id strings eligible jobs may match.
     job_names: a set of job-name strings eligible jobs may match.
     task_ids: a set of task-id strings eligible tasks may match.
+    task_attempts: a set of task-attempt strings eligible tasks may match.
     labels: set of LabelParam that all tasks must match.
     create_time_min: a timezone-aware datetime value for the earliest create
                      time of a task, inclusive.
@@ -528,6 +543,7 @@ def dstat_job_producer(provider,
         job_ids=job_ids,
         job_names=job_names,
         task_ids=task_ids,
+        task_attempts=task_attempts,
         labels=labels,
         create_time_min=create_time_min,
         create_time_max=create_time_max,
@@ -562,6 +578,7 @@ def lookup_job_tasks(provider,
                      job_ids=None,
                      job_names=None,
                      task_ids=None,
+                     task_attempts=None,
                      labels=None,
                      create_time_min=None,
                      create_time_max=None,
@@ -577,6 +594,7 @@ def lookup_job_tasks(provider,
     job_ids: a set of job-id strings eligible jobs may match.
     job_names: a set of job-name strings eligible jobs may match.
     task_ids: a set of task-id strings eligible tasks may match.
+    task_attempts: a set of task-attempt strings eligible tasks may match.
     labels: set of LabelParam that all tasks must match.
     create_time_min: a timezone-aware datetime value for the earliest create
                      time of a task, inclusive.
@@ -596,6 +614,7 @@ def lookup_job_tasks(provider,
       job_ids=job_ids,
       job_names=job_names,
       task_ids=task_ids,
+      task_attempts=task_attempts,
       labels=labels,
       create_time_min=create_time_min,
       create_time_max=create_time_max,

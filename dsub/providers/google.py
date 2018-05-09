@@ -377,7 +377,8 @@ class _Pipelines(object):
 
   @classmethod
   def build_pipeline_args(cls, project, script, job_params, task_params,
-                          preemptible, logging_uri, scopes, keep_alive):
+                          reserved_labels, preemptible, logging_uri, scopes,
+                          keep_alive):
     """Builds pipeline args for execution.
 
     Args:
@@ -387,6 +388,8 @@ class _Pipelines(object):
           for this job.
       task_params: dictionary of values for labels, envs, inputs, and outputs
           for this task.
+      reserved_labels: dictionary of reserved labels (e.g. task-id,
+          task-attempt)
       preemptible: use a preemptible VM for the job
       logging_uri: path for job logging output.
       scopes: list of scope.
@@ -427,7 +430,8 @@ class _Pipelines(object):
     labels = {}
     labels.update({
         label.name: label.value if label.value else ''
-        for label in job_params['labels'] | task_params['labels']
+        for label in (reserved_labels | job_params['labels']
+                      | task_params['labels'])
     })
 
     # pyformat: disable
@@ -484,6 +488,7 @@ class _Operations(object):
                  job_name=None,
                  labels=None,
                  task_id=None,
+                 task_attempt=None,
                  create_time_min=None,
                  create_time_max=None):
     """Return a filter string for operations.list()."""
@@ -500,6 +505,8 @@ class _Operations(object):
       ops_filter.append('labels.job-name = %s' % job_name)
     if task_id != '*':
       ops_filter.append('labels.task-id = %s' % task_id)
+    if task_attempt != '*':
+      ops_filter.append('labels.task-attempt = %s' % task_attempt)
 
     # Even though labels are nominally 'arbitrary strings' they are trusted
     # since param_util restricts the character set.
@@ -736,7 +743,8 @@ class GoogleJobProvider(base.JobProvider):
     task_resources = task_view.task_descriptors[0].task_resources
 
     script = task_view.job_metadata['script']
-    task_params['labels'] |= google_base.build_pipeline_labels(
+
+    reserved_labels = google_base.build_pipeline_labels(
         job_metadata, task_metadata, task_id_pattern='task-%d')
 
     # Build the ephemeralPipeline for this job.
@@ -764,9 +772,9 @@ class GoogleJobProvider(base.JobProvider):
     scopes = job_resources.scopes or google_base.DEFAULT_SCOPES
     pipeline.update(
         _Pipelines.build_pipeline_args(self._project, script.value, job_params,
-                                       task_params, job_resources.preemptible,
-                                       logging_uri, scopes,
-                                       job_resources.keep_alive))
+                                       task_params, reserved_labels,
+                                       job_resources.preemptible, logging_uri,
+                                       scopes, job_resources.keep_alive))
 
     return pipeline
 
@@ -842,6 +850,7 @@ class GoogleJobProvider(base.JobProvider):
                        job_ids=None,
                        job_names=None,
                        task_ids=None,
+                       task_attempts=None,
                        labels=None,
                        create_time_min=None,
                        create_time_max=None,
@@ -860,6 +869,8 @@ class GoogleJobProvider(base.JobProvider):
       job_ids: a list of job ids to return.
       job_names: a list of job names to return.
       task_ids: a list of specific tasks within the specified job(s) to return.
+      task_attempts: a list of specific attempts within the specified tasks(s)
+        to return.
       labels: a list of LabelParam with user-added labels. All labels must
               match the task being fetched.
       create_time_min: a timezone-aware datetime value for the earliest create
@@ -885,6 +896,7 @@ class GoogleJobProvider(base.JobProvider):
     job_ids = job_ids if job_ids else {'*'}
     job_names = job_names if job_names else {'*'}
     task_ids = task_ids if task_ids else {'*'}
+    task_attempts = task_attempts if task_attempts else {'*'}
 
     # The task-id label value of "task-n" instead of just "n" is a hold-over
     # from early label value character restrictions.
@@ -911,8 +923,9 @@ class GoogleJobProvider(base.JobProvider):
       return now - dsub_util.replace_timezone(t.get_field('create-time'), None)
 
     query_queue = sorting_util.SortedGeneratorIterator(key=_desc_date_sort_key)
-    for status, job_id, job_name, user_id, task_id in itertools.product(
-        statuses, job_ids, job_names, user_ids, task_ids):
+    for status, job_id, job_name, user_id, task_id, task_attempt in (
+        itertools.product(statuses, job_ids, job_names, user_ids, task_ids,
+                          task_attempts)):
       ops_filter = _Operations.get_filter(
           self._project,
           status=status,
@@ -921,6 +934,7 @@ class GoogleJobProvider(base.JobProvider):
           job_name=job_name,
           labels=labels,
           task_id=task_id,
+          task_attempt=task_attempt,
           create_time_min=create_time_min,
           create_time_max=create_time_max)
 
@@ -1018,6 +1032,8 @@ class GoogleOperation(base.Task):
       value = metadata['labels'].get('job-name')
     elif field == 'task-id':
       value = metadata['labels'].get('task-id')
+    elif field == 'task-attempt':
+      value = metadata['labels'].get('task-attempt')
     elif field == 'user-id':
       value = metadata['labels'].get('user-id')
     elif field == 'dsub-version':

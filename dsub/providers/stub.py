@@ -32,6 +32,7 @@ class StubJobProvider(base.JobProvider):
                   user_ids,
                   job_ids,
                   task_ids,
+                  task_attempts,
                   labels,
                   create_time_min=None,
                   create_time_max=None):
@@ -52,6 +53,7 @@ class StubJobProvider(base.JobProvider):
        - job-id: string
        - job-name: string
        - task-id: string
+       - task-attempt: integer
        - labels: list<dict>
        - status-message: string
        - error-messages : list of string
@@ -75,6 +77,7 @@ class StubJobProvider(base.JobProvider):
                        job_ids=None,
                        job_names=None,
                        task_ids=None,
+                       task_attempts=None,
                        labels=None,
                        create_time_min=None,
                        create_time_max=None,
@@ -85,6 +88,7 @@ class StubJobProvider(base.JobProvider):
     job_ids = None if job_ids == {'*'} else job_ids
     job_names = None if job_names == {'*'} else job_names
     task_ids = None if task_ids == {'*'} else task_ids
+    task_attempts = None if task_attempts == {'*'} else task_attempts
 
     if labels or create_time_min or create_time_max:
       raise NotImplementedError(
@@ -96,7 +100,9 @@ class StubJobProvider(base.JobProvider):
             ) and (not user_ids or x.get_field('user', None) in user_ids) and
             (not job_ids or x.get_field('job-id', None) in job_ids) and
             (not job_names or x.get_field('job-name', None) in job_names) and
-            (not task_ids or x.get_field('task-id', None) in task_ids))
+            (not task_ids or x.get_field('task-id', None) in task_ids) and
+            (not task_attempts or
+             x.get_field('task-attempt', None) in task_attempts))
     ]
     if max_tasks > 0:
       operations = operations[:max_tasks]
