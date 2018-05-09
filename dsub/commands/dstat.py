@@ -136,6 +136,9 @@ class TextOutput(OutputFormatter):
         ('inputs', 'Inputs', self.format_pairs),
         ('outputs', 'Outputs', self.format_pairs),
         ('dsub-version', 'Version'),
+        # These fielsd only shows up when summarizing
+        ('status', 'Status'),
+        ('task-count', 'Task Count'),
     ]
 
     new_row = collections.OrderedDict()
@@ -167,6 +170,7 @@ class YamlOutput(OutputFormatter):
 
     yaml.add_representer(unicode, self.string_presenter)
     yaml.add_representer(str, self.string_presenter)
+    yaml.add_representer(collections.OrderedDict, self.dict_representer)
 
   def string_presenter(self, dumper, data):
     """Presenter to force yaml.dump to use multi-line string style."""
@@ -174,6 +178,9 @@ class YamlOutput(OutputFormatter):
       return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
     else:
       return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+
+  def dict_representer(self, dumper, data):
+    return dumper.represent_dict(data.iteritems())
 
   def print_table(self, table):
     print(yaml.dump(table, default_flow_style=False))
@@ -195,7 +202,53 @@ class JsonOutput(OutputFormatter):
     print(json.dumps(table, indent=2, default=self.serialize))
 
 
-def _prepare_row(task, full):
+def _prepare_summary_table(rows):
+  """Create a new table that is a summary of the input rows.
+
+  All with the same (job-name or job-id, status) go together.
+
+  Args:
+    rows: the input rows, a list of dictionaries.
+  Returns:
+    A new row set of summary information.
+  """
+  if not rows:
+    return []
+
+  # We either group on the job-name (if present) or fall back to the job-id
+  key_field = 'job-name'
+  if key_field not in rows[0].keys():
+    key_field = 'job-id'
+
+  # Group each of the rows based on (job-name or job-id, status)
+  grouped = collections.defaultdict(lambda: collections.defaultdict(lambda: []))
+  for row in rows:
+    grouped[row.get(key_field, '')][row.get('status', '')] += [row]
+
+  # Now that we have the rows grouped, create a summary table.
+  # Use the original table as the driver in order to preserve the order.
+  new_rows = []
+  for job_key in sorted(grouped.keys()):
+    group = grouped.get(job_key, None)
+    canonical_status = ['RUNNING', 'SUCCESS', 'FAILURE', 'CANCEL']
+    # Written this way to ensure that if somehow a new status is introduced,
+    # it shows up in our output.
+    for status in canonical_status + sorted(group.keys()):
+      if status not in group:
+        continue
+      task_count = len(group[status])
+      del group[status]
+      if task_count:
+        summary_row = collections.OrderedDict()
+        summary_row[key_field] = job_key
+        summary_row['status'] = status
+        summary_row['task-count'] = task_count
+        new_rows.append(summary_row)
+
+  return new_rows
+
+
+def _prepare_row(task, full, summary):
   """return a dict with the task's info (more if "full" is set)."""
 
   # Would like to include the Job ID in the default set of columns, but
@@ -229,9 +282,21 @@ def _prepare_row(task, full):
       row_spec('provider-attributes', True, {}),
       row_spec('dsub-version', False, None),
   ]
+  summary_columns = default_columns + [
+      row_spec('job-id', True, None),
+      row_spec('user-id', True, None),
+      row_spec('status', True, None),
+  ]
   # pyformat: enable
 
-  columns = full_columns if full else default_columns
+  assert not (full and summary), 'Full and summary cannot both be enabled'
+
+  if full:
+    columns = full_columns
+  elif summary:
+    columns = summary_columns
+  else:
+    columns = default_columns
 
   row = {}
   for col in columns:
@@ -316,16 +381,20 @@ def _parse_arguments():
       type=int,
       help='The maximum number of tasks to list. The default is unlimited.')
   parser.add_argument(
-      '--full',
-      '-f',
-      action='store_true',
-      help='Toggle output with full operation identifiers'
-      ' and input parameters.')
-  parser.add_argument(
       '--format',
       choices=['text', 'json', 'yaml', 'provider-json'],
       help='Set the output format.')
-
+  output_style = parser.add_mutually_exclusive_group()
+  output_style.add_argument(
+      '--full',
+      '-f',
+      action='store_true',
+      help='Display output with full task information'
+      ' and input parameters.')
+  output_style.add_argument(
+      '--summary',
+      action='store_true',
+      help='Display a summary of the results, grouped by (job, status).')
   # Shared arguments between the "google" and "google-v2" providers
   google_common = parser.add_argument_group(
       title='google-common',
@@ -390,13 +459,18 @@ def main():
       create_time_min=create_time_min,
       max_tasks=args.limit,
       full_output=args.full,
+      summary_output=args.summary,
       poll_interval=poll_interval,
       raw_format=bool(args.format == 'provider-json'))
 
   # Track if any jobs are running in the event --wait was requested.
   for poll_event_tasks in job_producer:
+    rows = poll_event_tasks
+    if args.summary:
+      rows = _prepare_summary_table(rows)
+
     table = []
-    for row in poll_event_tasks:
+    for row in rows:
       row = output_formatter.prepare_output(row)
       table.append(row)
     output_formatter.print_table(table)
@@ -413,6 +487,7 @@ def dstat_job_producer(provider,
                        create_time_max=None,
                        max_tasks=0,
                        full_output=False,
+                       summary_output=False,
                        poll_interval=0,
                        raw_format=False):
   """Generate jobs as lists of task dicts ready for formatting/output.
@@ -431,6 +506,7 @@ def dstat_job_producer(provider,
                      time of a task, inclusive.
     max_tasks: (int) maximum number of tasks to return per dstat job lookup.
     full_output: (bool) return all dsub fields.
+    summary_output: (bool) return a summary of the job list.
     poll_interval: (int) wait time between poll events, dstat will poll jobs
                    until all jobs succeed or fail. Set to zero to disable
                    polling and return after the first lookup.
@@ -466,7 +542,7 @@ def dstat_job_producer(provider,
       if raw_format:
         formatted_tasks.append(task.raw_task_data())
       else:
-        formatted_tasks.append(_prepare_row(task, full_output))
+        formatted_tasks.append(_prepare_row(task, full_output, summary_output))
 
       # Determine if any of the jobs are running.
       if task.get_field('task-status') == 'RUNNING':
@@ -490,7 +566,8 @@ def lookup_job_tasks(provider,
                      create_time_min=None,
                      create_time_max=None,
                      max_tasks=0,
-                     page_size=0):
+                     page_size=0,
+                     summary_output=False):
   """Generate formatted jobs individually, in order of create-time.
 
   Args:
@@ -508,6 +585,7 @@ def lookup_job_tasks(provider,
     max_tasks: (int) maximum number of tasks to return per dstat job lookup.
     page_size: the page size to use for each query to the backend. May be
                ignored by some provider implementations.
+    summary_output: (bool) summarize the job list.
 
   Yields:
     Individual task dictionaries with associated metadata
@@ -526,7 +604,7 @@ def lookup_job_tasks(provider,
 
   # Yield formatted tasks.
   for task in tasks_generator:
-    yield _prepare_row(task, True)
+    yield _prepare_row(task, True, summary_output)
 
 
 if __name__ == '__main__':
