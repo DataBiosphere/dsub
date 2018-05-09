@@ -459,6 +459,7 @@ class TaskDescriptor(object):
       task_id = str(task_metadata.get('task-id'))
 
     task = {'task-id': task_id}
+    task['create-time'] = task_metadata.get('create-time')
 
     if task_resources.logging_path:
       task['logging-path'] = str(task_resources.logging_path.uri)
@@ -745,6 +746,12 @@ class JobDescriptor(object):
     task_descriptors = []
     for task in job.get('tasks', []):
       task_metadata = {'task-id': task.get('task-id')}
+
+      # Old instances of the meta.yaml do not have a task create time.
+      create_time = task.get('create-time')
+      if create_time:
+        task_metadata['create-time'] = dsub_util.replace_timezone(
+            create_time, pytz.utc)
 
       task_params = {}
       task_params['labels'] = cls._label_params_from_dict(

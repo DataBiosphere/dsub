@@ -150,6 +150,25 @@ def _convert_suffix_to_docker_chars(suffix):
   return ''.join(label_char_transform(c) for c in suffix)
 
 
+def _task_sort_function(task):
+  """Return a tuple for sorting 'most recent first'."""
+  return (task.get_field('create-time'), int(task.get_field('task-id', 0)))
+
+
+def _sort_tasks(tasks):
+  """Sort tasks by 'most recent first'."""
+
+  # The local provider can launch tasks quickly enough that they end up with
+  # the same timestamp.
+  #
+  # lookup_job_tasks needs to return tasks sorted: "most recent first".
+  # Sort the list of tasks by:
+  # - create time (descending)
+  # - task-id (descending, if any)
+
+  tasks.sort(key=_task_sort_function, reverse=True)
+
+
 class LocalJobProvider(base.JobProvider):
   """Docker jobs running locally (i.e. on the caller's computer)."""
 
@@ -508,7 +527,7 @@ class LocalJobProvider(base.JobProvider):
           if 0 < max_tasks < len(ret):
             break
 
-    ret.sort(key=lambda t: t.get_field('create-time'), reverse=True)
+    _sort_tasks(ret)
     return ret
 
   def get_tasks_completion_messages(self, tasks):
@@ -853,14 +872,17 @@ class LocalTask(base.Task):
     task_params = self._raw.job_descriptor.task_descriptors[0].task_params
 
     value = None
-    if field in [
-        'job-id', 'job-name', 'user-id', 'create-time', 'dsub-version'
-    ]:
+    if field in ['job-id', 'job-name', 'user-id', 'dsub-version']:
       value = job_metadata.get(field)
+    elif field == 'create-time':
+      value = task_metadata.get(field)
+      if not value:
+        # Old instances of the meta.yaml do not have a task create time.
+        value = job_metadata.get(field)
     elif field == 'start-time':
       # There's no delay between creation and start since we launch docker
       # immediately for local runs.
-      value = job_metadata.get('create-time')
+      value = self.get_field('create-time', default)
     elif field in ['task-id']:
       value = task_metadata.get(field)
     elif field == 'logging':
