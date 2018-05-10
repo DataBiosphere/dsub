@@ -59,6 +59,56 @@ _PYTHON_IMAGE = 'python:2.7-slim'
 # Name of the data disk
 _DATA_DISK_NAME = 'datadisk'
 
+# Define a bash function for "gsutil cp" to be used by the logging,
+# localization, and delocalization actions.
+_GSUTIL_CP_FN = textwrap.dedent("""\
+  function gsutil_cp() {
+    local src="${1}"
+    local dst="${2}"
+    local check_src="${3:-}"
+
+    if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
+      return
+    fi
+
+    local i
+    for ((i = 0; i < 3; i++)); do
+      echo "gsutil -m cp \"${src}\" \"${dst}\""
+      if gsutil -m cp "${src}" "${dst}"; then
+        return
+      fi
+    done
+
+    2>&1 echo "ERROR: gsutil -m cp \"${src}\" \"${dst}\""
+    exit 1
+  }
+""")
+
+# Define a bash function for "gsutil rsync" to be used by the logging,
+# localization, and delocalization actions.
+_GSUTIL_RSYNC_FN = textwrap.dedent("""\
+  function gsutil_rsync() {
+    local src="${1}"
+    local dst="${2}"
+    local check_src="${3:-}"
+
+    if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
+      return
+    fi
+
+    local i
+    for ((i = 0; i < 3; i++)); do
+      echo "gsutil -m rsync -r \"${src}\" \"${dst}\""
+      if gsutil -m rsync -r "${src}" "${dst}"; then
+        return
+      fi
+    done
+
+    2>&1 echo "ERROR: gsutil -m rsync -r \"${src}\" \"${dst}\""
+    exit 1
+  }
+""")
+
 # The logging in v2alpha1 is different than in v1alpha2.
 # v1alpha2 would provide:
 #   [your_path].log: Logging of the on-instance "controller" code that the
@@ -74,23 +124,81 @@ _DATA_DISK_NAME = 'datadisk'
 # We explicitly copy off the logs, simulating v1alpha2 behavior.
 # If the logging commands fail, there is currently no useful information in
 # the operation to indicate why it failed.
-_LOGGING_CMD = textwrap.dedent("""\
-  gsutil cp /google/logs/action/{user_container}/stdout {stdout_path} &
-  gsutil cp /google/logs/action/{user_container}/stderr {stderr_path} &
-  gsutil cp /google/logs/output {logging_path} &
+
+_LOG_CP_CMD = textwrap.dedent("""\
+  gsutil_cp /google/logs/action/{user_action}/stdout "${{STDOUT_PATH}}" "true" &
+  gsutil_cp /google/logs/action/{user_action}/stderr "${{STDERR_PATH}}" "true" &
+  gsutil_cp /google/logs/output "${{LOGGING_PATH}}" &
+
   wait
 """)
 
-_CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
-  while :; do
-    {logging_cmd}
+_LOGGING_CMD = textwrap.dedent("""\
+  {log_cp_fn}
+  {log_cp_cmd}
+""")
 
-    if [[ -d /google/logs/action/{last_action} ]]; then
-      break
-    fi
+# Keep logging until the final logging action starts
+_CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
+  set -o errexit
+  set -o nounset
+
+  {log_cp_fn}
+
+  while [[ ! -d /google/logs/action/{final_logging_action} ]]; do
+    {log_cp_cmd}
+
     sleep 10s
   done
 """)
+
+_LOCALIZATION_LOOP = textwrap.dedent("""\
+  set -o errexit
+  set -o nounset
+  set -o pipefail
+
+  for ((i=0; i < INPUT_COUNT; i++)); do
+    INPUT_VAR="INPUT_${i}"
+    INPUT_RECURSIVE="INPUT_RECURSIVE_${i}"
+    INPUT_SRC="INPUT_SRC_${i}"
+    INPUT_DST="INPUT_DST_${i}"
+
+    echo "Localizing ${!INPUT_VAR}"
+    if [[ "${!INPUT_RECURSIVE}" -eq "1" ]]; then
+      gsutil_rsync "${!INPUT_SRC}" "${!INPUT_DST}"
+    else
+      gsutil_cp "${!INPUT_SRC}" "${!INPUT_DST}"
+    fi
+  done
+""")
+
+_DELOCALIZATION_LOOP = textwrap.dedent("""\
+  set -o errexit
+  set -o nounset
+  set -o pipefail
+
+  for ((i=0; i < OUTPUT_COUNT; i++)); do
+    OUTPUT_VAR="OUTPUT_${i}"
+    OUTPUT_RECURSIVE="OUTPUT_RECURSIVE_${i}"
+    OUTPUT_SRC="OUTPUT_SRC_${i}"
+    OUTPUT_DST="OUTPUT_DST_${i}"
+
+    echo "Delocalizing ${!OUTPUT_VAR}"
+    if [[ "${!OUTPUT_RECURSIVE}" -eq "1" ]]; then
+      gsutil_rsync "${!OUTPUT_SRC}" "${!OUTPUT_DST}"
+    else
+      gsutil_cp "${!OUTPUT_SRC}" "${!OUTPUT_DST}"
+    fi
+  done
+""")
+
+_LOCALIZATION_CMD = textwrap.dedent("""\
+  {recursive_cp_cmd}
+  {cp_cmd}
+
+  {cp_loop}
+""")
+
 
 # Command to create the directories for the dsub user environment
 _MK_RUNTIME_DIRS_CMD = '\n'.join('mkdir -m 777 -p "%s" ' % dir for dir in [
@@ -118,6 +226,15 @@ _PYTHON_DECODE_SCRIPT = textwrap.dedent("""\
   sys.stdout.write(ast.literal_eval(sys.stdin.read()))
 """)
 
+_MK_IO_DIRS = textwrap.dedent("""\
+  for ((i=0; i < DIR_COUNT; i++)); do
+    DIR_VAR="DIR_${i}"
+
+    echo "mkdir -p \"${!DIR_VAR}\""
+    mkdir -p "${!DIR_VAR}"
+  done
+""")
+
 _PREPARE_CMD = textwrap.dedent("""\
   #!/bin/bash
 
@@ -130,6 +247,15 @@ _PREPARE_CMD = textwrap.dedent("""\
     | python -c '{python_decode_script}' \
     > {script_path}
   chmod u+x {script_path}
+
+  {mk_io_dirs}
+""")
+
+_USER_CMD = textwrap.dedent("""\
+  export TMPDIR="{tmp_dir}"
+  cd {working_dir}
+
+  {user_script}
 """)
 
 
@@ -150,17 +276,99 @@ class GoogleV2JobProvider(base.JobProvider):
     return google_base.prepare_job_metadata(script, job_name, user_id,
                                             create_time)
 
-  def _get_logging_command(self, user_container, logging_uri):
-    """Returns the base command for copying logging files."""
+  def _get_logging_env(self, logging_uri):
+    """Returns the environment for actions that copy logging files."""
     if not logging_uri.endswith('.log'):
       raise ValueError('Logging URI must end in ".log": {}'.format(logging_uri))
 
     logging_prefix = logging_uri[:-len('.log')]
-    return _LOGGING_CMD.format(
-        user_container=user_container,
-        logging_path='{}.log'.format(logging_prefix),
-        stdout_path='{}-stdout.log'.format(logging_prefix),
-        stderr_path='{}-stderr.log'.format(logging_prefix))
+    return {
+        'LOGGING_PATH': '{}.log'.format(logging_prefix),
+        'STDOUT_PATH': '{}-stdout.log'.format(logging_prefix),
+        'STDERR_PATH': '{}-stderr.log'.format(logging_prefix)
+    }
+
+  def _get_prepare_env(self, script, inputs, outputs):
+    """Return a dict with variables for the 'prepare' action."""
+
+    # Add the _SCRIPT_REPR with the repr(script) contents
+
+    # Add variables for directories that need to be created, for example:
+    # DIR_COUNT: 2
+    # DIR_0: /mnt/data/input/gs/bucket/path1/
+    # DIR_1: /mnt/data/output/gs/bucket/path2
+
+    docker_paths = [
+        var.docker_path if var.recursive else os.path.dirname(var.docker_path)
+        for var in inputs + outputs
+        if var.value
+    ]
+
+    env = {
+        _SCRIPT_VARNAME: repr(script.value),
+        'DIR_COUNT': str(len(docker_paths))
+    }
+
+    for idx, path in enumerate(docker_paths):
+      env['DIR_{}'.format(idx)] = os.path.join(providers_util.DATA_MOUNT_POINT,
+                                               path)
+
+    return env
+
+  def _get_localization_env(self, inputs):
+    """Return a dict with variables for the 'localization' action."""
+
+    # Add variables for paths that need to be localized, for example:
+    # INPUT_COUNT: 1
+    # INPUT_0: MY_INPUT_FILE
+    # INPUT_RECURSIVE_0: 0
+    # INPUT_SRC_0: gs://mybucket/mypath/myfile
+    # INPUT_DST_0: /mnt/data/inputs/mybucket/mypath/myfile
+
+    non_empty_inputs = [var for var in inputs if var.value]
+    env = {'INPUT_COUNT': str(len(non_empty_inputs))}
+
+    for idx, var in enumerate(non_empty_inputs):
+      env['INPUT_{}'.format(idx)] = var.name
+      env['INPUT_RECURSIVE_{}'.format(idx)] = str(int(var.recursive))
+      env['INPUT_SRC_{}'.format(idx)] = var.value
+
+      # For wildcard paths, the destination must be a directory
+      dst = os.path.join(providers_util.DATA_MOUNT_POINT, var.docker_path)
+      path, filename = os.path.split(dst)
+      if '*' in filename:
+        dst = '{}/'.format(path)
+      env['INPUT_DST_{}'.format(idx)] = dst
+
+    return env
+
+  def _get_delocalization_env(self, outputs):
+    """Return a dict with variables for the 'delocalization' action."""
+
+    # Add variables for paths that need to be delocalized, for example:
+    # OUTPUT_COUNT: 1
+    # OUTPUT_0: MY_OUTPUT_FILE
+    # OUTPUT_RECURSIVE_0: 0
+    # OUTPUT_SRC_0: gs://mybucket/mypath/myfile
+    # OUTPUT_DST_0: /mnt/data/outputs/mybucket/mypath/myfile
+
+    non_empty_outputs = [var for var in outputs if var.value]
+    env = {'OUTPUT_COUNT': str(len(non_empty_outputs))}
+
+    for idx, var in enumerate(non_empty_outputs):
+      env['OUTPUT_{}'.format(idx)] = var.name
+      env['OUTPUT_RECURSIVE_{}'.format(idx)] = str(int(var.recursive))
+      env['OUTPUT_SRC_{}'.format(idx)] = os.path.join(
+          providers_util.DATA_MOUNT_POINT, var.docker_path)
+
+      # For wildcard paths, the destination must be a directory
+      if '*' in var.uri.basename:
+        dst = var.uri.path
+      else:
+        dst = var.uri
+      env['OUTPUT_DST_{}'.format(idx)] = dst
+
+    return env
 
   def _build_user_environment(self, envs, inputs, outputs):
     """Returns a dictionary of for the user container environment."""
@@ -193,8 +401,24 @@ class GoogleV2JobProvider(base.JobProvider):
         | job_params['labels'] | task_params['labels']
     }
 
+    # The list of "actions" (1-based) will be:
+    #   1- continuous copy of log files off to Cloud Storage
+    #   2- localize objects from Cloud Storage to block storage
+    #   3- execute user command
+    #   4- delocalize objects from block storage to Cloud Storage
+    #   5- final copy of log files off to Cloud Storage
+    user_action = 4
+    final_logging_action = 6
+
     # Set up the logging command
-    logging_cmd = self._get_logging_command(3, task_resources.logging_path.uri)
+    log_cp_cmd = _LOG_CP_CMD.format(user_action=user_action)
+    logging_cmd = _LOGGING_CMD.format(
+        log_cp_fn=_GSUTIL_CP_FN, log_cp_cmd=log_cp_cmd)
+    continuous_logging_cmd = _CONTINUOUS_LOGGING_CMD.format(
+        log_cp_fn=_GSUTIL_CP_FN,
+        log_cp_cmd=log_cp_cmd,
+        final_logging_action=final_logging_action)
+    logging_env = self._get_logging_env(task_resources.logging_path.uri)
 
     # Set up user script and environment
     script = task_view.job_metadata['script']
@@ -204,52 +428,82 @@ class GoogleV2JobProvider(base.JobProvider):
     outputs = job_params['outputs'] | task_params['outputs']
     user_environment = self._build_user_environment(envs, inputs, outputs)
 
+    prepare_env = self._get_prepare_env(script, inputs, outputs)
+    localization_env = self._get_localization_env(inputs)
+    delocalization_env = self._get_delocalization_env(outputs)
+
     script_path = os.path.join(providers_util.SCRIPT_DIR, script.name)
     prepare_command = _PREPARE_CMD.format(
         mk_runtime_dirs=_MK_RUNTIME_DIRS_CMD,
         script_var=_SCRIPT_VARNAME,
         python_decode_script=_PYTHON_DECODE_SCRIPT,
-        script_path=script_path)
-
-    # The list of "actions" will be:
-    #   1- continuous copy of log files off to Cloud Storage
-    #   2- localize objects from Cloud Storage to block storage
-    #   3- execute user command
-    #   4- delocalize objects from block storage to Cloud Storage
-    #   5- final copy of log files off to Cloud Storage
+        script_path=script_path,
+        mk_io_dirs=_MK_IO_DIRS)
 
     actions = [
         google_v2_pipelines.build_action(
-            name='continuous_logging',
+            name='logging',
             flags='RUN_IN_BACKGROUND',
             image_uri=_CLOUD_SDK_IMAGE,
+            environment=logging_env,
             entrypoint='/bin/bash',
-            commands=[
-                '-c',
-                _CONTINUOUS_LOGGING_CMD.format(
-                    logging_cmd=logging_cmd, last_action=4)
-            ]),
+            commands=['-c', continuous_logging_cmd]),
         google_v2_pipelines.build_action(
             name='prepare',
             image_uri=_PYTHON_IMAGE,
             mounts=[mnt_datadisk],
-            environment={_SCRIPT_VARNAME: repr(script.value)},
+            environment=prepare_env,
             entrypoint='/bin/bash',
             commands=['-c', prepare_command]),
+        google_v2_pipelines.build_action(
+            name='localization',
+            image_uri=_CLOUD_SDK_IMAGE,
+            mounts=[mnt_datadisk],
+            environment=localization_env,
+            entrypoint='/bin/bash',
+            commands=[
+                '-c',
+                _LOCALIZATION_CMD.format(
+                    recursive_cp_cmd=_GSUTIL_RSYNC_FN,
+                    cp_cmd=_GSUTIL_CP_FN,
+                    cp_loop=_LOCALIZATION_LOOP)
+            ]),
         google_v2_pipelines.build_action(
             name=script.name,
             image_uri=job_resources.image,
             mounts=[mnt_datadisk],
             environment=user_environment,
             entrypoint='/bin/bash',
-            commands=['-c', script_path]),
+            commands=[
+                '-c',
+                _USER_CMD.format(
+                    tmp_dir=providers_util.TMP_DIR,
+                    working_dir=providers_util.WORKING_DIR,
+                    user_script=script_path)
+            ]),
+        google_v2_pipelines.build_action(
+            name='delocalization',
+            image_uri=_CLOUD_SDK_IMAGE,
+            mounts=[mnt_datadisk],
+            environment=delocalization_env,
+            entrypoint='/bin/bash',
+            commands=[
+                '-c',
+                _LOCALIZATION_CMD.format(
+                    recursive_cp_cmd=_GSUTIL_RSYNC_FN,
+                    cp_cmd=_GSUTIL_CP_FN,
+                    cp_loop=_DELOCALIZATION_LOOP)
+            ]),
         google_v2_pipelines.build_action(
             name='final_logging',
             flags='ALWAYS_RUN',
             image_uri=_CLOUD_SDK_IMAGE,
+            environment=logging_env,
             entrypoint='/bin/bash',
             commands=['-c', logging_cmd]),
     ]
+    assert len(actions) - 2 == user_action
+    assert len(actions) == final_logging_action
 
     disks = [
         google_v2_pipelines.build_disks(_DATA_DISK_NAME,
@@ -346,7 +600,10 @@ class GoogleV2JobProvider(base.JobProvider):
     }
 
   def get_tasks_completion_messages(self, tasks):
-    pass
+    completion_messages = []
+    for task in tasks:
+      completion_messages.append(task.error_message())
+    return completion_messages
 
   def _get_status_filters(self, statuses):
     if not statuses or statuses == {'*'}:
@@ -591,6 +848,27 @@ class GoogleOperation(base.Task):
         msg = 'Success'
 
     return msg
+
+  def error_message(self):
+    """Returns an error message if the operation failed for any reason.
+
+    Failure as defined here means ended for any reason other than 'success'.
+    This means that a successful cancelation will also return an error message.
+
+    Returns:
+      string, string will be empty if job did not error.
+    """
+    error = google_v2_operations.get_error(self._op)
+    if error:
+      job_id = self.get_field('job-id')
+      task_id = self.get_field('task-id')
+      task_str = job_id if task_id is None else '{} (task: {})'.format(
+          job_id, task_id)
+
+      return 'Error in {} - code {}: {}'.format(task_str, error['code'],
+                                                error['message'])
+
+    return ''
 
   def get_field(self, field, default=None):
     """Returns a value from the operation for a specific set of field names.

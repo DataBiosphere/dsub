@@ -973,13 +973,12 @@ def run(provider,
     if launched_job.get('task-id'):
       print('%s task(s)' % len(launched_job['task-id']))
     print('To check the status, run:')
-    print("  dstat%s --jobs '%s' --status '*'" %
+    print("  dstat %s --jobs '%s' --status '*'" %
           (provider_base.get_dstat_provider_args(provider, project),
            launched_job['job-id']))
     print('To cancel the job, run:')
-    print("  ddel%s --jobs '%s'" %
-          (provider_base.get_ddel_provider_args(provider, project),
-           launched_job['job-id']))
+    print("  ddel %s --jobs '%s'" % (provider_base.get_ddel_provider_args(
+        provider, project), launched_job['job-id']))
 
   # Poll for job completion
   if wait:

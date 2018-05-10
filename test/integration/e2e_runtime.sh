@@ -45,7 +45,6 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
     --image "ubuntu" \
-    --zones "us-central1-*" \
     --name "google_env.sh" \
     --command "${COMMAND}" \
     --wait

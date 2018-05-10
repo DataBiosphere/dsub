@@ -148,6 +148,13 @@ function dstat_google() {
     "${@}"
 }
 
+function dstat_google-v2() {
+  dstat \
+    --provider google-v2 \
+    --project "${PROJECT_ID}" \
+    "${@}"
+}
+
 function dstat_local() {
   dstat \
     --provider local \

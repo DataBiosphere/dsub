@@ -25,6 +25,7 @@ from dsub.lib import job_model
 from dsub.lib import param_util
 from dsub.lib import resources
 from dsub.providers import google
+from dsub.providers import google_v2
 from dsub.providers import local
 
 import test_setup
@@ -36,6 +37,8 @@ def get_dsub_provider():
     return local.LocalJobProvider(resources)
   elif test.DSUB_PROVIDER == 'google':
     return google.GoogleJobProvider(False, False, test.PROJECT_ID)
+  elif test.DSUB_PROVIDER == 'google-v2':
+    return google_v2.GoogleV2JobProvider(False, False, test.PROJECT_ID)
   else:
     print('Invalid provider specified.', file=sys.stderr)
     sys.exit(1)
