@@ -43,7 +43,7 @@ including:
   amount of disk space available to the user script, point the TMPDIR to
   a directory on that disk.
 
-  See [this github issue](https://github.com/googlegenomics/dsub/issues/24)
+  See [this github issue](https://github.com/DataBiosphere/dsub/issues/24)
   for background.
 
 - Copy the user's script to directory that is writeable to the user and

@@ -1,9 +1,5 @@
-### Disclaimer
-
-This is not an official Google product.
-
 # dsub: simple batch jobs with Docker
-[![License](https://img.shields.io/badge/license-Apache%202.0-brightgreen.svg)](https://github.com/googlegenomics/dsub/blob/master/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-brightgreen.svg)](https://github.com/DataBiosphere/dsub/blob/master/LICENSE)
 
 ## Overview
 
@@ -63,7 +59,7 @@ Choose one of the following:
 
 1.  Clone this repository.
 
-        git clone https://github.com/googlegenomics/dsub
+        git clone https://github.com/DataBiosphere/dsub
         cd dsub
 
 1.  Install dsub (this will also install the dependencies)
