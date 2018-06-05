@@ -65,7 +65,7 @@ class ParamUtilTest(unittest.TestCase):
     output_file_param_util = param_util.OutputFileParamUtil('output')
     all_task_descriptors = param_util.tasks_file_to_task_descriptors({
         'path': expected_tsv_file
-    }, input_file_param_util, output_file_param_util)
+    }, 0, input_file_param_util, output_file_param_util)
     self.assertEqual(4, len(all_task_descriptors))
 
     for i in range(4):

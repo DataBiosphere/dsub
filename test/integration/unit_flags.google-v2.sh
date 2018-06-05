@@ -28,7 +28,10 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 source "${SCRIPT_DIR}/test_setup_unit.sh"
 
 function call_dsub() {
-  run_dsub \
+  dsub \
+    --provider google-v2 \
+    --project "${PROJECT_ID}" \
+    --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
     "${@}" \
     --dry-run \
     1> "${TEST_STDOUT}" \

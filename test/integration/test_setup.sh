@@ -89,16 +89,24 @@ function dsub_google() {
     --project "${PROJECT_ID}" \
     --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
     --zones "${ZONES:-us-central1-*}" \
-    "${DISK_SIZE:+--disk-size ${DISK_SIZE}}" \
-    "${BOOT_DISK_SIZE:+--boot-disk-size ${BOOT_DISK_SIZE}}" \
+    ${DISK_SIZE:+--disk-size "${DISK_SIZE}"} \
+    ${BOOT_DISK_SIZE:+--boot-disk-size "${BOOT_DISK_SIZE}"} \
     "${@}"
 }
 
 function dsub_google-v2() {
+  local zones="${ZONES:-}"
+  local regions="${REGIONS:-}"
+  if [[ -z "${regions}" ]] && [[ -z "${zones}" ]]; then
+    regions="us-central1"
+  fi
+
   dsub \
     --provider google-v2 \
     --project "${PROJECT_ID}" \
     --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
+    ${regions:+--regions "${regions}"} \
+    ${zones:+--zones "${zones}"} \
     "${@}"
 }
 
@@ -136,6 +144,13 @@ function run_dstat() {
 function dstat_google() {
   dstat \
     --provider google \
+    --project "${PROJECT_ID}" \
+    "${@}"
+}
+
+function dstat_google-v2() {
+  dstat \
+    --provider google-v2 \
     --project "${PROJECT_ID}" \
     "${@}"
 }

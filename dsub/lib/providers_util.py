@@ -13,13 +13,57 @@
 # limitations under the License.
 """Helpers for providers."""
 
+import os
 import textwrap
+
 from . import job_model
 
 _LOCALIZE_COMMAND_MAP = {
     job_model.P_GCS: 'gsutil -m rsync -r',
     job_model.P_LOCAL: 'rsync -r',
 }
+
+# Attempt to keep the dsub runtime environment sane by being prescriptive
+# about what providers need to provide to the user's Docker container.
+# Requirements can be found in the docs/providers/README.md.
+#
+# This module defines some utility names and functions such that new providers
+# can follow the patterns of exising providers.
+#
+# Unless providers have a compelling reason not to, they should just provide
+# a single disk for everything that needs to be written by the dsub
+# runtime environment or the user.
+#
+# Backends like the Google Pipelines API, allow for the user to set both
+# a boot-disk-size and a disk-size. But the boot-disk-size is not something
+# that users should care about, so the google provider puts everything
+# meaningful on the data disk:
+#
+#   input: files localized from object storage
+#   output: files to de-localize to object storage
+#
+#   script: any code that dsub writes (like the user script)
+#   tmp: set TMPDIR in the environment to point here
+#
+#   workingdir: A workspace directory for user code.
+#               This is also the explicit working directory set before the
+#               user script runs.
+
+# Mount point for the data disk in the user's Docker container
+DATA_MOUNT_POINT = '/mnt/data'
+
+SCRIPT_DIR = '%s/script' % DATA_MOUNT_POINT
+TMP_DIR = '%s/tmp' % DATA_MOUNT_POINT
+WORKING_DIR = '%s/workingdir' % DATA_MOUNT_POINT
+
+
+def get_file_environment_variables(file_params):
+  """Return a dictionary of environment variables for the user container."""
+  env = {}
+  for param in file_params:
+    env[param.name] = os.path.join(DATA_MOUNT_POINT,
+                                   param.docker_path) if param.value else ''
+  return env
 
 
 def build_recursive_localize_env(destination, inputs):

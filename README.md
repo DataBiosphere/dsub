@@ -1,9 +1,5 @@
-### Disclaimer
-
-This is not an official Google product.
-
 # dsub: simple batch jobs with Docker
-[![License](https://img.shields.io/badge/license-Apache%202.0-brightgreen.svg)](https://github.com/googlegenomics/dsub/blob/master/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-brightgreen.svg)](https://github.com/DataBiosphere/dsub/blob/master/LICENSE)
 
 ## Overview
 
@@ -63,7 +59,7 @@ Choose one of the following:
 
 1.  Clone this repository.
 
-        git clone https://github.com/googlegenomics/dsub
+        git clone https://github.com/DataBiosphere/dsub
         cd dsub
 
 1.  Install dsub (this will also install the dependencies)
@@ -379,8 +375,13 @@ on how to specify your logging path, see [Logging](docs/logging.md).
 
 ### Job control
 
-It's possible to wait for a job to complete before starting another, see [job
-control with dsub](docs/job_control.md).
+It's possible to wait for a job to complete before starting another.
+For details, see [job control with dsub](docs/job_control.md).
+
+### Retries
+
+It is possible for `dsub` to automatically retry failed tasks.
+For details, see [retries with dsub](docs/retries.md).
 
 ### Labeling jobs and tasks
 
@@ -420,6 +421,24 @@ each job includes:
     gets a sequential value of the form "task-*n*" where *n* is 1-based.
 
 Metadata can be used to cancel a job or individual tasks within a batch job.
+
+#### Summarizing job status
+
+By default, dstat outputs one line per task. If you're using a batch job with
+many tasks then you may benefit from `--summary`.
+
+```
+$ dstat --project my-project --summary
+
+Job Name        Status         Task Count
+-------------   -------------  -------------
+my-job-name     RUNNING        2
+my-job-name     SUCCESS        1
+```
+
+In this mode, dstat prints one line per (job name, task status) pair. You can
+see at a glance how many tasks are finished, how many are still running, and
+how many are failed/canceled.
 
 ### Deleting a job
 
@@ -461,5 +480,6 @@ To delete all running jobs for the current user:
     *   [Logging](docs/logging.md)
     *   [Compute Resources](docs/compute_resources.md)
     *   [Job Control](docs/job_control.md)
+    *   [Retries](docs/retries.md)
     *   [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
     *   [Backend providers](docs/providers/README.md)

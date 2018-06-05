@@ -27,6 +27,9 @@ set -o nounset
 readonly SCRIPT_DIR="$(dirname "${0}")"
 readonly JOB_NAME="test-job"
 
+# We'd like to be able to use relative paths, so force cwd.
+cd "${SCRIPT_DIR}"
+
 # Utility routine for getting a list of task statuses
 function check_correct_task() {
   local dstat_output="${1}"
@@ -60,7 +63,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   JOBID="$(run_dsub \
     --name "${JOB_NAME}" \
-    --command 'sleep 1m' \
+    --command 'sleep 2m' \
     --tasks "${TASKS_FILE}")"
 
   # Get a count of the number of lines in the tasks file.
@@ -155,6 +158,63 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   if ! echo "${DSTAT_OUTPUT}" | grep -qi "${JOB_NAME}"; then
     echo "Job ${JOB_NAME} not found in the dstat output!"
     echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  echo "Checking dstat (summary)"
+
+  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}" --summary 2>&1)"; then
+    echo "dstat exited with a non-zero exit code!"
+    echo "Output:"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${JOB_NAME}"; then
+    echo "Job ${JOB_NAME} not found in the dstat output!"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  if ! echo "${DSTAT_OUTPUT}" | grep -qi "RUNNING \+3"; then
+    echo "'RUNNING 3' not found in the dstat output!"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  echo "Checking dstat (summary, json)"
+
+  if ! run_dstat --status '*' --jobs "${JOBID}" --summary --format json > "${TEST_TMP}/summary_json"; then
+    echo "dstat exited with a non-zero exit code!"
+    echo "Output:"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  if ! diff -q "${TEST_TMP}/summary_json" "../testdata/summary_3_running.json"; then
+    echo "Output does not match expected"
+    echo "Expected:"
+    cat "../testdata/summary_3_running.json"
+    echo "Output:"
+    cat "${TEST_TMP}/summary_json"
+    exit 1
+  fi
+
+  echo "Checking dstat (summary, yaml)"
+
+  if ! run_dstat --status '*' --jobs "${JOBID}" --summary --format yaml > "${TEST_TMP}/summary_yaml"; then
+    echo "dstat exited with a non-zero exit code!"
+    echo "Output:"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  if ! diff -q "${TEST_TMP}/summary_yaml" "../testdata/summary_3_running.yaml"; then
+    echo "Output does not match expected"
+    echo "Expected:"
+    cat "../testdata/summary_3_running.yaml"
+    echo "Output:"
+    cat "${TEST_TMP}/summary_yaml"
     exit 1
   fi
 

@@ -54,10 +54,10 @@ setup(
                  ' batch scripts in the cloud'),
 
     # The project's main homepage.
-    url='https://github.com/googlegenomics/dsub',
+    url='https://github.com/DataBiosphere/dsub',
 
     # Author details
-    author='Google',
+    author='Verily',
     # Choose your license
     license='Apache',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers

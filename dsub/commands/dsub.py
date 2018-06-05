@@ -33,6 +33,7 @@ from ..lib import job_model
 from ..lib import param_util
 from ..lib import resources
 from ..lib.dsub_util import print_error
+from ..providers import google_base
 from ..providers import provider_base
 
 SLEEP_FUNCTION = time.sleep  # so we can replace it in tests
@@ -286,6 +287,11 @@ def _parse_arguments(prog, argv):
       action='store_true',
       help='Wait for the job to finish all its tasks.')
   parser.add_argument(
+      '--retries',
+      default=0,
+      type=int,
+      help='Number of retries to perform on failed tasks.')
+  parser.add_argument(
       '--poll-interval',
       default=10,
       type=int,
@@ -349,9 +355,10 @@ def _parse_arguments(prog, argv):
       '--zones', nargs='+', help='List of Google Compute Engine zones.')
   google_common.add_argument(
       '--scopes',
-      default=job_model.DEFAULT_SCOPES,
       nargs='+',
-      help='Space-separated scopes for GCE instances.')
+      help="""Space-separated scopes for Google Compute Engine instances.
+          If unspecified, provider will use '%s'""" % ','.join(
+              google_base.DEFAULT_SCOPES))
 
   google = parser.add_argument_group(
       title='"google" provider options',
@@ -360,9 +367,9 @@ def _parse_arguments(prog, argv):
       '--keep-alive',
       type=int,
       help="""Time (in seconds) to keep a tasks's virtual machine (VM) running
-      after a localization, docker command, or delocalization failure.
-      Allows for connecting to the VM for debugging.
-      Default is 0; maximum allowed value is 86400 (1 day).""")
+          after a localization, docker command, or delocalization failure.
+          Allows for connecting to the VM for debugging.
+          Default is 0; maximum allowed value is 86400 (1 day).""")
   google.add_argument(
       '--accelerator-type',
       help="""The Compute Engine accelerator type. By specifying this parameter,
@@ -573,6 +580,97 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
   return error_messages
 
 
+def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
+  """Wait for job and retry any tasks that fail.
+
+  Stops retrying an individual task when: it succeeds, is canceled, or has been
+  retried "retries" times.
+
+  This function exits when there are no tasks running and there are no tasks
+  eligible to be retried.
+
+  Args:
+    provider: job service provider
+    job_id: a single job ID (string) to wait for
+    poll_interval: integer seconds to wait between iterations
+    retries: number of retries
+    job_descriptor: job descriptor used to originally submit job
+
+  Returns:
+    Empty list if there was no error,
+    a list containing an error message from a failed task otherwise.
+  """
+
+  while True:
+    tasks = provider.lookup_job_tasks({'*'}, job_ids=[job_id])
+
+    running_tasks = set()
+    completed_tasks = set()
+    canceled_tasks = set()
+    fully_failed_tasks = set()
+    task_fail_count = dict()
+
+    # This is an arbitrary task that is either fully failed or canceled (with
+    # preference for the former).
+    message_task = None
+
+    for t in tasks:
+      task_id = job_model.numeric_task_id(t.get_field('task-id'))
+      status = t.get_field('task-status')
+      if status == 'FAILURE':
+        # Could compute this from task-attempt as well.
+        task_fail_count[task_id] = task_fail_count.get(task_id, 0) + 1
+        if task_fail_count[task_id] > retries:
+          fully_failed_tasks.add(task_id)
+          message_task = t
+      elif status == 'CANCELED':
+        canceled_tasks.add(task_id)
+        if not message_task:
+          message_task = t
+      elif status == 'SUCCESS':
+        completed_tasks.add(task_id)
+      elif status == 'RUNNING':
+        running_tasks.add(task_id)
+
+    retry_tasks = (
+        set(task_fail_count).difference(fully_failed_tasks)
+        .difference(running_tasks).difference(completed_tasks)
+        .difference(canceled_tasks))
+
+    # job completed.
+    if not retry_tasks and not running_tasks:
+      # If there are any fully failed tasks, return the completion message of an
+      # arbitrary one.
+      # If not, but there are canceled tasks, return the completion message of
+      # an arbitrary one.
+      if message_task:
+        return [provider.get_tasks_completion_messages([message_task])]
+
+      # Otherwise successful completion.
+      return []
+
+    for task_id in retry_tasks:
+      print('  %s failed. Retrying.' % (task_id if task_id else 'Task'))
+      _retry_task(provider, job_descriptor, task_id,
+                  task_fail_count[task_id] + 1)
+
+    SLEEP_FUNCTION(poll_interval)
+
+
+def _retry_task(provider, job_descriptor, task_id, task_attempt):
+  """Retry task_id (numeric id) assigning it task_attempt."""
+  td_orig = job_descriptor.find_task_descriptor(task_id)
+  provider.submit_job(
+      job_model.JobDescriptor(
+          job_descriptor.job_metadata, job_descriptor.job_params,
+          job_descriptor.job_resources, [
+              job_model.TaskDescriptor({
+                  'task-id': task_id,
+                  'task-attempt': task_attempt
+              }, td_orig.task_params, td_orig.task_resources)
+          ]), False)
+
+
 def _dominant_task_for_jobs(tasks):
   """A list with, for each job, its dominant task.
 
@@ -748,16 +846,17 @@ def run_main(args):
   # If --tasks is on the command-line, then get task-specific data
   if args.tasks:
     task_descriptors = param_util.tasks_file_to_task_descriptors(
-        args.tasks, input_file_param_util, output_file_param_util)
+        args.tasks, args.retries, input_file_param_util, output_file_param_util)
 
     # Validate job data + task data
     _validate_job_and_task_arguments(job_params, task_descriptors)
   else:
     # Create the implicit task
+    task_metadata = {'task-id': None}
+    if args.retries:
+      task_metadata['task-attempt'] = 1
     task_descriptors = [
-        job_model.TaskDescriptor({
-            'task-id': None
-        }, {
+        job_model.TaskDescriptor(task_metadata, {
             'labels': set(),
             'envs': set(),
             'inputs': set(),
@@ -776,6 +875,7 @@ def run_main(args):
       script=args.script,
       user=args.user,
       wait=args.wait,
+      retries=args.retries,
       poll_interval=args.poll_interval,
       after=args.after,
       skip=args.skip,
@@ -793,6 +893,7 @@ def run(provider,
         script=None,
         user=None,
         wait=False,
+        retries=0,
         poll_interval=10,
         after=None,
         skip=False,
@@ -819,6 +920,9 @@ def run(provider,
     script = job_model.Script(os.path.basename(script), script_file.read())
   else:
     raise ValueError('One of --command or a script name must be supplied')
+
+  if retries and not wait:
+    raise ValueError('Requisting retries requires requesting wait')
 
   # The contract with providers and downstream code is that the job_params
   # and task_params contain 'labels', 'envs', 'inputs', and 'outputs'.
@@ -857,9 +961,9 @@ def run(provider,
             error_messages)
 
   # Launch all the job tasks!
-  launched_job = provider.submit_job(
-      job_model.JobDescriptor(job_metadata, job_params, job_resources,
-                              task_descriptors), skip)
+  job_descriptor = job_model.JobDescriptor(job_metadata, job_params,
+                                           job_resources, task_descriptors)
+  launched_job = provider.submit_job(job_descriptor, skip)
 
   if not dry_run:
     if launched_job['job-id'] == dsub_util.NO_JOB:
@@ -869,20 +973,23 @@ def run(provider,
     if launched_job.get('task-id'):
       print('%s task(s)' % len(launched_job['task-id']))
     print('To check the status, run:')
-    print("  dstat%s --jobs '%s' --status '*'" %
+    print("  dstat %s --jobs '%s' --status '*'" %
           (provider_base.get_dstat_provider_args(provider, project),
            launched_job['job-id']))
     print('To cancel the job, run:')
-    print("  ddel%s --jobs '%s'" %
-          (provider_base.get_ddel_provider_args(provider, project),
-           launched_job['job-id']))
+    print("  ddel %s --jobs '%s'" % (provider_base.get_ddel_provider_args(
+        provider, project), launched_job['job-id']))
 
   # Poll for job completion
   if wait:
     print('Waiting for job to complete...')
 
-    error_messages = _wait_after(provider, [job_metadata['job-id']],
-                                 poll_interval, False)
+    if retries:
+      error_messages = _wait_and_retry(provider, job_metadata['job-id'],
+                                       poll_interval, retries, job_descriptor)
+    else:
+      error_messages = _wait_after(provider, [job_metadata['job-id']],
+                                   poll_interval, False)
     if error_messages:
       for msg in error_messages:
         print_error(msg)
@@ -916,6 +1023,8 @@ def _name_for_command(command):
   'sort'
   >>> _name_for_command('# This should be ignored')
   'command'
+  >>> _name_for_command('\\\n\\\n# Bad continuations, but ignore.\necho hello.')
+  'echo'
 
   Arguments:
     command: the user-provided command
@@ -926,7 +1035,7 @@ def _name_for_command(command):
   lines = command.splitlines()
   for line in lines:
     line = line.strip()
-    if line and not line.startswith('#'):
+    if line and not line.startswith('#') and line != '\\':
       return os.path.basename(re.split(r'\s', line)[0])
 
   return 'command'

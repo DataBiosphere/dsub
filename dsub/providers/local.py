@@ -29,16 +29,18 @@ tasks to a local queue for execution.
 The local provider runs `dsub` tasks locally, in a Docker container.
 
 Input files are staged on your local machine at
-${TMPDIR}/dsub-local/job-id/task-id/input_mnt/.
+${TMPDIR}/dsub-local/job-id/task-id.task-attempt/input_mnt/.
 
 Output files are copied on your local machine at
-${TMPDIR}/dsub-local/job-id/task-id/output_mnt/.
+${TMPDIR}/dsub-local/job-id/task-id.task-attempt/output_mnt/.
 
-Task status files are staged to ${TMPDIR}/tmp/dsub-local/job-id/task-id/.
+Task status files are staged to
+${TMPDIR}/tmp/dsub-local/job-id/task-id.task-attempt/.
 The task status files include logs and scripts to drive the task.
 
 task-id is the task index, or "task" for a job that didn't specify a list
-of tasks.
+of tasks. task-attempt is the attempt number and is not included if --retries is
+0.
 
 Thus using the local runner requires:
 
@@ -71,7 +73,7 @@ import pytz
 #   ${TMPDIR}/dsub-local/
 #
 # For each task, the on-host directory is
-#  ${TMPDIR}/dsub-local/<job-id>/<task-id>
+#  ${TMPDIR}/dsub-local/<job-id>/<task-id>[.task-attempt]
 #
 # Within the task directory, we create:
 #    data: Mount point for user's data
@@ -105,8 +107,6 @@ _DATA_SUBDIR = 'data'
 _SCRIPT_DIR = 'script'
 _WORKING_DIR = 'workingdir'
 
-_DATA_MOUNT_POINT = '/mnt/data'
-
 # Set file provider whitelist.
 _SUPPORTED_FILE_PROVIDERS = frozenset([job_model.P_GCS, job_model.P_LOCAL])
 _SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
@@ -114,25 +114,26 @@ _SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 
 
-def _format_task_name(job_id, task_id):
-  """Create a task name from a job-id and a task-id.
+def _format_task_name(job_id, task_id, task_attempt):
+  """Create a task name from a job-id, task-id, and task-attempt.
 
   Task names are used internally by dsub as well as by the docker task runner.
-  The name is formatted as either "<job-id>.<task-id>" or jobs with multple
-  tasks, or just "<job-id>" for jobs with a single task. Task names follow
-  formatting conventions allowing them to be safely used as a docker name.
+  The name is formatted as "<job-id>.<task-id>[.task-attempt]". Task names
+  follow formatting conventions allowing them to be safely used as a docker
+  name.
 
   Args:
     job_id: (str) the job ID.
     task_id: (str) the task ID.
+    task_attempt: (int) the task attempt.
 
   Returns:
     a task name string.
   """
-  if task_id is None:
-    docker_name = job_id
-  else:
-    docker_name = '%s.%s' % (job_id, task_id)
+  docker_name = '%s.%s' % (job_id, 'task' if task_id is None else task_id)
+
+  if task_attempt is not None:
+    docker_name += '.' + str(task_attempt)
 
   # Docker container names must match: [a-zA-Z0-9][a-zA-Z0-9_.-]
   # So 1) prefix it with "dsub-" and 2) change all invalid characters to "-".
@@ -150,6 +151,26 @@ def _convert_suffix_to_docker_chars(suffix):
     return '-'
 
   return ''.join(label_char_transform(c) for c in suffix)
+
+
+def _task_sort_function(task):
+  """Return a tuple for sorting 'most recent first'."""
+  return (task.get_field('create-time'), int(task.get_field('task-id', 0)),
+          int(task.get_field('task-attempt', 0)))
+
+
+def _sort_tasks(tasks):
+  """Sort tasks by 'most recent first'."""
+
+  # The local provider can launch tasks quickly enough that they end up with
+  # the same timestamp.
+  #
+  # lookup_job_tasks needs to return tasks sorted: "most recent first".
+  # Sort the list of tasks by:
+  # - create time (descending)
+  # - task-id (descending, if any)
+
+  tasks.sort(key=_task_sort_function, reverse=True)
 
 
 class LocalJobProvider(base.JobProvider):
@@ -213,7 +234,8 @@ class LocalJobProvider(base.JobProvider):
 
       # Set up directories
       task_dir = self._task_directory(
-          job_metadata.get('job-id'), task_metadata.get('task-id'))
+          job_metadata.get('job-id'), task_metadata.get('task-id'),
+          task_metadata.get('task-attempt'))
       self._mkdir_outputs(task_dir,
                           job_params['outputs'] | task_params['outputs'])
 
@@ -304,18 +326,19 @@ class LocalJobProvider(base.JobProvider):
 
     # Build the local runner script
     volumes = ('-v ' + task_dir + '/' + _DATA_SUBDIR + '/'
-               ':' + _DATA_MOUNT_POINT)
+               ':' + providers_util.DATA_MOUNT_POINT)
 
     script_data = script_header.format(
         volumes=volumes,
         name=_format_task_name(
-            job_metadata.get('job-id'), task_metadata.get('task-id')),
+            job_metadata.get('job-id'), task_metadata.get('task-id'),
+            task_metadata.get('task-attempt')),
         image=job_resources.image,
-        script=_DATA_MOUNT_POINT + '/' + _SCRIPT_DIR + '/' +
+        script=providers_util.DATA_MOUNT_POINT + '/' + _SCRIPT_DIR + '/' +
         job_metadata['script'].name,
         env_file=task_dir + '/' + 'docker.env',
         uid=os.getuid(),
-        data_mount_point=_DATA_MOUNT_POINT,
+        data_mount_point=providers_util.DATA_MOUNT_POINT,
         data_dir=task_dir + '/' + _DATA_SUBDIR,
         date_format='+%Y-%m-%d %H:%M:%S',
         workingdir=_WORKING_DIR,
@@ -344,8 +367,8 @@ class LocalJobProvider(base.JobProvider):
 
     # Write the environment variables
     env_vars = set(env.items()) | job_params['envs'] | task_params['envs'] | {
-        job_model.EnvParam('DATA_ROOT', _DATA_MOUNT_POINT),
-        job_model.EnvParam('TMPDIR', _DATA_MOUNT_POINT + '/tmp')
+        job_model.EnvParam('DATA_ROOT', providers_util.DATA_MOUNT_POINT),
+        job_model.EnvParam('TMPDIR', providers_util.DATA_MOUNT_POINT + '/tmp')
     }
     env_fname = task_dir + '/docker.env'
     with open(env_fname, 'wt') as f:
@@ -387,7 +410,8 @@ class LocalJobProvider(base.JobProvider):
       # Try to cancel it for real.
       # First, tell the runner script to skip delocalization
       task_dir = self._task_directory(
-          task.get_field('job-id'), task.get_field('task-id'))
+          task.get_field('job-id'), task.get_field('task-id'),
+          task.get_field('task-attempt'))
       today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
       with open(os.path.join(task_dir, 'die'), 'wt') as f:
         f.write('Operation canceled at %s\n' % today)
@@ -436,6 +460,7 @@ class LocalJobProvider(base.JobProvider):
       job_ids=None,
       job_names=None,
       task_ids=None,
+      task_attempts=None,
       labels=None,
       create_time_min=None,
       create_time_max=None,
@@ -449,6 +474,7 @@ class LocalJobProvider(base.JobProvider):
     job_ids = None if job_ids == {'*'} else job_ids
     job_names = None if job_names == {'*'} else job_names
     task_ids = None if task_ids == {'*'} else task_ids
+    task_attempts = None if task_attempts == {'*'} else task_attempts
     # 'AND' filtering arguments.
     labels = labels if labels else {}
 
@@ -475,13 +501,17 @@ class LocalJobProvider(base.JobProvider):
         path = self._provider_root() + '/' + j
         if not os.path.isdir(path):
           continue
-        for task_id in os.listdir(path):
+        for task_dir in os.listdir(path):
+          task_id, task_attempt = self._split_task_directory(task_dir)
+
           if task_id == 'task':
             task_id = None
           if task_ids and task_id not in task_ids:
             continue
+          if task_attempts and task_attempt not in task_attempts:
+            continue
 
-          task = self._get_task_from_task_dir(j, u, task_id)
+          task = self._get_task_from_task_dir(j, u, task_id, task_attempt)
           if not task:
             continue
 
@@ -510,7 +540,7 @@ class LocalJobProvider(base.JobProvider):
           if 0 < max_tasks < len(ret):
             break
 
-    ret.sort(key=lambda t: t.get_field('create-time'), reverse=True)
+    _sort_tasks(ret)
     return ret
 
   def get_tasks_completion_messages(self, tasks):
@@ -577,7 +607,7 @@ class LocalJobProvider(base.JobProvider):
     except (IOError, OSError):
       return None
 
-  def _get_task_from_task_dir(self, job_id, user_id, task_id):
+  def _get_task_from_task_dir(self, job_id, user_id, task_id, task_attempt):
     """Return a Task object with this task's info."""
 
     # We need to be very careful about how we read and interpret the contents
@@ -590,7 +620,7 @@ class LocalJobProvider(base.JobProvider):
     # it is yet running.
     # If the task.pid file exists, it means that the runner.sh was started.
 
-    task_dir = self._task_directory(job_id, task_id)
+    task_dir = self._task_directory(job_id, task_id, task_attempt)
 
     job_descriptor = self._read_task_metadata(task_dir)
     if not job_descriptor:
@@ -650,7 +680,7 @@ class LocalJobProvider(base.JobProvider):
       cp_cmd = 'cp'
     elif logging_path.file_provider == job_model.P_GCS:
       mkdir_cmd = ''
-      cp_cmd = 'gsutil -q cp'
+      cp_cmd = 'gsutil -mq cp'
     else:
       assert False
 
@@ -688,19 +718,26 @@ class LocalJobProvider(base.JobProvider):
     return '%s--%s--%s' % (job_name_value[:10], user_id,
                            create_time.strftime('%y%m%d-%H%M%S-%f'))
 
-  def _task_directory(self, job_id, task_id):
+  def _task_directory(self, job_id, task_id, task_attempt):
     """The local dir for staging files for that particular task."""
     dir_name = 'task' if task_id is None else str(task_id)
+    if task_attempt:
+      dir_name = '%s.%s' % (dir_name, task_attempt)
     return self._provider_root() + '/' + job_id + '/' + dir_name
 
+  def _split_task_directory(self, task_dir):
+    """Return task_id and task_attempt from dir_name."""
+    if '.' in task_dir:
+      return task_dir.split('.')
+    else:
+      return task_dir, None
+
   def _make_environment(self, inputs, outputs):
-    """Return a dictionary of environment variables for the VM."""
-    ret = {}
-    for i in inputs:
-      ret[i.name] = _DATA_MOUNT_POINT + '/' + i.docker_path if i.value else ''
-    for o in outputs:
-      ret[o.name] = _DATA_MOUNT_POINT + '/' + o.docker_path if o.value else ''
-    return ret
+    """Return a dictionary of environment variables for the container."""
+    env = {}
+    env.update(providers_util.get_file_environment_variables(inputs))
+    env.update(providers_util.get_file_environment_variables(outputs))
+    return env
 
   def _localize_inputs_recursive_command(self, task_dir, inputs):
     """Returns a command that will stage recursive inputs."""
@@ -754,8 +791,8 @@ class LocalJobProvider(base.JobProvider):
         # - `cp path/* dest/` will error if "path" has subdirectories.
         # - `cp "path/*" "dest/"` will fail (it expects wildcard expansion
         #   to come from shell).
-        commands.append('gsutil -q cp "%s" "%s"' % (source_file_path,
-                                                    dest_file_path))
+        commands.append(
+            'gsutil -mq cp "%s" "%s"' % (source_file_path, dest_file_path))
 
     return '\n'.join(commands)
 
@@ -802,7 +839,7 @@ class LocalJobProvider(base.JobProvider):
 
       # Use gsutil even for local files (explained in _localize_inputs_command).
       if o.file_provider in [job_model.P_LOCAL, job_model.P_GCS]:
-        commands.append('gsutil -q cp "%s" "%s"' % (local_path, dest_path))
+        commands.append('gsutil -mq cp "%s" "%s"' % (local_path, dest_path))
 
     return '\n'.join(commands)
 
@@ -857,15 +894,18 @@ class LocalTask(base.Task):
     task_params = self._raw.job_descriptor.task_descriptors[0].task_params
 
     value = None
-    if field in [
-        'job-id', 'job-name', 'user-id', 'create-time', 'dsub-version'
-    ]:
+    if field in ['job-id', 'job-name', 'user-id', 'dsub-version']:
       value = job_metadata.get(field)
+    elif field == 'create-time':
+      value = task_metadata.get(field)
+      # Old instances of the meta.yaml do not have a task create time.
+      if not value:
+        value = job_metadata.get(field)
     elif field == 'start-time':
       # There's no delay between creation and start since we launch docker
       # immediately for local runs.
-      value = job_metadata.get('create-time')
-    elif field in ['task-id']:
+      value = self.get_field('create-time', default)
+    elif field in ['task-id', 'task-attempt']:
       value = task_metadata.get(field)
     elif field == 'logging':
       # The job_resources will contain the "--logging" value.
@@ -917,7 +957,8 @@ class LocalTask(base.Task):
 
   def get_docker_name_for_task(self):
     return _format_task_name(
-        self.get_field('job-id'), self.get_field('task-id'))
+        self.get_field('job-id'), self.get_field('task-id'),
+        self.get_field('task-attempt'))
 
   @staticmethod
   def _last_lines(value, count):

@@ -138,6 +138,7 @@ class JobProvider(object):
                        job_ids=None,
                        job_names=None,
                        task_ids=None,
+                       task_attempts=None,
                        labels=None,
                        create_time_min=None,
                        create_time_max=None,
@@ -156,6 +157,8 @@ class JobProvider(object):
       job_ids: a set of job ids to return.
       job_names: a set of job names to return.
       task_ids: a set of specific tasks within the specified job(s) to return.
+      task_attempts: a set of specific task attempts within the specified
+        tasks(s) to return.
       labels: a list of LabelParam, each must match the job(s) returned.
       create_time_min: a timezone-aware datetime value for the earliest create
                        time of a task, inclusive.
@@ -198,8 +201,9 @@ class Task(object):
     Not all fields need to be supported by all providers.
     Field identifiers include:
 
-    'job-name', 'job-id', 'task-id', 'user-id', 'task-status', 'error-message',
-    'create-time', 'start-time', 'end-time', 'inputs', 'outputs'
+    'job-name', 'job-id', 'task-id', 'task-attempt', 'user-id', 'task-status',
+    'error-message', 'create-time', 'start-time', 'end-time', 'inputs',
+    'outputs'
 
     The following are required by dstat:
     - status: The task status ('RUNNING', 'CANCELED', 'FAILED', 'SUCCESS')
