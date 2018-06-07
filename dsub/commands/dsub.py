@@ -818,8 +818,14 @@ def call(argv):
 def main(prog=sys.argv[0], argv=sys.argv[1:]):
   try:
     dsub_main(prog, argv)
+  except dsub_errors.PredecessorJobFailureError as e:
+    # Never tried to launch. Failure occurred in the --after wait.
+    print(dsub_util.NO_JOB)
+    sys.exit(1)
   except dsub_errors.JobError as e:
+    # Job was launched, but there was failure in --wait
     print('%s: %s' % (type(e).__name__, str(e)), file=sys.stderr)
+    print(e.launched_job['job-id'])
     sys.exit(1)
   return 0
 
@@ -958,7 +964,7 @@ def run(provider,
           print_error(msg)
         raise dsub_errors.PredecessorJobFailureError(
             'One or more predecessor jobs completed but did not succeed.',
-            error_messages)
+            error_messages, None)
 
   # Launch all the job tasks!
   job_descriptor = job_model.JobDescriptor(job_metadata, job_params,
@@ -995,7 +1001,7 @@ def run(provider,
         print_error(msg)
       raise dsub_errors.JobExecutionError(
           'One or more jobs finished with status FAILURE or CANCELED'
-          ' during wait.', error_messages)
+          ' during wait.', error_messages, launched_job)
 
   return launched_job
 

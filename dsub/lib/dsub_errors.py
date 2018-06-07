@@ -17,10 +17,19 @@
 class JobError(Exception):
   """Exception containing error information of one or more jobs."""
 
-  def __init__(self, message, error_list):
+  def __init__(self, message, error_list, launched_job):
+    """Create a JobError to indicate something went wrong.
+
+    Args:
+        message: user-friendly message
+        error_list: what went wrong
+        launched_job: if the job is launched, but has errors in
+          "--wait"ing on the tasks.
+    """
     super(JobError, self).__init__(message)
     self.message = message
     self.error_list = error_list
+    self.launched_job = launched_job
 
 
 class PredecessorJobFailureError(JobError):
