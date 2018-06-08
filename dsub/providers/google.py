@@ -123,15 +123,6 @@ INSTALL_CLOUD_SDK = textwrap.dedent("""\
   fi
 """)
 
-# When attempting to cancel an operation that is already completed
-# (succeeded, failed, or canceled), the response will include:
-# "error": {
-#    "code": 400,
-#    "status": "FAILED_PRECONDITION",
-# }
-FAILED_PRECONDITION_CODE = 400
-FAILED_PRECONDITION_STATUS = 'FAILED_PRECONDITION'
-
 
 class _Pipelines(object):
   """Utilty methods for creating pipeline operations."""
@@ -281,7 +272,7 @@ class _Pipelines(object):
       pipeline_name: string name of pipeline.
 
     Returns:
-      A nested dictionary with one entry under the key emphemeralPipeline
+      A nested dictionary with one entry under the key ephemeralPipeline
       containing the pipeline configuration.
     """
     if min_cores is None:
@@ -614,106 +605,6 @@ class _Operations(object):
       page_token = response.get('nextPageToken')
       more_operations = bool(page_token)
 
-  @classmethod
-  def _cancel_batch(cls, service, ops):
-    """Cancel a batch of operations.
-
-    Args:
-      service: Google Genomics API service object.
-      ops: A list of operations to cancel.
-
-    Returns:
-      A list of operations canceled and a list of error messages.
-    """
-
-    # We define an inline callback which will populate a list of
-    # successfully canceled operations as well as a list of operations
-    # which were not successfully canceled.
-
-    canceled = []
-    failed = []
-
-    def handle_cancel(request_id, response, exception):
-      """Callback for the cancel response."""
-      del response  # unused
-
-      if exception:
-        # We don't generally expect any failures here, except possibly trying
-        # to cancel an operation that is already canceled or finished.
-        #
-        # If the operation is already finished, provide a clearer message than
-        # "error 400: Bad Request".
-
-        msg = 'error %s: %s' % (exception.resp.status, exception.resp.reason)
-        if exception.resp.status == FAILED_PRECONDITION_CODE:
-          detail = json.loads(exception.content)
-          status = detail.get('error', {}).get('status')
-          if status == FAILED_PRECONDITION_STATUS:
-            msg = 'Not running'
-
-        failed.append({'name': request_id, 'msg': msg})
-      else:
-        canceled.append({'name': request_id})
-
-      return
-
-    # Set up the batch object
-    batch = service.new_batch_http_request(callback=handle_cancel)
-
-    # The callback gets a "request_id" which is the operation name.
-    # Build a dict such that after the callback, we can lookup the operation
-    # objects by name
-    ops_by_name = {}
-    for op in ops:
-      op_name = op.get_field('internal-id')
-      ops_by_name[op_name] = op
-      batch.add(
-          service.operations().cancel(name=op_name, body={}),
-          request_id=op_name)
-
-    # Cancel the operations
-    batch.execute()
-
-    # Iterate through the canceled and failed lists to build our return lists
-    canceled_ops = [ops_by_name[cancel['name']] for cancel in canceled]
-    error_messages = []
-    for fail in failed:
-      message = "Error canceling '%s': %s"
-      op = ops_by_name[fail['name']]
-      message %= (op.get_operation_full_job_id(), fail['msg'])
-      error_messages.append(message)
-
-    return canceled_ops, error_messages
-
-  @classmethod
-  def cancel(cls, service, ops):
-    """Cancel operations.
-
-    Args:
-      service: Google Genomics API service object.
-      ops: A list of operations to cancel.
-
-    Returns:
-      A list of operations canceled and a list of error messages.
-    """
-
-    # Canceling many operations one-by-one can be slow.
-    # The Pipelines API doesn't directly support a list of operations to cancel,
-    # but the requests can be performed in batch.
-
-    canceled_ops = []
-    error_messages = []
-
-    max_batch = 256
-    total_ops = len(ops)
-    for first_op in range(0, total_ops, max_batch):
-      batch_canceled, batch_messages = cls._cancel_batch(
-          service, ops[first_op:first_op + max_batch])
-      canceled_ops.extend(batch_canceled)
-      error_messages.extend(batch_messages)
-
-    return canceled_ops, error_messages
-
 
 class GoogleJobProvider(base.JobProvider):
   """Interface to dsub and related tools for managing Google cloud jobs."""
@@ -986,7 +877,8 @@ class GoogleJobProvider(base.JobProvider):
 
     print 'Found %d tasks to delete.' % len(tasks)
 
-    return _Operations.cancel(self._service, tasks)
+    return google_base.cancel(self._service.new_batch_http_request,
+                              self._service.operations().cancel, tasks)
 
   def get_tasks_completion_messages(self, tasks):
     completion_messages = []
@@ -1143,15 +1035,6 @@ class GoogleOperation(base.Task):
         msg = 'Success'
 
     return (msg, google_base.parse_rfc3339_utc_string(ds))
-
-  def get_operation_full_job_id(self):
-    """Returns the job-id or job-id.task-id for the operation."""
-    job_id = self.get_field('job-id')
-    task_id = self.get_field('task-id')
-    if task_id:
-      return '%s.%s' % (job_id, task_id)
-    else:
-      return job_id
 
   def _get_operation_input_field_values(self, metadata, file_input):
     """Returns a dictionary of envs or file inputs for an operation.

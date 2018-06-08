@@ -28,6 +28,7 @@ from __future__ import print_function
 
 import json
 import os
+import sys
 import textwrap
 
 from . import base
@@ -259,6 +260,31 @@ _USER_CMD = textwrap.dedent("""\
 """)
 
 
+class GoogleV2BatchHandler(object):
+  """Implement the HttpBatch interface to enable simple serial batches."""
+
+  # The v2alpha1 batch endpoint is not currently implemented.
+  # When it is, this can be replaced by service.new_batch_http_request.
+
+  def __init__(self, callback):
+    self._cancel_list = []
+    self._response_handler = callback
+
+  def add(self, cancel_fn, request_id):
+    self._cancel_list.append((request_id, cancel_fn))
+
+  def execute(self):
+    for (request_id, cancel_fn) in self._cancel_list:
+      response = None
+      exception = None
+      try:
+        response = cancel_fn.execute()
+      except:  # pylint: disable=bare-except
+        exception = sys.exc_info()[0]
+
+      self._response_handler(request_id, response, exception)
+
+
 class GoogleV2JobProvider(base.JobProvider):
   """dsub provider implementation managing Jobs on Google Cloud."""
 
@@ -300,7 +326,7 @@ class GoogleV2JobProvider(base.JobProvider):
 
     docker_paths = [
         var.docker_path if var.recursive else os.path.dirname(var.docker_path)
-        for var in inputs + outputs
+        for var in inputs | outputs
         if var.value
     ]
 
@@ -796,7 +822,37 @@ class GoogleV2JobProvider(base.JobProvider):
                   labels,
                   create_time_min=None,
                   create_time_max=None):
-    pass
+    """Kills the operations associated with the specified job or job.task.
+
+    Args:
+      user_ids: List of user ids who "own" the job(s) to cancel.
+      job_ids: List of job_ids to cancel.
+      task_ids: List of task-ids to cancel.
+      labels: List of LabelParam, each must match the job(s) to be canceled.
+      create_time_min: a timezone-aware datetime value for the earliest create
+                       time of a task, inclusive.
+      create_time_max: a timezone-aware datetime value for the most recent
+                       create time of a task, inclusive.
+
+    Returns:
+      A list of tasks canceled and a list of error messages.
+    """
+    # Look up the job(s)
+    tasks = list(
+        self.lookup_job_tasks(
+            {'RUNNING'},
+            user_ids=user_ids,
+            job_ids=job_ids,
+            task_ids=task_ids,
+            labels=labels,
+            create_time_min=create_time_min,
+            create_time_max=create_time_max))
+
+    print('Found %d tasks to delete.' % len(tasks))
+
+    return google_base.cancel(GoogleV2BatchHandler,
+                              self._service.projects().operations().cancel,
+                              tasks)
 
 
 class GoogleOperation(base.Task):
@@ -887,7 +943,10 @@ class GoogleOperation(base.Task):
     value = None
     if field == 'internal-id':
       value = self._op['name']
-    elif field in ['job-id', 'job-name', 'task-id', 'user-id', 'dsub-version']:
+    elif field in [
+        'job-id', 'job-name', 'task-id', 'task-attempt', 'user-id',
+        'dsub-version'
+    ]:
       value = google_v2_operations.get_label(self._op, field)
     elif field == 'task-status':
       value = self._operation_status()
