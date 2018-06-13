@@ -26,6 +26,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import ast
 import json
 import os
 import sys
@@ -219,6 +220,7 @@ _MK_RUNTIME_DIRS_CMD = '\n'.join('mkdir -m 777 -p "%s" ' % dir for dir in [
 # This has the advantage over other encoding schemes (such as base64) of being
 # user-readable in the Genomics "operation" object.
 _SCRIPT_VARNAME = '_SCRIPT_REPR'
+_META_YAML_VARNAME = '_META_YAML_REPR'
 
 _PYTHON_DECODE_SCRIPT = textwrap.dedent("""\
   import ast
@@ -314,10 +316,11 @@ class GoogleV2JobProvider(base.JobProvider):
         'STDERR_PATH': '{}-stderr.log'.format(logging_prefix)
     }
 
-  def _get_prepare_env(self, script, inputs, outputs):
+  def _get_prepare_env(self, script, job_descriptor, inputs, outputs):
     """Return a dict with variables for the 'prepare' action."""
 
     # Add the _SCRIPT_REPR with the repr(script) contents
+    # Add the _META_YAML_REPR with the repr(meta) contents
 
     # Add variables for directories that need to be created, for example:
     # DIR_COUNT: 2
@@ -332,6 +335,7 @@ class GoogleV2JobProvider(base.JobProvider):
 
     env = {
         _SCRIPT_VARNAME: repr(script.value),
+        _META_YAML_VARNAME: repr(job_descriptor.to_yaml()),
         'DIR_COUNT': str(len(docker_paths))
     }
 
@@ -429,10 +433,11 @@ class GoogleV2JobProvider(base.JobProvider):
 
     # The list of "actions" (1-based) will be:
     #   1- continuous copy of log files off to Cloud Storage
-    #   2- localize objects from Cloud Storage to block storage
-    #   3- execute user command
-    #   4- delocalize objects from block storage to Cloud Storage
-    #   5- final copy of log files off to Cloud Storage
+    #   2- prepare the shared mount point (write the user script
+    #   3- localize objects from Cloud Storage to block storage
+    #   4- execute user command
+    #   5- delocalize objects from block storage to Cloud Storage
+    #   6- final copy of log files off to Cloud Storage
     user_action = 4
     final_logging_action = 6
 
@@ -454,7 +459,7 @@ class GoogleV2JobProvider(base.JobProvider):
     outputs = job_params['outputs'] | task_params['outputs']
     user_environment = self._build_user_environment(envs, inputs, outputs)
 
-    prepare_env = self._get_prepare_env(script, inputs, outputs)
+    prepare_env = self._get_prepare_env(script, task_view, inputs, outputs)
     localization_env = self._get_localization_env(inputs)
     delocalization_env = self._get_delocalization_env(outputs)
 
@@ -495,7 +500,7 @@ class GoogleV2JobProvider(base.JobProvider):
                     cp_loop=_LOCALIZATION_LOOP)
             ]),
         google_v2_pipelines.build_action(
-            name=script.name,
+            name='user-command',
             image_uri=job_resources.image,
             mounts=[mnt_datadisk],
             environment=user_environment,
@@ -860,6 +865,22 @@ class GoogleOperation(base.Task):
 
   def __init__(self, operation_data):
     self._op = operation_data
+    self._job_descriptor = self._try_op_to_job_descriptor()
+
+  def _try_op_to_job_descriptor(self):
+    # The _META_YAML_REPR field in the 'prepare' action enables reconstructing
+    # the original job descriptor.
+    # Jobs run while the google-v2 provider was in development will not have
+    # the _META_YAML.
+    env = google_v2_operations.get_action_environment(self._op, 'prepare')
+    if not env:
+      return
+
+    meta = env.get(_META_YAML_VARNAME)
+    if not meta:
+      return
+
+    return job_model.JobDescriptor.from_yaml(ast.literal_eval(meta))
 
   def _operation_status(self):
     """Returns the status of this operation.
@@ -951,20 +972,35 @@ class GoogleOperation(base.Task):
     elif field == 'task-status':
       value = self._operation_status()
     elif field == 'logging':
-      value = 'TODO'
-    elif field == 'envs':
-      value = 'TODO'
-    elif field == 'labels':
-      # Reserved labels are filtered from dsub task output.
-      value = {
-          k: v
-          for k, v in google_v2_operations.get_labels(self._op).items()
-          if k not in job_model.RESERVED_LABELS
-      }
+      if self._job_descriptor:
+        # The job_resources will contain the "--logging" value.
+        # The task_resources will contain the resolved logging path.
+        # Return the resolved logging path.
+        task_resources = self._job_descriptor.task_descriptors[0].task_resources
+        value = task_resources.logging_path
+
+    elif field in ['envs', 'labels']:
+      if self._job_descriptor:
+        items = providers_util.get_job_and_task_param(
+            self._job_descriptor.job_params,
+            self._job_descriptor.task_descriptors[0].task_params, field)
+        value = {item.name: item.value for item in items}
     elif field == 'inputs':
-      value = 'TODO'
+      if self._job_descriptor:
+        value = {}
+        for field in ['inputs', 'input-recursives']:
+          items = providers_util.get_job_and_task_param(
+              self._job_descriptor.job_params,
+              self._job_descriptor.task_descriptors[0].task_params, field)
+          value.update({item.name: item.value for item in items})
     elif field == 'outputs':
-      value = 'TODO'
+      if self._job_descriptor:
+        value = {}
+        for field in ['outputs', 'output-recursives']:
+          items = providers_util.get_job_and_task_param(
+              self._job_descriptor.job_params,
+              self._job_descriptor.task_descriptors[0].task_params, field)
+          value.update({item.name: item.value for item in items})
     elif field == 'create-time':
       ds = google_v2_operations.get_create_time(self._op)
       value = google_base.parse_rfc3339_utc_string(ds)

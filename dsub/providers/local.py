@@ -881,9 +881,6 @@ class LocalTask(base.Task):
     """
     return self._raw._asdict()
 
-  def _get_job_and_task_param(self, job_params, task_params, field):
-    return job_params.get(field, set()) | task_params.get(field, set())
-
   def get_field(self, field, default=None):
 
     # Most fields should be satisfied from the job descriptor
@@ -913,17 +910,20 @@ class LocalTask(base.Task):
       # get_field('logging') should currently return the resolved logging path.
       value = task_resources.logging_path
     elif field in ['labels', 'envs']:
-      items = self._get_job_and_task_param(job_params, task_params, field)
+      items = providers_util.get_job_and_task_param(job_params, task_params,
+                                                    field)
       value = {item.name: item.value for item in items}
     elif field == 'inputs':
       value = {}
       for field in ['inputs', 'input-recursives']:
-        items = self._get_job_and_task_param(job_params, task_params, field)
+        items = providers_util.get_job_and_task_param(job_params, task_params,
+                                                      field)
         value.update({item.name: item.value for item in items})
     elif field == 'outputs':
       value = {}
       for field in ['outputs', 'output-recursives']:
-        items = self._get_job_and_task_param(job_params, task_params, field)
+        items = providers_util.get_job_and_task_param(job_params, task_params,
+                                                      field)
         value.update({item.name: item.value for item in items})
     elif field == 'provider':
       return _PROVIDER_NAME
