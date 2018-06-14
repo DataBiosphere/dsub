@@ -233,8 +233,8 @@ _MK_IO_DIRS = textwrap.dedent("""\
   for ((i=0; i < DIR_COUNT; i++)); do
     DIR_VAR="DIR_${i}"
 
-    echo "mkdir -p \"${!DIR_VAR}\""
-    mkdir -p "${!DIR_VAR}"
+    echo "mkdir -m 777 -p \"${!DIR_VAR}\""
+    mkdir -m 777 -p "${!DIR_VAR}"
   done
 """)
 
@@ -249,7 +249,7 @@ _PREPARE_CMD = textwrap.dedent("""\
   echo "${{{script_var}}}" \
     | python -c '{python_decode_script}' \
     > {script_path}
-  chmod u+x {script_path}
+  chmod a+x {script_path}
 
   {mk_io_dirs}
 """)
@@ -327,11 +327,19 @@ class GoogleV2JobProvider(base.JobProvider):
     # DIR_0: /mnt/data/input/gs/bucket/path1/
     # DIR_1: /mnt/data/output/gs/bucket/path2
 
-    docker_paths = [
+    # List the directories in sorted order so that they are created in that
+    # order. This is primarily to ensure that permissions are set as we create
+    # each directory.
+    # For example:
+    #   mkdir -m 777 -p /root/first/second
+    #   mkdir -m 777 -p /root/first
+    # *may* not actually set 777 on /root/first
+
+    docker_paths = sorted([
         var.docker_path if var.recursive else os.path.dirname(var.docker_path)
         for var in inputs | outputs
         if var.value
-    ]
+    ])
 
     env = {
         _SCRIPT_VARNAME: repr(script.value),

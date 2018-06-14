@@ -215,15 +215,7 @@ function get_test_providers() {
     return
   fi
 
-  case "${test_file}" in
-    e2e_non_root.sh)
-      local all_provider_list="${DSUB_PROVIDER:-local google}"
-      ;;
-    *)
-      local all_provider_list="${DSUB_PROVIDER:-local google google-v2}"
-      ;;
-  esac
-
+  local all_provider_list="${DSUB_PROVIDER:-local google google-v2}"
   echo -n "${all_provider_list}"
 }
 readonly -f get_test_providers
