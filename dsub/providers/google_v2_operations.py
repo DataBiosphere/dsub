@@ -141,6 +141,11 @@ def get_last_update(op):
   return last_update
 
 
+def get_resources(op):
+  """Return the operation's resource."""
+  return op.get('metadata', {}).get('pipeline').get('resources', {})
+
+
 def is_pipeline(op):
   """Check that an operation is a genomics pipeline run.
 

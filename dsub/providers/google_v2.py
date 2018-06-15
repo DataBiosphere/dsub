@@ -1032,7 +1032,25 @@ class GoogleOperation(base.Task):
     elif field == 'provider':
       return _PROVIDER_NAME
     elif field == 'provider-attributes':
-      value = 'TODO'
+      # Unlike Pipelines API v1, the v2 API hides the VM, so just emit
+      # configured items, like region, zone, VM type.
+      value = {}
+      resources = google_v2_operations.get_resources(self._op)
+      if 'regions' in resources:
+        value['regions'] = resources['regions']
+      if 'zones' in resources:
+        value['zones'] = resources['zones']
+      if 'virtualMachine' in resources:
+        vm = resources['virtualMachine']
+        value['machine-type'] = vm['machineType']
+        value['preemptible'] = vm['preemptible']
+
+        value['boot-disk-size'] = vm['bootDiskSizeGb']
+        if 'disks' in vm:
+          datadisk = next(
+              (d for d in vm['disks'] if d['name'] == _DATA_DISK_NAME))
+          if datadisk:
+            value['disk-size'] = datadisk['sizeGb']
     else:
       raise ValueError('Unsupported field: "%s"' % field)
 
