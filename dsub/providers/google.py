@@ -986,6 +986,22 @@ class GoogleOperation(base.Task):
           'instance-name': instance_name,
           'zone': instance_zone,
       }
+    elif field == 'events':
+      events = metadata.get('events', [])
+      value = []
+      for event in events:
+        event_value = {
+            'name':
+                event.get('description', ''),
+            'start-time':
+                google_base.parse_rfc3339_utc_string(event['startTime'])
+        }
+        if 'endTime' in event:
+          event_value['end-time'] = google_base.parse_rfc3339_utc_string(
+              event['endTime'])
+
+        value.append(event_value)
+
     else:
       raise ValueError('Unsupported field: "%s"' % field)
 

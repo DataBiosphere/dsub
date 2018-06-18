@@ -56,7 +56,7 @@ def _make_task(job_create_time, task_create_time, task_id):
       end_time=None,
       last_update=None,
       pid=None,
-  )
+      events=None)
 
 
 CREATE_TIME_1 = dsub_util.replace_timezone(

@@ -1057,6 +1057,10 @@ class GoogleOperation(base.Task):
               (d for d in vm['disks'] if d['name'] == _DATA_DISK_NAME))
           if datadisk:
             value['disk-size'] = datadisk['sizeGb']
+    elif field == 'events':
+      # TODO: Implement events for pipelines-v2. There are a ton
+      # of events in v2 so we'll likely need to filter some of them.
+      value = [{'name': 'TODO', 'start-time': None}]
     else:
       raise ValueError('Unsupported field: "%s"' % field)
 
