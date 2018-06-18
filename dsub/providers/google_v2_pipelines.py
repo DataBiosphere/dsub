@@ -26,11 +26,15 @@ def build_network(name, use_private_address):
   }
 
 
-def build_disks(name, size_gb):
-  return [{
+def build_disk(name, size_gb):
+  return {
       'name': name,
       'sizeGb': size_gb,
-  }]
+  }
+
+
+def build_accelerator(accelerator_type, accelerator_count):
+  return {'type': accelerator_type, 'count': accelerator_count}
 
 
 def build_service_account(email, scopes):
@@ -46,6 +50,7 @@ def build_machine(network=None,
                   service_account=None,
                   boot_disk_size_gb=None,
                   disks=None,
+                  accelerators=None,
                   labels=None):
   """Build a VirtualMachine object for a Pipeline request.
 
@@ -56,6 +61,7 @@ def build_machine(network=None,
     service_account (dict): Service account configuration for the VM.
     boot_disk_size_gb (int): Boot disk size in GB.
     disks (list[dict]): List of disks to mount.
+    accelerators (list[dict]): List of accelerators to attach to the VM.
     labels (dict[string, string]): Labels for the VM.
 
   Returns:
@@ -68,6 +74,7 @@ def build_machine(network=None,
       'serviceAccount': service_account,
       'bootDiskSizeGb': boot_disk_size_gb,
       'disks': disks,
+      'accelerators': accelerators,
       'labels': labels,
   }
 

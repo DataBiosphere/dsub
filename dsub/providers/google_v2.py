@@ -545,11 +545,16 @@ class GoogleV2JobProvider(base.JobProvider):
     assert len(actions) == final_logging_action
 
     disks = [
-        google_v2_pipelines.build_disks(_DATA_DISK_NAME,
-                                        job_resources.disk_size)
+        google_v2_pipelines.build_disk(_DATA_DISK_NAME, job_resources.disk_size)
     ]
     network = google_v2_pipelines.build_network(None, None)
     machine_type = job_resources.machine_type or job_model.DEFAULT_MACHINE_TYPE
+    accelerators = None
+    if job_resources.accelerator_type:
+      accelerators = [
+          google_v2_pipelines.build_accelerator(job_resources.accelerator_type,
+                                                job_resources.accelerator_count)
+      ]
     service_account = google_v2_pipelines.build_service_account(
         'default', scopes)
 
@@ -564,6 +569,7 @@ class GoogleV2JobProvider(base.JobProvider):
             service_account=service_account,
             boot_disk_size_gb=job_resources.boot_disk_size,
             disks=disks,
+            accelerators=accelerators,
             labels=labels),
     )
 

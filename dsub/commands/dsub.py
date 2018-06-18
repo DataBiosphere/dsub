@@ -359,6 +359,24 @@ def _parse_arguments(prog, argv):
       help="""Space-separated scopes for Google Compute Engine instances.
           If unspecified, provider will use '%s'""" % ','.join(
               google_base.DEFAULT_SCOPES))
+  google_common.add_argument(
+      '--accelerator-type',
+      help="""The Compute Engine accelerator type. By specifying this parameter,
+          you will download and install the following third-party software onto
+          your job's Compute Engine instances: NVIDIA(R) Tesla(R) drivers and
+          NVIDIA(R) CUDA toolkit. Please see
+          https://cloud.google.com/compute/docs/gpus/ for supported GPU types
+          and
+          https://cloud.google.com/genomics/reference/rest/v1alpha2/pipelines#pipelineresources
+          for more details.""")
+  google_common.add_argument(
+      '--accelerator-count',
+      type=int,
+      default=0,
+      help="""The number of accelerators of the specified type to attach.
+          By specifying this parameter, you will download and install the
+          following third-party software onto your job's Compute Engine
+          instances: NVIDIA(R) Tesla(R) drivers and NVIDIA(R) CUDA toolkit.""")
 
   google = parser.add_argument_group(
       title='"google" provider options',
@@ -370,24 +388,6 @@ def _parse_arguments(prog, argv):
           after a localization, docker command, or delocalization failure.
           Allows for connecting to the VM for debugging.
           Default is 0; maximum allowed value is 86400 (1 day).""")
-  google.add_argument(
-      '--accelerator-type',
-      help="""The Compute Engine accelerator type. By specifying this parameter,
-          you will download and install the following third-party software onto
-          your job's Compute Engine instances: NVIDIA(R) Tesla(R) drivers and
-          NVIDIA(R) CUDA toolkit. Please see
-          https://cloud.google.com/compute/docs/gpus/ for supported GPU types
-          and
-          https://cloud.google.com/genomics/reference/rest/v1alpha2/pipelines#pipelineresources
-          for more details.""")
-  google.add_argument(
-      '--accelerator-count',
-      type=int,
-      default=0,
-      help="""The number of accelerators of the specified type to attach.
-          By specifying this parameter, you will download and install the
-          following third-party software onto your job's Compute Engine
-          instances: NVIDIA(R) Tesla(R) drivers and NVIDIA(R) CUDA toolkit.""")
 
   google_v2 = parser.add_argument_group(
       title='"google-v2" provider options',

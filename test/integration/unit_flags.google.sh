@@ -249,7 +249,7 @@ function test_accelerator_type_and_count() {
     test_failed "${subtest}"
   fi
 }
-readonly -f test_no_keep_alive
+readonly -f test_accelerator_type_and_count
 
 function test_no_accelerator_type_and_count() {
   local subtest="${FUNCNAME[0]}"
@@ -270,7 +270,7 @@ function test_no_accelerator_type_and_count() {
     test_failed "${subtest}"
   fi
 }
-readonly -f test_no_keep_alive
+readonly -f test_no_accelerator_type_and_count
 
 # Run the tests
 trap "exit_handler" EXIT
