@@ -99,7 +99,7 @@ setup(
         'oauth2client',
         'python-dateutil',
         'pytz',
-        'pyyaml',
+        'pyyaml==3.12',
         'retrying',
         'tabulate',
 
