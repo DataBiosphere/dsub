@@ -203,7 +203,7 @@ class Task(object):
 
     'job-name', 'job-id', 'task-id', 'task-attempt', 'user-id', 'task-status',
     'error-message', 'create-time', 'start-time', 'end-time', 'inputs',
-    'outputs'
+    'outputs', 'events'
 
     The following are required by dstat:
     - status: The task status ('RUNNING', 'CANCELED', 'FAILED', 'SUCCESS')

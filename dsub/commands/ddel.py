@@ -71,19 +71,21 @@ def _parse_arguments():
       help='User labels to match. Tasks returned must match all labels.',
       metavar='KEY=VALUE')
 
-  # Add provider-specific arguments
-  google = parser.add_argument_group(
-      title='google',
-      description='Options for the Google provider (Pipelines API)')
-  google.add_argument(
+  # Shared arguments between the "google" and "google-v2" providers
+  google_common = parser.add_argument_group(
+      title='google-common',
+      description='Options common to the "google" and "google-v2" providers')
+  google_common.add_argument(
       '--project',
       help='Cloud project ID in which to find and delete the job(s)')
 
-  return provider_base.parse_args(parser, {
-      'google': ['project'],
-      'test-fails': [],
-      'local': [],
-  }, sys.argv[1:])
+  return provider_base.parse_args(
+      parser, {
+          'google': ['project'],
+          'google-v2': ['project'],
+          'test-fails': [],
+          'local': [],
+      }, sys.argv[1:])
 
 
 def _emit_search_criteria(user_ids, job_ids, task_ids, labels):

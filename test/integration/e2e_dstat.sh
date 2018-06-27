@@ -34,27 +34,44 @@ function verify_dstat_output() {
 
   # Verify that that the jobs are found and are in the expected order.
   # dstat sort ordering is by create-time (descending), so job 0 here should be the last started.
-  FIRST_JOB_NAME="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[0].job-name")"
-  SECOND_JOB_NAME="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[1].job-name")"
-  THIRD_JOB_NAME="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[2].job-name")"
+  local first_job_name="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[0].job-name")"
+  local second_job_name="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[1].job-name")"
+  local third_job_name="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[2].job-name")"
 
-  if [[ "${FIRST_JOB_NAME}" != "${RUNNING_JOB_NAME_2}" ]]; then
+  if [[ "${first_job_name}" != "${RUNNING_JOB_NAME_2}" ]]; then
     echo "Job ${RUNNING_JOB_NAME_2} not found in the correct location in the dstat output! "
     echo "${dstat_out}"
     exit 1
   fi
 
-  if [[ "${SECOND_JOB_NAME}" != "${RUNNING_JOB_NAME}" ]]; then
+  if [[ "${second_job_name}" != "${RUNNING_JOB_NAME}" ]]; then
     echo "Job ${RUNNING_JOB_NAME} not found in the correct location in the dstat output!"
     echo "${dstat_out}"
     exit 1
   fi
 
-  if [[ "${THIRD_JOB_NAME}" != "${COMPLETED_JOB_NAME}" ]]; then
+  if [[ "${third_job_name}" != "${COMPLETED_JOB_NAME}" ]]; then
     echo "Job ${COMPLETED_JOB_NAME} not found in the correct location in the dstat output!"
     echo "${dstat_out}"
     exit 1
   fi
+
+  declare -a expected_events
+  if [[ "${DSUB_PROVIDER}" == "google" || "${DSUB_PROVIDER}" == "local" ]]; then
+    expected_events=(start pulling-image localizing-files running-docker delocalizing-files ok)
+  else
+    # TODO: Update once events are implemented for google-v2
+    expected_events=(TODO)
+  fi
+
+  for ((i = 0 ; i < "${#expected_events[@]}"; i++)); do
+    local expected="${expected_events[i]}"
+    local actual="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${DSTAT_OUTPUT}" "[2].events.[${i}].name")"
+    if [[ ${actual} != ${expected} ]]; then
+      echo "Job idontknowhowtounix has incorrect event (${i}): ${actual} should be: ${expected}"
+      exit 1
+    fi
+  done
 }
 readonly -f verify_dstat_output
 
@@ -206,7 +223,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Waiting 5 seconds and checking 'dstat --age 5s'..."
   sleep 5s
 
-  DSTAT_OUTPUT="$(run_dstat_age "5s" --status '*' --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}" --full)"
+  DSTAT_OUTPUT="$(run_dstat_age "5s" --status '*' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"
   if [[ "${DSTAT_OUTPUT}" != "[]" ]]; then
     echo "dstat output not empty as expected:"
     echo "${DSTAT_OUTPUT}"
@@ -215,7 +232,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Verifying that the job didn't disappear completely."
 
-  DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}" --full)"
+  DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"
   verify_dstat_output "${DSTAT_OUTPUT}"
 
   echo "SUCCESS"

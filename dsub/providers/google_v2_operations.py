@@ -84,7 +84,7 @@ def is_failed(op):
 
 
 def get_labels(op):
-  """Return the operations array of labels."""
+  """Return the operation's array of labels."""
   return op.get('metadata', {}).get('labels', {})
 
 
@@ -93,8 +93,28 @@ def get_label(op, name):
   return get_labels(op).get(name)
 
 
+def get_actions(op):
+  """Return the operation's array of actions."""
+  return op.get('metadata', {}).get('pipeline').get('actions', [])
+
+
+def get_action(op, name):
+  """Return the value for the specified action."""
+  actions = get_actions(op)
+  for action in actions:
+    if action['name'] == name:
+      return action
+
+
+def get_action_environment(op, name):
+  """Return the environment for the operation."""
+  action = get_action(op, name)
+  if action:
+    return action.get('environment')
+
+
 def get_events(op):
-  """Return the arry of events for the operation."""
+  """Return the array of events for the operation."""
   return op.get('metadata', {}).get('events', [])
 
 
@@ -119,6 +139,11 @@ def get_last_update(op):
     last_update = get_create_time(op)
 
   return last_update
+
+
+def get_resources(op):
+  """Return the operation's resource."""
+  return op.get('metadata', {}).get('pipeline').get('resources', {})
 
 
 def is_pipeline(op):

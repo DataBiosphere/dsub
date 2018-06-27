@@ -28,10 +28,13 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   # (1) Launch a job to test command execution failure
   echo "Launch a job that should fail (--wait for it)..."
-  if run_dsub \
+  if JOBID="$(run_dsub \
       --command 'exit 1' \
-      --wait; then
+      --wait)"; then
     echo "Expected dsub to exit with error."
+    exit 1
+  elif [[ -z "${JOBID}" ]]; then
+    echo "dsub did not report a jobid but it should have."
     exit 1
   fi
 
@@ -42,11 +45,14 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   # (3) This call to dsub should fail before submit
   echo "Launch a job that should fail (--after the previous)"
-  if run_dsub \
+  if JOBID="$(run_dsub \
       --command 'echo "does not matter"' \
       --after "${BAD_JOB_PREVIOUS}" \
-      --wait; then
+      --wait)"; then
     echo "Expected dsub to exit with error."
+    exit 1
+  elif [[ "${JOBID}" != "NO_JOB" ]]; then
+    echo "dsub reported JOBID: '${JOBID}', expected 'NO_JOB'"
     exit 1
   fi
 

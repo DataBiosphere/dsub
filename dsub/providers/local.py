@@ -445,6 +445,8 @@ class LocalJobProvider(base.JobProvider):
       today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
       with open(os.path.join(task_dir, 'status.txt'), 'wt') as f:
         f.write('CANCELED\n')
+      with open(os.path.join(task_dir, 'events.txt'), 'a') as f:
+        f.write('canceled,{}\n'.format(today))
       with open(os.path.join(task_dir, 'end-time.txt'), 'wt') as f:
         f.write(today)
       msg = 'Operation canceled at %s\n' % today
@@ -593,6 +595,21 @@ class LocalJobProvider(base.JobProvider):
         datetime.datetime.fromtimestamp(last_update),
         tzlocal()) if last_update > 0 else None
 
+  def _get_events_from_task_dir(self, task_dir):
+    try:
+      with open(os.path.join(task_dir, 'events.txt'), 'r') as f:
+        events = []
+        for line in f:
+          if line.rstrip():
+            name, time_string = line.split(',')
+            start_time = dsub_util.replace_timezone(
+                datetime.datetime.strptime(time_string.rstrip(),
+                                           '%Y-%m-%d %H:%M:%S.%f'), tzlocal())
+            events.append({'name': name, 'start-time': start_time})
+        return events
+    except (IOError, OSError):
+      return None
+
   def _get_status_from_task_dir(self, task_dir):
     try:
       with open(os.path.join(task_dir, 'status.txt'), 'r') as f:
@@ -642,6 +659,7 @@ class LocalJobProvider(base.JobProvider):
     # For new tasks, these may not have been written yet.
     end_time = self._get_end_time_from_task_dir(task_dir)
     last_update = self._get_last_update_time_from_task_dir(task_dir)
+    events = self._get_events_from_task_dir(task_dir)
     status = self._get_status_from_task_dir(task_dir)
     log_detail = self._get_log_detail_from_task_dir(task_dir)
 
@@ -652,6 +670,7 @@ class LocalJobProvider(base.JobProvider):
 
     return LocalTask(
         task_status=status,
+        events=events,
         log_detail=log_detail,
         job_descriptor=job_descriptor,
         end_time=end_time,
@@ -860,6 +879,7 @@ class LocalJobProvider(base.JobProvider):
 _RawTask = namedtuple('_RawTask', [
     'job_descriptor',
     'task_status',
+    'events',
     'log_detail',
     'end_time',
     'last_update',
@@ -880,9 +900,6 @@ class LocalTask(base.Task):
       string of task data from the provider.
     """
     return self._raw._asdict()
-
-  def _get_job_and_task_param(self, job_params, task_params, field):
-    return job_params.get(field, set()) | task_params.get(field, set())
 
   def get_field(self, field, default=None):
 
@@ -913,22 +930,27 @@ class LocalTask(base.Task):
       # get_field('logging') should currently return the resolved logging path.
       value = task_resources.logging_path
     elif field in ['labels', 'envs']:
-      items = self._get_job_and_task_param(job_params, task_params, field)
+      items = providers_util.get_job_and_task_param(job_params, task_params,
+                                                    field)
       value = {item.name: item.value for item in items}
     elif field == 'inputs':
       value = {}
       for field in ['inputs', 'input-recursives']:
-        items = self._get_job_and_task_param(job_params, task_params, field)
+        items = providers_util.get_job_and_task_param(job_params, task_params,
+                                                      field)
         value.update({item.name: item.value for item in items})
     elif field == 'outputs':
       value = {}
       for field in ['outputs', 'output-recursives']:
-        items = self._get_job_and_task_param(job_params, task_params, field)
+        items = providers_util.get_job_and_task_param(job_params, task_params,
+                                                      field)
         value.update({item.name: item.value for item in items})
     elif field == 'provider':
       return _PROVIDER_NAME
     elif field == 'provider-attributes':
       value = {}
+    elif field == 'events':
+      value = self._raw.events
     else:
       # Convert the raw Task object to a dict.
       # With the exception of the "status' fields, the dsub field names map

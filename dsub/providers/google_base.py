@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # pylint: disable=g-tzinfo-datetime
 from datetime import datetime
+import json
 import os
 import re
 import socket
@@ -62,6 +63,15 @@ TRANSIENT_HTTP_ERROR_CODES = set([429, 500, 503, 504])
 
 # Socket error 104 (connection reset) should also be retried
 TRANSIENT_SOCKET_ERROR_CODES = set([104])
+
+# When attempting to cancel an operation that is already completed
+# (succeeded, failed, or canceled), the response will include:
+# "error": {
+#    "code": 400,
+#    "status": "FAILED_PRECONDITION",
+# }
+FAILED_PRECONDITION_CODE = 400
+FAILED_PRECONDITION_STATUS = 'FAILED_PRECONDITION'
 
 # List of Compute Engine zones, which enables simple wildcard expansion.
 # We could look this up dynamically, but new zones come online
@@ -306,7 +316,120 @@ def parse_rfc3339_utc_string(rfc3339_utc_string):
   else:
     assert False, 'Fraction length not 0, 6, or 9: {}'.len(fraction)
 
-  return datetime(g[0], g[1], g[2], g[3], g[4], g[5], micros, tzinfo=pytz.utc)
+  try:
+    return datetime(g[0], g[1], g[2], g[3], g[4], g[5], micros, tzinfo=pytz.utc)
+  except ValueError as e:
+    assert False, 'Could not parse RFC3339 datestring: {} exception: {}'.format(
+        rfc3339_utc_string, e)
+
+
+def get_operation_full_job_id(op):
+  """Returns the job-id or job-id.task-id for the operation."""
+  job_id = op.get_field('job-id')
+  task_id = op.get_field('task-id')
+  if task_id:
+    return '%s.%s' % (job_id, task_id)
+  else:
+    return job_id
+
+
+def _cancel_batch(batch_fn, cancel_fn, ops):
+  """Cancel a batch of operations.
+
+  Args:
+    batch_fn: API-specific batch function.
+    cancel_fn: API-specific cancel function.
+    ops: A list of operations to cancel.
+
+  Returns:
+    A list of operations canceled and a list of error messages.
+  """
+
+  # We define an inline callback which will populate a list of
+  # successfully canceled operations as well as a list of operations
+  # which were not successfully canceled.
+
+  canceled = []
+  failed = []
+
+  def handle_cancel_response(request_id, response, exception):
+    """Callback for the cancel response."""
+    del response  # unused
+
+    if exception:
+      # We don't generally expect any failures here, except possibly trying
+      # to cancel an operation that is already canceled or finished.
+      #
+      # If the operation is already finished, provide a clearer message than
+      # "error 400: Bad Request".
+
+      msg = 'error %s: %s' % (exception.resp.status, exception.resp.reason)
+      if exception.resp.status == FAILED_PRECONDITION_CODE:
+        detail = json.loads(exception.content)
+        status = detail.get('error', {}).get('status')
+        if status == FAILED_PRECONDITION_STATUS:
+          msg = 'Not running'
+
+      failed.append({'name': request_id, 'msg': msg})
+    else:
+      canceled.append({'name': request_id})
+
+    return
+
+  # Set up the batch object
+  batch = batch_fn(callback=handle_cancel_response)
+
+  # The callback gets a "request_id" which is the operation name.
+  # Build a dict such that after the callback, we can lookup the operation
+  # objects by name
+  ops_by_name = {}
+  for op in ops:
+    op_name = op.get_field('internal-id')
+    ops_by_name[op_name] = op
+    batch.add(cancel_fn(name=op_name, body={}), request_id=op_name)
+
+  # Cancel the operations
+  batch.execute()
+
+  # Iterate through the canceled and failed lists to build our return lists
+  canceled_ops = [ops_by_name[op['name']] for op in canceled]
+  error_messages = []
+  for fail in failed:
+    op = ops_by_name[fail['name']]
+    error_messages.append("Error canceling '%s': %s" %
+                          (get_operation_full_job_id(op), fail['msg']))
+
+  return canceled_ops, error_messages
+
+
+def cancel(batch_fn, cancel_fn, ops):
+  """Cancel operations.
+
+  Args:
+    batch_fn: API-specific batch function.
+    cancel_fn: API-specific cancel function.
+    ops: A list of operations to cancel.
+
+  Returns:
+    A list of operations canceled and a list of error messages.
+  """
+
+  # Canceling many operations one-by-one can be slow.
+  # The Pipelines API doesn't directly support a list of operations to cancel,
+  # but the requests can be performed in batch.
+
+  canceled_ops = []
+  error_messages = []
+
+  max_batch = 256
+  total_ops = len(ops)
+  for first_op in range(0, total_ops, max_batch):
+    batch_canceled, batch_messages = _cancel_batch(
+        batch_fn, cancel_fn, ops[first_op:first_op + max_batch])
+    canceled_ops.extend(batch_canceled)
+    error_messages.extend(batch_messages)
+
+  return canceled_ops, error_messages
 
 
 def retry_api_check(exception):
@@ -359,6 +482,7 @@ def setup_service(api_name, api_version, credentials=None):
 
 
 class Api(object):
+  """Wrapper around API execution with exponential backoff retries."""
 
   # Exponential backoff retrying API execution.
   # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.

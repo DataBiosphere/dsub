@@ -288,6 +288,7 @@ def _prepare_row(task, full, summary):
       row_spec('labels', True, {}),
       row_spec('provider', True, None),
       row_spec('provider-attributes', True, {}),
+      row_spec('events', True, []),
       row_spec('dsub-version', False, None),
   ]
   summary_columns = default_columns + [

@@ -198,3 +198,8 @@ def get_task_metadata(job_metadata, task_id):
   task_metadata['task-id'] = task_id
 
   return task_metadata
+
+
+def get_job_and_task_param(job_params, task_params, field):
+  """Returns a dict combining the field for job and task params."""
+  return job_params.get(field, set()) | task_params.get(field, set())

@@ -26,8 +26,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import ast
 import json
 import os
+import sys
 import textwrap
 
 from . import base
@@ -218,6 +220,7 @@ _MK_RUNTIME_DIRS_CMD = '\n'.join('mkdir -m 777 -p "%s" ' % dir for dir in [
 # This has the advantage over other encoding schemes (such as base64) of being
 # user-readable in the Genomics "operation" object.
 _SCRIPT_VARNAME = '_SCRIPT_REPR'
+_META_YAML_VARNAME = '_META_YAML_REPR'
 
 _PYTHON_DECODE_SCRIPT = textwrap.dedent("""\
   import ast
@@ -230,8 +233,8 @@ _MK_IO_DIRS = textwrap.dedent("""\
   for ((i=0; i < DIR_COUNT; i++)); do
     DIR_VAR="DIR_${i}"
 
-    echo "mkdir -p \"${!DIR_VAR}\""
-    mkdir -p "${!DIR_VAR}"
+    echo "mkdir -m 777 -p \"${!DIR_VAR}\""
+    mkdir -m 777 -p "${!DIR_VAR}"
   done
 """)
 
@@ -246,7 +249,7 @@ _PREPARE_CMD = textwrap.dedent("""\
   echo "${{{script_var}}}" \
     | python -c '{python_decode_script}' \
     > {script_path}
-  chmod u+x {script_path}
+  chmod a+x {script_path}
 
   {mk_io_dirs}
 """)
@@ -257,6 +260,31 @@ _USER_CMD = textwrap.dedent("""\
 
   {user_script}
 """)
+
+
+class GoogleV2BatchHandler(object):
+  """Implement the HttpBatch interface to enable simple serial batches."""
+
+  # The v2alpha1 batch endpoint is not currently implemented.
+  # When it is, this can be replaced by service.new_batch_http_request.
+
+  def __init__(self, callback):
+    self._cancel_list = []
+    self._response_handler = callback
+
+  def add(self, cancel_fn, request_id):
+    self._cancel_list.append((request_id, cancel_fn))
+
+  def execute(self):
+    for (request_id, cancel_fn) in self._cancel_list:
+      response = None
+      exception = None
+      try:
+        response = cancel_fn.execute()
+      except:  # pylint: disable=bare-except
+        exception = sys.exc_info()[0]
+
+      self._response_handler(request_id, response, exception)
 
 
 class GoogleV2JobProvider(base.JobProvider):
@@ -288,24 +316,34 @@ class GoogleV2JobProvider(base.JobProvider):
         'STDERR_PATH': '{}-stderr.log'.format(logging_prefix)
     }
 
-  def _get_prepare_env(self, script, inputs, outputs):
+  def _get_prepare_env(self, script, job_descriptor, inputs, outputs):
     """Return a dict with variables for the 'prepare' action."""
 
     # Add the _SCRIPT_REPR with the repr(script) contents
+    # Add the _META_YAML_REPR with the repr(meta) contents
 
     # Add variables for directories that need to be created, for example:
     # DIR_COUNT: 2
     # DIR_0: /mnt/data/input/gs/bucket/path1/
     # DIR_1: /mnt/data/output/gs/bucket/path2
 
-    docker_paths = [
+    # List the directories in sorted order so that they are created in that
+    # order. This is primarily to ensure that permissions are set as we create
+    # each directory.
+    # For example:
+    #   mkdir -m 777 -p /root/first/second
+    #   mkdir -m 777 -p /root/first
+    # *may* not actually set 777 on /root/first
+
+    docker_paths = sorted([
         var.docker_path if var.recursive else os.path.dirname(var.docker_path)
-        for var in inputs + outputs
+        for var in inputs | outputs
         if var.value
-    ]
+    ])
 
     env = {
         _SCRIPT_VARNAME: repr(script.value),
+        _META_YAML_VARNAME: repr(job_descriptor.to_yaml()),
         'DIR_COUNT': str(len(docker_paths))
     }
 
@@ -403,10 +441,11 @@ class GoogleV2JobProvider(base.JobProvider):
 
     # The list of "actions" (1-based) will be:
     #   1- continuous copy of log files off to Cloud Storage
-    #   2- localize objects from Cloud Storage to block storage
-    #   3- execute user command
-    #   4- delocalize objects from block storage to Cloud Storage
-    #   5- final copy of log files off to Cloud Storage
+    #   2- prepare the shared mount point (write the user script
+    #   3- localize objects from Cloud Storage to block storage
+    #   4- execute user command
+    #   5- delocalize objects from block storage to Cloud Storage
+    #   6- final copy of log files off to Cloud Storage
     user_action = 4
     final_logging_action = 6
 
@@ -428,7 +467,7 @@ class GoogleV2JobProvider(base.JobProvider):
     outputs = job_params['outputs'] | task_params['outputs']
     user_environment = self._build_user_environment(envs, inputs, outputs)
 
-    prepare_env = self._get_prepare_env(script, inputs, outputs)
+    prepare_env = self._get_prepare_env(script, task_view, inputs, outputs)
     localization_env = self._get_localization_env(inputs)
     delocalization_env = self._get_delocalization_env(outputs)
 
@@ -469,7 +508,7 @@ class GoogleV2JobProvider(base.JobProvider):
                     cp_loop=_LOCALIZATION_LOOP)
             ]),
         google_v2_pipelines.build_action(
-            name=script.name,
+            name='user-command',
             image_uri=job_resources.image,
             mounts=[mnt_datadisk],
             environment=user_environment,
@@ -506,11 +545,16 @@ class GoogleV2JobProvider(base.JobProvider):
     assert len(actions) == final_logging_action
 
     disks = [
-        google_v2_pipelines.build_disks(_DATA_DISK_NAME,
-                                        job_resources.disk_size)
+        google_v2_pipelines.build_disk(_DATA_DISK_NAME, job_resources.disk_size)
     ]
     network = google_v2_pipelines.build_network(None, None)
     machine_type = job_resources.machine_type or job_model.DEFAULT_MACHINE_TYPE
+    accelerators = None
+    if job_resources.accelerator_type:
+      accelerators = [
+          google_v2_pipelines.build_accelerator(job_resources.accelerator_type,
+                                                job_resources.accelerator_count)
+      ]
     service_account = google_v2_pipelines.build_service_account(
         'default', scopes)
 
@@ -525,6 +569,7 @@ class GoogleV2JobProvider(base.JobProvider):
             service_account=service_account,
             boot_disk_size_gb=job_resources.boot_disk_size,
             disks=disks,
+            accelerators=accelerators,
             labels=labels),
     )
 
@@ -796,7 +841,37 @@ class GoogleV2JobProvider(base.JobProvider):
                   labels,
                   create_time_min=None,
                   create_time_max=None):
-    pass
+    """Kills the operations associated with the specified job or job.task.
+
+    Args:
+      user_ids: List of user ids who "own" the job(s) to cancel.
+      job_ids: List of job_ids to cancel.
+      task_ids: List of task-ids to cancel.
+      labels: List of LabelParam, each must match the job(s) to be canceled.
+      create_time_min: a timezone-aware datetime value for the earliest create
+                       time of a task, inclusive.
+      create_time_max: a timezone-aware datetime value for the most recent
+                       create time of a task, inclusive.
+
+    Returns:
+      A list of tasks canceled and a list of error messages.
+    """
+    # Look up the job(s)
+    tasks = list(
+        self.lookup_job_tasks(
+            {'RUNNING'},
+            user_ids=user_ids,
+            job_ids=job_ids,
+            task_ids=task_ids,
+            labels=labels,
+            create_time_min=create_time_min,
+            create_time_max=create_time_max))
+
+    print('Found %d tasks to delete.' % len(tasks))
+
+    return google_base.cancel(GoogleV2BatchHandler,
+                              self._service.projects().operations().cancel,
+                              tasks)
 
 
 class GoogleOperation(base.Task):
@@ -804,6 +879,22 @@ class GoogleOperation(base.Task):
 
   def __init__(self, operation_data):
     self._op = operation_data
+    self._job_descriptor = self._try_op_to_job_descriptor()
+
+  def _try_op_to_job_descriptor(self):
+    # The _META_YAML_REPR field in the 'prepare' action enables reconstructing
+    # the original job descriptor.
+    # Jobs run while the google-v2 provider was in development will not have
+    # the _META_YAML.
+    env = google_v2_operations.get_action_environment(self._op, 'prepare')
+    if not env:
+      return
+
+    meta = env.get(_META_YAML_VARNAME)
+    if not meta:
+      return
+
+    return job_model.JobDescriptor.from_yaml(ast.literal_eval(meta))
 
   def _operation_status(self):
     """Returns the status of this operation.
@@ -887,25 +978,43 @@ class GoogleOperation(base.Task):
     value = None
     if field == 'internal-id':
       value = self._op['name']
-    elif field in ['job-id', 'job-name', 'task-id', 'user-id', 'dsub-version']:
+    elif field in [
+        'job-id', 'job-name', 'task-id', 'task-attempt', 'user-id',
+        'dsub-version'
+    ]:
       value = google_v2_operations.get_label(self._op, field)
     elif field == 'task-status':
       value = self._operation_status()
     elif field == 'logging':
-      value = 'TODO'
-    elif field == 'envs':
-      value = 'TODO'
-    elif field == 'labels':
-      # Reserved labels are filtered from dsub task output.
-      value = {
-          k: v
-          for k, v in google_v2_operations.get_labels(self._op).items()
-          if k not in job_model.RESERVED_LABELS
-      }
+      if self._job_descriptor:
+        # The job_resources will contain the "--logging" value.
+        # The task_resources will contain the resolved logging path.
+        # Return the resolved logging path.
+        task_resources = self._job_descriptor.task_descriptors[0].task_resources
+        value = task_resources.logging_path
+
+    elif field in ['envs', 'labels']:
+      if self._job_descriptor:
+        items = providers_util.get_job_and_task_param(
+            self._job_descriptor.job_params,
+            self._job_descriptor.task_descriptors[0].task_params, field)
+        value = {item.name: item.value for item in items}
     elif field == 'inputs':
-      value = 'TODO'
+      if self._job_descriptor:
+        value = {}
+        for field in ['inputs', 'input-recursives']:
+          items = providers_util.get_job_and_task_param(
+              self._job_descriptor.job_params,
+              self._job_descriptor.task_descriptors[0].task_params, field)
+          value.update({item.name: item.value for item in items})
     elif field == 'outputs':
-      value = 'TODO'
+      if self._job_descriptor:
+        value = {}
+        for field in ['outputs', 'output-recursives']:
+          items = providers_util.get_job_and_task_param(
+              self._job_descriptor.job_params,
+              self._job_descriptor.task_descriptors[0].task_params, field)
+          value.update({item.name: item.value for item in items})
     elif field == 'create-time':
       ds = google_v2_operations.get_create_time(self._op)
       value = google_base.parse_rfc3339_utc_string(ds)
@@ -929,7 +1038,29 @@ class GoogleOperation(base.Task):
     elif field == 'provider':
       return _PROVIDER_NAME
     elif field == 'provider-attributes':
-      value = 'TODO'
+      # Unlike Pipelines API v1, the v2 API hides the VM, so just emit
+      # configured items, like region, zone, VM type.
+      value = {}
+      resources = google_v2_operations.get_resources(self._op)
+      if 'regions' in resources:
+        value['regions'] = resources['regions']
+      if 'zones' in resources:
+        value['zones'] = resources['zones']
+      if 'virtualMachine' in resources:
+        vm = resources['virtualMachine']
+        value['machine-type'] = vm['machineType']
+        value['preemptible'] = vm['preemptible']
+
+        value['boot-disk-size'] = vm['bootDiskSizeGb']
+        if 'disks' in vm:
+          datadisk = next(
+              (d for d in vm['disks'] if d['name'] == _DATA_DISK_NAME))
+          if datadisk:
+            value['disk-size'] = datadisk['sizeGb']
+    elif field == 'events':
+      # TODO: Implement events for pipelines-v2. There are a ton
+      # of events in v2 so we'll likely need to filter some of them.
+      value = [{'name': 'TODO', 'start-time': None}]
     else:
       raise ValueError('Unsupported field: "%s"' % field)
 

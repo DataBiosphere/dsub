@@ -186,6 +186,13 @@ function ddel_google() {
     "${@}"
 }
 
+function ddel_google-v2() {
+  ddel \
+    --provider google-v2 \
+    --project "${PROJECT_ID}" \
+    "${@}"
+}
+
 function ddel_local() {
   ddel \
     --provider local \

@@ -81,16 +81,18 @@ function delocalize_logs_function() {
 }
 readonly -f delocalize_logs_function
 
+function get_timestamp() {
+  python \
+    -c 'import datetime; print datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")'
+}
+readonly -f get_timestamp
+
 function write_status() {
   local status="${1}"
   echo "${status}" > "${TASK_DIR}/status.txt"
   case "${status}" in
     SUCCESS|FAILURE|CANCELED)
-      # Record the finish time (with microseconds)
-      # Prepend "10#" so numbers like 0999... are not treated as octal
-      local nanos=$(echo "10#"$(date "+%N"))
-      echo $(date "+%Y-%m-%d %H:%M:%S").$((nanos/1000)) \
-        > "${TASK_DIR}/end-time.txt"
+      echo "$(get_timestamp)" > "${TASK_DIR}/end-time.txt"
       ;;
     RUNNING)
       ;;
@@ -101,6 +103,13 @@ function write_status() {
   esac
 }
 readonly -f write_status
+
+function write_event() {
+  local event="${1}"
+  echo "${event},$(get_timestamp)" >> "${TASK_DIR}/events.txt"
+}
+readonly -f write_event
+
 
 # Correctly log failures and nounset exits
 function error() {
@@ -113,6 +122,7 @@ function error() {
   trap ERR
 
   if [[ $code != "0" ]]; then
+    write_event "fail"
     write_status "FAILURE"
     log_error "${message} on or near line ${parent_lineno}; exiting with status ${code}"
   fi
@@ -181,6 +191,7 @@ function exit_if_canceled() {
   if [[ -f die ]]; then
     log_info "Job is canceled, stopping Docker container ${NAME}."
     docker stop "${NAME}"
+    write_event "canceled"
     write_status "CANCELED"
     log_info "Delocalize logs and cleanup"
     cleanup "false"
@@ -192,6 +203,7 @@ function exit_if_canceled() {
 readonly -f exit_if_canceled
 
 # Begin main execution
+write_event "start"
 
 # Trap errors and handle them instead of using errexit
 set +o errexit
@@ -204,14 +216,16 @@ trap 'error ${LINENO} $? "Exit (undefined variable or kill?)"' EXIT
 # Make sure that ERR traps are inherited by shell functions
 set -o errtrace
 
+# Handle gcr.io images
+write_event "pulling-image"
+fetch_image_if_necessary "${IMAGE}"
+
 # Copy inputs
 cd "${TASK_DIR}"
+write_event "localizing-files"
 write_status "RUNNING"
 log_info "Localizing inputs."
 localize_data
-
-# Handle gcr.io images
-fetch_image_if_necessary "${IMAGE}"
 
 log_info "Checking image userid."
 DOCKER_USERGROUP="$(get_docker_user)"
@@ -224,6 +238,7 @@ fi
 FAILURE_MESSAGE=''
 # Disable ERR trap, we want to copy the logs even if Docker fails.
 trap ERR
+write_event "running-docker"
 log_info "Running Docker image."
 docker run \
    --detach \
@@ -267,6 +282,7 @@ if [[ "${DOCKER_EXITCODE_2}" != 0 ]]; then
 fi
 
 log_info "Copying outputs."
+write_event "delocalizing-files"
 delocalize_data
 
 # Delocalize logs & cleanup
@@ -277,9 +293,11 @@ trap EXIT
 log_info "Delocalize logs and cleanup."
 cleanup "true"
 if [[ -z "${FAILURE_MESSAGE}" ]]; then
+  write_event "ok"
   write_status "SUCCESS"
   log_info "Done"
 else
+  write_event "fail"
   write_status "FAILURE"
   # we want this to be the last line in the log, for dstat to work right.
   log_error "${FAILURE_MESSAGE}"

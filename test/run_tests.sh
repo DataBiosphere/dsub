@@ -215,7 +215,7 @@ function get_test_providers() {
     return
   fi
 
-  local all_provider_list="${DSUB_PROVIDER:-local google}"
+  local all_provider_list="${DSUB_PROVIDER:-local google google-v2}"
   echo -n "${all_provider_list}"
 }
 readonly -f get_test_providers
