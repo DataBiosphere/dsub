@@ -316,7 +316,11 @@ def parse_rfc3339_utc_string(rfc3339_utc_string):
   else:
     assert False, 'Fraction length not 0, 6, or 9: {}'.len(fraction)
 
-  return datetime(g[0], g[1], g[2], g[3], g[4], g[5], micros, tzinfo=pytz.utc)
+  try:
+    return datetime(g[0], g[1], g[2], g[3], g[4], g[5], micros, tzinfo=pytz.utc)
+  except ValueError as e:
+    assert False, 'Could not parse RFC3339 datestring: {} exception: {}'.format(
+        rfc3339_utc_string, e)
 
 
 def get_operation_full_job_id(op):
@@ -478,6 +482,7 @@ def setup_service(api_name, api_version, credentials=None):
 
 
 class Api(object):
+  """Wrapper around API execution with exponential backoff retries."""
 
   # Exponential backoff retrying API execution.
   # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
