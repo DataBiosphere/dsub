@@ -24,6 +24,7 @@ import json
 import os
 import re
 import socket
+from ssl import SSLError
 import sys
 
 from .._dsub_version import DSUB_VERSION
@@ -452,6 +453,9 @@ def retry_api_check(exception):
       return True
 
   if isinstance(exception, HttpAccessTokenRefreshError):
+    return True
+
+  if isinstance(exception, SSLError):
     return True
 
   return False
