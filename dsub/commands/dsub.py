@@ -650,7 +650,8 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
       return []
 
     for task_id in retry_tasks:
-      print('  %s failed. Retrying.' % (task_id if task_id else 'Task'))
+      print('  %s failed. Retrying.' % ('Task %s' % task_id
+                                        if task_id else 'Task'))
       _retry_task(provider, job_descriptor, task_id,
                   task_fail_count[task_id] + 1)
 
