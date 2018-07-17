@@ -30,6 +30,7 @@ import sys
 from .._dsub_version import DSUB_VERSION
 import apiclient.discovery
 import apiclient.errors
+from httplib2 import ServerNotFoundError
 from ..lib import job_model
 from oauth2client.client import GoogleCredentials
 from oauth2client.client import HttpAccessTokenRefreshError
@@ -455,7 +456,14 @@ def retry_api_check(exception):
   if isinstance(exception, HttpAccessTokenRefreshError):
     return True
 
+  # For a given installation, this could be a permanent error, but has only
+  # been observed as transient.
   if isinstance(exception, SSLError):
+    return True
+
+  # This has been observed as a transient error:
+  #   ServerNotFoundError: Unable to find the server at genomics.googleapis.com
+  if isinstance(exception, ServerNotFoundError):
     return True
 
   return False
