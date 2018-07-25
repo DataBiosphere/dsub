@@ -110,7 +110,7 @@ For information on building Docker images, see the Docker documentation:
 
 * [Build your own image](https://docs.docker.com/engine/getstarted/step_four/)
 * [Best practices for writing Dockerfiles](https://docs.docker.com/engine/userguide/eng-image/dockerfile_best-practices/)
-* [Google Cloud Container Builder](https://cloud.google.com/container-builder/docs/)
+* [Google Cloud Build](https://cloud.google.com/container-builder/docs/)
 
 
 ## --input "path to file in cloud storage"
