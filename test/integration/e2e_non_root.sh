@@ -78,7 +78,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     USER test_user
 EOF
 
-  gcloud container builds submit "${BUILD_DIR}" \
+  gcloud builds submit "${BUILD_DIR}" \
     --tag "${IMAGE}" \
     --project "${PROJECT_ID}"
 

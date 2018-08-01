@@ -35,7 +35,7 @@ readonly OUTPUT_ROOT="${MY_BUCKET_PATH}/fastqc/submit_list"
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
 # Build the docker image
-gcloud container builds submit "${SCRIPT_DIR}" \
+gcloud builds submit "${SCRIPT_DIR}" \
   --tag="gcr.io/${CONTAINER_PROJECT}/fastqc"
 
 # Launch the task
