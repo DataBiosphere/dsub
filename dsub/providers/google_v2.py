@@ -28,7 +28,9 @@ from __future__ import print_function
 
 import ast
 import json
+import operator
 import os
+import re
 import sys
 import textwrap
 
@@ -260,6 +262,100 @@ _USER_CMD = textwrap.dedent("""\
 
   {user_script}
 """)
+
+_ACTION_LOGGING = 'logging'
+_ACTION_PREPARE = 'prepare'
+_ACTION_LOCALIZATION = 'localization'
+_ACTION_USER_COMMAND = 'user-command'
+_ACTION_DELOCALIZATION = 'delocalization'
+_ACTION_FINAL_LOGGING = 'final_logging'
+_FILTER_ACTIONS = [_ACTION_LOGGING, _ACTION_PREPARE, _ACTION_FINAL_LOGGING]
+_DEFAULT_IMAGES = [_CLOUD_SDK_IMAGE.replace('/', '\\/'), _PYTHON_IMAGE]
+_FILTERED_EVENT_REGEXES = [
+    re.compile('^Started pulling "({})"$'.format('|'.join(_DEFAULT_IMAGES))),
+    re.compile('^Started running "({})"$'.format('|'.join(_FILTER_ACTIONS))),
+    re.compile('Stopped pulling'),
+    re.compile('Stopped running'),
+    # An error causes two events, one we capture and one is filtered out.
+    re.compile('Execution failed: action 4: unexpected exit status [\\d]{1,4}')
+]
+
+_ABORT_REGEX = re.compile('The operation was cancelled')
+_FAIL_REGEX = re.compile(
+    '^Unexpected exit status [\\d]{1,4} while running "user-command"$')
+_EVENT_REGEX_MAP = {
+    'start': re.compile('^Worker ".*" assigned in ".*"$'),
+    'pulling-image': re.compile('^Started pulling ".*"$'),
+    'localizing-files': re.compile('^Started running "localization"$'),
+    'running-docker': re.compile('^Started running "user-command"$'),
+    'delocalizing-files': re.compile('^Started running "delocalization"$'),
+    'ok': re.compile('^Worker released$'),
+    'fail': _FAIL_REGEX,
+    'canceled': _ABORT_REGEX,
+}
+
+
+class GoogleV2EventMap(object):
+  """Helper for extracing a set of normalized, filtered operation events."""
+
+  def __init__(self, op):
+    self._op = op
+
+  def get_filtered_normalized_events(self):
+    """Filter through the large number of granular events returned by the
+    pipelines API, and extract only those that are interesting to a user. This
+    is implemented by filtering out events which are known to be uninteresting
+    (i.e. the default actions run for every job) and by explicitly matching
+    specific events which are interesting and mapping those to v1 style naming.
+
+    Events which are not whitelisted or blacklisted will still be output,
+    meaning any events which are added in the future won't be masked.
+    We don't want to suppress display of events that we don't recognize.
+    They may be important.
+
+    Returns:
+      A list of maps containing the normalized, filtered events.
+    """
+    # Track whether or not an error occurred so that we can remove the
+    # final 'ok' event. The 'Worker Released' event in pipelines V2 occurs
+    # even if an error is thrown in the user command.
+    has_error = False
+
+    # Events are keyed by name for easier deletion.
+    events = {}
+
+    for event in google_v2_operations.get_events(self._op):
+      if self._filter(event):
+        continue
+
+      mapped, match = self._map(event)
+      events[mapped['name']] = mapped
+      if match and match.re in [_FAIL_REGEX, _ABORT_REGEX]:
+        has_error = True
+
+    if has_error:
+      del events['ok']
+
+    return sorted(events.values(), key=operator.itemgetter('start-time'))
+
+  def _map(self, event):
+    description = event.get('description', '')
+    start_time = google_base.parse_rfc3339_utc_string(
+        event.get('timestamp', ''))
+
+    for name, regex in _EVENT_REGEX_MAP.items():
+      match = regex.match(description)
+      if match:
+        return {'name': name, 'start-time': start_time}, match
+
+    return {'name': description, 'start-time': start_time}, None
+
+  def _filter(self, event):
+    for regex in _FILTERED_EVENT_REGEXES:
+      if regex.match(event.get('description', '')):
+        return True
+
+    return False
 
 
 class GoogleV2BatchHandler(object):
@@ -1058,9 +1154,7 @@ class GoogleOperation(base.Task):
           if datadisk:
             value['disk-size'] = datadisk['sizeGb']
     elif field == 'events':
-      # TODO: Implement events for pipelines-v2. There are a ton
-      # of events in v2 so we'll likely need to filter some of them.
-      value = [{'name': 'TODO', 'start-time': None}]
+      value = GoogleV2EventMap(self._op).get_filtered_normalized_events()
     else:
       raise ValueError('Unsupported field: "%s"' % field)
 

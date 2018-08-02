@@ -56,22 +56,8 @@ function verify_dstat_output() {
     exit 1
   fi
 
-  declare -a expected_events
-  if [[ "${DSUB_PROVIDER}" == "google" || "${DSUB_PROVIDER}" == "local" ]]; then
-    expected_events=(start pulling-image localizing-files running-docker delocalizing-files ok)
-  else
-    # TODO: Update once events are implemented for google-v2
-    expected_events=(TODO)
-  fi
-
-  for ((i = 0 ; i < "${#expected_events[@]}"; i++)); do
-    local expected="${expected_events[i]}"
-    local actual="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${DSTAT_OUTPUT}" "[2].events.[${i}].name")"
-    if [[ ${actual} != ${expected} ]]; then
-      echo "Job idontknowhowtounix has incorrect event (${i}): ${actual} should be: ${expected}"
-      exit 1
-    fi
-  done
+  local expected_events=(start pulling-image localizing-files running-docker delocalizing-files ok)
+  util::dstat_out_assert_equal_events "${dstat_out}" "[2].events" "${expected_events[@]}"
 }
 readonly -f verify_dstat_output
 
