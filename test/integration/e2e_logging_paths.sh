@@ -107,3 +107,28 @@ fi
 echo
 echo "SUCCESS: Logging path: ${LOGGING_PATH}"
 echo
+
+# Test a retries job with base logging path
+echo "Subtest #4: Retries logging path"
+
+LOGGING_OVERRIDE="${LOGGING_BASE}"
+JOB_ID=$(run_dsub \
+           --name "${JOB_NAME}" \
+           --retries 1 \
+           --wait \
+           --command 'echo "Test"')
+
+LOGGING_PATH=$(dstat_get_logging "${JOB_ID}")
+
+if [[ ! "${LOGGING_PATH}" == "${LOGGING_OVERRIDE}/log-test"*.1.log ]]; then
+  echo "ERROR: Unexpected logging path."
+  echo "Received: ${LOGGING_PATH}"
+  echo "Expected: ${LOGGING_OVERRIDE}/log-test*.1.log"
+  exit 1
+fi
+
+echo
+echo "SUCCESS: Logging path: ${LOGGING_PATH}"
+echo
+
+

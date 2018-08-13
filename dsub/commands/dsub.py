@@ -507,9 +507,11 @@ def _resolve_task_resources(job_metadata, job_resources, task_descriptors):
     task_descriptors: Task metadata, parameters, and resources.
 
   This function exists to be called at the point that all job properties have
-  been validated and resolved. The only property to be resolved right now is
-  the logging path, which may have substitution parameters such as
-  job-id, task-id, user-id, and job-name.
+  been validated and resolved. It is also called prior to re-trying a task.
+
+  The only property to be resolved right now is the logging path,
+  which may have substitution parameters such as
+  job-id, task-id, task-attempt, user-id, and job-name.
   """
   _resolve_task_logging(job_metadata, job_resources, task_descriptors)
 
@@ -661,15 +663,22 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
 def _retry_task(provider, job_descriptor, task_id, task_attempt):
   """Retry task_id (numeric id) assigning it task_attempt."""
   td_orig = job_descriptor.find_task_descriptor(task_id)
+
+  new_task_descriptors = [
+      job_model.TaskDescriptor({
+          'task-id': task_id,
+          'task-attempt': task_attempt
+      }, td_orig.task_params, td_orig.task_resources)
+  ]
+
+  # Update the logging path.
+  _resolve_task_resources(job_descriptor.job_metadata,
+                          job_descriptor.job_resources, new_task_descriptors)
+
   provider.submit_job(
       job_model.JobDescriptor(
           job_descriptor.job_metadata, job_descriptor.job_params,
-          job_descriptor.job_resources, [
-              job_model.TaskDescriptor({
-                  'task-id': task_id,
-                  'task-attempt': task_attempt
-              }, td_orig.task_params, td_orig.task_resources)
-          ]), False)
+          job_descriptor.job_resources, new_task_descriptors), False)
 
 
 def _dominant_task_for_jobs(tasks):

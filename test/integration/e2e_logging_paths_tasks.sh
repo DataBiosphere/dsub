@@ -34,8 +34,9 @@ function dstat_get_logging() {
       --full \
       --format json)
 
+  # Tasks are listed in reverse order, so use -${task_id}.
   python "${SCRIPT_DIR}"/get_data_value.py \
-    "json" "${dstat_out}" "[$((task_id-1))].logging"
+    "json" "${dstat_out}" "[-${task_id}].logging"
 }
 readonly -f dstat_get_logging
 
@@ -127,3 +128,53 @@ ddel_task "${JOB_ID}"
 echo
 echo "SUCCESS: Logging path: ${LOGGING_PATH}"
 echo
+
+# Test a retries job with base logging path
+echo "Subtest #4: Retries logging path"
+
+LOGGING_OVERRIDE="${LOGGING_BASE}"
+JOB_ID=$(run_dsub \
+           --name "${JOB_NAME}" \
+           --tasks "${TASKS_FILE}" \
+           --retries 1 \
+           --wait \
+           --command 'echo "Test"')
+
+LOGGING_PATH=$(dstat_get_logging "${JOB_ID}" "1")
+
+if [[ ! "${LOGGING_PATH}" == "${LOGGING_OVERRIDE}/${JOB_NAME}"*.1.1.log ]]; then
+  echo "ERROR: Unexpected logging path."
+  echo "Received: ${LOGGING_PATH}"
+  echo "Expected: ${LOGGING_OVERRIDE}/${JOB_NAME}*.1.1.log"
+  exit 1
+fi
+
+echo
+echo "SUCCESS: Logging path: ${LOGGING_PATH}"
+echo
+
+# Test a retries job with base logging path and failed tasks
+echo "Subtest #5: Retries logging path with failure"
+
+LOGGING_OVERRIDE="${LOGGING_BASE}"
+JOB_ID=$(run_dsub \
+           --name "${JOB_NAME}" \
+           --tasks "${TASKS_FILE}" \
+           --retries 1 \
+           --wait \
+           --command 'false' || true)
+
+for task_attempt in 1 2; do
+  LOGGING_PATH=$(dstat_get_logging "${JOB_ID}" "${task_attempt}")
+
+  if [[ ! "${LOGGING_PATH}" == "${LOGGING_OVERRIDE}/${JOB_NAME}"*.1."${task_attempt}".log ]]; then
+    echo "ERROR: Unexpected logging path."
+    echo "Received: ${LOGGING_PATH}"
+    echo "Expected: ${LOGGING_OVERRIDE}/${JOB_NAME}*.1.${task_attempt}.log"
+    exit 1
+  fi
+
+  echo
+  echo "SUCCESS: Logging path: ${LOGGING_PATH}"
+  echo
+done

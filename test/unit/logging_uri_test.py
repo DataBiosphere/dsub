@@ -30,6 +30,10 @@ class TestLoggingPath(unittest.TestCase):
   task_metadata = {
       'task-id': 'task--id',
   }
+  task_metadata_attempt = {
+      'task-id': 'task--id',
+      'task-attempt': 'task--attempt',
+  }
 
   @parameterized.parameterized.expand([
       # Directory paths
@@ -54,6 +58,10 @@ class TestLoggingPath(unittest.TestCase):
        'gs://bucket/isitafile.txt/job--id.task--id.log'),
       ('6PL', '/tmp/dir/isitafile.txt', task_metadata,
        '/tmp/dir/isitafile.txt/job--id.task--id.log'),
+      ('7PG', 'gs://bucket/isitafile.txt', task_metadata_attempt,
+       'gs://bucket/isitafile.txt/job--id.task--id.task--attempt.log'),
+      ('7PL', '/tmp/dir/isitafile.txt', task_metadata_attempt,
+       '/tmp/dir/isitafile.txt/job--id.task--id.task--attempt.log'),
 
       # .log paths
       ('1FG', 'gs://bucket/file.log', task_metadata_no_task,
@@ -62,6 +70,10 @@ class TestLoggingPath(unittest.TestCase):
       ('2FG', 'gs://bucket/file.log', task_metadata,
        'gs://bucket/file.task--id.log'),
       ('2FL', '/tmp/dir/file.log', task_metadata, '/tmp/dir/file.task--id.log'),
+      ('3FG', 'gs://bucket/file.log', task_metadata_attempt,
+       'gs://bucket/file.task--id.task--attempt.log'),
+      ('3FL', '/tmp/dir/file.log', task_metadata_attempt,
+       '/tmp/dir/file.task--id.task--attempt.log'),
 
       # Custom paths
       ('1CG', 'gs://bucket/path/{job-id}/{task-id}.log', task_metadata_no_task,
@@ -83,6 +95,13 @@ class TestLoggingPath(unittest.TestCase):
        'gs://bucket/path/user--id/job--name/job--id/task--id.log'),
       ('4CL', '/tmp/dir/path/{user-id}/{job-name}/{job-id}/{task-id}.log',
        task_metadata, '/tmp/dir/path/user--id/job--name/job--id/task--id.log'),
+      ('5CG', 'gs://bucket/path/{user-id}/{job-name}/{job-id}/{task-id}.'
+       '{task-attempt}.log', task_metadata_attempt,
+       'gs://bucket/path/user--id/job--name/job--id/task--id.task--attempt.log'
+      ),
+      ('5CL', '/tmp/dir/path/{user-id}/{job-name}/{job-id}/{task-id}.'
+       '{task-attempt}.log', task_metadata_attempt,
+       '/tmp/dir/path/user--id/job--name/job--id/task--id.task--attempt.log'),
   ])
   def test_logging_path(self, unused_name, logging_uri, task_metadata,
                         expected):
