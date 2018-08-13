@@ -25,7 +25,7 @@ All of the source BAM files are stored in a public bucket at
   instructions.
 
 * (Optional) [Enable](https://console.cloud.google.com/flows/enableapi?apiid=cloudbuild.googleapis.com)
-  the Google Container Builder API.
+  the Google Cloud Build API.
 
   This step is necessary if you are going to build the FastQC Docker image
   remotely.
