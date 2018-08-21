@@ -668,7 +668,8 @@ class GoogleV2JobProvider(base.JobProvider):
             boot_disk_size_gb=job_resources.boot_disk_size,
             disks=disks,
             accelerators=accelerators,
-            labels=labels),
+            labels=labels,
+            cpu_platform=job_resources.cpu_platform),
     )
 
     pipeline = google_v2_pipelines.build_pipeline(actions, resources, None)

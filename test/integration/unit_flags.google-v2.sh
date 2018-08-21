@@ -255,6 +255,43 @@ function test_no_network() {
 }
 readonly -f test_no_network
 
+function test_cpu_platform() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --cpu-platform 'Intel Skylake'; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.cpuPlatform" "Intel Skylake"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_cpu_platform
+
+function test_no_cpu_platform() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.cpuPlatform" "None"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_cpu_platform
+
 # Run the tests
 trap "exit_handler" EXIT
 
@@ -277,3 +314,8 @@ test_no_accelerator_type_and_count
 echo
 test_network
 test_no_network
+
+echo
+test_cpu_platform
+test_no_cpu_platform
+

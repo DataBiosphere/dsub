@@ -416,6 +416,11 @@ def _parse_arguments(prog, argv):
   google_v2.add_argument(
       '--machine-type', help='Provider-specific machine type')
   google_v2.add_argument(
+      '--cpu-platform',
+      help="""The CPU platform to request. Supported values can be found at
+      https://cloud.google.com/compute/docs/instances/specify-min-cpu-platform"""
+  )
+  google_v2.add_argument(
       '--network',
       help="""The Compute Engine VPC network name to attach the VM's network
           interface to. The value will be prefixed with global/networks/ unless
@@ -473,6 +478,7 @@ def _get_job_resources(args):
       logging_path=None,
       scopes=args.scopes,
       keep_alive=args.keep_alive,
+      cpu_platform=args.cpu_platform,
       network=args.network,
       subnetwork=args.subnetwork,
       use_private_address=args.use_private_address,

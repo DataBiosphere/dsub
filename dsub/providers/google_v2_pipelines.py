@@ -52,7 +52,8 @@ def build_machine(network=None,
                   boot_disk_size_gb=None,
                   disks=None,
                   accelerators=None,
-                  labels=None):
+                  labels=None,
+                  cpu_platform=None):
   """Build a VirtualMachine object for a Pipeline request.
 
   Args:
@@ -64,6 +65,7 @@ def build_machine(network=None,
     disks (list[dict]): List of disks to mount.
     accelerators (list[dict]): List of accelerators to attach to the VM.
     labels (dict[string, string]): Labels for the VM.
+    cpu_platform (str): The CPU platform to request.
 
   Returns:
     An object representing a VirtualMachine.
@@ -77,6 +79,7 @@ def build_machine(network=None,
       'disks': disks,
       'accelerators': accelerators,
       'labels': labels,
+      'cpuPlatform': cpu_platform,
   }
 
 
