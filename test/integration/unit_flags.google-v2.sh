@@ -208,6 +208,53 @@ function test_no_accelerator_type_and_count() {
 }
 readonly -f test_no_accelerator_type_and_count
 
+function test_network() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --network 'network-name-foo' \
+    --subnetwork 'subnetwork-name-foo' \
+    --use-private-address; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.name" "network-name-foo"
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.subnetwork" "subnetwork-name-foo"
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.usePrivateAddress" "True"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_network
+
+function test_no_network() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.name" "None"
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.subnetwork" "None"
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.usePrivateAddress" "False"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_network
+
 # Run the tests
 trap "exit_handler" EXIT
 
@@ -226,3 +273,7 @@ test_no_machine_type
 echo
 test_accelerator_type_and_count
 test_no_accelerator_type_and_count
+
+echo
+test_network
+test_no_network

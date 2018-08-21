@@ -643,7 +643,9 @@ class GoogleV2JobProvider(base.JobProvider):
     disks = [
         google_v2_pipelines.build_disk(_DATA_DISK_NAME, job_resources.disk_size)
     ]
-    network = google_v2_pipelines.build_network(None, None)
+    network = google_v2_pipelines.build_network(
+        job_resources.network, job_resources.subnetwork,
+        job_resources.use_private_address)
     machine_type = job_resources.machine_type or job_model.DEFAULT_MACHINE_TYPE
     accelerators = None
     if job_resources.accelerator_type:

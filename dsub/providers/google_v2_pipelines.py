@@ -19,9 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 
-def build_network(name, use_private_address):
+def build_network(name, subnetwork, use_private_address):
   return {
       'name': name,
+      'subnetwork': subnetwork,
       'usePrivateAddress': use_private_address,
   }
 

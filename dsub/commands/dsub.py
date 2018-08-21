@@ -415,6 +415,21 @@ def _parse_arguments(prog, argv):
           Only one of --zones and --regions may be specified.""")
   google_v2.add_argument(
       '--machine-type', help='Provider-specific machine type')
+  google_v2.add_argument(
+      '--network',
+      help="""The Compute Engine VPC network name to attach the VM's network
+          interface to. The value will be prefixed with global/networks/ unless
+          it contains a /, in which case it is assumed to be a fully specified
+          network resource URL.""")
+  google_v2.add_argument(
+      '--subnetwork',
+      help="""The name of the Compute Engine subnetwork to attach the instance
+          to.""")
+  google_v2.add_argument(
+      '--use-private-address',
+      default=False,
+      action='store_true',
+      help='If set to true, do not attach a public IP address to the VM.')
 
   args = provider_base.parse_args(
       parser, {
@@ -458,6 +473,9 @@ def _get_job_resources(args):
       logging_path=None,
       scopes=args.scopes,
       keep_alive=args.keep_alive,
+      network=args.network,
+      subnetwork=args.subnetwork,
+      use_private_address=args.use_private_address,
       accelerator_type=args.accelerator_type,
       accelerator_count=args.accelerator_count)
 
