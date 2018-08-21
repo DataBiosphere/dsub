@@ -170,10 +170,28 @@ class TaskParamAction(argparse.Action):
     setattr(namespace, self.dest, tasks)
 
 
+def _google_parse_arguments(args):
+  """Validated google arguments."""
+  if args.machine_type:
+    raise ValueError('Not supported with the google provider: --machine-type. '
+                     'Use --min-cores and --min-ram instead.'
+                     '')
+
+
 def _google_v2_parse_arguments(args):
   """Validated google-v2 arguments."""
   if (args.zones and args.regions) or (not args.zones and not args.regions):
     raise ValueError('Exactly one of --regions and --zones must be specified')
+
+  if args.min_cores:
+    raise ValueError('Not supported with the google-v2 provider: --min-cores. '
+                     'Use --machine-type instead.'
+                     '')
+
+  if args.min_ram:
+    raise ValueError('Not supported with the google-v2 provider: --min-ram. '
+                     'Use --machine-type instead.'
+                     '')
 
 
 def _parse_arguments(prog, argv):
@@ -314,12 +332,10 @@ def _parse_arguments(prog, argv):
   # Add dsub resource requirement arguments
   parser.add_argument(
       '--min-cores',
-      default=job_model.DEFAULT_MIN_CORES,
       type=int,
       help='Minimum CPU cores for each job')
   parser.add_argument(
       '--min-ram',
-      default=job_model.DEFAULT_MIN_RAM,
       type=float,
       help='Minimum RAM per job in GB')
   parser.add_argument(
@@ -408,6 +424,8 @@ def _parse_arguments(prog, argv):
           'local': ['logging'],
       }, argv)
 
+  if args.provider == 'google':
+    _google_parse_arguments(args)
   if args.provider == 'google-v2':
     _google_v2_parse_arguments(args)
 

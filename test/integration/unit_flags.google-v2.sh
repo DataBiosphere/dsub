@@ -41,7 +41,7 @@ readonly -f call_dsub
 
 # Define tests
 
-function test_with_neither_region_nor_zone() {
+function test_neither_region_nor_zone() {
   local subtest="${FUNCNAME[0]}"
 
   if call_dsub \
@@ -60,9 +60,9 @@ function test_with_neither_region_nor_zone() {
     test_passed "${subtest}"
   fi
 }
-readonly -f test_with_neither_region_nor_zone
+readonly -f test_neither_region_nor_zone
 
-function test_with_region_and_zone() {
+function test_region_and_zone() {
   local subtest="${FUNCNAME[0]}"
 
   if call_dsub \
@@ -83,7 +83,90 @@ function test_with_region_and_zone() {
     test_passed "${subtest}"
   fi
 }
-readonly -f test_with_region_and_zone
+readonly -f test_region_and_zone
+
+function test_min_cores() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --min-cores 1; then
+
+    2>&1 echo "min-cores set with google-v2 provider - not detected"
+
+    test_failed "${subtest}"
+  else
+
+    assert_output_empty
+
+    assert_err_contains \
+      "ValueError: Not supported with the google-v2 provider: --min-cores. Use --machine-type instead."
+
+    test_passed "${subtest}"
+  fi
+}
+readonly -f test_min_cores
+
+function test_min_ram() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --min-ram 1; then
+
+    2>&1 echo "min-ram set with google-v2 provider - not detected"
+
+    test_failed "${subtest}"
+  else
+
+    assert_output_empty
+
+    assert_err_contains \
+      "ValueError: Not supported with the google-v2 provider: --min-ram. Use --machine-type instead."
+
+    test_passed "${subtest}"
+  fi
+}
+readonly -f test_min_ram
+
+function test_machine_type() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --machine-type "n1-highmem-2"; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.machineType" "n1-highmem-2"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_machine_type
+
+function test_no_machine_type() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.machineType" "n1-standard-1"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_machine_type
 
 function test_accelerator_type_and_count() {
   local subtest="${FUNCNAME[0]}"
@@ -131,8 +214,14 @@ trap "exit_handler" EXIT
 mkdir -p "${TEST_TMP}"
 
 echo
-test_with_neither_region_nor_zone
-test_with_region_and_zone
+test_neither_region_nor_zone
+test_region_and_zone
+
+echo
+test_min_cores
+test_min_ram
+test_machine_type
+test_no_machine_type
 
 echo
 test_accelerator_type_and_count

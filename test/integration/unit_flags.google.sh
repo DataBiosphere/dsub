@@ -53,6 +53,21 @@ function call_dsub() {
 }
 readonly -f call_dsub
 
+function call_dsub2() {
+  # A better function, structurally, than call_dsub().
+  # Leave the existing tests that use call_dsub() alone.
+  # New tests should use this function.
+  dsub \
+    --provider google \
+    --project "${PROJECT_ID}" \
+    --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
+    "${@}" \
+    --dry-run \
+    1> "${TEST_STDOUT}" \
+    2> "${TEST_STDERR}"
+}
+readonly -f call_dsub2
+
 # Define tests
 
 function test_with_command() {
@@ -272,6 +287,71 @@ function test_no_accelerator_type_and_count() {
 }
 readonly -f test_no_accelerator_type_and_count
 
+function test_min_cores_and_ram() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub2 \
+    --command 'echo "${TEST_NAME}"' \
+    --zones 'us-*' \
+    --min-cores 2 \
+    --min-ram 5; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].ephemeralPipeline.resources.minimumCpuCores" "2"
+    assert_err_value_equals \
+     "[0].ephemeralPipeline.resources.minimumRamGb" "5.0"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_min_cores_and_ram
+
+function test_no_min_cores_and_ram() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub2 \
+    --command 'echo "${TEST_NAME}"' \
+    --zones 'us-*'; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].ephemeralPipeline.resources.minimumCpuCores" "1"
+    assert_err_value_equals \
+     "[0].ephemeralPipeline.resources.minimumRamGb" "3.75"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_min_cores_and_ram
+
+function test_with_machine_type() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub2 \
+    --command 'echo "${TEST_NAME}"' \
+    --zones 'us-*' \
+    --machine-type "n1-standard-1"; then
+
+    2>&1 echo "machine-type set with google provider - not detected"
+
+    test_failed "${subtest}"
+  else
+
+    assert_output_empty
+
+    assert_err_contains \
+      "ValueError: Not supported with the google provider: --machine-type. Use --min-cores and --min-ram instead."
+
+    test_passed "${subtest}"
+  fi
+}
+readonly -f test_with_machine_type
+
 # Run the tests
 trap "exit_handler" EXIT
 
@@ -296,3 +376,8 @@ test_no_keep_alive
 echo
 test_accelerator_type_and_count
 test_no_accelerator_type_and_count
+
+echo
+test_with_machine_type
+test_min_cores_and_ram
+test_no_min_cores_and_ram
