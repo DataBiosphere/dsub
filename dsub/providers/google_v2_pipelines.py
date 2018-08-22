@@ -169,13 +169,15 @@ def build_action(name=None,
   }
 
 
-def build_pipeline(actions, resources, environment):
+def build_pipeline(actions, resources, environment, timeout):
   """Build an Pipeline argument for a Pipeline request.
 
   Args:
     actions (List): A list of actions to execute.
     resources (dict): An object indicating pipeline resources.
     environment (dict[str,str]): The environment to pass into the container.
+    timeout (str): A duration in seconds with up to nine fractional digits,
+      terminated by 's'.
 
   Returns:
     An object representing a Pipelines Resource.
@@ -185,6 +187,7 @@ def build_pipeline(actions, resources, environment):
       'actions': actions,
       'resources': resources,
       'environment': environment,
+      'timeout': timeout,
   }
 
 

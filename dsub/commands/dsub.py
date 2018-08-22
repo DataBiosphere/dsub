@@ -435,6 +435,13 @@ def _parse_arguments(prog, argv):
       default=False,
       action='store_true',
       help='If set to true, do not attach a public IP address to the VM.')
+  google_v2.add_argument(
+      '--timeout',
+      help="""The maximum amount of time to give the pipeline to complete.
+          This includes the time spent waiting for a worker to be allocated.
+          Time can be listed using a number followed by a unit. Supported units are
+          s (seconds), m (minutes), h (hours), d (days), w (weeks).
+          For example: '7d' (7 days).""")
 
   args = provider_base.parse_args(
       parser, {
@@ -463,6 +470,7 @@ def _get_job_resources(args):
   """
   logging = param_util.build_logging_param(
       args.logging) if args.logging else None
+  timeout = param_util.timeout_in_seconds(args.timeout)
 
   return job_model.Resources(
       min_cores=args.min_cores,
@@ -483,7 +491,8 @@ def _get_job_resources(args):
       subnetwork=args.subnetwork,
       use_private_address=args.use_private_address,
       accelerator_type=args.accelerator_type,
-      accelerator_count=args.accelerator_count)
+      accelerator_count=args.accelerator_count,
+      timeout=timeout)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids):

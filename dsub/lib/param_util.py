@@ -786,3 +786,39 @@ def age_to_create_time(age, from_time=None):
 
   except (ValueError, OverflowError) as e:
     raise ValueError('Unable to parse age string %s: %s' % (age, e))
+
+
+def timeout_in_seconds(timeout):
+  """Convert the timeout duration to seconds.
+
+  The value must be of the form "<integer><unit>" where supported
+  units are s, m, h, d, w (seconds, minutes, hours, days, weeks).
+
+  Args:
+    timeout: A "<integer><unit>" string.
+
+  Returns:
+    A string of the form "<integer><unit>" or None if timeout is empty.
+  """
+  if not timeout:
+    return None
+
+  try:
+    last_char = timeout[-1]
+
+    if last_char == 's':
+      return str(float(timeout[:-1])) + 's'
+    elif last_char == 'm':
+      return str(float(timeout[:-1]) * 60) + 's'
+    elif last_char == 'h':
+      return str(float(timeout[:-1]) * 60 * 60) + 's'
+    elif last_char == 'd':
+      return str(float(timeout[:-1]) * 60 * 60 * 24) + 's'
+    elif last_char == 'w':
+      return str(float(timeout[:-1]) * 60 * 60 * 24 * 7) + 's'
+    else:
+      raise ValueError(
+          'Unsupported units in timeout string %s: %s' % (timeout, last_char))
+
+  except (ValueError, OverflowError) as e:
+    raise ValueError('Unable to parse timeout string %s: %s' % (timeout, e))

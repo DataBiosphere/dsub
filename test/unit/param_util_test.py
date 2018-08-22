@@ -106,6 +106,27 @@ class ParamUtilTest(unittest.TestCase):
     with self.assertRaisesRegexp(ValueError, 'Unable to parse age string'):
       _ = param_util.age_to_create_time(age)
 
+  @parameterized.parameterized.expand([
+      ('simple_second', '1s', '1.0s'),
+      ('simple_minute', '1m', '60.0s'),
+      ('simple_hour', '1h', '3600.0s'),
+      ('simple_day', '1d', '86400.0s'),
+      ('simple_week', '1w', '604800.0s'),
+  ])
+  def test_timeout_in_seconds(self, unused_name, timeout, expected):
+    del unused_name
+    result = param_util.timeout_in_seconds(timeout)
+    self.assertEqual(expected, result)
+
+  @parameterized.parameterized.expand([
+      ('bad_units', '1second'),
+      ('no_units', '123'),
+  ])
+  def test_timeout_in_seconds_fail(self, unused_name, timeout):
+    del unused_name
+    with self.assertRaisesRegexp(ValueError, 'Unable to parse timeout string'):
+      _ = param_util.timeout_in_seconds(timeout)
+
 
 class FileParamUtilTest(unittest.TestCase):
 

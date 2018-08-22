@@ -672,7 +672,8 @@ class GoogleV2JobProvider(base.JobProvider):
             cpu_platform=job_resources.cpu_platform),
     )
 
-    pipeline = google_v2_pipelines.build_pipeline(actions, resources, None)
+    pipeline = google_v2_pipelines.build_pipeline(actions, resources, None,
+                                                  job_resources.timeout)
 
     return {'pipeline': pipeline, 'labels': labels}
 

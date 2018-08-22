@@ -292,6 +292,43 @@ function test_no_cpu_platform() {
 }
 readonly -f test_no_cpu_platform
 
+function test_timeout() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --timeout '1h'; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.timeout" "3600.0s"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_timeout
+
+function test_no_timeout() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.timeout" "None"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_timeout
+
 # Run the tests
 trap "exit_handler" EXIT
 
@@ -318,4 +355,8 @@ test_no_network
 echo
 test_cpu_platform
 test_no_cpu_platform
+
+echo
+test_timeout
+test_no_timeout
 

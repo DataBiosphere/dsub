@@ -327,7 +327,8 @@ class Resources(
         'min_cores', 'min_ram', 'machine_type', 'disk_size', 'boot_disk_size',
         'preemptible', 'image', 'logging', 'logging_path', 'regions', 'zones',
         'scopes', 'keep_alive', 'cpu_platform', 'network', 'subnetwork',
-        'use_private_address', 'accelerator_type', 'accelerator_count'
+        'use_private_address', 'accelerator_type', 'accelerator_count',
+        'timeout'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -352,6 +353,7 @@ class Resources(
     accelerator_type (string): Accelerator type (e.g. 'nvidia-tesla-k80').
     accelerator_count (int): Number of accelerators of the specified type to
       attach.
+    timeout (string): The max amount of time to give the pipeline to complete.
   """
   __slots__ = ()
 
@@ -374,12 +376,13 @@ class Resources(
               subnetwork=None,
               use_private_address=None,
               accelerator_type=None,
-              accelerator_count=0):
+              accelerator_count=0,
+              timeout=None):
     return super(Resources, cls).__new__(
         cls, min_cores, min_ram, machine_type, disk_size, boot_disk_size,
         preemptible, image, logging, logging_path, regions, zones, scopes,
         keep_alive, cpu_platform, network, subnetwork, use_private_address,
-        accelerator_type, accelerator_count)
+        accelerator_type, accelerator_count, timeout)
 
 
 def ensure_job_params_are_complete(job_params):
