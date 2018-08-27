@@ -80,6 +80,14 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
       util::get_job_status "${JOB_ID}"
       exit 1
     fi
+
+    # For the google-v2 provider, wait a sufficiently long time so that all the
+    # startup events occur prior to canceling so that the output event list is
+    # consistent..
+    if [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+      echo "Sleeping for 60s"
+      sleep 60
+    fi
   fi
 
   echo
@@ -102,6 +110,13 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     echo "dstat output for ${JOB_ID} does not include a valid end time."
     echo "${DSTAT_OUTPUT}"
     exit 1
+  fi
+
+  # The 'google' provider job is canceled immediately after start so no events
+  # are registered.
+  if [[ "${DSUB_PROVIDER}" != "google" ]]; then
+    EXPECTED_EVENTS=(start pulling-image localizing-files running-docker canceled)
+    util::dstat_out_assert_equal_events "${DSTAT_OUTPUT}" "[0].events" "${EXPECTED_EVENTS[@]}"
   fi
 
   provider_verify_stopped_job "${JOB_ID}"

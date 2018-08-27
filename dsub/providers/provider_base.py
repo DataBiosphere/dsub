@@ -148,7 +148,8 @@ def _format_task_uri(fmt, job_metadata, task_metadata):
       'job-id': None,
       'task-id': 'task',
       'job-name': None,
-      'user-id': None
+      'user-id': None,
+      'task-attempt': None
   }
   for key in values:
     values[key] = task_metadata.get(key) or job_metadata.get(key) or values[key]
@@ -170,9 +171,11 @@ def format_logging_uri(uri, job_metadata, task_metadata):
   For (2), the file name generated is {job-id}, or for --tasks jobs, it is
   {job-id}.{task-id}.
 
+  In both cases .{task-attempt} is inserted before .log for --retries jobs.
+
   In addition, full task metadata substitution is supported. The URI
   may include substitution strings such as
-  "{job-id}", "{task-id}", "{job-name}", and "{user-id}".
+  "{job-id}", "{task-id}", "{job-name}", "{user-id}", and "{task-attempt}".
 
   Args:
     uri: User-specified logging URI which may contain substitution fields.
@@ -183,22 +186,26 @@ def format_logging_uri(uri, job_metadata, task_metadata):
     The logging_uri formatted as described above.
   """
 
-  task_id = task_metadata.get('task-id')
-
   # If the user specifies any formatting (with curly braces), then use that
   # as the format string unchanged.
   fmt = str(uri)
   if '{' not in fmt:
     if uri.endswith('.log'):
-      if task_id is not None:
-        parts = os.path.splitext(uri)
-        fmt = '%s.{task-id}.log' % parts[0]
+      # URI includes a filename. Trim the extension and just use the prefix.
+      fmt = os.path.splitext(uri)[0]
     else:
-      # The path is a directory - generate the file name
-      if task_id is not None:
-        fmt = os.path.join(uri, '{job-id}.{task-id}.log')
-      else:
-        fmt = os.path.join(uri, '{job-id}.log')
+      # URI is a path to a directory. The job-id becomes the filename prefix.
+      fmt = os.path.join(uri, '{job-id}')
+
+    # If this is a task job, add the task-id.
+    if task_metadata.get('task-id') is not None:
+      fmt += '.{task-id}'
+
+    # If this is a retryable task, add the task-attempt.
+    if task_metadata.get('task-attempt') is not None:
+      fmt += '.{task-attempt}'
+
+    fmt += '.log'
 
   return _format_task_uri(fmt, job_metadata, task_metadata)
 

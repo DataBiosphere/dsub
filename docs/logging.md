@@ -42,6 +42,12 @@ or for `--tasks` jobs:
 -   `gs://my-bucket/my-path/my-pipeline/{job-id}.{task-id}-stderr.log`
 -   `gs://my-bucket/my-path/my-pipeline/{job-id}.{task-id}-stdout.log`
 
+or for `--retries` jobs:
+
+-   `gs://my-bucket/my-path/my-pipeline/{job-id}.{task-id}.{task-attempt}.log`
+-   `gs://my-bucket/my-path/my-pipeline/{job-id}.{task-id}.{task-attempt}-stderr.log`
+-   `gs://my-bucket/my-path/my-pipeline/{job-id}.{task-id}.{task-attempt}-stdout.log`
+
 ### A path + file ending in ".log"
 
 You can also specify a path that ends in ".log". For example if you specify:
@@ -57,6 +63,12 @@ or for `--tasks` jobs:
 -   `gs://my-bucket/my-path/my-pipeline.{task-id}.log`
 -   `gs://my-bucket/my-path/my-pipeline.{task-id}-stderr.log`
 -   `gs://my-bucket/my-path/my-pipeline.{task-id}-stdout.log`
+
+or for `--retries` jobs:
+
+-   `gs://my-bucket/my-path/my-pipeline.{task-id}.{task-attempt}.log`
+-   `gs://my-bucket/my-path/my-pipeline.{task-id}.{task-attempt}-stderr.log`
+-   `gs://my-bucket/my-path/my-pipeline.{task-id}.{task-attempt}-stdout.log`
 
 ### Inserting job data
 
@@ -76,4 +88,5 @@ Supported variables are:
 -   `job-name`
 -   `task-id`
 -   `user-id`
+-   `task-attempt`
 

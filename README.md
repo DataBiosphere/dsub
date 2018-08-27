@@ -3,20 +3,17 @@
 
 ## Overview
 
-dsub is a command-line tool that makes it easy to submit and run batch scripts
+`dsub` is a command-line tool that makes it easy to submit and run batch scripts
 in the cloud.
 
-The dsub user experience is modeled after traditional high-performance
+The `dsub` user experience is modeled after traditional high-performance
 computing job schedulers like Grid Engine and Slurm. You write a script and
 then submit it to a job scheduler from a shell prompt on your local machine.
 
-Today dsub supports Google Cloud as the backend batch job runner, along with a
+Today `dsub` supports Google Cloud as the backend batch job runner, along with a
 local provider for development and testing. With help from the community, we'd
 like to add other backends, such as a Grid Engine, Slurm, Amazon Batch,
 and Azure Batch.
-
-If others find dsub useful, our hope is to contribute dsub to an open-source
-foundation for use by the wider batch computing community.
 
 ## Getting started
 
@@ -157,6 +154,26 @@ charges using it.
 
         gsutil cat gs://my-bucket/output/out.txt
 
+
+### Getting started with the `google-v2` provider
+
+Google Cloud has made available a new version of the Google Genomics
+Pipelines API. This version, `v2alpha1`, will soon replace the `v1alpha2`
+verision that dsub's `google` provider uses.
+
+To use the `google-v2` provider:
+
+- Add `--provider google-v2` to your command-line
+- Use `--machine-type` (default is `n1-standard-1`).
+
+The `--machine-type` value can be one of the
+[Predefined Machine Types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types)
+or a
+[Custom Machine Type](https://cloud.google.com/compute/docs/machine-types#custom_machine_types).
+
+The `google` provider supports `--min-cpu` and `--min-ram`. A plan to support
+these flags for `google-v2` is being evaluated.
+See [google-v2 support](https://github.com/DataBiosphere/dsub/issues/114).
 
 ## `dsub` features
 
@@ -307,8 +324,8 @@ If you use a Red Hat or CentOS Docker image, you are encouraged to use the
 `dsub` tasks run using the `local` provider will use the resources available on
 your local machine.
 
-`dsub` tasks run using the `google` provider can take advantage of a wide range
-of CPU, RAM, disk, and hardware accelerator (eg. GPU) options.
+`dsub` tasks run using the `google` or `google-v2` providers can take advantage
+of a wide range of CPU, RAM, disk, and hardware accelerator (eg. GPU) options.
 
 See the [Compute Resources](docs/compute_resources.md) documentation for
 details.
@@ -334,13 +351,17 @@ parameters. For example:
 
     --env SAMPLE_ID<tab>--input VCF_FILE<tab>--output OUTPUT_PATH
 
-The first line also supports bare-word variables which are treated as
-the names of environment variables. This example is equivalent to the previous:
-
-    SAMPLE_ID<tab>--input VCF_FILE<tab>--output OUTPUT_PATH
-
 Each addition line in the file should provide the variable, input, and output
-values for each task. Each line represents the values for a separate task.
+values for each task. Each line beyond the header represents the values for a
+separate task.
+
+Multiple `--env`, `--input`, and `--output` parameters can be specified and
+they can be specified in any order. For example:
+
+    --env SAMPLE<tab>--input A<tab>--input B<tab>--env REFNAME<tab>--output O
+    S1<tab>gs://path/A1.txt<tab>gs://path/B1.txt<tab>R1<tab>gs://path/O1.txt
+    S2<tab>gs://path/A2.txt<tab>gs://path/B2.txt<tab>R2<tab>gs://path/O2.txt
+
 
 #### Tasks parameter
 

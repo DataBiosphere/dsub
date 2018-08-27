@@ -63,10 +63,10 @@ trap "exit_handler" EXIT
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
-  echo "Enabling Google Container Builder"
+  echo "Enabling Google Cloud Build"
   gcloud services enable cloudbuild.googleapis.com
 
-  echo "Creating image using Google Container Builder"
+  echo "Creating image using Google Cloud Build"
 
   mkdir -p "${BUILD_DIR}"
   sed -e 's#^ *##' > "${DOCKERFILE}" <<-EOF
@@ -78,7 +78,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     USER test_user
 EOF
 
-  gcloud container builds submit "${BUILD_DIR}" \
+  gcloud builds submit "${BUILD_DIR}" \
     --tag "${IMAGE}" \
     --project "${PROJECT_ID}"
 

@@ -25,10 +25,8 @@ set -o nounset
 # that no error is returned and the output looks minimally sane.
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
+readonly TESTDATA_DIR="$(cd "${SCRIPT_DIR}/../testdata" && pwd)"
 readonly JOB_NAME="test-job"
-
-# We'd like to be able to use relative paths, so force cwd.
-cd "${SCRIPT_DIR}"
 
 # Utility routine for getting a list of task statuses
 function check_correct_task() {
@@ -191,10 +189,10 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     exit 1
   fi
 
-  if ! diff -q "${TEST_TMP}/summary_json" "../testdata/summary_3_running.json"; then
+  if ! diff -q "${TEST_TMP}/summary_json" "${TESTDATA_DIR}/summary_3_running.json"; then
     echo "Output does not match expected"
     echo "Expected:"
-    cat "../testdata/summary_3_running.json"
+    cat "${TESTDATA_DIR}/summary_3_running.json"
     echo "Output:"
     cat "${TEST_TMP}/summary_json"
     exit 1
@@ -209,10 +207,10 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     exit 1
   fi
 
-  if ! diff -q "${TEST_TMP}/summary_yaml" "../testdata/summary_3_running.yaml"; then
+  if ! diff -q "${TEST_TMP}/summary_yaml" "${TESTDATA_DIR}/summary_3_running.yaml"; then
     echo "Output does not match expected"
     echo "Expected:"
-    cat "../testdata/summary_3_running.yaml"
+    cat "${TESTDATA_DIR}/summary_3_running.yaml"
     echo "Output:"
     cat "${TEST_TMP}/summary_yaml"
     exit 1

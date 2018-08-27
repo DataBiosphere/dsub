@@ -11,12 +11,23 @@ tasks will need.
 By default, `dsub` launches a Compute Engine VM with a single CPU core and
 3.75 GB.
 
-To change the minimum RAM, use the `--min-ram` flag.
+### With the `google` provider (the default):
 
-To change the minimum number of CPU cores, use the `--min-cores` flag.
+To change the virtual machine minimum RAM, use the `--min-ram` flag.
+To change the virtual machine minimum number of CPU cores, use the `--min-cores` flag.
 
 The machine type selected will be the smallest matching VM from the
 [predefined machine types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types).
+
+### With the `google-v2` provider:
+
+To change the virtual machine RAM and number of CPU cores, use the
+`--machine-type` flag.
+
+The `--machine-type` value can be one of the
+[predefined machine types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types)
+or a
+[custom machine type](https://cloud.google.com/compute/docs/machine-types#custom_machine_types).
 
 ## Disks
 

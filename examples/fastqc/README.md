@@ -25,7 +25,7 @@ All of the source BAM files are stored in a public bucket at
   instructions.
 
 * (Optional) [Enable](https://console.cloud.google.com/flows/enableapi?apiid=cloudbuild.googleapis.com)
-  the Google Container Builder API.
+  the Google Cloud Build API.
 
   This step is necessary if you are going to build the FastQC Docker image
   remotely.
@@ -53,7 +53,7 @@ docker build --tag gcr.io/MY-PROJECT/fastqc ./
 gcloud docker -- push gcr.io/MY-PROJECT/fastqc
 ```
 
-### Create the image with Google Container Builder
+### Create the image with Google Cloud Build
 
 This command can be used to build the image remotely and automatically store
 it in the Google Container Registry. If your project ID is domain-scoped
@@ -61,7 +61,7 @@ it in the Google Container Registry. If your project ID is domain-scoped
 (ex: `example.com/foo-bar`).
 
 ```
- gcloud container builds submit ./ --tag=gcr.io/MY-PROJECT/fastqc
+ gcloud builds submit ./ --tag=gcr.io/MY-PROJECT/fastqc
 ```
 
 

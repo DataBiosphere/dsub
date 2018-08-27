@@ -326,7 +326,9 @@ class Resources(
     collections.namedtuple('Resources', [
         'min_cores', 'min_ram', 'machine_type', 'disk_size', 'boot_disk_size',
         'preemptible', 'image', 'logging', 'logging_path', 'regions', 'zones',
-        'scopes', 'keep_alive', 'accelerator_type', 'accelerator_count'
+        'scopes', 'keep_alive', 'cpu_platform', 'network', 'subnetwork',
+        'use_private_address', 'accelerator_type', 'accelerator_count',
+        'timeout'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -344,9 +346,14 @@ class Resources(
     zones (List[str]): zone list in which to run the job
     scopes (List[str]): OAuth2 scopes for the job
     keep_alive (int): Seconds to keep VM alive on failure
+    cpu_platform (string): The CPU platform to request (e.g. 'Intel Skylake')
+    network (string): The network name to attach the VM's network interface to.
+    subnetwork (string): The name of the subnetwork to attach the instance to.
+    use_private_address (bool): Do not attach a public IP address to the VM
     accelerator_type (string): Accelerator type (e.g. 'nvidia-tesla-k80').
     accelerator_count (int): Number of accelerators of the specified type to
       attach.
+    timeout (string): The max amount of time to give the pipeline to complete.
   """
   __slots__ = ()
 
@@ -364,12 +371,18 @@ class Resources(
               zones=None,
               scopes=None,
               keep_alive=None,
+              cpu_platform=None,
+              network=None,
+              subnetwork=None,
+              use_private_address=None,
               accelerator_type=None,
-              accelerator_count=0):
+              accelerator_count=0,
+              timeout=None):
     return super(Resources, cls).__new__(
         cls, min_cores, min_ram, machine_type, disk_size, boot_disk_size,
         preemptible, image, logging, logging_path, regions, zones, scopes,
-        keep_alive, accelerator_type, accelerator_count)
+        keep_alive, cpu_platform, network, subnetwork, use_private_address,
+        accelerator_type, accelerator_count, timeout)
 
 
 def ensure_job_params_are_complete(job_params):

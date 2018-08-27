@@ -191,11 +191,24 @@ function util::dstat_yaml_assert_field_equal() {
   local field="${2}"
   local expected="${3}"
 
-  actual=$(util::dstat_yaml_output_value "${dstat_output}" "${field}")
+  actual=$(util::dstat_yaml_output_value "${dstat_out}" "${field}")
   if [[ "${actual}" != "${expected}" ]]; then
     2>&1 echo "Assert: actual value for ${field}, ${actual}, does not match expected: ${expected}"
-    2>&1 echo "${dstat_output}"
+    2>&1 echo "${dstat_out}"
     exit 1
   fi
 }
 readonly -f util::dstat_yaml_assert_field_equal
+
+function util::dstat_out_assert_equal_events() {
+  local dstat_out="${1}"
+  local events_field="${2}"
+  shift; shift
+  local expected_events=("$@")
+
+  for ((i = 0 ; i < "${#expected_events[@]}"; i++)); do
+    expected="${expected_events[i]}"
+    util::dstat_yaml_assert_field_equal "${dstat_out}" "${events_field}.[${i}].name" "${expected}"
+  done
+}
+readonly -f util::dstat_out_assert_equal_events

@@ -41,7 +41,7 @@ readonly -f call_dsub
 
 # Define tests
 
-function test_with_neither_region_nor_zone() {
+function test_neither_region_nor_zone() {
   local subtest="${FUNCNAME[0]}"
 
   if call_dsub \
@@ -60,9 +60,9 @@ function test_with_neither_region_nor_zone() {
     test_passed "${subtest}"
   fi
 }
-readonly -f test_with_neither_region_nor_zone
+readonly -f test_neither_region_nor_zone
 
-function test_with_region_and_zone() {
+function test_region_and_zone() {
   local subtest="${FUNCNAME[0]}"
 
   if call_dsub \
@@ -83,7 +83,90 @@ function test_with_region_and_zone() {
     test_passed "${subtest}"
   fi
 }
-readonly -f test_with_region_and_zone
+readonly -f test_region_and_zone
+
+function test_min_cores() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --min-cores 1; then
+
+    2>&1 echo "min-cores set with google-v2 provider - not detected"
+
+    test_failed "${subtest}"
+  else
+
+    assert_output_empty
+
+    assert_err_contains \
+      "ValueError: Not supported with the google-v2 provider: --min-cores. Use --machine-type instead."
+
+    test_passed "${subtest}"
+  fi
+}
+readonly -f test_min_cores
+
+function test_min_ram() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --min-ram 1; then
+
+    2>&1 echo "min-ram set with google-v2 provider - not detected"
+
+    test_failed "${subtest}"
+  else
+
+    assert_output_empty
+
+    assert_err_contains \
+      "ValueError: Not supported with the google-v2 provider: --min-ram. Use --machine-type instead."
+
+    test_passed "${subtest}"
+  fi
+}
+readonly -f test_min_ram
+
+function test_machine_type() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --machine-type "n1-highmem-2"; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.machineType" "n1-highmem-2"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_machine_type
+
+function test_no_machine_type() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.machineType" "n1-standard-1"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_machine_type
 
 function test_accelerator_type_and_count() {
   local subtest="${FUNCNAME[0]}"
@@ -125,15 +208,155 @@ function test_no_accelerator_type_and_count() {
 }
 readonly -f test_no_accelerator_type_and_count
 
+function test_network() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --network 'network-name-foo' \
+    --subnetwork 'subnetwork-name-foo' \
+    --use-private-address; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.name" "network-name-foo"
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.subnetwork" "subnetwork-name-foo"
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.usePrivateAddress" "True"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_network
+
+function test_no_network() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.name" "None"
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.subnetwork" "None"
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.network.usePrivateAddress" "False"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_network
+
+function test_cpu_platform() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --cpu-platform 'Intel Skylake'; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.cpuPlatform" "Intel Skylake"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_cpu_platform
+
+function test_no_cpu_platform() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.cpuPlatform" "None"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_cpu_platform
+
+function test_timeout() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --timeout '1h'; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.timeout" "3600.0s"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_timeout
+
+function test_no_timeout() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.timeout" "None"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_timeout
+
 # Run the tests
 trap "exit_handler" EXIT
 
 mkdir -p "${TEST_TMP}"
 
 echo
-test_with_neither_region_nor_zone
-test_with_region_and_zone
+test_neither_region_nor_zone
+test_region_and_zone
+
+echo
+test_min_cores
+test_min_ram
+test_machine_type
+test_no_machine_type
 
 echo
 test_accelerator_type_and_count
 test_no_accelerator_type_and_count
+
+echo
+test_network
+test_no_network
+
+echo
+test_cpu_platform
+test_no_cpu_platform
+
+echo
+test_timeout
+test_no_timeout
+

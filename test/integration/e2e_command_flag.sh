@@ -35,8 +35,6 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   BOOT_DISK_SIZE=20 \
   run_dsub \
     --image "ubuntu" \
-    --min-cores "1" \
-    --min-ram "3.75" \
     --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
     --env VAR4="VAL4" \
     --env VAR5="VAL5" \

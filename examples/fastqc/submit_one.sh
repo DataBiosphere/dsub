@@ -36,7 +36,7 @@ readonly OUTPUT_FILES="${OUTPUT_ROOT}/output/*"
 readonly INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chrom19.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam"
 
 # Build the docker image
-gcloud container builds submit "${SCRIPT_DIR}" \
+gcloud builds submit "${SCRIPT_DIR}" \
   --tag="gcr.io/${CONTAINER_PROJECT}/fastqc"
 
 # Launch the task

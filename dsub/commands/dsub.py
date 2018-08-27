@@ -170,10 +170,28 @@ class TaskParamAction(argparse.Action):
     setattr(namespace, self.dest, tasks)
 
 
+def _google_parse_arguments(args):
+  """Validated google arguments."""
+  if args.machine_type:
+    raise ValueError('Not supported with the google provider: --machine-type. '
+                     'Use --min-cores and --min-ram instead.'
+                     '')
+
+
 def _google_v2_parse_arguments(args):
   """Validated google-v2 arguments."""
   if (args.zones and args.regions) or (not args.zones and not args.regions):
     raise ValueError('Exactly one of --regions and --zones must be specified')
+
+  if args.min_cores:
+    raise ValueError('Not supported with the google-v2 provider: --min-cores. '
+                     'Use --machine-type instead.'
+                     '')
+
+  if args.min_ram:
+    raise ValueError('Not supported with the google-v2 provider: --min-ram. '
+                     'Use --machine-type instead.'
+                     '')
 
 
 def _parse_arguments(prog, argv):
@@ -314,12 +332,10 @@ def _parse_arguments(prog, argv):
   # Add dsub resource requirement arguments
   parser.add_argument(
       '--min-cores',
-      default=job_model.DEFAULT_MIN_CORES,
       type=int,
       help='Minimum CPU cores for each job')
   parser.add_argument(
       '--min-ram',
-      default=job_model.DEFAULT_MIN_RAM,
       type=float,
       help='Minimum RAM per job in GB')
   parser.add_argument(
@@ -399,6 +415,33 @@ def _parse_arguments(prog, argv):
           Only one of --zones and --regions may be specified.""")
   google_v2.add_argument(
       '--machine-type', help='Provider-specific machine type')
+  google_v2.add_argument(
+      '--cpu-platform',
+      help="""The CPU platform to request. Supported values can be found at
+      https://cloud.google.com/compute/docs/instances/specify-min-cpu-platform"""
+  )
+  google_v2.add_argument(
+      '--network',
+      help="""The Compute Engine VPC network name to attach the VM's network
+          interface to. The value will be prefixed with global/networks/ unless
+          it contains a /, in which case it is assumed to be a fully specified
+          network resource URL.""")
+  google_v2.add_argument(
+      '--subnetwork',
+      help="""The name of the Compute Engine subnetwork to attach the instance
+          to.""")
+  google_v2.add_argument(
+      '--use-private-address',
+      default=False,
+      action='store_true',
+      help='If set to true, do not attach a public IP address to the VM.')
+  google_v2.add_argument(
+      '--timeout',
+      help="""The maximum amount of time to give the pipeline to complete.
+          This includes the time spent waiting for a worker to be allocated.
+          Time can be listed using a number followed by a unit. Supported units are
+          s (seconds), m (minutes), h (hours), d (days), w (weeks).
+          For example: '7d' (7 days).""")
 
   args = provider_base.parse_args(
       parser, {
@@ -408,6 +451,8 @@ def _parse_arguments(prog, argv):
           'local': ['logging'],
       }, argv)
 
+  if args.provider == 'google':
+    _google_parse_arguments(args)
   if args.provider == 'google-v2':
     _google_v2_parse_arguments(args)
 
@@ -425,6 +470,7 @@ def _get_job_resources(args):
   """
   logging = param_util.build_logging_param(
       args.logging) if args.logging else None
+  timeout = param_util.timeout_in_seconds(args.timeout)
 
   return job_model.Resources(
       min_cores=args.min_cores,
@@ -440,8 +486,13 @@ def _get_job_resources(args):
       logging_path=None,
       scopes=args.scopes,
       keep_alive=args.keep_alive,
+      cpu_platform=args.cpu_platform,
+      network=args.network,
+      subnetwork=args.subnetwork,
+      use_private_address=args.use_private_address,
       accelerator_type=args.accelerator_type,
-      accelerator_count=args.accelerator_count)
+      accelerator_count=args.accelerator_count,
+      timeout=timeout)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids):
@@ -507,9 +558,11 @@ def _resolve_task_resources(job_metadata, job_resources, task_descriptors):
     task_descriptors: Task metadata, parameters, and resources.
 
   This function exists to be called at the point that all job properties have
-  been validated and resolved. The only property to be resolved right now is
-  the logging path, which may have substitution parameters such as
-  job-id, task-id, user-id, and job-name.
+  been validated and resolved. It is also called prior to re-trying a task.
+
+  The only property to be resolved right now is the logging path,
+  which may have substitution parameters such as
+  job-id, task-id, task-attempt, user-id, and job-name.
   """
   _resolve_task_logging(job_metadata, job_resources, task_descriptors)
 
@@ -650,7 +703,8 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
       return []
 
     for task_id in retry_tasks:
-      print('  %s failed. Retrying.' % (task_id if task_id else 'Task'))
+      print('  %s failed. Retrying.' % ('Task %s' % task_id
+                                        if task_id else 'Task'))
       _retry_task(provider, job_descriptor, task_id,
                   task_fail_count[task_id] + 1)
 
@@ -660,15 +714,22 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
 def _retry_task(provider, job_descriptor, task_id, task_attempt):
   """Retry task_id (numeric id) assigning it task_attempt."""
   td_orig = job_descriptor.find_task_descriptor(task_id)
+
+  new_task_descriptors = [
+      job_model.TaskDescriptor({
+          'task-id': task_id,
+          'task-attempt': task_attempt
+      }, td_orig.task_params, td_orig.task_resources)
+  ]
+
+  # Update the logging path.
+  _resolve_task_resources(job_descriptor.job_metadata,
+                          job_descriptor.job_resources, new_task_descriptors)
+
   provider.submit_job(
       job_model.JobDescriptor(
           job_descriptor.job_metadata, job_descriptor.job_params,
-          job_descriptor.job_resources, [
-              job_model.TaskDescriptor({
-                  'task-id': task_id,
-                  'task-attempt': task_attempt
-              }, td_orig.task_params, td_orig.task_resources)
-          ]), False)
+          job_descriptor.job_resources, new_task_descriptors), False)
 
 
 def _dominant_task_for_jobs(tasks):

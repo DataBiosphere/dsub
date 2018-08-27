@@ -24,11 +24,13 @@ import json
 import os
 import re
 import socket
+from ssl import SSLError
 import sys
 
 from .._dsub_version import DSUB_VERSION
 import apiclient.discovery
 import apiclient.errors
+from httplib2 import ServerNotFoundError
 from ..lib import job_model
 from oauth2client.client import GoogleCredentials
 from oauth2client.client import HttpAccessTokenRefreshError
@@ -93,9 +95,13 @@ _ZONES = [
     'asia-south1-c',
     'asia-southeast1-a',
     'asia-southeast1-b',
+    'asia-southeast1-c',
     'australia-southeast1-a',
     'australia-southeast1-b',
     'australia-southeast1-c',
+    'europe-north1-a',
+    'europe-north1-b',
+    'europe-north1-c',
     'europe-west1-b',
     'europe-west1-c',
     'europe-west1-d',
@@ -127,6 +133,9 @@ _ZONES = [
     'us-west1-a',
     'us-west1-b',
     'us-west1-c',
+    'us-west2-a',
+    'us-west2-b',
+    'us-west2-c',
 ]
 
 
@@ -452,6 +461,16 @@ def retry_api_check(exception):
       return True
 
   if isinstance(exception, HttpAccessTokenRefreshError):
+    return True
+
+  # For a given installation, this could be a permanent error, but has only
+  # been observed as transient.
+  if isinstance(exception, SSLError):
+    return True
+
+  # This has been observed as a transient error:
+  #   ServerNotFoundError: Unable to find the server at genomics.googleapis.com
+  if isinstance(exception, ServerNotFoundError):
     return True
 
   return False

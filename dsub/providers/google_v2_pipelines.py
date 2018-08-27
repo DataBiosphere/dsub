@@ -19,9 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 
-def build_network(name, use_private_address):
+def build_network(name, subnetwork, use_private_address):
   return {
       'name': name,
+      'subnetwork': subnetwork,
       'usePrivateAddress': use_private_address,
   }
 
@@ -51,7 +52,8 @@ def build_machine(network=None,
                   boot_disk_size_gb=None,
                   disks=None,
                   accelerators=None,
-                  labels=None):
+                  labels=None,
+                  cpu_platform=None):
   """Build a VirtualMachine object for a Pipeline request.
 
   Args:
@@ -63,6 +65,7 @@ def build_machine(network=None,
     disks (list[dict]): List of disks to mount.
     accelerators (list[dict]): List of accelerators to attach to the VM.
     labels (dict[string, string]): Labels for the VM.
+    cpu_platform (str): The CPU platform to request.
 
   Returns:
     An object representing a VirtualMachine.
@@ -76,6 +79,7 @@ def build_machine(network=None,
       'disks': disks,
       'accelerators': accelerators,
       'labels': labels,
+      'cpuPlatform': cpu_platform,
   }
 
 
@@ -165,13 +169,15 @@ def build_action(name=None,
   }
 
 
-def build_pipeline(actions, resources, environment):
+def build_pipeline(actions, resources, environment, timeout):
   """Build an Pipeline argument for a Pipeline request.
 
   Args:
     actions (List): A list of actions to execute.
     resources (dict): An object indicating pipeline resources.
     environment (dict[str,str]): The environment to pass into the container.
+    timeout (str): A duration in seconds with up to nine fractional digits,
+      terminated by 's'.
 
   Returns:
     An object representing a Pipelines Resource.
@@ -181,6 +187,7 @@ def build_pipeline(actions, resources, environment):
       'actions': actions,
       'resources': resources,
       'environment': environment,
+      'timeout': timeout,
   }
 
 
