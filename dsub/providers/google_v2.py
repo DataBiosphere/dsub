@@ -549,6 +549,7 @@ class GoogleV2JobProvider(base.JobProvider):
     ]
     network = google_v2_pipelines.build_network(None, None)
     machine_type = job_resources.machine_type or job_model.DEFAULT_MACHINE_TYPE
+    min_cpu_platform = job_resources.min_cpu_platform
     accelerators = None
     if job_resources.accelerator_type:
       accelerators = [
@@ -565,6 +566,7 @@ class GoogleV2JobProvider(base.JobProvider):
         google_v2_pipelines.build_machine(
             network=network,
             machine_type=machine_type,
+            min_cpu_platform=min_cpu_platform,
             preemptible=job_resources.preemptible,
             service_account=service_account,
             boot_disk_size_gb=job_resources.boot_disk_size,
@@ -1049,6 +1051,7 @@ class GoogleOperation(base.Task):
       if 'virtualMachine' in resources:
         vm = resources['virtualMachine']
         value['machine-type'] = vm['machineType']
+        value['min-cpu-platform'] = vm['cpuPlatform']
         value['preemptible'] = vm['preemptible']
 
         value['boot-disk-size'] = vm['bootDiskSizeGb']

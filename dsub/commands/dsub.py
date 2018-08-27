@@ -399,6 +399,8 @@ def _parse_arguments(prog, argv):
           Only one of --zones and --regions may be specified.""")
   google_v2.add_argument(
       '--machine-type', help='Provider-specific machine type')
+  google_v2.add_argument(
+      '--min-cpu-platform', help='Provider-specific minimum CPU platform')
 
   args = provider_base.parse_args(
       parser, {
@@ -430,6 +432,7 @@ def _get_job_resources(args):
       min_cores=args.min_cores,
       min_ram=args.min_ram,
       machine_type=args.machine_type,
+      min_cpu_platform=args.min_cpu_platform,
       disk_size=args.disk_size,
       boot_disk_size=args.boot_disk_size,
       preemptible=args.preemptible,
