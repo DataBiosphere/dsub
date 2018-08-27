@@ -324,7 +324,7 @@ class OutputFileParam(FileParam):
 
 class Resources(
     collections.namedtuple('Resources', [
-        'min_cores', 'min_ram', 'machine_type', 'disk_size', 'boot_disk_size',
+        'min_cores', 'min_ram', 'machine_type', 'min_cpu_platform', 'disk_size', 'boot_disk_size',
         'preemptible', 'image', 'logging', 'logging_path', 'regions', 'zones',
         'scopes', 'keep_alive', 'accelerator_type', 'accelerator_count'
     ])):
@@ -334,6 +334,7 @@ class Resources(
     min_cores (int): number of CPU cores
     min_ram (float): amount of memory (in GB)
     machine_type (str): machine type (e.g. 'n1-standard-1', 'custom-1-4096')
+    min_cpu_platform (str): lowest permitted CPU platform (e.g., 'Intel Skylake')
     disk_size (int): size of the data disk (in GB)
     boot_disk_size (int): size of the boot disk (in GB)
     preemptible (bool): use a preemptible VM for the job
@@ -354,6 +355,7 @@ class Resources(
               min_cores=None,
               min_ram=None,
               machine_type=None,
+              min_cpu_platform=None,
               disk_size=None,
               boot_disk_size=None,
               preemptible=None,
@@ -367,7 +369,7 @@ class Resources(
               accelerator_type=None,
               accelerator_count=0):
     return super(Resources, cls).__new__(
-        cls, min_cores, min_ram, machine_type, disk_size, boot_disk_size,
+        cls, min_cores, min_ram, machine_type, min_cpu_platform, disk_size, boot_disk_size,
         preemptible, image, logging, logging_path, regions, zones, scopes,
         keep_alive, accelerator_type, accelerator_count)
 

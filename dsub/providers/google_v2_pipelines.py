@@ -46,6 +46,7 @@ def build_service_account(email, scopes):
 
 def build_machine(network=None,
                   machine_type=None,
+                  min_cpu_platform=None,
                   preemptible=None,
                   service_account=None,
                   boot_disk_size_gb=None,
@@ -57,6 +58,7 @@ def build_machine(network=None,
   Args:
     network (dict): Network details for the pipeline to run in.
     machine_type (str): GCE Machine Type string for the pipeline.
+    min_cpu_platform (str): GCE Minimum CPU platform (e.g. "Intel Skylake").
     preemptible (bool): Use a preemptible VM for the job.
     service_account (dict): Service account configuration for the VM.
     boot_disk_size_gb (int): Boot disk size in GB.
@@ -70,6 +72,7 @@ def build_machine(network=None,
   return {
       'network': network,
       'machineType': machine_type,
+      'cpuPlatform': min_cpu_platform,
       'preemptible': preemptible,
       'serviceAccount': service_account,
       'bootDiskSizeGb': boot_disk_size_gb,
