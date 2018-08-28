@@ -101,6 +101,7 @@ setup(
         'pytz',
         'pyyaml==3.12',
         'retrying',
+        'six',
         'tabulate',
 
         # dependencies for test code

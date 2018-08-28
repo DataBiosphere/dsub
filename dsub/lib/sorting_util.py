@@ -14,7 +14,31 @@
 """Utility classes for merging multiple query results in a sorted manner."""
 
 import collections
-import Queue
+import six
+from six.moves import queue
+
+
+class PriorityIterEntry(object):
+  """Class for holding (and ordering) queue data."""
+
+  def __init__(self, priority, next_value, generator):
+    self.priority = priority
+    self.next_value = next_value
+    self.generator = generator
+
+  def __lt__(self, other):
+    """Allow order testing via '<' operator, needed by priority queue."""
+    # When priority is equal, compare values of each shared key. Shared keys are
+    # compared in alphabetical order and the first non-equal value is used
+    # for comparison.
+    if self.priority == other.priority:
+      localkeys = self.next_value.keys()
+      otherkeys = other.next_value.keys()
+      shared_keys = sorted(set(localkeys).intersection(otherkeys))
+      for key in shared_keys:
+        if self.next_value[key] != other.next_value[key]:
+          return self.next_value[key] < other.next_value[key]
+    return self.priority < other.priority
 
 
 class SortedGeneratorIterator(collections.Iterator):
@@ -30,7 +54,7 @@ class SortedGeneratorIterator(collections.Iterator):
 
   def __init__(self, maxsize=0, key=None):
     self._key = key if key else lambda item: item
-    self._queue = Queue.PriorityQueue(maxsize=maxsize)
+    self._queue = queue.PriorityQueue(maxsize=maxsize)
 
   def __iter__(self):
     return self
@@ -42,16 +66,19 @@ class SortedGeneratorIterator(collections.Iterator):
     if self.empty():
       raise StopIteration
 
-    _, val, generator = self._queue.get()
-    self.add_generator(generator)
-    return val
+    entry = self._queue.get()
+    self.add_generator(entry.generator)
+    return entry.next_value
+
+  def __next__(self):
+    return self.next()
 
   def add_generator(self, generator):
     try:
-      next_val = generator.next()
+      next_val = six.advance_iterator(generator)
     except StopIteration:
       return False
 
-    value_tuple = (self._key(next_val), next_val, generator)
+    value_tuple = PriorityIterEntry(self._key(next_val), next_val, generator)
     self._queue.put(value_tuple)
     return True
