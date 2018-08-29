@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Fake time, for testing."""
+import six
 
 
 class FakeTime(object):
@@ -32,7 +33,7 @@ class FakeTime(object):
     # current fake time
     self._now = 0
     # time at which to wake up the chronology
-    self._next = self._chronology.next()
+    self._next = six.advance_iterator(self._chronology)
 
   def sleep(self, seconds):
     """Sleep for this many fictitious seconds.

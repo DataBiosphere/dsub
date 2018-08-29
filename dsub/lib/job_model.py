@@ -420,7 +420,7 @@ def _remove_empty_items(d, required):
   """
 
   new_dict = {}
-  for k, v in d.iteritems():
+  for k, v in d.items():
     if k in required:
       new_dict[k] = v
     elif isinstance(v, int) or v:

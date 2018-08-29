@@ -28,8 +28,15 @@ from dsub.providers import google
 from dsub.providers import google_v2
 from dsub.providers import local
 
-import test_setup
-import test_setup_e2e as test
+# Because this may be invoked from another directory (treated as a library) or
+# invoked localy (treated as a binary) both import styles need to be supported.
+# pylint: disable=g-import-not-at-top
+try:
+  from . import test_setup
+  from . import test_setup_e2e as test
+except SystemError:
+  import test_setup
+  import test_setup_e2e as test
 
 
 def get_dsub_provider():

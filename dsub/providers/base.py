@@ -32,11 +32,12 @@ explicit tasks.
 
 from abc import ABCMeta
 from abc import abstractmethod
+import six
 
 
+@six.add_metaclass(ABCMeta)
 class JobProvider(object):
   """Interface all job providers should inherit from."""
-  __metaclass__ = ABCMeta
 
   @abstractmethod
   def prepare_job_metadata(self, script, job_name, user_id, create_time):

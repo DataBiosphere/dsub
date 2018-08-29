@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Package marker file."""
-from _dsub_version import DSUB_VERSION as __version__
+from ._dsub_version import DSUB_VERSION as __version__

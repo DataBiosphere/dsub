@@ -20,12 +20,22 @@ import subprocess
 import sys
 
 
+def to_string(stdoutbytes):
+  """Convert stdout to a string in python 2 or 3."""
+  if sys.version_info[0] < 3:
+    return stdoutbytes
+  # Get the stdout system encoding. If unknown, assume utf-8.
+  encoding = sys.stdout.encoding if sys.stdout.encoding else 'utf-8'
+  return stdoutbytes.decode(encoding)
+
+
 def gsutil_ls_check(path):
   return not subprocess.call('gsutil ls "%s" 2>/dev/null' % path, shell=True)
 
 
 def gsutil_cat(path):
-  return subprocess.check_output('gsutil cat "%s"' % path, shell=True)
+  return to_string(
+      subprocess.check_output('gsutil cat "%s"' % path, shell=True))
 
 
 def diff(str1, str2):

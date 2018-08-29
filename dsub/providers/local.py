@@ -51,6 +51,7 @@ Thus using the local runner requires:
 Note that the local runner supports the `--tasks` parameter. All tasks
 submitted will run concurrently.
 """
+from __future__ import print_function
 
 from collections import namedtuple
 import datetime
@@ -229,7 +230,7 @@ class LocalJobProvider(base.JobProvider):
       if skip_if_output_present:
         # check whether the output's already there
         if dsub_util.outputs_are_present(outputs):
-          print 'Skipping task because its outputs are present.'
+          print('Skipping task because its outputs are present.')
           continue
 
       # Set up directories
@@ -266,7 +267,7 @@ class LocalJobProvider(base.JobProvider):
   def _write_source_file(self, dest, body):
     with open(dest, 'wt') as f:
       f.write(body)
-    os.chmod(dest, 0500)
+    os.chmod(dest, 0o500)
 
   def _run_docker_via_script(self, task_dir, env, job_metadata, job_params,
                              job_resources, task_metadata, task_params,
@@ -872,7 +873,7 @@ class LocalJobProvider(base.JobProvider):
     f.close()
     st = os.stat(path)
     # Ensure the user script is executable.
-    os.chmod(path, st.st_mode | 0100)
+    os.chmod(path, st.st_mode | 0o100)
 
 
 # The task object for this provider.
@@ -958,7 +959,7 @@ class LocalTask(base.Task):
       # Task member name).
       tad = {
           key.replace('_', '-'): value
-          for key, value in self._raw._asdict().iteritems()
+          for key, value in self._raw._asdict().items()
       }
 
       if field == 'status':

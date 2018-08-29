@@ -16,6 +16,7 @@
 * Raises an exception for job submission, listing, or deletion.
 * Returns uninteresting values for other public provider methods.
 """
+from __future__ import print_function
 
 from . import base
 from ..lib import dsub_util
@@ -43,7 +44,7 @@ class FailsJobProvider(base.JobProvider):
 
       outputs = job_params["outputs"] | task_params["outputs"]
       if dsub_util.outputs_are_present(outputs):
-        print "Skipping task because its outputs are present"
+        print("Skipping task because its outputs are present")
         continue
 
       # if any task is allowed to run, then we fail.

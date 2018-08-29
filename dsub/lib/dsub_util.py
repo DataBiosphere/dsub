@@ -20,7 +20,6 @@ import fnmatch
 import io
 import os
 import pwd
-from StringIO import StringIO
 import sys
 
 from apiclient import discovery
@@ -29,6 +28,7 @@ from apiclient.http import MediaIoBaseDownload
 import oauth2client.client
 from oauth2client.client import GoogleCredentials
 import retrying
+from six import StringIO
 
 
 # this is the Job ID for jobs that are skipped.

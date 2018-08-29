@@ -17,15 +17,23 @@
 This test is a copy of the e2e_env_list.sh test with additional checks
 on the objects returned by dsub.call().
 """
+from __future__ import print_function
 
 import os
 import sys
 
-import test_setup_e2e as test
-import test_util
+# Because this may be invoked from another directory (treated as a library) or
+# invoked localy (treated as a binary) both import styles need to be supported.
+# pylint: disable=g-import-not-at-top
+try:
+  from . import test_setup_e2e as test
+  from . import test_util
+except SystemError:
+  import test_setup_e2e as test
+  import test_util
 
 if not os.environ.get('CHECK_RESULTS_ONLY'):
-  print 'Launching pipeline...'
+  print('Launching pipeline...')
 
   # pyformat: disable
   launched_job = test.run_dsub([
@@ -38,26 +46,25 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
 
   # Sanity check launched_jobs - should have a single record with no tasks
   if not launched_job:
-    print >> sys.stderr, 'No launched jobs returned.'
+    print('No launched jobs returned.', file=sys.stderr)
     sys.exit(1)
 
   if not launched_job.get('job-id'):
-    print >> sys.stderr, 'Launched job contains no job-id.'
+    print('Launched job contains no job-id.', file=sys.stderr)
     sys.exit(1)
 
   if not launched_job.get('user-id'):
-    print >> sys.stderr, 'Launched job contains no user-id.'
+    print('Launched job contains no user-id.', file=sys.stderr)
     sys.exit(1)
 
   if launched_job.get('task-id'):
-    print >> sys.stderr, 'Launched job contains tasks.'
-    print >> sys.stderr, launched_job['task-id']
+    print('Launched job contains tasks.', file=sys.stderr)
+    print(launched_job['task-id'], file=sys.stderr)
     sys.exit(1)
 
-  print 'Launched job: %s' % launched_job['job-id']
+  print('Launched job: %s' % launched_job['job-id'])
 
-print
-print 'Checking output...'
+print('\nChecking output...')
 
 # Check the results
 RESULT_EXPECTED = """
@@ -70,13 +77,12 @@ VAR5=VAL5
 
 RESULT = test_util.gsutil_cat(test.STDOUT_LOG)
 if not test_util.diff(RESULT_EXPECTED, RESULT):
-  print 'Output file does not match expected'
+  print('Output file does not match expected')
   sys.exit(1)
 
-print
-print 'Output file matches expected:'
-print '*****************************'
-print RESULT
-print '*****************************'
+print('\nOutput file matches expected:')
+print('*****************************')
+print(RESULT)
+print('*****************************')
 
-print 'SUCCESS'
+print('SUCCESS')
