@@ -20,7 +20,10 @@ and Azure Batch.
 You can install `dsub` from [PyPI](pypi.python.org), or you can clone and
 install from this github repository.
 
-Note: `dsub`, `dstat`, and `ddel` must be run under Python 2.
+Note: `dsub` was written for Python 2.7 and production users of `dsub`
+should continue using Python 2.7. As of `dsub` v0.2.0, we have enabled
+experimental support of Python 3.5+.
+
 
 ### Pre-installation steps
 
@@ -32,7 +35,7 @@ you are encouraged to use a [Python virtualenv](https://virtualenv.pypa.io).
 1.  Create and activate a Python virtualenv.
 
         # (You can do this in a directory of your choosing.)
-        virtualenv dsub_libs
+        virtualenv --python=python2.7 dsub_libs
         source dsub_libs/bin/activate
 
 ### Install `dsub`
