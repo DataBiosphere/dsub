@@ -83,7 +83,7 @@ readonly -f delocalize_logs_function
 
 function get_timestamp() {
   python \
-    -c 'import datetime; print datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")'
+    -c 'import datetime; print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"))'
 }
 readonly -f get_timestamp
 

@@ -265,7 +265,7 @@ class LocalJobProvider(base.JobProvider):
     }
 
   def _write_source_file(self, dest, body):
-    with open(dest, 'wt') as f:
+    with open(dest, 'wb') as f:
       f.write(body)
     os.chmod(dest, 0o500)
 
@@ -364,7 +364,7 @@ class LocalJobProvider(base.JobProvider):
     script_data_path = os.path.join(task_dir, 'data.sh')
     self._write_source_file(script_path,
                             self._resources.get_resource(_RUNNER_SH_RESOURCE))
-    self._write_source_file(script_data_path, script_data)
+    self._write_source_file(script_data_path, script_data.encode())
 
     # Write the environment variables
     env_vars = set(env.items()) | job_params['envs'] | task_params['envs'] | {

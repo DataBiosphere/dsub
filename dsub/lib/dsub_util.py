@@ -28,7 +28,7 @@ from apiclient.http import MediaIoBaseDownload
 import oauth2client.client
 from oauth2client.client import GoogleCredentials
 import retrying
-from six import StringIO
+import six
 
 
 # this is the Job ID for jobs that are skipped.
@@ -171,8 +171,10 @@ def _load_file_from_gcs(gcs_file_path, credentials=None):
   done = False
   while not done:
     _, done = _downloader_next_chunk(downloader)
-
-  return StringIO(file_handle.getvalue())
+  filevalue = file_handle.getvalue()
+  if not isinstance(filevalue, six.string_types):
+    filevalue = filevalue.decode()
+  return six.StringIO(filevalue)
 
 
 def load_file(file_path, credentials=None):
