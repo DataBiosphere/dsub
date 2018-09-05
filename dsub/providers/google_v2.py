@@ -53,8 +53,8 @@ _SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 
 # Action steps that interact with GCS need gsutil.
-# Use the 'alpine' variant of the cloud-sdk Docker image as it is much smaller.
-_CLOUD_SDK_IMAGE = 'google/cloud-sdk:alpine'
+# Use the 'slim' variant of the cloud-sdk Docker image as it is much smaller.
+_CLOUD_SDK_IMAGE = 'google/cloud-sdk:slim'
 
 # The prepare step needs Python.
 # Use the 'slim' variant of the python Docker image as it is much smaller.
