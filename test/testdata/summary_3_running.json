@@ -1,7 +1,7 @@
 [
   {
-    "job-name": "test-job",
-    "status": "RUNNING",
+    "job-name": "test-job", 
+    "status": "RUNNING", 
     "task-count": 3
   }
 ]
