@@ -852,11 +852,15 @@ class GoogleV2JobProvider(base.JobProvider):
 
     page_token = None
     more_operations = True
-    documented_default_page_size = 256
+
+    # We are not using the documented default page size of 256,
+    # as it causes the operations.list() API to return an error
+    # HttpError 429 ... Resource has been exhausted (e.g. check quota).
+    current_best_page_size = 128
     documented_max_page_size = 2048
 
     if not page_size:
-      page_size = documented_default_page_size
+      page_size = current_best_page_size
     page_size = min(page_size, documented_max_page_size)
 
     while more_operations:
