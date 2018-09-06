@@ -124,7 +124,7 @@ function error() {
   if [[ $code != "0" ]]; then
     write_event "fail"
     write_status "FAILURE"
-    log_error "${message} on or near line ${parent_lineno}; exiting with status ${code}"
+    log_error "${message} on or near line ${parent_lineno}; ${0} exiting with status ${code}"
   fi
   cleanup "false"
   exit "${code}"
