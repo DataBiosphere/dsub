@@ -287,9 +287,10 @@ def parse_rfc3339_utc_string(rfc3339_utc_string):
   """
 
   # The timestamp from the Google Operations are all in RFC3339 format, but
-  # they are sometimes formatted to microseconds, sometimes nanoseconds, and
-  # sometimes only seconds:
-  # * 2016-11-14T23:04:55Z
+  # they are sometimes formatted to millisconds, microseconds, sometimes
+  # nanoseconds, and sometimes only seconds:
+  # * 2016-11-14T23:05:56Z
+  # * 2016-11-14T23:05:56.010Z
   # * 2016-11-14T23:05:56.010429Z
   # * 2016-11-14T23:05:56.010429380Z
   m = re.match(r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}).?(\d*)Z',
@@ -305,7 +306,7 @@ def parse_rfc3339_utc_string(rfc3339_utc_string):
     return None
 
   groups = m.groups()
-  if len(groups[6]) not in (0, 6, 9):
+  if len(groups[6]) not in (0, 3, 6, 9):
     return None
 
   # Create a UTC datestamp from parsed components
@@ -317,6 +318,8 @@ def parse_rfc3339_utc_string(rfc3339_utc_string):
   fraction = groups[6]
   if not fraction:
     micros = 0
+  elif len(fraction) == 3:
+    micros = int(fraction) * 1000
   elif len(fraction) == 6:
     micros = int(fraction)
   elif len(fraction) == 9:

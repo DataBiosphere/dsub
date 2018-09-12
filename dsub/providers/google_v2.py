@@ -302,7 +302,9 @@ class GoogleV2EventMap(object):
     self._op = op
 
   def get_filtered_normalized_events(self):
-    """Filter through the large number of granular events returned by the
+    """Filter the granular v2 events down to events of interest.
+
+    Filter through the large number of granular events returned by the
     pipelines API, and extract only those that are interesting to a user. This
     is implemented by filtering out events which are known to be uninteresting
     (i.e. the default actions run for every job) and by explicitly matching
@@ -316,29 +318,32 @@ class GoogleV2EventMap(object):
     Returns:
       A list of maps containing the normalized, filtered events.
     """
-    # Track whether or not an error occurred so that we can remove the
-    # final 'ok' event. The 'Worker Released' event in pipelines V2 occurs
-    # even if an error is thrown in the user command.
-    has_error = False
+    # Only create an "ok" event for operations with SUCCESS status.
+    need_ok = google_v2_operations.is_success(self._op)
 
     # Events are keyed by name for easier deletion.
     events = {}
 
+    # Events are assumed to be ordered by timestamp (newest to oldest).
     for event in google_v2_operations.get_events(self._op):
       if self._filter(event):
         continue
 
-      mapped, match = self._map(event)
-      events[mapped['name']] = mapped
-      if match and match.re in [_FAIL_REGEX, _ABORT_REGEX]:
-        has_error = True
+      mapped, unused_match = self._map(event)
+      del unused_match
 
-    if has_error:
-      del events['ok']
+      name = mapped['name']
+      if name == 'ok':
+        # If we want the "ok" event, we grab the first (most recent).
+        if not need_ok or 'ok' in events:
+          continue
+
+      events[name] = mapped
 
     return sorted(events.values(), key=operator.itemgetter('start-time'))
 
   def _map(self, event):
+    """Extract elements from an operation event and map to a named event."""
     description = event.get('description', '')
     start_time = google_base.parse_rfc3339_utc_string(
         event.get('timestamp', ''))

@@ -134,11 +134,11 @@ function run_dstat_age() {
 }
 
 function run_dstat() {
-  # Call dstat and automatically add "--age 30m".
+  # Call dstat and automatically add "--age 45m".
   # This speeds up tests and helps avoid dstat calls that return jobs
   # from other test runs.
-  # If a test takes longer than 30 minutes, then we should fix the test.
-  run_dstat_age "30m" "${@}"
+  # If a test takes longer than 45 minutes, then we should fix the test.
+  run_dstat_age "45m" "${@}"
 }
 
 function dstat_google() {
@@ -172,11 +172,11 @@ function run_ddel_age() {
 }
 
 function run_ddel() {
-  # Call ddel and automatically add "--age 30m".
+  # Call ddel and automatically add "--age 45m".
   # This speeds up tests and helps avoid ddel calls that return jobs
   # from other test runs.
-  # If a test takes longer than 30 minutes, then we should fix the test.
-  run_ddel_age "30m" "${@}"
+  # If a test takes longer than 45 minutes, then we should fix the test.
+  run_ddel_age "45m" "${@}"
 }
 
 function ddel_google() {
