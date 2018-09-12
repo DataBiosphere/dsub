@@ -113,6 +113,13 @@ def get_action_environment(op, name):
     return action.get('environment')
 
 
+def get_action_image(op, name):
+  """Return the image for the operation."""
+  action = get_action(op, name)
+  if action:
+    return action.get('imageUri')
+
+
 def get_events(op):
   """Return the array of events for the operation."""
   return op.get('metadata', {}).get('events', [])

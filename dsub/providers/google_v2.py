@@ -270,9 +270,7 @@ _ACTION_USER_COMMAND = 'user-command'
 _ACTION_DELOCALIZATION = 'delocalization'
 _ACTION_FINAL_LOGGING = 'final_logging'
 _FILTER_ACTIONS = [_ACTION_LOGGING, _ACTION_PREPARE, _ACTION_FINAL_LOGGING]
-_DEFAULT_IMAGES = [_CLOUD_SDK_IMAGE.replace('/', '\\/'), _PYTHON_IMAGE]
 _FILTERED_EVENT_REGEXES = [
-    re.compile('^Started pulling "({})"$'.format('|'.join(_DEFAULT_IMAGES))),
     re.compile('^Started running "({})"$'.format('|'.join(_FILTER_ACTIONS))),
     re.compile('Stopped pulling'),
     re.compile('Stopped running'),
@@ -285,7 +283,7 @@ _FAIL_REGEX = re.compile(
     '^Unexpected exit status [\\d]{1,4} while running "user-command"$')
 _EVENT_REGEX_MAP = {
     'start': re.compile('^Worker ".*" assigned in ".*"$'),
-    'pulling-image': re.compile('^Started pulling ".*"$'),
+    'pulling-image': re.compile('^Started pulling "(.*)"$'),
     'localizing-files': re.compile('^Started running "localization"$'),
     'running-docker': re.compile('^Started running "user-command"$'),
     'delocalizing-files': re.compile('^Started running "delocalization"$'),
@@ -318,6 +316,10 @@ class GoogleV2EventMap(object):
     Returns:
       A list of maps containing the normalized, filtered events.
     """
+    # Need the user-image to look for the right "pulling image" event
+    user_image = google_v2_operations.get_action_image(self._op,
+                                                       _ACTION_USER_COMMAND)
+
     # Only create an "ok" event for operations with SUCCESS status.
     need_ok = google_v2_operations.is_success(self._op)
 
@@ -329,13 +331,16 @@ class GoogleV2EventMap(object):
       if self._filter(event):
         continue
 
-      mapped, unused_match = self._map(event)
-      del unused_match
-
+      mapped, match = self._map(event)
       name = mapped['name']
+
       if name == 'ok':
         # If we want the "ok" event, we grab the first (most recent).
         if not need_ok or 'ok' in events:
+          continue
+
+      if name == 'pulling-image':
+        if match.group(1) != user_image:
           continue
 
       events[name] = mapped
