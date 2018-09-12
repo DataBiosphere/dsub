@@ -134,7 +134,7 @@ def _get_storage_service(credentials):
   return discovery.build('storage', 'v1', credentials=credentials)
 
 
-def _retry_download_check(exception):
+def _retry_storage_check(exception):
   """Return True if we should retry, False otherwise."""
   print_error('Exception during download: %s' % str(exception))
   return isinstance(exception, oauth2client.client.HttpAccessTokenRefreshError)
@@ -143,9 +143,11 @@ def _retry_download_check(exception):
 # Exponential backoff retrying downloads of GCS object chunks.
 # Maximum 23 retries.
 # Wait 1, 2, 4 ... 64, 64, 64... seconds.
-@retrying.retry(stop_max_attempt_number=23,
-                retry_on_exception=_retry_download_check,
-                wait_exponential_multiplier=1000, wait_exponential_max=64000)
+@retrying.retry(
+    stop_max_attempt_number=23,
+    retry_on_exception=_retry_storage_check,
+    wait_exponential_multiplier=1000,
+    wait_exponential_max=64000)
 def _downloader_next_chunk(downloader):
   return downloader.next_chunk()
 
@@ -195,6 +197,14 @@ def load_file(file_path, credentials=None):
     return open(file_path, 'r')
 
 
+# Exponential backoff retrying downloads of GCS object chunks.
+# Maximum 23 retries.
+# Wait 1, 2, 4 ... 64, 64, 64... seconds.
+@retrying.retry(
+    stop_max_attempt_number=23,
+    retry_on_exception=_retry_storage_check,
+    wait_exponential_multiplier=1000,
+    wait_exponential_max=64000)
 def _file_exists_in_gcs(gcs_file_path, credentials=None):
   """Check whether the file exists, in GCS.
 
@@ -233,6 +243,14 @@ def file_exists(file_path, credentials=None):
     return os.path.isfile(file_path)
 
 
+# Exponential backoff retrying downloads of GCS object chunks.
+# Maximum 23 retries.
+# Wait 1, 2, 4 ... 64, 64, 64... seconds.
+@retrying.retry(
+    stop_max_attempt_number=23,
+    retry_on_exception=_retry_storage_check,
+    wait_exponential_multiplier=1000,
+    wait_exponential_max=64000)
 def _prefix_exists_in_gcs(gcs_prefix, credentials=None):
   """Check whether there is a GCS object whose name starts with the prefix.
 
@@ -266,6 +284,14 @@ def folder_exists(folder_path, credentials=None):
     return os.path.isdir(folder_path)
 
 
+# Exponential backoff retrying downloads of GCS object chunks.
+# Maximum 23 retries.
+# Wait 1, 2, 4 ... 64, 64, 64... seconds.
+@retrying.retry(
+    stop_max_attempt_number=23,
+    retry_on_exception=_retry_storage_check,
+    wait_exponential_multiplier=1000,
+    wait_exponential_max=64000)
 def simple_pattern_exists_in_gcs(file_pattern, credentials=None):
   """True iff an object exists matching the input GCS pattern.
 
