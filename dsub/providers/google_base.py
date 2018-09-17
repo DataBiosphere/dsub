@@ -61,7 +61,7 @@ DEFAULT_SCOPES = [
 # There are a set of HTTP and socket errors which we automatically retry.
 #  429: too frequent polling
 #  50x: backend error
-TRANSIENT_HTTP_ERROR_CODES = set([429, 500, 503, 504])
+TRANSIENT_HTTP_ERROR_CODES = set([403, 429, 500, 503, 504])
 
 # Socket error 104 (connection reset) should also be retried
 TRANSIENT_SOCKET_ERROR_CODES = set([104])
