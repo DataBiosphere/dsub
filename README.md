@@ -370,6 +370,9 @@ they can be specified in any order. For example:
 
 Pass the TSV file to dsub using the `--tasks` parameter. This parameter
 accepts both the file path and optionally a range of tasks to process.
+The file may be read from the local filesystem (on the machine you're calling
+`dsub` from), or from a bucket in Google Cloud Storage (file name starts with
+"gs://").
 
 For example, suppose `my-tasks.tsv` contains 101 lines: a one-line header and
 100 lines of parameters for tasks to run. Then:
