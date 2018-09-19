@@ -16,6 +16,7 @@
 from __future__ import print_function
 
 from contextlib import contextmanager
+from datetime import datetime
 import fnmatch
 import io
 import os
@@ -26,7 +27,6 @@ from apiclient import discovery
 from apiclient import errors
 from apiclient.http import MediaIoBaseDownload
 import oauth2client.client
-from oauth2client.client import GoogleCredentials
 import retrying
 import six
 
@@ -130,23 +130,26 @@ def compact_interval_string(value_list):
 def _get_storage_service(credentials):
   """Get a storage client using the provided credentials or defaults."""
   if credentials is None:
-    credentials = GoogleCredentials.get_application_default()
+    credentials = oauth2client.client.GoogleCredentials.get_application_default(
+    )
   return discovery.build('storage', 'v1', credentials=credentials)
 
 
 def _retry_storage_check(exception):
   """Return True if we should retry, False otherwise."""
-  print_error('Exception during download: %s' % str(exception))
-  return isinstance(exception, oauth2client.client.HttpAccessTokenRefreshError)
+  now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+  print_error(
+      '%s: Exception %s: %s' % (now, type(exception).__name__, str(exception)))
+  return isinstance(exception, oauth2client.client.AccessTokenRefreshError)
 
 
 # Exponential backoff retrying downloads of GCS object chunks.
 # Maximum 23 retries.
 # Wait 1, 2, 4 ... 64, 64, 64... seconds.
 @retrying.retry(
-    stop_max_attempt_number=23,
+    stop_max_attempt_number=24,
     retry_on_exception=_retry_storage_check,
-    wait_exponential_multiplier=1000,
+    wait_exponential_multiplier=500,
     wait_exponential_max=64000)
 def _downloader_next_chunk(downloader):
   return downloader.next_chunk()
@@ -247,9 +250,9 @@ def file_exists(file_path, credentials=None):
 # Maximum 23 retries.
 # Wait 1, 2, 4 ... 64, 64, 64... seconds.
 @retrying.retry(
-    stop_max_attempt_number=23,
+    stop_max_attempt_number=24,
     retry_on_exception=_retry_storage_check,
-    wait_exponential_multiplier=1000,
+    wait_exponential_multiplier=500,
     wait_exponential_max=64000)
 def _prefix_exists_in_gcs(gcs_prefix, credentials=None):
   """Check whether there is a GCS object whose name starts with the prefix.

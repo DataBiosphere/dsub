@@ -32,8 +32,7 @@ import apiclient.discovery
 import apiclient.errors
 from httplib2 import ServerNotFoundError
 from ..lib import job_model
-from oauth2client.client import GoogleCredentials
-from oauth2client.client import HttpAccessTokenRefreshError
+import oauth2client.client
 import pytz
 import retrying
 
@@ -61,7 +60,13 @@ DEFAULT_SCOPES = [
 # There are a set of HTTP and socket errors which we automatically retry.
 #  429: too frequent polling
 #  50x: backend error
-TRANSIENT_HTTP_ERROR_CODES = set([403, 429, 500, 503, 504])
+TRANSIENT_HTTP_ERROR_CODES = set([429, 500, 503, 504])
+
+# Auth errors should be permanent errors that a user needs to go fix
+# (enable a service, grant access on a resource).
+# However we have seen them occur transiently, so let's retry them when we
+# see them, but not as patiently.
+HTTP_AUTH_ERROR_CODES = set([401, 403])
 
 # Socket error 104 (connection reset) should also be retried
 TRANSIENT_SOCKET_ERROR_CODES = set([104])
@@ -453,28 +458,59 @@ def retry_api_check(exception):
   Returns:
     True if we should retry. False otherwise.
   """
-  _print_error('Exception %s: %s' % (type(exception).__name__, str(exception)))
+  now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+  _print_error(
+      '%s: Exception %s: %s' % (now, type(exception).__name__, str(exception)))
 
   if isinstance(exception, apiclient.errors.HttpError):
     if exception.resp.status in TRANSIENT_HTTP_ERROR_CODES:
+      _print_error('Retrying...')
       return True
 
   if isinstance(exception, socket.error):
     if exception.errno in TRANSIENT_SOCKET_ERROR_CODES:
+      _print_error('Retrying...')
       return True
 
-  if isinstance(exception, HttpAccessTokenRefreshError):
+  if isinstance(exception, oauth2client.client.AccessTokenRefreshError):
+    _print_error('Retrying...')
     return True
 
   # For a given installation, this could be a permanent error, but has only
   # been observed as transient.
   if isinstance(exception, SSLError):
+    _print_error('Retrying...')
     return True
 
   # This has been observed as a transient error:
   #   ServerNotFoundError: Unable to find the server at genomics.googleapis.com
   if isinstance(exception, ServerNotFoundError):
+    _print_error('Retrying...')
     return True
+
+  return False
+
+
+def retry_auth_check(exception):
+  """Specific check for auth error codes.
+
+  Return True if we should retry.
+
+  False otherwise.
+  Args:
+    exception: An exception to test for transience.
+
+  Returns:
+    True if we should retry. False otherwise.
+  """
+  now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+  _print_error(
+      '%s: Exception %s: %s' % (now, type(exception).__name__, str(exception)))
+
+  if isinstance(exception, apiclient.errors.HttpError):
+    if exception.resp.status in HTTP_AUTH_ERROR_CODES:
+      _print_error('Retrying...')
+      return True
 
   return False
 
@@ -482,10 +518,17 @@ def retry_api_check(exception):
 # Exponential backoff retrying API discovery.
 # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
 @retrying.retry(
-    stop_max_attempt_number=23,
+    stop_max_attempt_number=24,
     retry_on_exception=retry_api_check,
-    wait_exponential_multiplier=1000,
+    wait_exponential_multiplier=500,
     wait_exponential_max=64000)
+# For API errors dealing with auth, we want to retry, but not as often
+# Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
+@retrying.retry(
+    stop_max_attempt_number=5,
+    retry_on_exception=retry_auth_check,
+    wait_exponential_multiplier=500,
+    wait_exponential_max=8000)
 def setup_service(api_name, api_version, credentials=None):
   """Configures genomics API client.
 
@@ -498,7 +541,8 @@ def setup_service(api_name, api_version, credentials=None):
     A configured Google Genomics API client with appropriate credentials.
   """
   if not credentials:
-    credentials = GoogleCredentials.get_application_default()
+    credentials = oauth2client.client.GoogleCredentials.get_application_default(
+    )
   return apiclient.discovery.build(
       api_name, api_version, credentials=credentials)
 
@@ -510,11 +554,26 @@ class Api(object):
   # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
   @staticmethod
   @retrying.retry(
-      stop_max_attempt_number=23,
+      stop_max_attempt_number=24,
       retry_on_exception=retry_api_check,
-      wait_exponential_multiplier=1000,
+      wait_exponential_multiplier=500,
       wait_exponential_max=64000)
+  # For API errors dealing with auth, we want to retry, but not as often
+  # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
+  @retrying.retry(
+      stop_max_attempt_number=5,
+      retry_on_exception=retry_auth_check,
+      wait_exponential_multiplier=500,
+      wait_exponential_max=8000)
   def execute(api):
+    """Executes operation.
+
+    Args:
+      api: The base API object
+
+    Returns:
+       A response body object
+    """
     return api.execute()
 
 
