@@ -207,7 +207,15 @@ class JsonOutput(OutputFormatter):
     return field
 
   def print_table(self, table):
-    print(json.dumps(table, indent=2, default=self.serialize))
+    # Prior to Python 3.4, json.dumps() with an indent included
+    # trailing whitespace (see https://bugs.python.org/issue16333).
+    separators_to_eliminate_trailing_whitespace = (',', ': ')
+    print(
+        json.dumps(
+            table,
+            indent=2,
+            default=self.serialize,
+            separators=separators_to_eliminate_trailing_whitespace))
 
 
 def _prepare_summary_table(rows):

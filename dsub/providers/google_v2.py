@@ -743,7 +743,9 @@ class GoogleV2JobProvider(base.JobProvider):
 
     # If this is a dry-run, emit all the pipeline request objects
     if self._dry_run:
-      print(json.dumps(requests, indent=2, sort_keys=True))
+      print(
+          json.dumps(
+              requests, indent=2, sort_keys=True, separators=(',', ': ')))
 
     if not requests and not launched_tasks:
       return {'job-id': dsub_util.NO_JOB}
