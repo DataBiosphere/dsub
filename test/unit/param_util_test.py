@@ -26,6 +26,7 @@ from dsub.lib import job_model
 from dsub.lib import param_util
 import parameterized
 import pytz
+import six
 
 
 # Fixed values for age_to_create_time
@@ -103,7 +104,7 @@ class ParamUtilTest(unittest.TestCase):
   ])
   def test_compute_create_time_fail(self, unused_name, age):
     del unused_name
-    with self.assertRaisesRegexp(ValueError, 'Unable to parse age string'):
+    with six.assertRaisesRegex(self, ValueError, 'Unable to parse age string'):
       _ = param_util.age_to_create_time(age)
 
   @parameterized.parameterized.expand([
@@ -124,7 +125,7 @@ class ParamUtilTest(unittest.TestCase):
   ])
   def test_timeout_in_seconds_fail(self, unused_name, timeout):
     del unused_name
-    with self.assertRaisesRegexp(ValueError, 'Unable to parse timeout string'):
+    with six.assertRaisesRegex(self, ValueError, 'Unable to parse timeout'):
       _ = param_util.timeout_in_seconds(timeout)
 
 
@@ -308,7 +309,7 @@ class FileParamUtilTest(unittest.TestCase):
   def test_output_val_err(self, unused_name, recursive, uri, regex):
     del unused_name
     file_param_util = param_util.OutputFileParamUtil('output')
-    with self.assertRaisesRegexp(ValueError, regex):
+    with six.assertRaisesRegex(self, ValueError, regex):
       file_param_util.parse_uri(uri, recursive)
 
   @parameterized.parameterized.expand([
@@ -319,7 +320,7 @@ class FileParamUtilTest(unittest.TestCase):
   def test_file_provider_err(self, unused_name, uri, regex):
     del unused_name
     file_param_util = param_util.OutputFileParamUtil('output')
-    with self.assertRaisesRegexp(ValueError, regex):
+    with six.assertRaisesRegex(self, ValueError, regex):
       file_param_util.parse_file_provider(uri)
 
   @parameterized.parameterized.expand([
@@ -386,7 +387,7 @@ class TestSubmitValidator(unittest.TestCase):
     job_resources = job_model.Resources(
         logging=job_model.LoggingParam('gs://buck/logs', job_model.P_GCS))
     err_expected = 'Unsupported %s path (%s) for provider' % (name, path)
-    with self.assertRaisesRegexp(ValueError, re.escape(err_expected)):
+    with six.assertRaisesRegex(self, ValueError, re.escape(err_expected)):
       param_util.validate_submit_args_or_fail(
           job_model.JobDescriptor(None, job_params, job_resources,
                                   TASK_DESCRIPTORS),

@@ -17,16 +17,26 @@
 This test is a copy of the e2e_io_tasks.sh test with additional checks
 on the objects returned by dsub.call().
 """
+from __future__ import print_function
 
 import os
 import sys
 
-import test_setup_e2e as test
-import test_util
+# Because this may be invoked from another directory (treated as a library) or
+# invoked localy (treated as a binary) both import styles need to be supported.
+# pylint: disable=g-import-not-at-top
+try:
+  from . import test_setup_e2e as test
+  from . import test_util
+except SystemError:
+  import test_setup_e2e as test
+  import test_util
 
 POPULATION_FILE = 'gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/20131219.superpopulations.tsv'
 POPULATION_MD5 = '68a73f849b82071afe11888bac1aa8a7'
 
+# Disable the linter that flags several of the following files for a typo.
+# common_typos_disable
 INPUT_BAMS_PATH = 'gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment'
 
 INPUT_BAMS = (INPUT_BAMS_PATH +
@@ -49,7 +59,7 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
       f.write('TASK_{task}\t{input}\t{output_path}/{task}/*.md5\n'.format(
           task=i + 1, input=INPUT_BAMS[i], output_path=test.OUTPUTS))
 
-  print 'Launching pipeline...'
+  print('Launching pipeline...')
 
   # pyformat: disable
   launched_job = test.run_dsub([
@@ -63,28 +73,27 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
 
   # Sanity check launched_jobs - should have a single record with 3 tasks
   if not launched_job:
-    print >> sys.stderr, 'No launched jobs returned'
+    print('No launched jobs returned', file=sys.stderr)
     sys.exit(1)
 
   if not launched_job.get('job-id'):
-    print >> sys.stderr, 'Launched job contains no job id'
+    print('Launched job contains no job id', file=sys.stderr)
     sys.exit(1)
 
   if not launched_job.get('user-id'):
-    print >> sys.stderr, 'Launched job contains no user-id.'
+    print('Launched job contains no user-id.', file=sys.stderr)
     sys.exit(1)
 
   if len(launched_job.get('task-id', [])) != 3:
-    print >> sys.stderr, 'Launched job does not contain 3 tasks.'
-    print >> sys.stderr, launched_job.get('task-id')
+    print('Launched job does not contain 3 tasks.', file=sys.stderr)
+    print(launched_job.get('task-id'), file=sys.stderr)
     sys.exit(1)
 
-  print 'Launched job: %s' % launched_job['job-id']
+  print('Launched job: %s' % launched_job['job-id'])
   for task in launched_job['task-id']:
-    print '  task: %s' % task
+    print('  task: %s' % task)
 
-print
-print 'Checking output...'
+print('\nChecking output...')
 
 TASKS_COUNT = len(INPUT_BAMS)
 
@@ -100,14 +109,13 @@ for i in range(TASKS_COUNT):
   RESULT = test_util.gsutil_cat(OUTPUT_FILE)
 
   if not test_util.diff(RESULT_EXPECTED.strip(), RESULT.strip()):
-    print 'Output file does not match expected'
+    print('Output file does not match expected')
     sys.exit(1)
 
-  print
-  print 'Output file matches expected:'
-  print '*****************************'
-  print 'RESULT'
-  print '*****************************'
+  print('\nOutput file matches expected:')
+  print('*****************************')
+  print('RESULT')
+  print('*****************************')
 
 # Check that the population file got copied for each of the tasks
 RESULT_EXPECTED = POPULATION_MD5
@@ -116,13 +124,12 @@ for i in range(TASKS_COUNT):
   RESULT = test_util.gsutil_cat(OUTPUT_FILE)
 
   if not test_util.diff(RESULT_EXPECTED.strip(), RESULT.strip()):
-    print 'Output file does not match expected'
+    print('Output file does not match expected')
     sys.exit(1)
 
-  print
-  print 'Output file matches expected:'
-  print '*****************************'
-  print 'RESULT'
-  print '*****************************'
+  print('\nOutput file matches expected:')
+  print('*****************************')
+  print('RESULT')
+  print('*****************************')
 
-print 'SUCCESS'
+print('SUCCESS')

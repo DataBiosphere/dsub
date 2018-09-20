@@ -54,6 +54,7 @@ To extract "arg1_value2", use the path:
   data.more_data.{name="ARG1"}.array_data.[1].field
 
 """
+from __future__ import print_function
 
 import json
 import re
@@ -71,7 +72,8 @@ def unquote(value):
 def main():
 
   if len(sys.argv) != 4:
-    print >> sys.stderr, 'Usage: %s [json|yaml] DOC-STRING FIELD' % sys.argv[0]
+    print('Usage: %s [json|yaml] DOC-STRING FIELD' % sys.argv[0],
+          file=sys.stderr)
     sys.exit(1)
 
   doc_type = sys.argv[1]
@@ -100,9 +102,9 @@ def main():
         value = unquote(m.group(2))
 
         if not isinstance(curr, list):
-          print >> sys.stderr, 'Cannot value match on non-list object.'
-          print >> sys.stderr, 'Key: %s' % key
-          print >> sys.stderr, 'Value: %s' % curr
+          print('Cannot value match on non-list object.', file=sys.stderr)
+          print('Key: %s' % key, file=sys.stderr)
+          print('Value: %s' % curr, file=sys.stderr)
           sys.exit(1)
 
         found = None
@@ -119,9 +121,9 @@ def main():
     if key.startswith('[') and key.endswith(']'):
       idx = int(key[1:-1])
       if not isinstance(curr, list):
-        print >> sys.stderr, 'Cannot index into a on non-list object.'
-        print >> sys.stderr, 'Key: %s' % key
-        print >> sys.stderr, 'Value: %s' % curr
+        print('Cannot index into a on non-list object.', file=sys.stderr)
+        print('Key: %s' % key, file=sys.stderr)
+        print('Value: %s' % curr, file=sys.stderr)
         sys.exit(1)
 
       if idx >= len(curr):
@@ -136,7 +138,7 @@ def main():
     else:
       sys.exit(1)
 
-  print curr
+  print(curr)
 
 
 if __name__ == '__main__':

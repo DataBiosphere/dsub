@@ -222,12 +222,16 @@ def _parse_arguments(prog, argv):
       '--tasks',
       nargs='*',
       action=TaskParamAction,
-      help="""Path to TSV of task parameters. Each column can specify an
-          --env, --input, or --output variable, and each line specifies the
-          values of those variables for a separate task.
+      help="""Path to a file of tab separated values (TSV) for task parameters.
+          The file may be located in the local filesystem or in a Google Cloud
+          Storage bucket.
 
-          Optionally specify tasks in the file to submit. Can take the form
-          "m", "m-", or "m-n" where m and n are task numbers.""",
+          The first line is a list of column headers specifying an --env,
+          --input, --input-recursive, --output or --output-recursive variable,
+          and each subsequent line specifies the values for a task.
+
+          Optionally specify tasks from the file to submit. Can take the form
+          "m", "m-", or "m-n" where m and n are task numbers starting at 1.""",
       metavar='FILE M-N')
   parser.add_argument(
       '--image',
@@ -242,11 +246,15 @@ def _parse_arguments(prog, argv):
       help='Print the pipeline(s) that would be run and then exit.')
   parser.add_argument(
       '--command',
-      help='Command to run inside the job\'s Docker container',
+      help="""Command to run inside the job\'s Docker container. This argument
+          or the --script argument must be provided.""",
       metavar='COMMAND')
   parser.add_argument(
       '--script',
-      help='Local path to a script to run inside the job\'s Docker container.',
+      help="""Path to a script that is located in the local file system or
+          inside a Google Cloud Storage bucket. This script will be run inside
+          the job\'s Docker container.  This argument or the --command
+          argument must be provided.""",
       metavar='SCRIPT')
   parser.add_argument(
       '--env',

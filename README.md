@@ -20,7 +20,10 @@ and Azure Batch.
 You can install `dsub` from [PyPI](pypi.python.org), or you can clone and
 install from this github repository.
 
-Note: `dsub`, `dstat`, and `ddel` must be run under Python 2.
+Note: `dsub` was written for Python 2.7 and production users of `dsub`
+should continue using Python 2.7. As of `dsub` v0.2.0, we have enabled
+experimental support of Python 3.5+.
+
 
 ### Pre-installation steps
 
@@ -32,7 +35,7 @@ you are encouraged to use a [Python virtualenv](https://virtualenv.pypa.io).
 1.  Create and activate a Python virtualenv.
 
         # (You can do this in a directory of your choosing.)
-        virtualenv dsub_libs
+        virtualenv --python=python2.7 dsub_libs
         source dsub_libs/bin/activate
 
 ### Install `dsub`
@@ -367,6 +370,9 @@ they can be specified in any order. For example:
 
 Pass the TSV file to dsub using the `--tasks` parameter. This parameter
 accepts both the file path and optionally a range of tasks to process.
+The file may be read from the local filesystem (on the machine you're calling
+`dsub` from), or from a bucket in Google Cloud Storage (file name starts with
+"gs://").
 
 For example, suppose `my-tasks.tsv` contains 101 lines: a one-line header and
 100 lines of parameters for tasks to run. Then:

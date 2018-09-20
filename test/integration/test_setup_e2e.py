@@ -33,6 +33,7 @@
 # * Check if LOGGING, INPUTS, and OUTPUTS are empty.
 # * For task file tests, generate the file from TASKS_FILE_TMPL.
 # pylint: enable=line-too-long
+from __future__ import print_function
 
 import os
 import subprocess
@@ -40,8 +41,15 @@ import sys
 
 from dsub.commands import dsub as dsub_command
 
-import test_setup
-import test_util
+# Because this may be invoked from another directory (treated as a library) or
+# invoked localy (treated as a binary) both import styles need to be supported.
+# pylint: disable=g-import-not-at-top
+try:
+  from . import test_setup
+  from . import test_util
+except SystemError:
+  import test_setup
+  import test_util
 
 TEST_VARS = ("TEST_NAME", "TEST_DIR", "TEST_TMP", "TASKS_FILE",
              "TASKS_FILE_TMPL",)
@@ -66,34 +74,34 @@ TEST_TMP = test_setup.TEST_TMP
 TASKS_FILE = test_setup.TASKS_FILE
 TASKS_FILE_TMPL = test_setup.TASKS_FILE_TMPL
 
-print "Checking that required environment values are set:"
+print("Checking that required environment values are set:")
 
 if "YOUR_PROJECT" in os.environ:
   PROJECT_ID = os.environ["YOUR_PROJECT"]
 else:
-  print "Checking configured gcloud project"
+  print("Checking configured gcloud project")
   PROJECT_ID = subprocess.check_output(
       'gcloud config list core/project --format="value(core.project)"',
       shell=True).strip()
 
 if not PROJECT_ID:
-  print "Your project ID could not be determined."
-  print "Set the environment variable YOUR_PROJECT or run \"gcloud init\"."
+  print("Your project ID could not be determined.")
+  print("Set the environment variable YOUR_PROJECT or run \"gcloud init\".")
   sys.exit(1)
 
-print "  Project ID detected as: %s" % PROJECT_ID
+print("  Project ID detected as: %s" % PROJECT_ID)
 
 if "YOUR_BUCKET" in os.environ:
   DSUB_BUCKET = os.environ["YOUR_BUCKET"]
 else:
   DSUB_BUCKET = "%s-dsub-test" % os.environ["USER"]
 
-print "  Bucket detected as: %s" % DSUB_BUCKET
+print("  Bucket detected as: %s" % DSUB_BUCKET)
 
-print "  Checking if bucket exists"
+print("  Checking if bucket exists")
 if not test_util.gsutil_ls_check("gs://%s" % DSUB_BUCKET):
-  print >> sys.stderr, "Bucket does not exist: %s" % DSUB_BUCKET
-  print >> sys.stderr, "Create the bucket with \"gsutil mb\"."
+  print("Bucket does not exist: %s" % DSUB_BUCKET, file=sys.stderr)
+  print("Create the bucket with \"gsutil mb\".", file=sys.stderr)
   sys.exit(1)
 
 # Set standard LOGGING, INPUTS, and OUTPUTS values
@@ -116,22 +124,22 @@ OUTPUTS = "%s/output" % TEST_GCS_ROOT
 DOCKER_GCS_INPUTS = "%s/input" % TEST_GCS_DOCKER_ROOT
 DOCKER_GCS_OUTPUTS = "%s/output" % TEST_GCS_DOCKER_ROOT
 
-print "Logging path: %s" % LOGGING
-print "Input path: %s" % INPUTS
-print "Output path: %s" % OUTPUTS
+print("Logging path: %s" % LOGGING)
+print("Input path: %s" % INPUTS)
+print("Output path: %s" % OUTPUTS)
 
 if not os.environ.get("CHECK_RESULTS_ONLY"):
 
-  print "  Checking if remote test files already exists"
+  print("  Checking if remote test files already exists")
   if test_util.gsutil_ls_check("%s/**" % TEST_GCS_ROOT):
-    print >> sys.stderr, "Test files exist: %s" % TEST_GCS_ROOT
-    print >> sys.stderr, "Remove contents:"
-    print >> sys.stderr, "  gsutil -m rm %s/**" % TEST_GCS_ROOT
+    print("Test files exist: %s" % TEST_GCS_ROOT, file=sys.stderr)
+    print("Remove contents:", file=sys.stderr)
+    print("  gsutil -m rm %s/**" % TEST_GCS_ROOT, file=sys.stderr)
     sys.exit(1)
 
 if TASKS_FILE:
   # For a task file test, set up the task file from its template
-  print "Setting up task file %s" % TASKS_FILE
+  print("Setting up task file %s" % TASKS_FILE)
   if not os.path.exists(os.path.dirname(TASKS_FILE)):
     os.makedirs(os.path.dirname(TASKS_FILE))
   if os.path.exists(TASKS_FILE_TMPL):

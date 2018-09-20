@@ -115,8 +115,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   # The 'google' provider job is canceled immediately after start so no events
   # are registered.
   if [[ "${DSUB_PROVIDER}" != "google" ]]; then
-    EXPECTED_EVENTS=(start pulling-image localizing-files running-docker canceled)
-    util::dstat_out_assert_equal_events "${DSTAT_OUTPUT}" "[0].events" "${EXPECTED_EVENTS[@]}"
+    util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].events.[-1].name" "canceled"
   fi
 
   provider_verify_stopped_job "${JOB_ID}"

@@ -5,46 +5,71 @@
 # This will set up virtualenv and install the necessary python library,
 # as explained in the README.
 #
-# You can call this from anywhere.
-#
 # If you execute this instead of sourcing it, it will not work.
+#
+# This script accepts one optional argument; a python version number. The
+# version is expected to be one of 2, 3, 2.7, 3.5, 3.6, or 3.7. The version
+# defaults to "2".
 
-if [[ $(basename "${VIRTUAL_ENV:-}") == "dsub_libs" && -d "${VIRTUAL_ENV:-}" ]]; then
+readonly VERSION_ARG="${1}"
+
+declare PY_VERSION=""
+declare LIBS_FOLDER=""
+if [[ -z "${VERSION_ARG}" ]]; then
+  PY_VERSION="python2"
+elif grep -Pq "^[23]\.?[567]?$" <<< "${VERSION_ARG}" ; then
+  PY_VERSION="python${VERSION_ARG}"
+else
+  echo "ERROR: Python version must be a value from 2.7 to 3.7"
+  exit 1
+fi
+readonly PY_VERSION
+
+if [[ "${PY_VERSION}" -eq "python2" ]]; then
+  LIBS_FOLDER="dsub_libs"
+else
+  LIBS_FOLDER="dsub_libs$VERSION_ARG"
+fi
+readonly LIBS_FOLDER
+
+readonly PY_PATH="$(which "$PY_VERSION")"
+
+if [[ $(basename "${VIRTUAL_ENV:-}") == "${LIBS_FOLDER}" && -d "${VIRTUAL_ENV:-}" ]]; then
   echo "We are already running in a virtual environment:"
   echo "${VIRTUAL_ENV}"
-  echo "It ends in dsub_libs so it's probably the same I was about to set up."
+  echo "It ends in ${LIBS_FOLDER} so it's probably the same I was about to set up."
   echo "Skipping."
   return
 fi
 
-echo "Creating virtualenv in: ${PWD}/dsub_libs"
+echo "Creating virtualenv in: ${PWD}/${LIBS_FOLDER}"
 
 if [[ -n "${VIRTUAL_ENV:-}" ]]; then
   echo "WARNING: a virtual environment is already active: ${VIRTUAL_ENV}"
-  echo "WARNING: continuing to set up and activate dsub_libs"
+  echo "WARNING: continuing to set up and activate ${LIBS_FOLDER}"
 fi
 
-if [[ ! -f dsub_libs/bin/activate ]]; then
-  echo "setting up dsub_libs/"
-  if ! virtualenv dsub_libs; then
+if [[ ! -f "${LIBS_FOLDER}/bin/activate" ]]; then
+  echo "setting up ${LIBS_FOLDER}/"
+  if ! virtualenv "${LIBS_FOLDER}" --python="${PY_PATH}" ; then
     echo "virtualenv call failed"
     return
   fi
 fi
 
-if [[ ! -f dsub_libs/bin/activate ]]; then
-  echo "dsub_libs/bin/activate not found. Did the virtualenv call fail?"
+if [[ ! -f "${LIBS_FOLDER}/bin/activate" ]]; then
+  echo "${LIBS_FOLDER}/bin/activate not found. Did the virtualenv call fail?"
   return
 fi
 
-if source dsub_libs/bin/activate; then
+if source "${LIBS_FOLDER}/bin/activate"; then
   echo "virtualenv activate succeeded."
 else
   echo "virtualenv activate failed."
 fi
 
-if [[ $(basename "${VIRTUAL_ENV:-}") != "dsub_libs" ]]; then
-  echo "Error: We should be in the dsub_libs virtualenv but are not."
+if [[ $(basename "${VIRTUAL_ENV:-}") != "${LIBS_FOLDER}" ]]; then
+  echo "Error: We should be in the ${LIBS_FOLDER} virtualenv but are not."
   echo "We are in: ${VIRTUAL_ENV:-}"
   return
 fi

@@ -66,6 +66,10 @@ dsub ... \
   --script "my_custom_script.sh"
 ```
 
+The script may be read from the local filesystem (on the machine you're calling
+`dsub` from), or from a bucket in Google Cloud Storage (file name starts with
+"gs://").
+
 will make `my.vcf` available as a local file to the script
 `my_custom_script.sh` and the location of the VCF file will be available to
 the script via the `INPUT_VCF` environment variable.

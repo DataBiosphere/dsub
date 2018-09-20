@@ -6,12 +6,13 @@ File is based on this template: https://github.com/pypa/sampleproject
 import os
 import sys
 import unittest
+import warnings
 # Always prefer setuptools over distutils
 from setuptools import find_packages
 from setuptools import setup
 
 if sys.version_info[0] != 2:
-  sys.exit('ERROR: Python 2 is currently required for this package')
+  warnings.warn('Python 3.x support is experimental.')
 
 
 def unittest_suite():
@@ -101,6 +102,7 @@ setup(
         'pytz',
         'pyyaml==3.12',
         'retrying',
+        'six',
         'tabulate',
 
         # dependencies for test code

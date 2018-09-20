@@ -23,6 +23,7 @@
 # * Set the TEST_DIR to the directory the test file is in.
 # * For task file tests, set TASKS_FILE and TASKS_FILE_TMPL.
 # * Set the TEST_TMP variable for a temporary directory.
+from __future__ import print_function
 
 import datetime
 import os
@@ -47,15 +48,16 @@ if not DSUB_PROVIDER:
     DSUB_PROVIDER = 'local'
 elif SCRIPT_DEFAULT_PROVIDER:
   if DSUB_PROVIDER != SCRIPT_DEFAULT_PROVIDER:
-    print >> sys.stderr, "DSUB_PROVIDER is '%s' not '%s'" % (
-        DSUB_PROVIDER, SCRIPT_DEFAULT_PROVIDER)
+    print('DSUB_PROVIDER inconsistent with default provider', file=sys.stderr)
+    print('"%s" is not "%s"' % (DSUB_PROVIDER, SCRIPT_DEFAULT_PROVIDER),
+          file=sys.stderr)
     sys.exit(1)
 
 # Compute the name of the test from the calling script
 # (trim the e2e_ or unit_ prefix, along with the .py extension)
 TEST_NAME = os.path.splitext(SCRIPT_NAME.split('_', 1)[1])[0]
 
-print 'Setting up test: %s' % TEST_NAME
+print('Setting up test: %s' % TEST_NAME)
 
 TEST_DIR = os.path.dirname(sys.argv[0])
 

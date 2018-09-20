@@ -16,6 +16,8 @@
 
 Follows the model of qdel.
 """
+from __future__ import print_function
+
 import sys
 
 from ..lib import dsub_util
@@ -90,18 +92,18 @@ def _parse_arguments():
 
 def _emit_search_criteria(user_ids, job_ids, task_ids, labels):
   """Print the filters used to delete tasks. Use raw flags as arguments."""
-  print 'Delete running jobs:'
-  print '  user:'
-  print '    %s\n' % user_ids
-  print '  job-id:'
-  print '    %s\n' % job_ids
+  print('Delete running jobs:')
+  print('  user:')
+  print('    %s\n' % user_ids)
+  print('  job-id:')
+  print('    %s\n' % job_ids)
   if task_ids:
-    print '  task-id:'
-    print '    %s\n' % task_ids
+    print('  task-id:')
+    print('    %s\n' % task_ids)
   # Labels are in a LabelParam namedtuple and must be reformated for printing.
   if labels:
-    print '  labels:'
-    print '    %s\n' % repr(labels)
+    print('  labels:')
+    print('    %s\n' % repr(labels))
 
 
 def main():
@@ -147,8 +149,8 @@ def main():
       task_count = len(deleted_tasks)
       tasks_msg = ' (%d task%s)' % (task_count, '' if task_count == 1 else 's')
 
-  print '%d job%s deleted%s' % (job_count, ''
-                                if job_count == 1 else 's', tasks_msg)
+  print('%d job%s deleted%s' % (job_count, ''
+                                if job_count == 1 else 's', tasks_msg))
 
 
 def ddel_tasks(provider,
@@ -183,7 +185,7 @@ def ddel_tasks(provider,
 
   # Emit any errors canceling jobs
   for msg in error_messages:
-    print msg
+    print(msg)
 
   return deleted_tasks
 

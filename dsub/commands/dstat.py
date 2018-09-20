@@ -41,6 +41,7 @@ from ..lib import param_util
 from ..lib import resources
 from ..providers import provider_base
 
+import six
 import tabulate
 import yaml
 
@@ -113,8 +114,8 @@ class TextOutput(OutputFormatter):
 
   def format_pairs(self, values):
     """Returns a string of comma-delimited key=value pairs."""
-    return ', '.join('%s=%s' % (key, value)
-                     for key, value in sorted(values.iteritems()))
+    return ', '.join(
+        '%s=%s' % (key, value) for key, value in sorted(values.items()))
 
   def text_format_date(self, dt):
     if self._full:
@@ -175,7 +176,7 @@ class YamlOutput(OutputFormatter):
   def __init__(self, full):
     super(YamlOutput, self).__init__(full)
 
-    yaml.add_representer(unicode, self.string_presenter)
+    yaml.add_representer(six.text_type, self.string_presenter)
     yaml.add_representer(str, self.string_presenter)
     yaml.add_representer(collections.OrderedDict, self.dict_representer)
 
@@ -187,7 +188,7 @@ class YamlOutput(OutputFormatter):
       return dumper.represent_scalar('tag:yaml.org,2002:str', data)
 
   def dict_representer(self, dumper, data):
-    return dumper.represent_dict(data.iteritems())
+    return dumper.represent_dict(data.items())
 
   def print_table(self, table):
     print(yaml.dump(table, default_flow_style=False))
@@ -224,7 +225,7 @@ def _prepare_summary_table(rows):
 
   # We either group on the job-name (if present) or fall back to the job-id
   key_field = 'job-name'
-  if key_field not in rows[0].keys():
+  if key_field not in rows[0]:
     key_field = 'job-id'
 
   # Group each of the rows based on (job-name or job-id, status)
@@ -391,6 +392,7 @@ def _parse_arguments():
       '--wait', action='store_true', help='Wait until jobs have all completed.')
   parser.add_argument(
       '--limit',
+      default=0,
       type=int,
       help='The maximum number of tasks to list. The default is unlimited.')
   parser.add_argument(

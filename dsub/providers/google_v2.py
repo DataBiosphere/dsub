@@ -53,8 +53,8 @@ _SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 
 # Action steps that interact with GCS need gsutil.
-# Use the 'alpine' variant of the cloud-sdk Docker image as it is much smaller.
-_CLOUD_SDK_IMAGE = 'google/cloud-sdk:alpine'
+# Use the 'slim' variant of the cloud-sdk Docker image as it is much smaller.
+_CLOUD_SDK_IMAGE = 'google/cloud-sdk:slim'
 
 # The prepare step needs Python.
 # Use the 'slim' variant of the python Docker image as it is much smaller.
@@ -270,9 +270,7 @@ _ACTION_USER_COMMAND = 'user-command'
 _ACTION_DELOCALIZATION = 'delocalization'
 _ACTION_FINAL_LOGGING = 'final_logging'
 _FILTER_ACTIONS = [_ACTION_LOGGING, _ACTION_PREPARE, _ACTION_FINAL_LOGGING]
-_DEFAULT_IMAGES = [_CLOUD_SDK_IMAGE.replace('/', '\\/'), _PYTHON_IMAGE]
 _FILTERED_EVENT_REGEXES = [
-    re.compile('^Started pulling "({})"$'.format('|'.join(_DEFAULT_IMAGES))),
     re.compile('^Started running "({})"$'.format('|'.join(_FILTER_ACTIONS))),
     re.compile('Stopped pulling'),
     re.compile('Stopped running'),
@@ -285,7 +283,7 @@ _FAIL_REGEX = re.compile(
     '^Unexpected exit status [\\d]{1,4} while running "user-command"$')
 _EVENT_REGEX_MAP = {
     'start': re.compile('^Worker ".*" assigned in ".*"$'),
-    'pulling-image': re.compile('^Started pulling ".*"$'),
+    'pulling-image': re.compile('^Started pulling "(.*)"$'),
     'localizing-files': re.compile('^Started running "localization"$'),
     'running-docker': re.compile('^Started running "user-command"$'),
     'delocalizing-files': re.compile('^Started running "delocalization"$'),
@@ -302,7 +300,9 @@ class GoogleV2EventMap(object):
     self._op = op
 
   def get_filtered_normalized_events(self):
-    """Filter through the large number of granular events returned by the
+    """Filter the granular v2 events down to events of interest.
+
+    Filter through the large number of granular events returned by the
     pipelines API, and extract only those that are interesting to a user. This
     is implemented by filtering out events which are known to be uninteresting
     (i.e. the default actions run for every job) and by explicitly matching
@@ -316,29 +316,39 @@ class GoogleV2EventMap(object):
     Returns:
       A list of maps containing the normalized, filtered events.
     """
-    # Track whether or not an error occurred so that we can remove the
-    # final 'ok' event. The 'Worker Released' event in pipelines V2 occurs
-    # even if an error is thrown in the user command.
-    has_error = False
+    # Need the user-image to look for the right "pulling image" event
+    user_image = google_v2_operations.get_action_image(self._op,
+                                                       _ACTION_USER_COMMAND)
+
+    # Only create an "ok" event for operations with SUCCESS status.
+    need_ok = google_v2_operations.is_success(self._op)
 
     # Events are keyed by name for easier deletion.
     events = {}
 
+    # Events are assumed to be ordered by timestamp (newest to oldest).
     for event in google_v2_operations.get_events(self._op):
       if self._filter(event):
         continue
 
       mapped, match = self._map(event)
-      events[mapped['name']] = mapped
-      if match and match.re in [_FAIL_REGEX, _ABORT_REGEX]:
-        has_error = True
+      name = mapped['name']
 
-    if has_error:
-      del events['ok']
+      if name == 'ok':
+        # If we want the "ok" event, we grab the first (most recent).
+        if not need_ok or 'ok' in events:
+          continue
+
+      if name == 'pulling-image':
+        if match.group(1) != user_image:
+          continue
+
+      events[name] = mapped
 
     return sorted(events.values(), key=operator.itemgetter('start-time'))
 
   def _map(self, event):
+    """Extract elements from an operation event and map to a named event."""
     description = event.get('description', '')
     start_time = google_base.parse_rfc3339_utc_string(
         event.get('timestamp', ''))
@@ -852,11 +862,15 @@ class GoogleV2JobProvider(base.JobProvider):
 
     page_token = None
     more_operations = True
-    documented_default_page_size = 256
+
+    # We are not using the documented default page size of 256,
+    # as it causes the operations.list() API to return an error
+    # HttpError 429 ... Resource has been exhausted (e.g. check quota).
+    current_best_page_size = 128
     documented_max_page_size = 2048
 
     if not page_size:
-      page_size = documented_default_page_size
+      page_size = current_best_page_size
     page_size = min(page_size, documented_max_page_size)
 
     while more_operations:

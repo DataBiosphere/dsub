@@ -16,6 +16,7 @@
 This module implements job creation, listing, and canceling using the
 Google Genomics Pipelines and Operations APIs.
 """
+from __future__ import print_function
 
 from datetime import datetime
 import itertools
@@ -672,7 +673,7 @@ class GoogleJobProvider(base.JobProvider):
   def _submit_pipeline(self, request):
     operation = _Pipelines.run_pipeline(self._service, request)
     if self._verbose:
-      print 'Launched operation %s' % operation['name']
+      print('Launched operation %s' % operation['name'])
 
     return GoogleOperation(operation).get_field('task-id')
 
@@ -711,7 +712,7 @@ class GoogleJobProvider(base.JobProvider):
       if skip_if_output_present:
         # check whether the output's already there
         if dsub_util.outputs_are_present(outputs):
-          print 'Skipping task because its outputs are present'
+          print('Skipping task because its outputs are present')
           continue
 
       request = self._build_pipeline_request(task_view)
@@ -724,7 +725,7 @@ class GoogleJobProvider(base.JobProvider):
 
     # If this is a dry-run, emit all the pipeline request objects
     if self._dry_run:
-      print json.dumps(requests, indent=2, sort_keys=True)
+      print(json.dumps(requests, indent=2, sort_keys=True))
 
     if not requests and not launched_tasks:
       return {'job-id': dsub_util.NO_JOB}
@@ -875,7 +876,7 @@ class GoogleJobProvider(base.JobProvider):
             create_time_min=create_time_min,
             create_time_max=create_time_max))
 
-    print 'Found %d tasks to delete.' % len(tasks)
+    print('Found %d tasks to delete.' % len(tasks))
 
     return google_base.cancel(self._service.new_batch_http_request,
                               self._service.operations().cancel, tasks)

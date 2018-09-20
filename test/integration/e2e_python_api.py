@@ -27,9 +27,17 @@ from dsub.lib import resources
 from dsub.providers import google
 from dsub.providers import google_v2
 from dsub.providers import local
+import six
 
-import test_setup
-import test_setup_e2e as test
+# Because this may be invoked from another directory (treated as a library) or
+# invoked localy (treated as a binary) both import styles need to be supported.
+# pylint: disable=g-import-not-at-top
+try:
+  from . import test_setup
+  from . import test_setup_e2e as test
+except SystemError:
+  import test_setup
+  import test_setup_e2e as test
 
 
 def get_dsub_provider():
@@ -127,15 +135,16 @@ def dstat_get_jobs(statuses=None,
   labels['test-name'] = test_setup.TEST_NAME
   labels_set = {job_model.LabelParam(k, v) for (k, v) in labels.items()}
 
-  return dstat.dstat_job_producer(
-      provider=get_dsub_provider(),
-      statuses=statuses,
-      job_ids=job_ids,
-      task_ids=task_ids,
-      labels=labels_set,
-      create_time_min=create_time_min,
-      create_time_max=create_time_max,
-      full_output=True).next()
+  return six.advance_iterator(
+      dstat.dstat_job_producer(
+          provider=get_dsub_provider(),
+          statuses=statuses,
+          job_ids=job_ids,
+          task_ids=task_ids,
+          labels=labels_set,
+          create_time_min=create_time_min,
+          create_time_max=create_time_max,
+          full_output=True))
 
 
 def dstat_get_job_names(statuses=None,
