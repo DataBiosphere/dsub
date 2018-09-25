@@ -77,13 +77,13 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
 
     local i
     for ((i = 0; i < 3; i++)); do
-      echo "gsutil -m cp \"${src}\" \"${dst}\""
-      if gsutil -m cp "${src}" "${dst}"; then
+      echo "gsutil -mq cp \"${src}\" \"${dst}\""
+      if gsutil -mq cp "${src}" "${dst}"; then
         return
       fi
     done
 
-    2>&1 echo "ERROR: gsutil -m cp \"${src}\" \"${dst}\""
+    2>&1 echo "ERROR: gsutil -mq cp \"${src}\" \"${dst}\""
     exit 1
   }
 """)
@@ -102,13 +102,13 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
 
     local i
     for ((i = 0; i < 3; i++)); do
-      echo "gsutil -m rsync -r \"${src}\" \"${dst}\""
-      if gsutil -m rsync -r "${src}" "${dst}"; then
+      echo "gsutil -mq rsync -r \"${src}\" \"${dst}\""
+      if gsutil -mq rsync -r "${src}" "${dst}"; then
         return
       fi
     done
 
-    2>&1 echo "ERROR: gsutil -m rsync -r \"${src}\" \"${dst}\""
+    2>&1 echo "ERROR: gsutil -mq rsync -r \"${src}\" \"${dst}\""
     exit 1
   }
 """)
