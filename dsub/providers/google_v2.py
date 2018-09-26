@@ -70,20 +70,26 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
     local src="${1}"
     local dst="${2}"
     local check_src="${3:-}"
+    local content_type="${4:-}"
 
     if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
       return
     fi
 
+    local headers=""
+    if [[ -n "${content_type}" ]]; then
+      headers="-h Content-Type:${content_type}"
+    fi
+
     local i
     for ((i = 0; i < 3; i++)); do
-      echo "gsutil -mq cp \"${src}\" \"${dst}\""
-      if gsutil -mq cp "${src}" "${dst}"; then
+      echo "gsutil ${headers} -mq cp \"${src}\" \"${dst}\""
+      if gsutil ${headers} -mq cp "${src}" "${dst}"; then
         return
       fi
     done
 
-    2>&1 echo "ERROR: gsutil -mq cp \"${src}\" \"${dst}\""
+    2>&1 echo "ERROR: gsutil ${headers} -mq cp \"${src}\" \"${dst}\""
     exit 1
   }
 """)
@@ -130,9 +136,9 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
 # the operation to indicate why it failed.
 
 _LOG_CP_CMD = textwrap.dedent("""\
-  gsutil_cp /google/logs/action/{user_action}/stdout "${{STDOUT_PATH}}" "true" &
-  gsutil_cp /google/logs/action/{user_action}/stderr "${{STDERR_PATH}}" "true" &
-  gsutil_cp /google/logs/output "${{LOGGING_PATH}}" &
+  gsutil_cp /google/logs/action/{user_action}/stdout "${{STDOUT_PATH}}" "true" "text/plain" &
+  gsutil_cp /google/logs/action/{user_action}/stderr "${{STDERR_PATH}}" "true" "text/plain" &
+  gsutil_cp /google/logs/output "${{LOGGING_PATH}}" "false" "text/plain" &
 
   wait
 """)
