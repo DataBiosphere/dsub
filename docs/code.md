@@ -36,13 +36,11 @@ a simple file rewrite operation using
 
 **Be sure to enclose your `command string` in single quotes and not double
 quotes. If you use double quotes, the command will be expanded in your local
-shell before being passed to dsub. If your command flag was in double quotes
+shell before being passed to `dsub`. If your command flag was in double quotes
 as:**
 
     dsub \
-        --project my-cloud-project \
-        --zones "us-central1-*" \
-        --logging gs://my-bucket/logs \
+        ... \
         --env MESSAGE=hello \
         --command "echo ${MESSAGE}"
 

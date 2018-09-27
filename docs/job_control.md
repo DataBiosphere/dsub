@@ -61,35 +61,35 @@ dsub ... --after "${JOB_A}" "${JOB_B}"
 Here is the output of a sample run:
 
 ```
-$ JOBID_A=$(dsub --project "${MYPROJECT}" --zones "us-central1-*" \
+$ JOBID_A=$(dsub --provider google-v2 --project "${MYPROJECT}" --regions us-central1 \
 --logging "gs://${MYBUCKET}/logging/"   \
 --command 'echo "hello from job A"')
-Job: echo--<userid>--170328-093205-80
-Launched job-id: echo--<userid>--170328-093205-80
+Job: echo--<user>--180924-112256-64
+Launched job-id: echo--<user>--180924-112256-64
 To check the status, run:
-  dstat --project test-project --jobs echo--<userid>--170328-093205-80
+  dstat --provider google-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112256-64' --status '*'
 To cancel the job, run:
-  ddel --project test-project --jobs echo--<userid>--170328-093205-80
+  ddel --provider google-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112256-64'
 
 $ echo "${JOBID_A}"
-echo--<userid>--170328-093205-80
+echo--<user>--180924-112256-64
 
 $ JOBID_B=... (similar)
 
-$ JOBID_C=$(dsub --project "${MYPROJECT}" --zones "us-central1-*" \
+$ JOBID_C=$(dsub --provider google-v2 --project "${MYPROJECT}" --regions us-central1 \
 --logging "gs://${MYBUCKET}/logging/"   \
 --command 'echo "job C"' --after "${JOBID_A}" "${JOBID_B}")
-Job: echo--<userid>--170328-093415-23
 Waiting for predecessor jobs to complete...
-Waiting for: echo--<userid>--170328-093358-55, echo--<userid>--170328-093205-80.
-  echo--<userid>--170328-093205-80: ('Success', '2017-03-28 09:32:58')
-Waiting for: echo--<userid>--170328-093358-55.
-  echo--<userid>--170328-093358-55: ('Success', '2017-03-28 09:35:00')
-Launched job-id: echo--<userid>--170328-093415-23
+Waiting for: echo--<user>--180924-112256-64, echo--<user>--180924-112259-48.
+  echo--<user>--180924-112256-64: SUCCESS
+Waiting for: echo--<user>--180924-112259-48.
+  echo--<user>--180924-112259-48: SUCCESS
+Launched job-id: echo--<user>--180924-112302-87
 To check the status, run:
-  dstat --project test-project --jobs echo--<userid>--170328-093415-23
+  dstat --provider google-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112302-87' --status '*'
 To cancel the job, run:
-  ddel --project test-project --jobs echo--<userid>--170328-093415-23
+  ddel --provider google-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112302-87'
+echo--<user>--180924-112302-87
 ```
 
 ## --after is blocking

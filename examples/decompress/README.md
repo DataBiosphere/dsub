@@ -33,6 +33,7 @@ To run a command to decompress the VCF file, type:
 
 ```
 dsub \
+  --provider google-v2 \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging "gs://MY-BUCKET/decompress_one/logging" \
@@ -121,6 +122,7 @@ output file name.
 
 ```
 dsub \
+  --provider google-v2 \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging "gs://MY-BUCKET/decompress_list/logging" \

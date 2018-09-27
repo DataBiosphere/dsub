@@ -57,6 +57,7 @@ echo
 
 # Launch the task
 dsub \
+  --provider google-v2 \
   --project "${MY_PROJECT}" \
   --zones "us-central1-*" \
   --logging "${LOGGING}" \

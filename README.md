@@ -24,7 +24,6 @@ Note: `dsub` was written for Python 2.7 and production users of `dsub`
 should continue using Python 2.7. As of `dsub` v0.2.0, we have enabled
 experimental support of Python 3.5+.
 
-
 ### Pre-installation steps
 
 1. This is optional, but whether installing from PyPI or from github,
@@ -123,8 +122,8 @@ charges using it.
 
     The dsub logs and output files will be written to a bucket. Create a
     bucket using the [storage browser](https://cloud.google.com/storage/browser?project=)
-    or run the command-line utility [gsutil](https://cloud.google.com/storage/docs/gsutil), included in
-    the Cloud SDK.
+    or run the command-line utility [gsutil](https://cloud.google.com/storage/docs/gsutil),
+    included in the Cloud SDK.
 
         gsutil mb gs://my-bucket
 
@@ -132,16 +131,17 @@ charges using it.
     [bucket-naming conventions](https://cloud.google.com/storage/docs/bucket-naming).
 
     (By default, the bucket will be in the US, but you can change or
-    refine the [location](https://cloud.google.com/storage/docs/bucket-locations) setting with the
-    `-l` option.)
+    refine the [location](https://cloud.google.com/storage/docs/bucket-locations)
+    setting with the `-l` option.)
 
 1.  Run a dsub job and wait for completion.
 
     Here is a very simple "Hello World" test:
 
         dsub \
+          --provider google-v2 \
           --project my-cloud-project \
-          --zones "us-central1-*" \
+          --regions us-central1 \
           --logging gs://my-bucket/logging/ \
           --output OUT=gs://my-bucket/output/out.txt \
           --command 'echo "Hello World" > "${OUT}"' \
@@ -157,26 +157,50 @@ charges using it.
 
         gsutil cat gs://my-bucket/output/out.txt
 
+## Backend providers
 
-### Getting started with the `google-v2` provider
+Where possible, `dsub` tries to support users being able to develop and test
+locally (for faster iteration) and then progressing to running at scale.
 
-Google Cloud has made available a new version of the Google Genomics
-Pipelines API. This version, `v2alpha1`, will soon replace the `v1alpha2`
-verision that dsub's `google` provider uses.
+To this end, `dsub` provides multiple "backend providers", each of which
+implements a consistent runtime environment. The current providers are:
 
-To use the `google-v2` provider:
+- local
+- google (the default, but deprecated)
+- google-v2
+
+More details on the runtime environment implemented by the backend providers
+can be found in [dsub backend providers](./docs/providers/README.md).
+
+### Deprecation of the `google` provider
+
+The original `dsub` provider was the `google` provider, built on top of the
+Google Genomics Pipelines API `v1alpha2`. The Pipelines API `v1alpha2` has
+been deprecated and will be turned down at the end of 2018.
+For more details, see
+[Cloud Genomics v1alpha2 Migration Guide](https://cloud.google.com/genomics/docs/how-tos/migration)
+
+Replacing `v1alpha2` is [v2alpha1](https://cloud.google.com/genomics/reference/rest/v2alpha1/pipelines/run).
+`dsub` has added the `google-v2` provider which use `v2alpha1` as the backend
+for running `dsub` jobs on Google Cloud.
+
+**dsub users are encourage today to use the google-v2 provider. At the end of
+2018, the Pipelines API `v1alpha2` will be turned down and the `google` provider
+for `dsub` will be removed.**
+
+### Migrating existing code from `google` to `google-v2`
+
+To migrate existing `dsub` calls from the `google` provider to the `google-v2`
+provider:
 
 - Add `--provider google-v2` to your command-line
-- Use `--machine-type` (default is `n1-standard-1`).
+- Use `--machine-type` (default is `n1-standard-1`) instead of `--min-cpu`
+  and `--min-ram`.
 
 The `--machine-type` value can be one of the
 [Predefined Machine Types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types)
 or a
 [Custom Machine Type](https://cloud.google.com/compute/docs/machine-types#custom_machine_types).
-
-The `google` provider supports `--min-cpu` and `--min-ram`. A plan to support
-these flags for `google-v2` is being evaluated.
-See [google-v2 support](https://github.com/DataBiosphere/dsub/issues/114).
 
 ## `dsub` features
 
@@ -190,9 +214,7 @@ hello example above.
 You can also save your script to a file, like `hello.sh`. Then you can run:
 
     dsub \
-        --project my-cloud-project \
-        --zones "us-central1-*" \
-        --logging gs://my-bucket/logging \
+        ... \
         --script hello.sh
 
 If your script has dependencies that are not stored in your Docker image,
@@ -205,9 +227,7 @@ By default, dsub uses a stock Ubuntu image. You can change the image
 by passing the `--image` flag.
 
     dsub \
-        --project my-cloud-project \
-        --zones "us-central1-*" \
-        --logging gs://my-bucket/logging \
+        ... \
         --image ubuntu:16.04 \
         --script hello.sh
 
@@ -216,9 +236,7 @@ by passing the `--image` flag.
 You can pass environment variables to your script using the `--env` flag.
 
     dsub \
-        --project my-cloud-project \
-        --zones "us-central1-*" \
-        --logging gs://my-bucket/logging \
+        ... \
         --env MESSAGE=hello \
         --command 'echo ${MESSAGE}'
 
@@ -278,9 +296,7 @@ can find in the [Google Cloud Console](https://console.cloud.google.com).
 To specify input and output files, use the `--input` and `--output` flags:
 
     dsub \
-        --project my-cloud-project \
-        --zones "us-central1-*" \
-        --logging gs://my-bucket/logging \
+        ... \
         --input INPUT_FILE=gs://my-bucket/my-input-file \
         --output OUTPUT_FILE=gs://my-bucket/my-output-file \
         --command 'cat ${INPUT_FILE} > ${OUTPUT_FILE}'
@@ -300,15 +316,14 @@ To copy folders rather than files, use the `--input-recursive` or
 `output-recursive` flags:
 
     dsub \
-        --project my-cloud-project \
-        --zones "us-central1-*" \
-        --logging gs://my-bucket/logging \
+        ... \
         --input-recursive FOLDER=gs://my-bucket/my-folder \
         --command 'find ${FOLDER} -name "foo*"'
 
 ##### Notice
 
-As a getting started convenience, if `--input-recursive` or `--output-recursive`
+For the `google` provider, as a getting started convenience, if
+`--input-recursive` or `--output-recursive`
 are used, `dsub` will automatically check for and, if needed, install the
 [Google Cloud SDK](https://cloud.google.com/sdk/docs/) in the Docker container
 at runtime (before your script executes).
@@ -321,6 +336,9 @@ If you use a Debian or Ubuntu Docker image, you are encouraged to use the
 
 If you use a Red Hat or CentOS Docker image, you are encouraged to use the
 [package installation instructions](https://cloud.google.com/sdk/downloads#yum).
+
+**The installation of the CloudSDK into your Docker image is not needed for the
+`local` or the `google-v2` providers.**
 
 ### Setting resource requirements
 
@@ -377,15 +395,11 @@ The file may be read from the local filesystem (on the machine you're calling
 For example, suppose `my-tasks.tsv` contains 101 lines: a one-line header and
 100 lines of parameters for tasks to run. Then:
 
-```
-dsub ... --tasks ./my-tasks.tsv
-```
+    dsub ... --tasks ./my-tasks.tsv
 
 will create a job with 100 tasks, while:
 
-```
-dsub ... --tasks ./my-tasks.tsv 1-10
-```
+    dsub ... --tasks ./my-tasks.tsv 1-10
 
 will create a job with 10 tasks, one for each of lines 2 through 11.
 
@@ -423,14 +437,14 @@ For more details, see [Checking Status and Troubleshooting Jobs](docs/troublesho
 
 The `dstat` command displays the status of jobs:
 
-    dstat --project my-cloud-project
+    dstat --provider google-v2 --project my-cloud-project
 
 With no additional arguments, dstat will display a list of *running* jobs for
 the current `USER`.
 
 To display the status of a specific job, use the `--jobs` flag:
 
-    dstat --project my-cloud-project --jobs job-id
+    dstat --provider google-v2 --project my-cloud-project --jobs job-id
 
 For a batch job, the output will list all *running* tasks.
 
@@ -449,13 +463,15 @@ each job includes:
 
 Metadata can be used to cancel a job or individual tasks within a batch job.
 
+For more details, see [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
+
 #### Summarizing job status
 
 By default, dstat outputs one line per task. If you're using a batch job with
 many tasks then you may benefit from `--summary`.
 
 ```
-$ dstat --project my-project --summary
+$ dstat --provider google-v2 --project my-project --summary
 
 Job Name        Status         Task Count
 -------------   -------------  -------------
@@ -472,24 +488,25 @@ how many are failed/canceled.
 The `ddel` command will delete running jobs.
 
 By default, only jobs submitted by the current user will be deleted.
-Use the `--users` flag to specify other users, or `"*"` for all users.
+Use the `--users` flag to specify other users, or `'*'` for all users.
 
 To delete a running job:
 
-    ddel --project my-cloud-project --jobs job-id
+    ddel --provider google-v2 --project my-cloud-project --jobs job-id
 
 If the job is a batch job, all running tasks will be deleted.
 
 To delete specific tasks:
 
     ddel \
+        --provider google-v2 \
         --project my-cloud-project \
         --jobs job-id \
         --tasks task-id1 task-id2
 
 To delete all running jobs for the current user:
 
-    ddel --project my-cloud-project --jobs "*"
+    ddel --provider google-v2 --project my-cloud-project --jobs '*'
 
 ## What next?
 
