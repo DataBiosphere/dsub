@@ -789,37 +789,46 @@ def age_to_create_time(age, from_time=None):
     raise ValueError('Unable to parse age string %s: %s' % (age, e))
 
 
-def timeout_in_seconds(timeout):
+def _interval_to_seconds(interval, valid_units='smhdw'):
   """Convert the timeout duration to seconds.
 
   The value must be of the form "<integer><unit>" where supported
   units are s, m, h, d, w (seconds, minutes, hours, days, weeks).
 
   Args:
-    timeout: A "<integer><unit>" string.
+    interval: A "<integer><unit>" string.
+    valid_units: A list of supported units.
 
   Returns:
-    A string of the form "<integer><unit>" or None if timeout is empty.
+    A string of the form "<integer>s" or None if timeout is empty.
   """
-  if not timeout:
+  if not interval:
     return None
 
   try:
-    last_char = timeout[-1]
+    last_char = interval[-1]
 
-    if last_char == 's':
-      return str(float(timeout[:-1])) + 's'
-    elif last_char == 'm':
-      return str(float(timeout[:-1]) * 60) + 's'
-    elif last_char == 'h':
-      return str(float(timeout[:-1]) * 60 * 60) + 's'
-    elif last_char == 'd':
-      return str(float(timeout[:-1]) * 60 * 60 * 24) + 's'
-    elif last_char == 'w':
-      return str(float(timeout[:-1]) * 60 * 60 * 24 * 7) + 's'
+    if last_char == 's' and 's' in valid_units:
+      return str(float(interval[:-1])) + 's'
+    elif last_char == 'm' and 'm' in valid_units:
+      return str(float(interval[:-1]) * 60) + 's'
+    elif last_char == 'h' and 'h' in valid_units:
+      return str(float(interval[:-1]) * 60 * 60) + 's'
+    elif last_char == 'd' and 'd' in valid_units:
+      return str(float(interval[:-1]) * 60 * 60 * 24) + 's'
+    elif last_char == 'w' and 'w' in valid_units:
+      return str(float(interval[:-1]) * 60 * 60 * 24 * 7) + 's'
     else:
       raise ValueError(
-          'Unsupported units in timeout string %s: %s' % (timeout, last_char))
+          'Unsupported units in interval string %s: %s' % (interval, last_char))
 
   except (ValueError, OverflowError) as e:
-    raise ValueError('Unable to parse timeout string %s: %s' % (timeout, e))
+    raise ValueError('Unable to parse interval string %s: %s' % (interval, e))
+
+
+def timeout_in_seconds(timeout):
+  return _interval_to_seconds(timeout, valid_units='smhdw')
+
+
+def log_interval_in_seconds(log_interval):
+  return _interval_to_seconds(log_interval, valid_units='smh')

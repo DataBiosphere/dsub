@@ -328,7 +328,7 @@ class Resources(
         'preemptible', 'image', 'logging', 'logging_path', 'regions', 'zones',
         'scopes', 'keep_alive', 'cpu_platform', 'network', 'subnetwork',
         'use_private_address', 'accelerator_type', 'accelerator_count',
-        'timeout'
+        'timeout', 'log_interval'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -354,6 +354,7 @@ class Resources(
     accelerator_count (int): Number of accelerators of the specified type to
       attach.
     timeout (string): The max amount of time to give the pipeline to complete.
+    log_interval (string): The amount of time to sleep between log uploads.
   """
   __slots__ = ()
 
@@ -377,12 +378,13 @@ class Resources(
               use_private_address=None,
               accelerator_type=None,
               accelerator_count=0,
-              timeout=None):
+              timeout=None,
+              log_interval=None):
     return super(Resources, cls).__new__(
         cls, min_cores, min_ram, machine_type, disk_size, boot_disk_size,
         preemptible, image, logging, logging_path, regions, zones, scopes,
         keep_alive, cpu_platform, network, subnetwork, use_private_address,
-        accelerator_type, accelerator_count, timeout)
+        accelerator_type, accelerator_count, timeout, log_interval)
 
 
 def ensure_job_params_are_complete(job_params):

@@ -15,12 +15,6 @@
 
 This module implements job creation, listing, and canceling using the
 Google Genomics Pipelines and Operations APIs v2alpha1.
-
-Status: *early* development
-Much still to be done just on launching a pipeline, including localization,
-delocalization, logging.
-Need to figure out support for generic scripts (currently only supports bash).
-Then dstat/ddel support.
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -158,7 +152,7 @@ _CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
   while [[ ! -d /google/logs/action/{final_logging_action} ]]; do
     {log_cp_cmd}
 
-    sleep 10s
+    sleep {log_interval}
   done
 """)
 
@@ -568,7 +562,8 @@ class GoogleV2JobProvider(base.JobProvider):
     continuous_logging_cmd = _CONTINUOUS_LOGGING_CMD.format(
         log_cp_fn=_GSUTIL_CP_FN,
         log_cp_cmd=log_cp_cmd,
-        final_logging_action=final_logging_action)
+        final_logging_action=final_logging_action,
+        log_interval=job_resources.log_interval or '60s')
     logging_env = self._get_logging_env(task_resources.logging_path.uri)
 
     # Set up user script and environment

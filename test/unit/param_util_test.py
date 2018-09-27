@@ -125,8 +125,29 @@ class ParamUtilTest(unittest.TestCase):
   ])
   def test_timeout_in_seconds_fail(self, unused_name, timeout):
     del unused_name
-    with six.assertRaisesRegex(self, ValueError, 'Unable to parse timeout'):
+    with six.assertRaisesRegex(self, ValueError, 'Unable to parse interval'):
       _ = param_util.timeout_in_seconds(timeout)
+
+  @parameterized.parameterized.expand([
+      ('simple_second', '1s', '1.0s'),
+      ('simple_minute', '1m', '60.0s'),
+      ('simple_hour', '1h', '3600.0s'),
+  ])
+  def test_log_interval_in_seconds(self, unused_name, log_interval, expected):
+    del unused_name
+    result = param_util.log_interval_in_seconds(log_interval)
+    self.assertEqual(expected, result)
+
+  @parameterized.parameterized.expand([
+      ('simple_day', '1d'),
+      ('simple_week', '1w'),
+      ('bad_units', '1second'),
+      ('no_units', '123'),
+  ])
+  def test_log_interval_in_seconds_fail(self, unused_name, log_interval):
+    del unused_name
+    with six.assertRaisesRegex(self, ValueError, 'Unable to parse interval'):
+      _ = param_util.log_interval_in_seconds(log_interval)
 
 
 class FileParamUtilTest(unittest.TestCase):

@@ -447,9 +447,16 @@ def _parse_arguments(prog, argv):
       '--timeout',
       help="""The maximum amount of time to give the pipeline to complete.
           This includes the time spent waiting for a worker to be allocated.
-          Time can be listed using a number followed by a unit. Supported units are
-          s (seconds), m (minutes), h (hours), d (days), w (weeks).
-          For example: '7d' (7 days).""")
+          Time can be listed using a number followed by a unit. Supported units
+          are s (seconds), m (minutes), h (hours), d (days), w (weeks).
+          Example: '7d' (7 days).""")
+  google_v2.add_argument(
+      '--log-interval',
+      help="""The amount of time to sleep between copies of log files from
+          the pipeline to the logging path.
+          Time can be listed using a number followed by a unit. Supported units
+          are s (seconds), m (minutes), h (hours).
+          Example: '5m' (5 minutes). Default is '1m'.""")
 
   args = provider_base.parse_args(
       parser, {
@@ -479,6 +486,7 @@ def _get_job_resources(args):
   logging = param_util.build_logging_param(
       args.logging) if args.logging else None
   timeout = param_util.timeout_in_seconds(args.timeout)
+  log_interval = param_util.log_interval_in_seconds(args.log_interval)
 
   return job_model.Resources(
       min_cores=args.min_cores,
@@ -500,7 +508,8 @@ def _get_job_resources(args):
       use_private_address=args.use_private_address,
       accelerator_type=args.accelerator_type,
       accelerator_count=args.accelerator_count,
-      timeout=timeout)
+      timeout=timeout,
+      log_interval=log_interval)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids):
