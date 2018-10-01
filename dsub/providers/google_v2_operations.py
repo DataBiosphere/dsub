@@ -133,6 +133,20 @@ def get_last_event(op):
   return None
 
 
+def get_event_of_type(op, event_type):
+  """Return all events of a particular type."""
+  events = get_events(op)
+  if not events:
+    return None
+
+  return [e for e in events if e.get('details', {}).get('@type') == event_type]
+
+
+def get_worker_assigned_events(op):
+  return get_event_of_type(
+      op, 'type.googleapis.com/google.genomics.v2alpha1.WorkerAssignedEvent')
+
+
 def get_last_update(op):
   """Return the most recent timestamp in the operation."""
   last_update = get_end_time(op)

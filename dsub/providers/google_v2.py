@@ -998,6 +998,9 @@ class GoogleOperation(base.Task):
     self._op = operation_data
     self._job_descriptor = self._try_op_to_job_descriptor()
 
+  def raw_task_data(self):
+    return self._op
+
   def _try_op_to_job_descriptor(self):
     # The _META_YAML_REPR field in the 'prepare' action enables reconstructing
     # the original job descriptor.
@@ -1155,9 +1158,19 @@ class GoogleOperation(base.Task):
     elif field == 'provider':
       return _PROVIDER_NAME
     elif field == 'provider-attributes':
-      # Unlike Pipelines API v1, the v2 API hides the VM, so just emit
-      # configured items, like region, zone, VM type.
       value = {}
+
+      # The VM instance name and zone can be found in the WorkerAssignedEvent.
+      # For a given operation, this may have occurred multiple times, so be
+      # sure to grab the most recent.
+      assigned_events = google_v2_operations.get_worker_assigned_events(
+          self._op)
+      if assigned_events:
+        details = assigned_events[0].get('details', {})
+        value['instance-name'] = details.get('instance')
+        value['zone'] = details.get('zone')
+
+      # The rest of the information comes from the request itself.
       resources = google_v2_operations.get_resources(self._op)
       if 'regions' in resources:
         value['regions'] = resources['regions']
