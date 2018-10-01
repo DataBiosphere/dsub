@@ -353,3 +353,41 @@ The Google Pipelines API is currently the only backend provider.
 See the
 [Pipelines API Troubleshooting guide](https://cloud.google.com/genomics/v1alpha2/pipelines-api-troubleshooting)
 for more details on log files.
+
+## SSH to the VM
+
+With the `google-v2` provider, there is no SSH server running on the
+Compute Engine Virtual Machine by default. To start an SSH server, use the
+`dsub` command-line flag `--ssh` , which will start an SSH container in the
+background and will mount your data disk. This will allow you to inspect the
+runtime environment of your job's container in real time.
+
+The SSH container will pick up authentication information from the VM, so to
+connect you can use the `gcloud compute ssh` command to establish an SSH
+session.
+
+The VM `instance-name` and `zone` can be found in the `provider-attributes`
+section of `dstat ... --full` output. For example:
+
+```
+  provider-attributes:
+    boot-disk-size: 10
+    disk-size: 200
+    instance-name: google-pipelines-worker-<hash>
+    machine-type: n1-standard-1
+    preemptible: false
+    regions:
+    - us-central1
+    zone: us-central1-f
+    zones: []
+```
+
+Then issue the command:
+
+```
+    gcloud compute \
+      --project your-project \
+      ssh \
+      --zone <zone> \
+     <instance-name>
+```

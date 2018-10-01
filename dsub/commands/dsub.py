@@ -457,6 +457,12 @@ def _parse_arguments(prog, argv):
           Time can be listed using a number followed by a unit. Supported units
           are s (seconds), m (minutes), h (hours).
           Example: '5m' (5 minutes). Default is '1m'.""")
+  google_v2.add_argument(
+      '--ssh',
+      default=False,
+      action='store_true',
+      help="""If set to true, start an ssh container in the background
+          to allow you to log in using SSH and debug in real time.""")
 
   args = provider_base.parse_args(
       parser, {
@@ -509,7 +515,8 @@ def _get_job_resources(args):
       accelerator_type=args.accelerator_type,
       accelerator_count=args.accelerator_count,
       timeout=timeout,
-      log_interval=log_interval)
+      log_interval=log_interval,
+      ssh=args.ssh)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids):

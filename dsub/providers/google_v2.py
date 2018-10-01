@@ -54,6 +54,10 @@ _CLOUD_SDK_IMAGE = 'google/cloud-sdk:slim'
 # Use the 'slim' variant of the python Docker image as it is much smaller.
 _PYTHON_IMAGE = 'python:2.7-slim'
 
+# This image is for an optional ssh container.
+_SSH_IMAGE = 'gcr.io/cloud-genomics-pipelines/tools'
+_DEFAULT_SSH_PORT = 22
+
 # Name of the data disk
 _DATA_DISK_NAME = 'datadisk'
 
@@ -547,13 +551,22 @@ class GoogleV2JobProvider(base.JobProvider):
 
     # The list of "actions" (1-based) will be:
     #   1- continuous copy of log files off to Cloud Storage
-    #   2- prepare the shared mount point (write the user script
+    #   2- prepare the shared mount point (write the user script)
     #   3- localize objects from Cloud Storage to block storage
     #   4- execute user command
     #   5- delocalize objects from block storage to Cloud Storage
     #   6- final copy of log files off to Cloud Storage
-    user_action = 4
-    final_logging_action = 6
+    #
+    # If the user has requested an SSH server be started, it will be inserted
+    # after logging is started, and all subsequent action numbers above will be
+    # incremented by 1.
+
+    optional_actions = 0
+    if job_resources.ssh:
+      optional_actions += 1
+
+    user_action = 4 + optional_actions
+    final_logging_action = 6 + optional_actions
 
     # Set up the logging command
     log_cp_cmd = _LOG_CP_CMD.format(user_action=user_action)
@@ -586,14 +599,27 @@ class GoogleV2JobProvider(base.JobProvider):
         script_path=script_path,
         mk_io_dirs=_MK_IO_DIRS)
 
-    actions = [
+    actions = []
+    actions.append(
         google_v2_pipelines.build_action(
             name='logging',
             flags='RUN_IN_BACKGROUND',
             image_uri=_CLOUD_SDK_IMAGE,
             environment=logging_env,
             entrypoint='/bin/bash',
-            commands=['-c', continuous_logging_cmd]),
+            commands=['-c', continuous_logging_cmd]))
+
+    if job_resources.ssh:
+      actions.append(
+          google_v2_pipelines.build_action(
+              name='ssh',
+              image_uri=_SSH_IMAGE,
+              mounts=[mnt_datadisk],
+              entrypoint='ssh-server',
+              port_mappings={_DEFAULT_SSH_PORT: _DEFAULT_SSH_PORT},
+              flags='RUN_IN_BACKGROUND'))
+
+    actions.extend([
         google_v2_pipelines.build_action(
             name='prepare',
             image_uri=_PYTHON_IMAGE,
@@ -647,7 +673,8 @@ class GoogleV2JobProvider(base.JobProvider):
             environment=logging_env,
             entrypoint='/bin/bash',
             commands=['-c', logging_cmd]),
-    ]
+    ])
+
     assert len(actions) - 2 == user_action
     assert len(actions) == final_logging_action
 
