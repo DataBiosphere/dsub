@@ -69,13 +69,21 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Creating image using Google Cloud Build"
 
   mkdir -p "${BUILD_DIR}"
+  ENTRYPOINT=""
+  if [[ "${DSUB_PROVIDER}" != "google" ]]; then
+    ENTRYPOINT='ENTRYPOINT [ "sh", "-c", "exit 1" ]'
+  fi
   sed -e 's#^ *##' > "${DOCKERFILE}" <<-EOF
-    FROM ubuntu:14.04
+    FROM alpine:latest
+
+    RUN apk add --no-cache bash
 
     RUN adduser test_user \
       --disabled-password --gecos "First Last,RoomNumber,WorkPhone,HomePhone"
 
     USER test_user
+
+    ${ENTRYPOINT}
 EOF
 
   gcloud builds submit "${BUILD_DIR}" \

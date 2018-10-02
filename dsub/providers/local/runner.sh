@@ -54,11 +54,13 @@ function cleanup() {
     # Clean up files written from inside Docker
     2>&1 docker run \
       --name "${NAME}-cleanup" \
+      --entrypoint /bin/bash \
       --workdir "${DATA_MOUNT_POINT}/${WORKING_DIR}" \
       "${VOLUMES[@]}" \
       --env-file "${ENV_FILE}" \
       "${IMAGE}" \
-      rm -rf "${DATA_MOUNT_POINT}/*" | tee -a "${TASK_DIR}/log.txt"
+      "-c" "rm -rf ${DATA_MOUNT_POINT}/*" \
+      | tee -a "${TASK_DIR}/log.txt"
 
     rm -rf "${DATA_DIR}" || echo "sorry, unable to delete ${DATA_DIR}."
   fi
@@ -166,8 +168,9 @@ function get_docker_user() {
   # Get the userid and groupid the Docker image is set to run as.
   docker run \
     --name "${NAME}-get-docker-userid" \
+    --entrypoint /bin/bash \
     "${IMAGE}" \
-    bash -c 'echo "$(id -u):$(id -g)"' 2>> "${TASK_DIR}/stderr.txt"
+    '-c' 'echo "$(id -u):$(id -g)"' 2>> "${TASK_DIR}/stderr.txt"
 }
 readonly -f get_docker_user
 
@@ -180,9 +183,10 @@ function docker_recursive_chown() {
   # after they return.
   docker run \
     --user 0 \
+    --entrypoint /bin/bash \
     "${VOLUMES[@]}" \
     "${IMAGE}" \
-    chown -R "${usergroup}" "${docker_directory}" \
+    "-c" "chown -R ${usergroup} ${docker_directory}" \
     >> "${TASK_DIR}/stdout.txt" 2>> "${TASK_DIR}/stderr.txt"
 }
 readonly -f docker_recursive_chown
@@ -243,11 +247,12 @@ log_info "Running Docker image."
 docker run \
    --detach \
    --name "${NAME}" \
+   --entrypoint /bin/bash \
    --workdir "${DATA_MOUNT_POINT}/${WORKING_DIR}" \
    "${VOLUMES[@]}" \
    --env-file "${ENV_FILE}" \
    "${IMAGE}" \
-   "${SCRIPT_FILE}"
+   "-c" "${SCRIPT_FILE}"
 
 # Start a log writer in the background
 docker logs --follow "${NAME}" \
