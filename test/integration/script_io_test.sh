@@ -16,14 +16,24 @@
 
 # script_io_tests.sh
 #
-# Basic pipeline script, which exercises file localization/de-localiation.
+# Basic pipeline script, which exercises file localization/de-localiation,
+# or exercises GCS bucket mounting if --mount is used.
 # Note: The behavior of this script is coupled to the implementation of output
-#       checks defined in io_setup.sh. Changes here could break these tests.
+#       checks defined in io_setup.sh and io_tasks_setup.sh.
+#       Changes here could break these tests.
 #
-# The script must be run with:
+# The script must be run with either:
 #   INPUT_PATH: file or directory where files have been localized,
 #       such as "/mnt/data/input/gs/bucket/path/"
 #       or "/mnt/data/input/gs/bucket/path/file.bam"
+#
+#   OR
+#
+#   GENOMICS_PUBLIC_BUCKET: A directory mounted to a GCS bucket,
+#       such as "/mnt/data/bucket"
+#
+#   AND
+#
 #   OUTPUT_PATH: path where files will be de-localized from,
 #       such as "/mnt/data/output/gs/bucket/path/*"
 #       or "/mnt/data/output/gs/bucket/path/file.md5"
@@ -32,11 +42,28 @@
 set -o errexit
 set -o nounset
 
-echo "POPULATION_FILE = ${POPULATION_FILE}"
+echo "GENOMICS_PUBLIC_BUCKET = ${GENOMICS_PUBLIC_BUCKET:-}"
+echo "POPULATION_FILE_PATH = ${POPULATION_FILE_PATH:-}"
 echo "OUTPUT_POPULATION_FILE = ${OUTPUT_POPULATION_FILE}"
 
-echo "INPUT_PATH = ${INPUT_PATH}"
+echo "INPUT_PATH = ${INPUT_PATH:-}"
 echo "OUTPUT_PATH = ${OUTPUT_PATH}"
+
+if [[ -n "${GENOMICS_PUBLIC_BUCKET:-}" ]]; then
+  if [[ -n "${INPUT_PATH:-}" ]]; then
+    echo "Invalid test: GENOMICS_PUBLIC_BUCKET and INPUT_PATH should not both be set"
+    exit 1
+  fi
+  if [[ -n "${POPULATION_FILE_PATH:-}" ]]; then
+    echo "Invalid test: GENOMICS_PUBLIC_BUCKET and POPULATION_FILE_PATH should not both be set"
+    exit 1
+  fi
+  # Set the INPUT PATH based on the bucket
+  # GENOMICS_PUBLIC_DATA is the path representing the bucket root.
+  # Get the rest of the path from env vars.
+  INPUT_PATH="${GENOMICS_PUBLIC_BUCKET}/${INPUT_BAM}"
+  POPULATION_FILE_PATH="${GENOMICS_PUBLIC_BUCKET}/${POPULATION_FILE}"
+fi
 
 if [[ -d "${INPUT_PATH}" ]]; then
   readonly INPUT_DIR="${INPUT_PATH}"
@@ -60,5 +87,5 @@ for INPUT_FILE in "${INPUT_FILE_LIST[@]}"; do
 done
 
 # Write the md5 for the population file to a task-specific output location
-md5sum "${POPULATION_FILE}" | awk '{ print $1 }' \
+md5sum "${POPULATION_FILE_PATH}" | awk '{ print $1 }' \
   > "$(dirname "${OUTPUT_POPULATION_FILE}")/${TASK_ID}.md5"

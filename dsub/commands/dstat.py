@@ -143,8 +143,9 @@ class TextOutput(OutputFormatter):
         ('labels', 'Labels', self.format_pairs),
         ('inputs', 'Inputs', self.format_pairs),
         ('outputs', 'Outputs', self.format_pairs),
+        ('mounts', 'Mounts', self.format_pairs),
         ('dsub-version', 'Version'),
-        # These fielsd only shows up when summarizing
+        # These fields only shows up when summarizing
         ('status', 'Status'),
         ('task-count', 'Task Count'),
     ]
@@ -291,10 +292,11 @@ def _prepare_row(task, full, summary):
       row_spec('end-time', True, None),
       row_spec('internal-id', True, None),
       row_spec('logging', True, None),
+      row_spec('labels', True, {}),
+      row_spec('envs', True, {}),
       row_spec('inputs', True, {}),
       row_spec('outputs', True, {}),
-      row_spec('envs', True, {}),
-      row_spec('labels', True, {}),
+      row_spec('mounts', True, {}),
       row_spec('provider', True, None),
       row_spec('provider-attributes', True, {}),
       row_spec('events', True, []),

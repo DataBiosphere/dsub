@@ -12,21 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-readonly POPULATION_FILE="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/20131219.superpopulations.tsv"
+readonly GENOMICS_PUBLIC_BUCKET="gs://genomics-public-data"
+readonly POPULATION_FILE="ftp-trace.ncbi.nih.gov/1000genomes/ftp/20131219.superpopulations.tsv"
+readonly POPULATION_FILE_FULL_PATH="${GENOMICS_PUBLIC_BUCKET}"/"${POPULATION_FILE}"
 readonly POPULATION_MD5="68a73f849b82071afe11888bac1aa8a7"
 
-readonly INPUT_BAM="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam"
+readonly INPUT_BAM_FILE="ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chromY.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam"
+readonly INPUT_BAM_FULL_PATH="${GENOMICS_PUBLIC_BUCKET}/${INPUT_BAM_FILE}"
 readonly INPUT_BAM_MD5="4afb9b8908959dbd4e2d5c54bf254c93"
+
+function io_setup::run_dsub_fuse() {
+  run_dsub \
+    ${IMAGE:+--image "${IMAGE}"} \
+    --script "${SCRIPT_DIR}/script_io_test.sh" \
+    --env TASK_ID="task" \
+    --output OUTPUT_PATH="${OUTPUTS}/task/*.md5" \
+    --env TEST_NAME="${TEST_NAME}" \
+    --env INPUT_BAM="${INPUT_BAM_FILE}" \
+    --env POPULATION_FILE="${POPULATION_FILE}" \
+    --mount GENOMICS_PUBLIC_BUCKET="${GENOMICS_PUBLIC_BUCKET}" \
+    --output OUTPUT_POPULATION_FILE="${OUTPUTS}/*" \
+    --wait
+}
+readonly -f io_setup::run_dsub_fuse
 
 function io_setup::run_dsub() {
   run_dsub \
     ${IMAGE:+--image "${IMAGE}"} \
     --script "${SCRIPT_DIR}/script_io_test.sh" \
     --env TASK_ID="task" \
-    --input INPUT_PATH="${INPUT_BAM}" \
+    --input INPUT_PATH="${INPUT_BAM_FULL_PATH}" \
     --output OUTPUT_PATH="${OUTPUTS}/task/*.md5" \
     --env TEST_NAME="${TEST_NAME}" \
-    --input POPULATION_FILE="${POPULATION_FILE}" \
+    --input POPULATION_FILE_PATH="${POPULATION_FILE_FULL_PATH}" \
     --output OUTPUT_POPULATION_FILE="${OUTPUTS}/*" \
     --wait
 }
@@ -55,7 +73,7 @@ function io_setup::check_output() {
   echo "Checking output..."
 
   io_setup::_check_output \
-    "${OUTPUTS}/task/$(basename "${INPUT_BAM}").md5" \
+    "${OUTPUTS}/task/$(basename "${INPUT_BAM_FULL_PATH}").md5" \
     "${INPUT_BAM_MD5}"
 
   io_setup::_check_output \
@@ -68,6 +86,8 @@ readonly -f io_setup::check_output
 
 function io_setup::check_dstat() {
   local job_id="${1}"
+  local check_inputs="${2}"
+  local check_mounts="${3}"
 
   echo
   echo "Checking dstat output..."
@@ -96,13 +116,20 @@ function io_setup::check_dstat() {
   util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].envs.TASK_ID" "task"
   util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].envs.TEST_NAME" "${TEST_NAME}"
 
-  echo "  Checking inputs..."
-  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].inputs.INPUT_PATH" "${INPUT_BAM}"
-  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].inputs.POPULATION_FILE" "${POPULATION_FILE}"
+  if [[ "${check_inputs}" == "true" ]]; then
+    echo "  Checking inputs..."
+    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].inputs.INPUT_PATH" "${INPUT_BAM_FULL_PATH}"
+    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].inputs.POPULATION_FILE_PATH" "${POPULATION_FILE_FULL_PATH}"
+  fi
 
   echo "  Checking outputs..."
   util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].outputs.OUTPUT_PATH" "${OUTPUTS}/task/*.md5"
   util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].outputs.OUTPUT_POPULATION_FILE" "${OUTPUTS}/*"
+
+  if [[ "${check_mounts}" == "true" ]]; then
+    echo "  Checking mounts..."
+    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].mounts.GENOMICS_PUBLIC_BUCKET" "${GENOMICS_PUBLIC_BUCKET}"
+  fi
 
   echo "SUCCESS"
 }

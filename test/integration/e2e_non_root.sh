@@ -69,9 +69,11 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Creating image using Google Cloud Build"
 
   mkdir -p "${BUILD_DIR}"
-  ENTRYPOINT=""
-  if [[ "${DSUB_PROVIDER}" != "google" ]]; then
-    ENTRYPOINT='ENTRYPOINT [ "sh", "-c", "exit 1" ]'
+  ENTRYPOINT='ENTRYPOINT [ "sh", "-c", "exit 1" ]'
+  if [[ "${DSUB_PROVIDER}" == "google" ]]; then
+    # The original google provider could not support Docker images with
+    # entrypoints because the Pipelines API v1alpha2 did not.
+    ENTRYPOINT=""
   fi
   sed -e 's#^ *##' > "${DOCKERFILE}" <<-EOF
     FROM alpine:latest
@@ -104,4 +106,4 @@ fi
 
 # Do validation
 io_setup::check_output
-io_setup::check_dstat "${JOB_ID}"
+io_setup::check_dstat "${JOB_ID}" true false

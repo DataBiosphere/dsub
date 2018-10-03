@@ -112,6 +112,7 @@ SLEEP_FUNCTION = time.sleep  # so we can replace it in tests
 
 DEFAULT_INPUT_LOCAL_PATH = 'input'
 DEFAULT_OUTPUT_LOCAL_PATH = 'output'
+DEFAULT_MOUNT_LOCAL_PATH = 'mount'
 
 
 class TaskParamAction(argparse.Action):
@@ -463,6 +464,14 @@ def _parse_arguments(prog, argv):
       action='store_true',
       help="""If set to true, start an ssh container in the background
           to allow you to log in using SSH and debug in real time.""")
+  google_v2.add_argument(
+      '--mount',
+      nargs='*',
+      action=param_util.ListParamAction,
+      default=[],
+      help="""Google Cloud Storage bucket path (gs://bucket) to mount using
+          Cloud Storage FUSE (gcsfuse).""",
+      metavar='KEY=REMOTE_PATH')
 
   args = provider_base.parse_args(
       parser, {
@@ -928,12 +937,13 @@ def run_main(args):
       DEFAULT_INPUT_LOCAL_PATH)
   output_file_param_util = param_util.OutputFileParamUtil(
       DEFAULT_OUTPUT_LOCAL_PATH)
+  mount_param_util = param_util.MountParamUtil(DEFAULT_MOUNT_LOCAL_PATH)
 
   # Get job arguments from the command line
   job_params = param_util.args_to_job_params(
       args.env, args.label, args.input, args.input_recursive, args.output,
-      args.output_recursive, input_file_param_util, output_file_param_util)
-
+      args.output_recursive, args.mount, input_file_param_util,
+      output_file_param_util, mount_param_util)
   # If --tasks is on the command-line, then get task-specific data
   if args.tasks:
     task_descriptors = param_util.tasks_file_to_task_descriptors(

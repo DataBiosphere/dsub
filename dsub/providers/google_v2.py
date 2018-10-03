@@ -58,6 +58,9 @@ _PYTHON_IMAGE = 'python:2.7-slim'
 _SSH_IMAGE = 'gcr.io/cloud-genomics-pipelines/tools'
 _DEFAULT_SSH_PORT = 22
 
+# This image is for an optional mount on a bucket using GCS Fuse
+_GCSFUSE_IMAGE = 'gcr.io/cloud-genomics-pipelines/gcsfuse:latest'
+
 # Name of the data disk
 _DATA_DISK_NAME = 'datadisk'
 
@@ -426,7 +429,7 @@ class GoogleV2JobProvider(base.JobProvider):
         'STDERR_PATH': '{}-stderr.log'.format(logging_prefix)
     }
 
-  def _get_prepare_env(self, script, job_descriptor, inputs, outputs):
+  def _get_prepare_env(self, script, job_descriptor, inputs, outputs, mounts):
     """Return a dict with variables for the 'prepare' action."""
 
     # Add the _SCRIPT_REPR with the repr(script) contents
@@ -447,7 +450,7 @@ class GoogleV2JobProvider(base.JobProvider):
 
     docker_paths = sorted([
         var.docker_path if var.recursive else os.path.dirname(var.docker_path)
-        for var in inputs | outputs
+        for var in inputs | outputs | mounts
         if var.value
     ])
 
@@ -518,13 +521,41 @@ class GoogleV2JobProvider(base.JobProvider):
 
     return env
 
-  def _build_user_environment(self, envs, inputs, outputs):
+  def _build_user_environment(self, envs, inputs, outputs, mounts):
     """Returns a dictionary of for the user container environment."""
     envs = {env.name: env.value for env in envs}
     envs.update(providers_util.get_file_environment_variables(inputs))
     envs.update(providers_util.get_file_environment_variables(outputs))
-
+    envs.update(providers_util.get_file_environment_variables(mounts))
     return envs
+
+  def _get_mount_actions(self, mounts, mnt_datadisk):
+    """Returns a list of two actions per gcs bucket to mount."""
+    actions_to_add = []
+    for mount in mounts:
+      bucket = mount.value[len('gs://'):]
+      mount_path = mount.docker_path
+      actions_to_add.extend([
+          google_v2_pipelines.build_action(
+              name='mount-{}'.format(bucket),
+              flags=['ENABLE_FUSE', 'RUN_IN_BACKGROUND'],
+              image_uri=_GCSFUSE_IMAGE,
+              mounts=[mnt_datadisk],
+              commands=[
+                  '--implicit-dirs', '--foreground', bucket,
+                  os.path.join(providers_util.DATA_MOUNT_POINT, mount_path)
+              ]),
+          google_v2_pipelines.build_action(
+              name='mount-wait-{}'.format(bucket),
+              flags=['ENABLE_FUSE'],
+              image_uri=_GCSFUSE_IMAGE,
+              mounts=[mnt_datadisk],
+              commands=[
+                  'wait',
+                  os.path.join(providers_util.DATA_MOUNT_POINT, mount_path)
+              ])
+      ])
+    return actions_to_add
 
   def _build_pipeline_request(self, task_view):
     """Returns a Pipeline objects for the task."""
@@ -549,6 +580,14 @@ class GoogleV2JobProvider(base.JobProvider):
         | job_params['labels'] | task_params['labels']
     }
 
+    # Set local variables for the core pipeline values
+    script = task_view.job_metadata['script']
+
+    envs = job_params['envs'] | task_params['envs']
+    inputs = job_params['inputs'] | task_params['inputs']
+    outputs = job_params['outputs'] | task_params['outputs']
+    mounts = job_params['mounts']
+
     # The list of "actions" (1-based) will be:
     #   1- continuous copy of log files off to Cloud Storage
     #   2- prepare the shared mount point (write the user script)
@@ -560,15 +599,23 @@ class GoogleV2JobProvider(base.JobProvider):
     # If the user has requested an SSH server be started, it will be inserted
     # after logging is started, and all subsequent action numbers above will be
     # incremented by 1.
-
+    # If the user has requested to mount one or more buckets, two actions per
+    # bucket will be inserted after the prepare step, and all subsequent action
+    # numbers will be incremented by the number of actions added.
+    #
+    # We need to track the action numbers specifically for the user action and
+    # the final logging action.
     optional_actions = 0
     if job_resources.ssh:
       optional_actions += 1
 
+    mount_actions = self._get_mount_actions(mounts, mnt_datadisk)
+    optional_actions += len(mount_actions)
+
     user_action = 4 + optional_actions
     final_logging_action = 6 + optional_actions
 
-    # Set up the logging command
+    # Set up the commands and environment for the logging actions
     log_cp_cmd = _LOG_CP_CMD.format(user_action=user_action)
     logging_cmd = _LOGGING_CMD.format(
         log_cp_fn=_GSUTIL_CP_FN, log_cp_cmd=log_cp_cmd)
@@ -579,18 +626,8 @@ class GoogleV2JobProvider(base.JobProvider):
         log_interval=job_resources.log_interval or '60s')
     logging_env = self._get_logging_env(task_resources.logging_path.uri)
 
-    # Set up user script and environment
-    script = task_view.job_metadata['script']
-
-    envs = job_params['envs'] | task_params['envs']
-    inputs = job_params['inputs'] | task_params['inputs']
-    outputs = job_params['outputs'] | task_params['outputs']
-    user_environment = self._build_user_environment(envs, inputs, outputs)
-
-    prepare_env = self._get_prepare_env(script, task_view, inputs, outputs)
-    localization_env = self._get_localization_env(inputs)
-    delocalization_env = self._get_delocalization_env(outputs)
-
+    # Set up command and environments for the prepare, localization, user,
+    # and de-localization actions
     script_path = os.path.join(providers_util.SCRIPT_DIR, script.name)
     prepare_command = _PREPARE_CMD.format(
         mk_runtime_dirs=_MK_RUNTIME_DIRS_CMD,
@@ -599,6 +636,14 @@ class GoogleV2JobProvider(base.JobProvider):
         script_path=script_path,
         mk_io_dirs=_MK_IO_DIRS)
 
+    prepare_env = self._get_prepare_env(script, task_view, inputs, outputs,
+                                        mounts)
+    localization_env = self._get_localization_env(inputs)
+    user_environment = self._build_user_environment(envs, inputs, outputs,
+                                                    mounts)
+    delocalization_env = self._get_delocalization_env(outputs)
+
+    # Build the list of actions
     actions = []
     actions.append(
         google_v2_pipelines.build_action(
@@ -619,14 +664,18 @@ class GoogleV2JobProvider(base.JobProvider):
               port_mappings={_DEFAULT_SSH_PORT: _DEFAULT_SSH_PORT},
               flags='RUN_IN_BACKGROUND'))
 
-    actions.extend([
+    actions.append(
         google_v2_pipelines.build_action(
             name='prepare',
             image_uri=_PYTHON_IMAGE,
             mounts=[mnt_datadisk],
             environment=prepare_env,
             entrypoint='/bin/bash',
-            commands=['-c', prepare_command]),
+            commands=['-c', prepare_command]),)
+
+    actions.extend(mount_actions)
+
+    actions.extend([
         google_v2_pipelines.build_action(
             name='localization',
             image_uri=_CLOUD_SDK_IMAGE,
@@ -678,6 +727,7 @@ class GoogleV2JobProvider(base.JobProvider):
     assert len(actions) - 2 == user_action
     assert len(actions) == final_logging_action
 
+    # Prepare the VM (resources) configuration
     disks = [
         google_v2_pipelines.build_disk(_DATA_DISK_NAME, job_resources.disk_size)
     ]
@@ -710,6 +760,7 @@ class GoogleV2JobProvider(base.JobProvider):
             cpu_platform=job_resources.cpu_platform),
     )
 
+    # Build the pipeline request
     pipeline = google_v2_pipelines.build_pipeline(actions, resources, None,
                                                   job_resources.timeout)
 
@@ -1162,6 +1213,12 @@ class GoogleOperation(base.Task):
               self._job_descriptor.job_params,
               self._job_descriptor.task_descriptors[0].task_params, field)
           value.update({item.name: item.value for item in items})
+    elif field == 'mounts':
+      if self._job_descriptor:
+        items = providers_util.get_job_and_task_param(
+            self._job_descriptor.job_params,
+            self._job_descriptor.task_descriptors[0].task_params, field)
+        value = {item.name: item.value for item in items}
     elif field == 'create-time':
       ds = google_v2_operations.get_create_time(self._op)
       value = google_base.parse_rfc3339_utc_string(ds)

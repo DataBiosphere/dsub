@@ -384,7 +384,7 @@ TASK_DESCRIPTORS = [
 class TestSubmitValidator(unittest.TestCase):
 
   def test_submit_validator_passes(self):
-    job_params = {'inputs': set(), 'outputs': set()}
+    job_params = {'inputs': set(), 'outputs': set(), 'mounts': set()}
     job_resources = job_model.Resources(
         logging=job_model.LoggingParam('gs://buck/logs', job_model.P_GCS))
     param_util.validate_submit_args_or_fail(
@@ -404,7 +404,7 @@ class TestSubmitValidator(unittest.TestCase):
        [job_model.P_LOCAL]),
   ])
   def test_submit_validator_fails(self, name, path, inwl, outwl, logwl):
-    job_params = {'inputs': set(), 'outputs': set()}
+    job_params = {'inputs': set(), 'outputs': set(), 'mounts': set()}
     job_resources = job_model.Resources(
         logging=job_model.LoggingParam('gs://buck/logs', job_model.P_GCS))
     err_expected = 'Unsupported %s path (%s) for provider' % (name, path)

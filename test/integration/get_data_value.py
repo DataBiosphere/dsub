@@ -127,6 +127,9 @@ def main():
         sys.exit(1)
 
       if idx >= len(curr):
+        print('Index of key out of bounds', file=sys.stderr)
+        print('Key: %s' % key, file=sys.stderr)
+        print('Value: %s' % curr, file=sys.stderr)
         sys.exit(1)
 
       curr = curr[idx]
@@ -136,6 +139,9 @@ def main():
     if key in curr:
       curr = curr[key]
     else:
+      print('Key not found', file=sys.stderr)
+      print('Key: %s' % key, file=sys.stderr)
+      print('Value: %s' % curr, file=sys.stderr)
       sys.exit(1)
 
   print(curr)

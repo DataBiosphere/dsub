@@ -111,6 +111,16 @@ def validate_param_name(name, param_type):
     raise ValueError('Invalid %s: %s' % (param_type, name))
 
 
+def validate_bucket_name(bucket):
+  """Validate that the name is a valid GCS bucket."""
+  if not bucket.startswith('gs://'):
+    raise ValueError(
+        'Invalid bucket path "%s". Must start with "gs://".' % bucket)
+  bucket_name = bucket[len('gs://'):]
+  if not re.search(r'^\w[\w_\.-]{1,61}\w$', bucket_name):
+    raise ValueError('Invalid bucket name: %s' % bucket)
+
+
 class UriParts(str):
   """Subclass string for multipart URIs.
 
@@ -322,6 +332,15 @@ class OutputFileParam(FileParam):
                                                uri, recursive, file_provider)
 
 
+class MountParam(FileParam):
+  """Simple typed-derivative of a FileParam."""
+
+  def __new__(cls, name, value, docker_path=None):
+    validate_param_name(name, 'Mount parameter')
+    validate_bucket_name(value)
+    return super(MountParam, cls).__new__(cls, name, value, docker_path)
+
+
 class Resources(
     collections.namedtuple('Resources', [
         'min_cores', 'min_ram', 'machine_type', 'disk_size', 'boot_disk_size',
@@ -391,7 +410,7 @@ class Resources(
 
 def ensure_job_params_are_complete(job_params):
   """For the job, ensure that each param entry is not None."""
-  for param in 'labels', 'envs', 'inputs', 'outputs':
+  for param in 'labels', 'envs', 'inputs', 'outputs', 'mounts':
     if not job_params.get(param):
       job_params[param] = set()
 
@@ -593,6 +612,7 @@ class JobDescriptor(object):
         for var in job_params['outputs']
         if var.recursive
     }
+    job['mounts'] = {var.name: var.value for var in job_params['mounts']}
 
     tasks = []
     for task_descriptor in task_descriptors:
@@ -648,6 +668,13 @@ class JobDescriptor(object):
       outputs.add(
           OutputFileParam(key, raw_outputs.get(key), recursive=recursive))
     return outputs
+
+  @classmethod
+  def _mount_params_from_dict(cls, raw_mounts):
+    mounts = set()
+    for key in raw_mounts:
+      mounts.add(MountParam(key, raw_mounts.get(key)))
+    return mounts
 
   @classmethod
   def _from_yaml_v0(cls, job):
@@ -761,6 +788,7 @@ class JobDescriptor(object):
     job_params['outputs'] = cls._output_file_params_from_dict(
         job.get('outputs', {}), False) | cls._output_file_params_from_dict(
             job.get('output-recursives', {}), True)
+    job_params['mounts'] = cls._mount_params_from_dict(job.get('mounts', {}))
 
     task_descriptors = []
     for task in job.get('tasks', []):

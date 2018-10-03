@@ -179,6 +179,7 @@ _ENV_LIST_JOB_DESCRIPTOR = job_model.JobDescriptor(
         'labels': set(),
         'inputs': set(),
         'outputs': set(),
+        'mounts': set(),
     },
     task_descriptors=[
         job_model.TaskDescriptor(
@@ -281,6 +282,7 @@ _IO_TASKS_JOB_DESCRIPTOR = job_model.JobDescriptor(
                 'gs://b/dsub/sh/local/io_tasks/output/*',
                 recursive=False),
         },
+        'mounts': set(),
     },
     task_descriptors=[
         job_model.TaskDescriptor(
@@ -389,6 +391,7 @@ _IO_RECURSIVE_JOB_DESCRIPTOR = job_model.JobDescriptor(
                 'gs://b/dsub/sh/local/io_recursive/output/shallow/*',
                 recursive=False),
         },
+        'mounts': set(),
     },
     task_descriptors=[
         job_model.TaskDescriptor(
@@ -464,6 +467,7 @@ _LABELS_JOB_DESCRIPTOR = job_model.JobDescriptor(
         'labels': {job_model.LabelParam('batch', 'hello-world')},
         'inputs': set(),
         'outputs': set(),
+        'mounts': set(),
     },
     task_descriptors=[
         job_model.TaskDescriptor(
