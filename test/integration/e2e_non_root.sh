@@ -69,13 +69,23 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Creating image using Google Cloud Build"
 
   mkdir -p "${BUILD_DIR}"
+  ENTRYPOINT='ENTRYPOINT [ "sh", "-c", "exit 1" ]'
+  if [[ "${DSUB_PROVIDER}" == "google" ]]; then
+    # The original google provider could not support Docker images with
+    # entrypoints because the Pipelines API v1alpha2 did not.
+    ENTRYPOINT=""
+  fi
   sed -e 's#^ *##' > "${DOCKERFILE}" <<-EOF
-    FROM ubuntu:14.04
+    FROM alpine:latest
+
+    RUN apk add --no-cache bash
 
     RUN adduser test_user \
       --disabled-password --gecos "First Last,RoomNumber,WorkPhone,HomePhone"
 
     USER test_user
+
+    ${ENTRYPOINT}
 EOF
 
   gcloud builds submit "${BUILD_DIR}" \
@@ -96,4 +106,4 @@ fi
 
 # Do validation
 io_setup::check_output
-io_setup::check_dstat "${JOB_ID}"
+io_setup::check_dstat "${JOB_ID}" true false

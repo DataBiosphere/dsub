@@ -112,6 +112,7 @@ SLEEP_FUNCTION = time.sleep  # so we can replace it in tests
 
 DEFAULT_INPUT_LOCAL_PATH = 'input'
 DEFAULT_OUTPUT_LOCAL_PATH = 'output'
+DEFAULT_MOUNT_LOCAL_PATH = 'mount'
 
 
 class TaskParamAction(argparse.Action):
@@ -447,9 +448,30 @@ def _parse_arguments(prog, argv):
       '--timeout',
       help="""The maximum amount of time to give the pipeline to complete.
           This includes the time spent waiting for a worker to be allocated.
-          Time can be listed using a number followed by a unit. Supported units are
-          s (seconds), m (minutes), h (hours), d (days), w (weeks).
-          For example: '7d' (7 days).""")
+          Time can be listed using a number followed by a unit. Supported units
+          are s (seconds), m (minutes), h (hours), d (days), w (weeks).
+          Example: '7d' (7 days).""")
+  google_v2.add_argument(
+      '--log-interval',
+      help="""The amount of time to sleep between copies of log files from
+          the pipeline to the logging path.
+          Time can be listed using a number followed by a unit. Supported units
+          are s (seconds), m (minutes), h (hours).
+          Example: '5m' (5 minutes). Default is '1m'.""")
+  google_v2.add_argument(
+      '--ssh',
+      default=False,
+      action='store_true',
+      help="""If set to true, start an ssh container in the background
+          to allow you to log in using SSH and debug in real time.""")
+  google_v2.add_argument(
+      '--mount',
+      nargs='*',
+      action=param_util.ListParamAction,
+      default=[],
+      help="""Google Cloud Storage bucket path (gs://bucket) to mount using
+          Cloud Storage FUSE (gcsfuse).""",
+      metavar='KEY=REMOTE_PATH')
 
   args = provider_base.parse_args(
       parser, {
@@ -479,6 +501,7 @@ def _get_job_resources(args):
   logging = param_util.build_logging_param(
       args.logging) if args.logging else None
   timeout = param_util.timeout_in_seconds(args.timeout)
+  log_interval = param_util.log_interval_in_seconds(args.log_interval)
 
   return job_model.Resources(
       min_cores=args.min_cores,
@@ -500,7 +523,9 @@ def _get_job_resources(args):
       use_private_address=args.use_private_address,
       accelerator_type=args.accelerator_type,
       accelerator_count=args.accelerator_count,
-      timeout=timeout)
+      timeout=timeout,
+      log_interval=log_interval,
+      ssh=args.ssh)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids):
@@ -912,12 +937,13 @@ def run_main(args):
       DEFAULT_INPUT_LOCAL_PATH)
   output_file_param_util = param_util.OutputFileParamUtil(
       DEFAULT_OUTPUT_LOCAL_PATH)
+  mount_param_util = param_util.MountParamUtil(DEFAULT_MOUNT_LOCAL_PATH)
 
   # Get job arguments from the command line
   job_params = param_util.args_to_job_params(
       args.env, args.label, args.input, args.input_recursive, args.output,
-      args.output_recursive, input_file_param_util, output_file_param_util)
-
+      args.output_recursive, args.mount, input_file_param_util,
+      output_file_param_util, mount_param_util)
   # If --tasks is on the command-line, then get task-specific data
   if args.tasks:
     task_descriptors = param_util.tasks_file_to_task_descriptors(

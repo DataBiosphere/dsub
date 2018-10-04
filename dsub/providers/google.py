@@ -948,6 +948,8 @@ class GoogleOperation(base.Task):
       value = self._get_operation_input_field_values(metadata, True)
     elif field == 'outputs':
       value = self._get_operation_output_field_values(metadata)
+    elif field == 'mounts':
+      value = None
     elif field == 'create-time':
       value = google_base.parse_rfc3339_utc_string(metadata['createTime'])
     elif field == 'start-time':

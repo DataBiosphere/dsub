@@ -50,7 +50,7 @@ function io_tasks_setup::run_dsub() {
     --script "${io_tasks_script}" \
     --tasks "${io_tasks_file}" \
     --env TEST_NAME="${TEST_NAME}" \
-    --input POPULATION_FILE="${POPULATION_FILE}" \
+    --input POPULATION_FILE_PATH="${POPULATION_FILE}" \
     --output OUTPUT_POPULATION_FILE="${OUTPUTS}/*" \
     --wait
 }
@@ -142,7 +142,7 @@ function io_tasks_setup::check_dstat() {
 
     echo "  Checking inputs..."
     util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].inputs.INPUT_PATH" "${INPUT_BAMS[$((task_id-1))]}"
-    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].inputs.POPULATION_FILE" "${POPULATION_FILE}"
+    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].inputs.POPULATION_FILE_PATH" "${POPULATION_FILE}"
 
     echo "  Checking outputs..."
     util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].outputs.OUTPUT_PATH" "${OUTPUTS}/${task_id}/*.md5"

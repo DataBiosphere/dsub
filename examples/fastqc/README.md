@@ -77,6 +77,7 @@ To run FastQC on the BAM file, type:
 
 ```
 dsub \
+  --provider google-v2 \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging "gs://MY-BUCKET/fastqc/submit_one/logging" \
@@ -98,9 +99,9 @@ You should see output like:
 Job: fastqc--<userid>--170619-105212-67
 Launched job-id: fastqc--<userid>--170619-105212-67
 To check the status, run:
-  dstat --project MY-PROJECT --jobs fastqc--<userid>--170619-105212-67 --status '*'
+  dstat --provider google-v2 --project MY-PROJECT --jobs fastqc--<userid>--170619-105212-67 --status '*'
 To cancel the job, run:
-  ddel --project MY-PROJECT --jobs fastqc--<userid>--170619-105212-67
+  ddel --provider google-v2 --project MY-PROJECT --jobs fastqc--<userid>--170619-105212-67
 Waiting for job to complete...
 Waiting for: fastqc--<userid>--170619-105212-67.
 ```
@@ -155,6 +156,7 @@ output file name.
 
 ```
 dsub \
+  --provider google-v2 \
   --project MY-PROJECT \
   --zones "us-central1-*" \
   --logging "gs://MY-BUCKET/samtools/submit_list/logging" \
@@ -173,9 +175,9 @@ Job: fastqc--<userid>--170522-154943-70
 Launched job-id: fastqc--<userid>--170522-154943-70
 3 task(s)
 To check the status, run:
-  dstat --project MY-PROJECT --jobs fastqc--<userid>--170522-154943-70 --status '*'
+  dstat --provider google-v2 --project MY-PROJECT --jobs fastqc--<userid>--170522-154943-70 --status '*'
 To cancel the job, run:
-  ddel --project MY-PROJECT --jobs fastqc--<userid>--170522-154943-70
+  ddel --provider google-v2 --project MY-PROJECT --jobs fastqc--<userid>--170522-154943-70
 Waiting for job to complete...
 Waiting for: fastqc--<userid>--170522-154943-70.
 ```

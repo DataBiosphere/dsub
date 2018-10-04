@@ -136,7 +136,7 @@ class FileParamUtil(object):
       ValueError: if file_provider is not valid.
     """
     if file_provider == job_model.P_GCS:
-      normalized, docker_path = self._gcs_uri_rewriter(raw_uri)
+      normalized, docker_path = _gcs_uri_rewriter(raw_uri)
     elif file_provider == job_model.P_LOCAL:
       normalized, docker_path = self._local_uri_rewriter(raw_uri)
     else:
@@ -203,25 +203,6 @@ class FileParamUtil(object):
     docker_path = docker_path.lstrip('./')  # Strips any of '.' './' '/'.
     docker_path = directory_fmt('file/' + docker_path) + filename
     return normed_uri, docker_path
-
-  @staticmethod
-  def _gcs_uri_rewriter(raw_uri):
-    """Rewrite GCS file paths as required by the rewrite_uris method.
-
-    The GCS rewriter performs no operations on the raw_path and simply returns
-    it as the normalized URI. The docker path has the gs:// prefix replaced
-    with gs/ so that it can be mounted inside a docker image.
-
-    Args:
-      raw_uri: (str) the raw GCS URI, prefix, or pattern.
-
-    Returns:
-      normalized: a cleaned version of the uri provided by command line.
-      docker_path: the uri rewritten in the format required for mounting inside
-                   a docker worker.
-    """
-    docker_path = raw_uri.replace('gs://', 'gs/', 1)
-    return raw_uri, docker_path
 
   @staticmethod
   def parse_file_provider(uri):
@@ -312,6 +293,46 @@ class OutputFileParamUtil(FileParamUtil):
   def __init__(self, docker_path):
     super(OutputFileParamUtil, self).__init__(AUTO_PREFIX_OUTPUT, docker_path)
     self.param_class = job_model.OutputFileParam
+
+
+class MountParamUtil(object):
+  """Utility class for gcsfuse mounted buckets."""
+
+  def __init__(self, docker_path):
+    self._relative_path = docker_path
+    self.param_class = job_model.MountParam
+
+  def parse_uri(self, raw_uri):
+    """Return a valid docker_path, uri, and file provider from a flag value."""
+    # Assume URI is a directory path.
+    raw_uri = directory_fmt(raw_uri)
+    _, docker_path = _gcs_uri_rewriter(raw_uri)
+    docker_uri = os.path.join(self._relative_path, docker_path)
+    return docker_uri
+
+  def make_param(self, name, raw_uri):
+    """Return a MountParam given the uri for a GCS bucket."""
+    docker_path = self.parse_uri(raw_uri)
+    return self.param_class(name, raw_uri, docker_path)
+
+
+def _gcs_uri_rewriter(raw_uri):
+  """Rewrite GCS file paths as required by the rewrite_uris method.
+
+  The GCS rewriter performs no operations on the raw_path and simply returns
+  it as the normalized URI. The docker path has the gs:// prefix replaced
+  with gs/ so that it can be mounted inside a docker image.
+
+  Args:
+    raw_uri: (str) the raw GCS URI, prefix, or pattern.
+
+  Returns:
+    normalized: a cleaned version of the uri provided by command line.
+    docker_path: the uri rewritten in the format required for mounting inside
+                 a docker worker.
+  """
+  docker_path = raw_uri.replace('gs://', 'gs/', 1)
+  return raw_uri, docker_path
 
 
 def build_logging_param(logging_uri, util_class=OutputFileParamUtil):
@@ -527,8 +548,8 @@ def parse_pair_args(labels, argclass):
 
 
 def args_to_job_params(envs, labels, inputs, inputs_recursive, outputs,
-                       outputs_recursive, input_file_param_util,
-                       output_file_param_util):
+                       outputs_recursive, mounts, input_file_param_util,
+                       output_file_param_util, mount_param_util):
   """Parse env, input, and output parameters into a job parameters and data.
 
   Passing arguments on the command-line allows for launching a single job.
@@ -549,8 +570,10 @@ def args_to_job_params(envs, labels, inputs, inputs_recursive, outputs,
     inputs_recursive: list of recursive directory input parameters
     outputs: list of file output parameters
     outputs_recursive: list of recursive directory output parameters
+    mounts: list of gcs buckets to mount
     input_file_param_util: Utility for producing InputFileParam objects.
     output_file_param_util: Utility for producing OutputFileParam objects.
+    mount_param_util: Utility for producing MountParam objects.
 
   Returns:
     job_params: a dictionary of 'envs', 'inputs', and 'outputs' that defines the
@@ -582,11 +605,17 @@ def args_to_job_params(envs, labels, inputs, inputs_recursive, outputs,
       name = output_file_param_util.get_variable_name(name)
       output_data.add(output_file_param_util.make_param(name, value, recursive))
 
+  mount_data = set()
+  for arg in mounts:
+    name, value = split_pair(arg, '=', 1)
+    mount_data.add(mount_param_util.make_param(name, value))
+
   return {
       'envs': env_data,
       'inputs': input_data,
       'outputs': output_data,
       'labels': label_data,
+      'mounts': mount_data,
   }
 
 
@@ -612,7 +641,7 @@ def validate_submit_args_or_fail(job_descriptor, provider_name, input_providers,
 
   >>> job_resources = type('', (object,),
   ...    {"logging": job_model.LoggingParam('gs://logtemp', job_model.P_GCS)})()
-  >>> job_params={'inputs': set(), 'outputs': set()}
+  >>> job_params={'inputs': set(), 'outputs': set(), 'mounts': set()}
   >>> task_descriptors = [
   ...     job_model.TaskDescriptor(None, {
   ...       'inputs': {
@@ -789,37 +818,46 @@ def age_to_create_time(age, from_time=None):
     raise ValueError('Unable to parse age string %s: %s' % (age, e))
 
 
-def timeout_in_seconds(timeout):
+def _interval_to_seconds(interval, valid_units='smhdw'):
   """Convert the timeout duration to seconds.
 
   The value must be of the form "<integer><unit>" where supported
   units are s, m, h, d, w (seconds, minutes, hours, days, weeks).
 
   Args:
-    timeout: A "<integer><unit>" string.
+    interval: A "<integer><unit>" string.
+    valid_units: A list of supported units.
 
   Returns:
-    A string of the form "<integer><unit>" or None if timeout is empty.
+    A string of the form "<integer>s" or None if timeout is empty.
   """
-  if not timeout:
+  if not interval:
     return None
 
   try:
-    last_char = timeout[-1]
+    last_char = interval[-1]
 
-    if last_char == 's':
-      return str(float(timeout[:-1])) + 's'
-    elif last_char == 'm':
-      return str(float(timeout[:-1]) * 60) + 's'
-    elif last_char == 'h':
-      return str(float(timeout[:-1]) * 60 * 60) + 's'
-    elif last_char == 'd':
-      return str(float(timeout[:-1]) * 60 * 60 * 24) + 's'
-    elif last_char == 'w':
-      return str(float(timeout[:-1]) * 60 * 60 * 24 * 7) + 's'
+    if last_char == 's' and 's' in valid_units:
+      return str(float(interval[:-1])) + 's'
+    elif last_char == 'm' and 'm' in valid_units:
+      return str(float(interval[:-1]) * 60) + 's'
+    elif last_char == 'h' and 'h' in valid_units:
+      return str(float(interval[:-1]) * 60 * 60) + 's'
+    elif last_char == 'd' and 'd' in valid_units:
+      return str(float(interval[:-1]) * 60 * 60 * 24) + 's'
+    elif last_char == 'w' and 'w' in valid_units:
+      return str(float(interval[:-1]) * 60 * 60 * 24 * 7) + 's'
     else:
       raise ValueError(
-          'Unsupported units in timeout string %s: %s' % (timeout, last_char))
+          'Unsupported units in interval string %s: %s' % (interval, last_char))
 
   except (ValueError, OverflowError) as e:
-    raise ValueError('Unable to parse timeout string %s: %s' % (timeout, e))
+    raise ValueError('Unable to parse interval string %s: %s' % (interval, e))
+
+
+def timeout_in_seconds(timeout):
+  return _interval_to_seconds(timeout, valid_units='smhdw')
+
+
+def log_interval_in_seconds(log_interval):
+  return _interval_to_seconds(log_interval, valid_units='smh')

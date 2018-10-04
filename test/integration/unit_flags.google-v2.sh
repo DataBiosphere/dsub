@@ -329,6 +329,80 @@ function test_no_timeout() {
 }
 readonly -f test_no_timeout
 
+function test_log_interval() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --log-interval '1h'; then
+
+    # Check that the output contains expected values
+    assert_err_value_matches \
+     "[0].pipeline.actions.[0].commands.[1]" "3600.0s"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_log_interval
+
+function test_no_log_interval() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_matches \
+     "[0].pipeline.actions.[0].commands.[1]" "60s"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_log_interval
+
+function test_ssh() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --ssh; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.actions.[1].entrypoint" "ssh-server"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_ssh
+
+function test_no_ssh() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output does not contain ssh values
+    assert_err_not_contains \
+     "ssh-server"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_ssh
+
 # Run the tests
 trap "exit_handler" EXIT
 
@@ -360,3 +434,10 @@ echo
 test_timeout
 test_no_timeout
 
+echo
+test_log_interval
+test_no_log_interval
+
+echo
+test_ssh
+test_no_ssh

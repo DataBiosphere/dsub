@@ -66,7 +66,7 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
       '--script', '%s/script_io_test.sh' % test.TEST_DIR,
       '--tasks', test.TASKS_FILE,
       '--env', 'TEST_NAME=%s' % test.TEST_NAME,
-      '--input', 'POPULATION_FILE=%s' % POPULATION_FILE,
+      '--input', 'POPULATION_FILE_PATH=%s' % POPULATION_FILE,
       '--output', 'OUTPUT_POPULATION_FILE=%s/*' % test.OUTPUTS,
       '--wait'])
   # pyformat: enable

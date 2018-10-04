@@ -10,8 +10,8 @@ filtering of output based on 3 fields. Each field can take a list of values
 to filter on:
 
 * `job-id`: one or more job-id values
-* `user-id`: the `$USER` who submitted the job, or `"*"` for all users
-* `status`: `RUNNING`, `SUCCESS`, `FAILURE`, `CANCELED`, or `"*"` for all job
+* `user-id`: the `$USER` who submitted the job, or `'*'` for all users
+* `status`: `RUNNING`, `SUCCESS`, `FAILURE`, `CANCELED`, or `'*'` for all job
 statuses
 
 ### Check all my running jobs
@@ -20,7 +20,7 @@ When submitted with no filter arguments, `dstat` shows  information for all
 tasks in the `RUNNING` state belonging to the current user:
 
 ```
-$ dstat --project my-project
+$ dstat --provider google-v2 --project my-project
 Job Name        Task    Status            Last Update
 --------------  ------  ----------------  -------------------
 my-job-name     task-3  localizing-files  2017-04-06 16:03:34
@@ -44,7 +44,7 @@ them separately. To check on a specific job, pass the `--jobs` (or `-j`)
 flag. For example:
 
 ```
-$ dstat --project my-project --jobs my-job-id
+$ dstat --provider google-v2 --project my-project --jobs my-job-id
 Job Name        Status    Last Update
 --------------  --------  -------------------
 my-job-name     Pending   2017-04-11 16:05:35
@@ -58,9 +58,11 @@ To check a specific job independent of status, pass the
 value `*` to `dstat`:
 
 ```
-$ dstat --project my-project \
+$ dstat \
+  --provider google-v2 \
+  --project my-project \
   --jobs my-job-id \
-  --status "*"
+  --status '*'
 Job Name        Status                          Last Update
 --------------  ------------------------------  -------------------
 my-job-name     Operation canceled at 2017-...  2017-04-11 16:07:02
@@ -73,7 +75,7 @@ Be sure to quote the `*` to prevent shell expansion.
 To view results for all jobs associated with your user id:
 
 ```
-dstat --project my-project --status "*"
+dstat --provider google-v2 --project my-project --status '*'
 ```
 
 ### Check jobs with my own labels
@@ -87,8 +89,8 @@ You can set labels on your job using the `--label` flag. For example:
 
 ```
 dsub \
-  --label "billing-code=c9" \
-  --label "batch=august-2017" \
+  --label 'billing-code=c9' \
+  --label 'batch=august-2017' \
   ...
 ```
 
@@ -109,9 +111,9 @@ For example, looking up all tasks from the above `--tasks` example:
 
 ```
 dstat \
-  --label "billing-code=a9" \
-  --label "batch=august-2017" \
-  --status "*" \
+  --label 'billing-code=a9' \
+  --label 'batch=august-2017' \
+  --status '*' \
   ...
 ```
 
@@ -119,10 +121,10 @@ Will match all jobs with the `billing-code` label of `a9`, while:
 
 ```
 dstat \
-  --label "billing-code=999" \
-  --label "batch=august-2017" \
-  --label "sample-id=sam002" \
-  --status "*" \
+  --label 'billing-code=999' \
+  --label 'batch=august-2017' \
+  --label 'sample-id=sam002' \
+  --status '*' \
   ...
 ```
 
@@ -136,9 +138,9 @@ To delete all of the above tasks:
 
 ```
 ddel \
-  --label "billing-code=a9" \
-  --label "batch=august-2017" \
-  --status "*" \
+  --label 'billing-code=a9' \
+  --label 'batch=august-2017' \
+  --status '*' \
   ...
 ```
 
@@ -146,10 +148,10 @@ To delete only the second task:
 
 ```
 dstat \
-  --label "billing-code=a9" \
-  --label "batch=august-2017" \
-  --label "sample-id=sam002" \
-  --status "*" \
+  --label 'billing-code=a9' \
+  --label 'batch=august-2017' \
+  --label 'sample-id=sam002' \
+  --status '*' \
   ...
 ```
 
@@ -174,7 +176,7 @@ use the `--age` flag.
 For example, the following command will return all jobs started in the last day:
 
 ```
-./dstat --project my-project --status "*" --age 1d
+./dstat --provider google-v2 --project my-project --status '*' --age 1d
 ```
 
 The `--age` flags supports the following types of values:
@@ -215,7 +217,9 @@ By default `dstat` will query job status and exit. However, you can use the
 The following examples shows minute-by-minute progression of 3 tasks
 
 ```
-$ dstat --project my-project \
+$ dstat \
+  --provider google-v2 \
+  --project my-project \
   --jobs my-job-id \
   --wait --poll-interval 60
 Job Name        Task    Status    Last Update
@@ -276,28 +280,15 @@ maintain consistency between dsub versions.
 ### Full output (default format YAML)
 
 ```
-$ dstat --project my-project \
+$ dstat \
+  --provider google-v2 \
+  --project my-project \
   --jobs my-job-id \
   --full
 - create-time: '2017-04-11 16:47:06'
   end-time: '2017-04-11 16:51:38'
   inputs:
     INPUT_PATH: gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam
-    _SCRIPT: |+
-      #!/bin/bash
-
-      # Copyright 2016 Google Inc. All Rights Reserved.
-      #
-      # Licensed under the Apache License, Version 2.0 (the "License");
-<trimmed for brevity>
-      readonly INPUT_FILE_LIST="$(ls "${INPUT_PATH}")"
-
-      for INPUT_FILE in "${INPUT_FILE_LIST[@]}"; do
-        FILE_NAME="$(basename "${INPUT_FILE}")"
-
-        md5sum "${INPUT_FILE}" | awk '{ print $1 }' > "${OUTPUT_DIR}/${FILE_NAME}.md5"
-      done
-
   internal-id: operations/OPERATION-ID
   job-id: my-job-id
   job-name: my-job-name
@@ -314,28 +305,23 @@ Note the `Internal ID` in this example provides the
 ### Full output as tabular text
 
 ```
-$ dstat --project my-project \
+$ dstat \
+  --provider google-v2 \
+  --project my-project \
   --jobs my-job-id \
   --format text \
   --full
 Job ID                                  Job Name        Status    Last Update          Created              Ended                User      Internal ID                                                         Inputs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  Outputs
 --------------------------------------  --------------  --------  -------------------  -------------------  -------------------  --------  ------------------------------------------------------------------  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  -------------------------------------------------------
-my-job-id                               my-job-name     Success   2017-04-11 16:51:38  2017-04-11 16:47:06  2017-04-11 16:51:38  my-user   operations/OPERATION-ID                                             INPUT_PATH=gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam, _SCRIPT=#!/bin/bash
-# Copyright 2016 Google Inc. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-<trimmed for brevity>
-for INPUT_FILE in "${INPUT_FILE_LIST[@]}"; do
-  FILE_NAME="$(basename "${INPUT_FILE}")"
-
-  md5sum "${INPUT_FILE}" | awk '{ print $1 }' > "${OUTPUT_DIR}/${FILE_NAME}.md5"
-done  OUTPUT_PATH=gs://my-bucket/path/output
+my-job-id                               my-job-name     Success   2017-04-11 16:51:38  2017-04-11 16:47:06  2017-04-11 16:51:38  my-user   operations/OPERATION-ID                                             INPUT_PATH=gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam
 ```
 
 ### Full output as JSON
 
 ```
-$ dstat --project my-project \
+$ dstat \
+  --provider google-v2 \
+  --project my-project \
   --jobs my-job-id \
   --format json \
   --full
@@ -343,7 +329,6 @@ $ dstat --project my-project \
   {
     "status": "Success",
     "inputs": {
-      "_SCRIPT": "#!/bin/bash\n\n# Copyright 2016 Google Inc. All Rights Reserved.\n#\n# Licensed under the Apache License, Version 2.0 (the \"License\");\n<trimmed for brevity>for INPUT_FILE in \"${INPUT_FILE_LIST[@]}\"; do\n  FILE_NAME=\"$(basename \"${INPUT_FILE}\")\"\n\n  md5sum \"${INPUT_FILE}\" | awk '{ print $1 }' > \"${OUTPUT_DIR}/${FILE_NAME}.md5\"\ndone\n\n", 
       "INPUT_PATH": "gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot2_high_cov_GRCh37_bams/data/NA12878/alignment/NA12878.chrom9.SOLID.bfast.CEU.high_coverage.20100125.bam"
     },
     "job-name": "my-job-name",
@@ -368,3 +353,41 @@ The Google Pipelines API is currently the only backend provider.
 See the
 [Pipelines API Troubleshooting guide](https://cloud.google.com/genomics/v1alpha2/pipelines-api-troubleshooting)
 for more details on log files.
+
+## SSH to the VM
+
+With the `google-v2` provider, there is no SSH server running on the
+Compute Engine Virtual Machine by default. To start an SSH server, use the
+`dsub` command-line flag `--ssh` , which will start an SSH container in the
+background and will mount your data disk. This will allow you to inspect the
+runtime environment of your job's container in real time.
+
+The SSH container will pick up authentication information from the VM, so to
+connect you can use the `gcloud compute ssh` command to establish an SSH
+session.
+
+The VM `instance-name` and `zone` can be found in the `provider-attributes`
+section of `dstat ... --full` output. For example:
+
+```
+  provider-attributes:
+    boot-disk-size: 10
+    disk-size: 200
+    instance-name: google-pipelines-worker-<hash>
+    machine-type: n1-standard-1
+    preemptible: false
+    regions:
+    - us-central1
+    zone: us-central1-f
+    zones: []
+```
+
+Then issue the command:
+
+```
+    gcloud compute \
+      --project your-project \
+      ssh \
+      --zone <zone> \
+     <instance-name>
+```

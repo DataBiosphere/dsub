@@ -10,7 +10,8 @@ implements a consistent runtime environment. The current supported providers
 are:
 
 - local
-- google
+- google (the default, deprecated: please use `google-v2`)
+- google-v2
 
 ## Runtime environment
 
@@ -39,7 +40,7 @@ Use the environment variables described in
 [Input and Output File Handling](../input_output.md)
 documentation.
 
-### User script name is preserved and the directory is "world-writeable"
+### Your script name is preserved and the directory is "world-writeable"
 
 The script that you specify for the `--script` flag will be written to a
 writeable directory within your Docker container, and the name of your
@@ -69,13 +70,15 @@ of `.py` files, your script will be able to run.
 
 ### TMPDIR will be set to reference a directory on your "data disk"
 
-The `google` provider depends on the
+The `google` and `google-v2` providers depend on the
 [Google Genomics Pipelines API](https://cloud.google.com/genomics/reference/rest/v1alpha2/pipelines)
-which puts the Docker container's `/tmp` directory on the Compute Engine VM's
-boot disk, rather than the data disk that is created for `dsub`.
-To avoid users needing to separately size both the boot disk and the data disk,
-the `google` provider creates a `tmp` directory and sets the `TMPDIR`
-environment variable (supported by many tools) to point to it.
+and
+[Google Genomics Pipelines API](https://cloud.google.com/genomics/reference/rest/v2alpha1/pipelines)
+respectively, which put the Docker container's `/tmp` directory on the Compute
+Engine VM's boot disk, rather than the data disk that is created for `dsub`.
+To avoid your needing to separately size both the boot disk and the data disk,
+the `google` and `google-v2` providers create a `tmp` directory and set the
+`TMPDIR` environment variable (supported by many tools) to point to it.
 
 The separation of boot vs. data disk does not hold for the `local` provider,
 but the `local` provider still sets `TMPDIR`. `dsub` scripts that need
@@ -108,7 +111,7 @@ The specifics of where temporary directories and files are created are subject
 to change. Your script code should access elements of the runtime environment
 through environment variables as described above.
 
-### Local provider
+### `local` provider
 
 The `local` provider creates a runtime workspace on the Docker host
 (your local workstation or laptop) to execute the following sequence of events:
@@ -158,9 +161,9 @@ The data folder contains:
 -   `output`: location for script to write automatically delocalized `--output`
     and `--output-recursive` parameter values.
 -   `script`: location of the your dsub `--script` or `--command` script.
--   `tmp`: temporary directory for the user script. `TMPDIR` is set to this
+-   `tmp`: temporary directory for the your script. `TMPDIR` is set to this
     directory.
--   `workingdir`: the working directory set before the user script runs.
+-   `workingdir`: the working directory set before the your script runs.
 
 #### Task state and logging
 
@@ -191,7 +194,7 @@ During execution, `runner.sh` writes the following files to record task state:
 The `local` provider does not support resource-related flags such as
 `--min-cpu`, `--min-ram`, `--boot-disk-size`, or `--disk-size`.
 
-### Google provider
+### `google` provider
 
 The `google` provider utilizes the Google Genomics Pipelines API
 [pipelines.run()](https://cloud.google.com/genomics/reference/rest/v1alpha2/pipelines/run)
@@ -274,9 +277,9 @@ The `/mnt/data` folder contains:
 -   `output`: location for script to write automatically delocalized `--output`
     and `--output-recursive` parameter values.
 -   `script`: location of the your dsub `--script` or `--command` script.
--   `tmp`: temporary directory for the user script. `TMPDIR` is set to this
+-   `tmp`: temporary directory for the your script. `TMPDIR` is set to this
     directory.
--   `workingdir`: the working directory set before the user script runs.
+-   `workingdir`: the working directory set before the your script runs.
 
 #### Task state and logging
 
@@ -319,4 +322,109 @@ that satisfies your requested minimums.
 The Docker container launched by the Pipelines API will use the host VM boot
 disk for system paths. All other directories set up by `dsub` will be on the
 data disk, including the `TMPDIR` (as discussed abovec). Thus you should only
+ever need to change the `--disk-size`.
+
+### `google-v2` provider
+
+The `google-v2` provider utilizes the Google Genomics Pipelines API
+[pipelines.run()](https://cloud.google.com/genomics/reference/rest/v2alpha1/pipelines/run)
+to queue a request for the following sequence of events:
+
+1. Create a Google Compute Engine
+[Virtual Machine (VM) instance](https://cloud.google.com/compute/docs/instances/).
+2. Create a Google Compute Engine
+[Persistent Disk](https://cloud.google.com/compute/docs/disks/) and mount it
+as a "data disk".
+3. Localize files from
+[Google Cloud Storage](https://cloud.google.com/storage/docs/) to the data disk.
+4. Run execute your `--script` or `--command` in your Docker container.
+5. Delocalize files from the data disk to Google Cloud Storage.
+6. Destroy the VM
+
+#### Orchestration
+
+When the pipelines.run() API is called, it creates an
+[operation](https://cloud.google.com/genomics/reference/rest/v2alpha1/operations).
+The Pipelines API service will then create the VM and disk when
+the your Cloud Project has sufficient
+[Compute Engine quota](https://cloud.google.com/compute/quotas).
+
+When the VM starts, it runs a Compute Engine
+[startup script](https://cloud.google.com/compute/docs/startupscript)
+to launch the Pipelines API "worker" which runs a set of on-VM services,
+and orchestrates execution of *a sequence* of Docker containers.
+After the containers have exited, the worker shuts off the VM.
+
+Execution of `dsub` features is handled by a series of Docker containers on the
+VM. The sequence of containers executed is:
+
+1. `logging` (copy logs to GCS; *run in background*)
+2. `prepare` (prepare data disk and save your script to the data disk)
+3. `localization` (copy GCS objects to the data disk)
+4. `user-command` (execute the user command)
+5. `delocalization` (copy files from the data disk to GCS)
+6. `final_logging` (copy logs to GCS; *always run*)
+
+The `prepare` step does the following:
+
+1. Create runtime directories (`script`, `tmp`, `workingdir`).
+2. Write the user `--script` or `--command` to a file and make it executable.
+3. Create the directories for `--input` and `--output` parameters.
+
+#### Container runtime environment
+
+The data disk path in the Docker containers is:
+
+- `/mnt/data`
+
+The `/mnt/data` folder contains:
+
+-   `input`: location of localized `--input` and `--input-recursive` parameters.
+-   `output`: location for your script to write files to be delocalized for
+    `--output` and `--output-recursive` parameters.
+-   `script`: location of the your dsub `--script` or `--command` script.
+-   `tmp`: temporary directory for the your script. `TMPDIR` is set to this
+    directory.
+-   `workingdir`: the working directory set before the your script runs.
+
+#### Task status
+
+The Genomics `v2alpha1` API supports operation status of:
+
+- done: false
+- done: true with no error
+- done: true with error
+
+`dsub` interprets the above to provide task statuses of:
+
+- RUNNING
+- SUCCESS
+- FAILURE
+- CANCELED
+
+Note that for historical reasons, while an operation is queued for execution
+its status is `RUNNING`.
+
+#### Logging
+
+The `google-v2` provider saves 3 log files to Cloud Storage, every 5 minutes
+to the `--logging` location specified to `dsub`:
+
+- `[prefix].log`: log generated by all containers running on the VM
+- `[prefix]-stdout.log`: stdout from your Docker container
+- `[prefix]-stderr.log`: stderr from your Docker container
+
+Logging paths and the `[prefix]` are discussed further in [Logging](../logging.md).
+
+#### Resource requirements
+
+The `google-v2` provider supports resource-related flags such as
+`--machine-type`, `--boot-disk-size`, `--disk-size`, and several other
+Compute Engine VM parameters.
+
+##### Disk allocation
+
+The Docker container launched by the Pipelines API will use the host VM boot
+disk for system paths. All other directories set up by `dsub` will be on the
+data disk, including the `TMPDIR` (as discussed above). Thus you should only
 ever need to change the `--disk-size`.
