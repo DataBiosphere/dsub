@@ -141,6 +141,7 @@ class TextOutput(OutputFormatter):
         ('internal-id', 'Internal ID'),
         ('logging', 'Logging'),
         ('labels', 'Labels', self.format_pairs),
+        ('envs', 'Environment Variables', self.format_pairs),
         ('inputs', 'Inputs', self.format_pairs),
         ('outputs', 'Outputs', self.format_pairs),
         ('mounts', 'Mounts', self.format_pairs),
