@@ -168,7 +168,11 @@ class TextOutput(OutputFormatter):
     return new_row
 
   def print_table(self, table):
-    print(tabulate.tabulate(table, headers='keys'))
+    if not table:
+      # Old versions of tabulate (0.7.5)  emit 'k e y s\n--- --- --- ---'
+      print('')
+    else:
+      print(tabulate.tabulate(table, headers='keys'))
     print('')
 
 
