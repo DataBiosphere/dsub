@@ -21,7 +21,7 @@ from __future__ import print_function
 STATUS_FILTER_MAP = {
     'RUNNING': 'done = false',
     'CANCELED': 'error = 1',
-    'FAILED': 'error > 1',
+    'FAILURE': 'error > 1',
     'SUCCESS': 'error = 0',
 }
 
