@@ -568,6 +568,9 @@ def dstat_job_producer(provider,
 
     formatted_tasks = []
     for task in tasks:
+      if 0 < max_tasks <= len(formatted_tasks):
+        break
+
       # Format tasks as specified.
       if raw_format:
         formatted_tasks.append(task.raw_task_data())

@@ -540,7 +540,7 @@ class LocalJobProvider(base.JobProvider):
 
           ret.append(task)
 
-          if 0 < max_tasks < len(ret):
+          if 0 < max_tasks <= len(ret):
             break
 
     _sort_tasks(ret)

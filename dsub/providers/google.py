@@ -840,7 +840,7 @@ class GoogleJobProvider(base.JobProvider):
     for task in query_queue:
       yield task
       tasks_yielded += 1
-      if 0 < max_tasks < tasks_yielded:
+      if 0 < max_tasks <= tasks_yielded:
         break
 
   def delete_jobs(self,

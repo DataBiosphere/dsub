@@ -929,46 +929,42 @@ class GoogleV2JobProvider(base.JobProvider):
     # Now and all of these arguments together.
     return ' AND '.join(or_arguments + and_arguments)
 
-  def _operations_list(self, ops_filter, page_size=0):
+  def _operations_list(self, ops_filter, max_tasks, page_size, page_token):
     """Gets the list of operations for the specified filter.
 
     Args:
       ops_filter: string filter of operations to return
+      max_tasks: the maximum number of job tasks to return or 0 for no limit.
       page_size: the number of operations to requested on each list operation to
         the pipelines API (if 0 or None, the API default is used)
+      page_token: page token returned by a previous _operations_list call.
 
-    Yields:
+    Returns:
       Operations matching the filter criteria.
     """
 
-    page_token = None
-    more_operations = True
-
     # We are not using the documented default page size of 256,
-    # as it causes the operations.list() API to return an error
+    # nor allowing for the maximum page size of 2048 as larger page sizes
+    # currently cause the operations.list() API to return an error:
     # HttpError 429 ... Resource has been exhausted (e.g. check quota).
-    current_best_page_size = 128
-    documented_max_page_size = 2048
+    max_page_size = 128
 
-    if not page_size:
-      page_size = current_best_page_size
-    page_size = min(page_size, documented_max_page_size)
+    # Set the page size to the smallest (non-zero) size we can
+    page_size = min(sz for sz in [page_size, max_page_size, max_tasks] if sz)
 
-    while more_operations:
-      api = self._service.projects().operations().list(
-          name='projects/{}/operations'.format(self._project),
-          filter=ops_filter,
-          pageToken=page_token,
-          pageSize=page_size)
-      response = google_base.Api.execute(api)
+    # Execute operations.list() and return all of the dsub operations
+    api = self._service.projects().operations().list(
+        name='projects/{}/operations'.format(self._project),
+        filter=ops_filter,
+        pageToken=page_token,
+        pageSize=page_size)
+    response = google_base.Api.execute(api)
 
-      ops = response.get('operations', [])
-      for op in ops:
-        if google_v2_operations.is_dsub_operation(op):
-          yield GoogleOperation(op)
-
-      page_token = response.get('nextPageToken')
-      more_operations = bool(page_token)
+    return [
+        GoogleOperation(op)
+        for op in response.get('operations', [])
+        if google_v2_operations.is_dsub_operation(op)
+    ], response.get('nextPageToken')
 
   def lookup_job_tasks(self,
                        statuses,
@@ -1013,20 +1009,29 @@ class GoogleV2JobProvider(base.JobProvider):
       Genomics API Operations objects.
     """
 
+    # Build a filter for operations to return
     ops_filter = self._build_query_filter(
         statuses, user_ids, job_ids, job_names, task_ids, task_attempts, labels,
         create_time_min, create_time_max)
 
-    # The pipelines API returns operations sorted by create-time date. We can
-    # use this sorting guarantee to merge-sort the streams together and only
-    # retrieve more tasks as needed.
-    stream = self._operations_list(ops_filter, page_size=page_size)
-
+    # Execute the operations.list() API to get batches of operations to yield
+    page_token = None
     tasks_yielded = 0
-    for task in stream:
-      yield task
-      tasks_yielded += 1
-      if 0 < max_tasks < tasks_yielded:
+    while True:
+      # If max_tasks is set, let operations.list() know not to send more than
+      # we need.
+      max_to_fetch = None
+      if max_tasks:
+        max_to_fetch = max_tasks - tasks_yielded
+      ops, page_token = self._operations_list(ops_filter, max_to_fetch,
+                                              page_size, page_token)
+
+      for op in ops:
+        yield op
+        tasks_yielded += 1
+
+      assert (max_tasks >= tasks_yielded or not max_tasks)
+      if not page_token or 0 < max_tasks <= tasks_yielded:
         break
 
   def delete_jobs(self,

@@ -159,6 +159,22 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     exit 1
   fi
 
+  echo "Checking dstat (with a limit)..."
+
+  LIMIT=1
+  if ! DSTAT_OUTPUT=$(run_dstat --status '*' --limit="${LIMIT}" --format yaml 2>&1); then
+    echo "dstat exited with a non-zero exit code!"
+    echo "Output:"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+
+  TASK_COUNT=$(echo "${DSTAT_OUTPUT}" | grep -w "job-name" | wc -l)
+  if [[ "${TASK_COUNT}" -ne "${LIMIT}" ]]; then
+    echo "Number of tasks returned by limit ${TASK_COUNT} not ${LIMIT}!"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
   echo "Checking dstat (summary)"
 
   if ! DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${JOBID}" --summary 2>&1)"; then
