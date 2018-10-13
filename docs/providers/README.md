@@ -20,7 +20,7 @@ runtime environment:
 
 ### Environment variables point to your `--input` files
 
-When you write your commands that run in your Docker container, you shoud
+When you write your commands that run in your Docker container, you should
 always access your input files through the environment variables that
 are set for them.
 You may observe that providers consistently place input files under
@@ -321,7 +321,7 @@ that satisfies your requested minimums.
 
 The Docker container launched by the Pipelines API will use the host VM boot
 disk for system paths. All other directories set up by `dsub` will be on the
-data disk, including the `TMPDIR` (as discussed abovec). Thus you should only
+data disk, including the `TMPDIR` (as discussed above). Thus you should only
 ever need to change the `--disk-size`.
 
 ### `google-v2` provider
