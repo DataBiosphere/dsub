@@ -403,6 +403,49 @@ function test_no_ssh() {
 }
 readonly -f test_no_ssh
 
+function test_user_project() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --user-project 'sample-project-name'; then
+
+    # Check for the USER_PROJECT in the environment for the
+    # logging, localization, delocalization, and final_logging actions
+    assert_err_value_matches \
+     "[0].pipeline.actions.[0].environment.USER_PROJECT" "sample-project-name"
+    assert_err_value_matches \
+     "[0].pipeline.actions.[2].environment.USER_PROJECT" "sample-project-name"
+    assert_err_value_matches \
+     "[0].pipeline.actions.[4].environment.USER_PROJECT" "sample-project-name"
+    assert_err_value_matches \
+     "[0].pipeline.actions.[5].environment.USER_PROJECT" "sample-project-name"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_user_project
+
+function test_no_user_project() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_not_contains "sample-project-name"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_user_project
+
 # Run the tests
 trap "exit_handler" EXIT
 
@@ -441,3 +484,7 @@ test_no_log_interval
 echo
 test_ssh
 test_no_ssh
+
+echo
+test_user_project
+test_no_user_project

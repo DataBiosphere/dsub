@@ -1004,6 +1004,9 @@ class GoogleOperation(base.Task):
               event['endTime'])
 
         value.append(event_value)
+    elif field == 'user-project':
+      # Supported in local and google-v2 providers.
+      value = None
 
     else:
       raise ValueError('Unsupported field: "%s"' % field)

@@ -307,6 +307,11 @@ def _parse_arguments(prog, argv):
       '--user',
       '-u',
       help='User submitting the dsub job, defaults to the current OS user.')
+  parser.add_argument(
+      '--user-project',
+      help="""Specify a user project to be billed for all requests to Google
+         Cloud Storage (logging, localization, delocalization). This flag exists
+         to support accessing Requester Pays buckets""")
 
   # Add dsub job management arguments
   parser.add_argument(
@@ -528,7 +533,8 @@ def _get_job_resources(args):
       ssh=args.ssh)
 
 
-def _get_job_metadata(provider, user_id, job_name, script, task_ids):
+def _get_job_metadata(provider, user_id, job_name, script, task_ids,
+                      user_project):
   """Allow provider to extract job-specific metadata from command-line args.
 
   Args:
@@ -537,6 +543,7 @@ def _get_job_metadata(provider, user_id, job_name, script, task_ids):
     job_name: name for the job
     script: the script to run
     task_ids: a set of the task-ids for all tasks in the job
+    user_project: name of the project to be billed for the request
 
   Returns:
     A dictionary of job-specific metadata (such as job id, name, etc.)
@@ -548,6 +555,7 @@ def _get_job_metadata(provider, user_id, job_name, script, task_ids):
 
   job_metadata['create-time'] = create_time
   job_metadata['script'] = script
+  job_metadata['user-project'] = user_project
   if task_ids:
     job_metadata['task-ids'] = dsub_util.compact_interval_string(list(task_ids))
 
@@ -975,6 +983,7 @@ def run_main(args):
       command=args.command,
       script=args.script,
       user=args.user,
+      user_project=args.user_project,
       wait=args.wait,
       retries=args.retries,
       poll_interval=args.poll_interval,
@@ -993,6 +1002,7 @@ def run(provider,
         command=None,
         script=None,
         user=None,
+        user_project=None,
         wait=False,
         retries=0,
         poll_interval=10,
@@ -1040,7 +1050,8 @@ def run(provider,
   # We can now compute some job and task properties, including:
   #  job_metadata such as the job-id, create-time, user-id, etc.
   #  task_resources such as the logging_path (which may include job-id, task-id)
-  job_metadata = _get_job_metadata(provider, user, name, script, task_ids)
+  job_metadata = _get_job_metadata(provider, user, name, script, task_ids,
+                                   user_project)
   _resolve_task_resources(job_metadata, job_resources, task_descriptors)
 
   # Job and task properties are now all resolved. Begin execution!

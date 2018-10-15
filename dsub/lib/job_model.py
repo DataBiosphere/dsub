@@ -577,6 +577,7 @@ class JobDescriptor(object):
         'user-id': job_metadata.get('user-id'),
         'create-time': job_metadata.get('create-time'),
         'dsub-version': job_metadata.get('dsub-version'),
+        'user-project': job_metadata.get('user-project'),
     }
 
     job['task-ids'] = job_metadata.get('task-ids')
@@ -769,7 +770,10 @@ class JobDescriptor(object):
       return cls._from_yaml_v0(job)
 
     job_metadata = {}
-    for key in ['job-id', 'job-name', 'task-ids', 'user-id', 'dsub-version']:
+    for key in [
+        'job-id', 'job-name', 'task-ids', 'user-id', 'dsub-version',
+        'user-project'
+    ]:
       if job.get(key) is not None:
         job_metadata[key] = job.get(key)
 
