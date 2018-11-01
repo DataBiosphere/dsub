@@ -215,7 +215,15 @@ function get_test_providers() {
     return
   fi
 
-  local all_provider_list="${DSUB_PROVIDER:-local google google-v2}"
+  case "${test_file}" in
+    e2e_requester_pays_buckets.sh)
+      local all_provider_list="${DSUB_PROVIDER:-local google-v2}"
+      ;;
+    *)
+      local all_provider_list="${DSUB_PROVIDER:-local google google-v2}"
+      ;;
+  esac
+
   echo -n "${all_provider_list}"
 }
 readonly -f get_test_providers

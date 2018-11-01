@@ -241,6 +241,20 @@ If you use a Debian or Ubuntu Docker image, you are encouraged to use the
 If you use a Red Hat or CentOS Docker image, you are encouraged to use the
 [package installation instructions](https://cloud.google.com/sdk/downloads#yum).
 
+## Requester Pays
+
+To access a Google Cloud Storage
+[Requester Pays bucket](https://cloud.google.com/storage/docs/requester-pays),
+you will need to specify a billing project. To do so, use the `dsub`
+command-line option `--user-project`:
+
+```
+--user-project my-cloud-project
+```
+
+Access to Requester Pays buckets is supported by the `local` and `google-v2`
+providers. It is not supported by the `google` provider.
+
 ## Unsupported path formats:
 
 * GCS recursive wildcards (**) are not supported
