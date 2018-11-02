@@ -840,7 +840,7 @@ class GoogleJobProvider(base.JobProvider):
     for task in query_queue:
       yield task
       tasks_yielded += 1
-      if 0 < max_tasks < tasks_yielded:
+      if 0 < max_tasks <= tasks_yielded:
         break
 
   def delete_jobs(self,
@@ -1004,6 +1004,9 @@ class GoogleOperation(base.Task):
               event['endTime'])
 
         value.append(event_value)
+    elif field == 'user-project':
+      # Supported in local and google-v2 providers.
+      value = None
 
     else:
       raise ValueError('Unsupported field: "%s"' % field)

@@ -348,15 +348,17 @@ class LocalJobProvider(base.JobProvider):
         recursive_localize_command=self._localize_inputs_recursive_command(
             task_dir, job_params['inputs'] | task_params['inputs']),
         localize_command=self._localize_inputs_command(
-            task_dir, job_params['inputs'] | task_params['inputs']),
+            task_dir, job_params['inputs'] | task_params['inputs'],
+            job_metadata['user-project']),
         export_output_dirs=providers_util.build_recursive_gcs_delocalize_env(
             task_dir, job_params['outputs'] | task_params['outputs']),
         recursive_delocalize_command=self._delocalize_outputs_recursive_command(
             task_dir, job_params['outputs'] | task_params['outputs']),
         delocalize_command=self._delocalize_outputs_commands(
-            task_dir, job_params['outputs'] | task_params['outputs']),
+            task_dir, job_params['outputs'] | task_params['outputs'],
+            job_metadata['user-project']),
         delocalize_logs_command=self._delocalize_logging_command(
-            task_resources.logging_path),
+            task_resources.logging_path, job_metadata['user-project']),
     )
 
     # Write the runner script and data file to the task_dir
@@ -540,7 +542,7 @@ class LocalJobProvider(base.JobProvider):
 
           ret.append(task)
 
-          if 0 < max_tasks < len(ret):
+          if 0 < max_tasks <= len(ret):
             break
 
     _sort_tasks(ret)
@@ -681,11 +683,12 @@ class LocalJobProvider(base.JobProvider):
   def _provider_root(self):
     return tempfile.gettempdir() + '/dsub-local'
 
-  def _delocalize_logging_command(self, logging_path):
+  def _delocalize_logging_command(self, logging_path, user_project):
     """Returns a command to delocalize logs.
 
     Args:
       logging_path: location of log files.
+      user_project: name of the project to be billed for the request.
 
     Returns:
       eg. 'gs://bucket/path/myfile' or 'gs://bucket/script-foobar-12'
@@ -700,7 +703,10 @@ class LocalJobProvider(base.JobProvider):
       cp_cmd = 'cp'
     elif logging_path.file_provider == job_model.P_GCS:
       mkdir_cmd = ''
-      cp_cmd = 'gsutil -mq cp'
+      if user_project:
+        cp_cmd = 'gsutil -u {} -mq cp'.format(user_project)
+      else:
+        cp_cmd = 'gsutil -mq cp'
     else:
       assert False
 
@@ -790,7 +796,7 @@ class LocalJobProvider(base.JobProvider):
     else:
       return local_file_path
 
-  def _localize_inputs_command(self, task_dir, inputs):
+  def _localize_inputs_command(self, task_dir, inputs, user_project):
     """Returns a command that will stage inputs."""
     commands = []
     for i in inputs:
@@ -811,8 +817,13 @@ class LocalJobProvider(base.JobProvider):
         # - `cp path/* dest/` will error if "path" has subdirectories.
         # - `cp "path/*" "dest/"` will fail (it expects wildcard expansion
         #   to come from shell).
-        commands.append(
-            'gsutil -mq cp "%s" "%s"' % (source_file_path, dest_file_path))
+        if user_project:
+          command = 'gsutil -u %s -mq cp "%s" "%s"' % (
+              user_project, source_file_path, dest_file_path)
+        else:
+          command = 'gsutil -mq cp "%s" "%s"' % (source_file_path,
+                                                 dest_file_path)
+        commands.append(command)
 
     return '\n'.join(commands)
 
@@ -842,7 +853,7 @@ class LocalJobProvider(base.JobProvider):
             os.path.join(task_dir, _DATA_SUBDIR), outputs, job_model.P_LOCAL))
     return '\n'.join(cmd_lines)
 
-  def _delocalize_outputs_commands(self, task_dir, outputs):
+  def _delocalize_outputs_commands(self, task_dir, outputs, user_project):
     """Copy outputs from local disk to GCS."""
     commands = []
     for o in outputs:
@@ -859,7 +870,12 @@ class LocalJobProvider(base.JobProvider):
 
       # Use gsutil even for local files (explained in _localize_inputs_command).
       if o.file_provider in [job_model.P_LOCAL, job_model.P_GCS]:
-        commands.append('gsutil -mq cp "%s" "%s"' % (local_path, dest_path))
+        if user_project:
+          command = 'gsutil -u %s -mq cp "%s" "%s"' % (user_project, local_path,
+                                                       dest_path)
+        else:
+          command = 'gsutil -mq cp "%s" "%s"' % (local_path, dest_path)
+        commands.append(command)
 
     return '\n'.join(commands)
 
@@ -912,7 +928,9 @@ class LocalTask(base.Task):
     task_params = self._raw.job_descriptor.task_descriptors[0].task_params
 
     value = None
-    if field in ['job-id', 'job-name', 'user-id', 'dsub-version']:
+    if field in [
+        'job-id', 'job-name', 'user-id', 'dsub-version', 'user-project'
+    ]:
       value = job_metadata.get(field)
     elif field == 'create-time':
       value = task_metadata.get(field)

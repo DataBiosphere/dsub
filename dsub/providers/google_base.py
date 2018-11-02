@@ -458,10 +458,6 @@ def retry_api_check(exception):
   Returns:
     True if we should retry. False otherwise.
   """
-  now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-  _print_error(
-      '%s: Exception %s: %s' % (now, type(exception).__name__, str(exception)))
-
   if isinstance(exception, apiclient.errors.HttpError):
     if exception.resp.status in TRANSIENT_HTTP_ERROR_CODES:
       _print_error('Retrying...')
@@ -503,10 +499,6 @@ def retry_auth_check(exception):
   Returns:
     True if we should retry. False otherwise.
   """
-  now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-  _print_error(
-      '%s: Exception %s: %s' % (now, type(exception).__name__, str(exception)))
-
   if isinstance(exception, apiclient.errors.HttpError):
     if exception.resp.status in HTTP_AUTH_ERROR_CODES:
       _print_error('Retrying...')
@@ -574,7 +566,14 @@ class Api(object):
     Returns:
        A response body object
     """
-    return api.execute()
+    try:
+      return api.execute()
+    except Exception as exception:
+      now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+      _print_error('%s: Exception %s: %s' % (now, type(exception).__name__,
+                                             str(exception)))
+      # Re-raise exception to be handled by retry logic
+      raise exception
 
 
 if __name__ == '__main__':

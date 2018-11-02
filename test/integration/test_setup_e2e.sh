@@ -74,6 +74,13 @@ if ! gsutil ls "gs://${DSUB_BUCKET}" 2>/dev/null; then
   exit 1
 fi
 
+declare DSUB_BUCKET_REQUESTER_PAYS
+if [[ -n "${YOUR_BUCKET_REQUESTER_PAYS:-}" ]]; then
+  DSUB_BUCKET_REQUESTER_PAYS="${YOUR_BUCKET_REQUESTER_PAYS}"
+else
+  DSUB_BUCKET_REQUESTER_PAYS="dsub-test-requester-pays-public"
+fi
+
 # Set standard LOGGING, INPUTS, and OUTPUTS values
 readonly TEST_GCS_ROOT="gs://${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}"
 readonly TEST_GCS_DOCKER_ROOT="gs/${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}"

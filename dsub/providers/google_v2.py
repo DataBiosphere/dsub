@@ -70,8 +70,9 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
   function gsutil_cp() {
     local src="${1}"
     local dst="${2}"
-    local check_src="${3:-}"
-    local content_type="${4:-}"
+    local check_src="${3}"
+    local content_type="${4}"
+    local user_project_name="${5}"
 
     if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
       return
@@ -82,15 +83,20 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
       headers="-h Content-Type:${content_type}"
     fi
 
+    local user_project_flag=""
+    if [[ -n "${user_project_name}" ]]; then
+      user_project_flag="-u ${user_project_name}"
+    fi
+
     local i
     for ((i = 0; i < 3; i++)); do
-      echo "gsutil ${headers} -mq cp \"${src}\" \"${dst}\""
-      if gsutil ${headers} -mq cp "${src}" "${dst}"; then
+      echo "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
+      if gsutil ${headers} ${user_project_flag} -mq cp "${src}" "${dst}"; then
         return
       fi
     done
 
-    2>&1 echo "ERROR: gsutil ${headers} -mq cp \"${src}\" \"${dst}\""
+    2>&1 echo "ERROR: gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
     exit 1
   }
 """)
@@ -101,21 +107,27 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
   function gsutil_rsync() {
     local src="${1}"
     local dst="${2}"
-    local check_src="${3:-}"
+    local check_src="${3}"
+    local user_project_name="${4}"
 
     if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
       return
     fi
 
+    local user_project_flag=""
+    if [[ -n "${user_project_name}" ]]; then
+      user_project_flag="-u ${user_project_name}"
+    fi
+
     local i
     for ((i = 0; i < 3; i++)); do
-      echo "gsutil -mq rsync -r \"${src}\" \"${dst}\""
-      if gsutil -mq rsync -r "${src}" "${dst}"; then
+      echo "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
+      if gsutil ${user_project_flag} -mq rsync -r "${src}" "${dst}"; then
         return
       fi
     done
 
-    2>&1 echo "ERROR: gsutil -mq rsync -r \"${src}\" \"${dst}\""
+    2>&1 echo "ERROR: gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
     exit 1
   }
 """)
@@ -137,9 +149,9 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
 # the operation to indicate why it failed.
 
 _LOG_CP_CMD = textwrap.dedent("""\
-  gsutil_cp /google/logs/action/{user_action}/stdout "${{STDOUT_PATH}}" "true" "text/plain" &
-  gsutil_cp /google/logs/action/{user_action}/stderr "${{STDERR_PATH}}" "true" "text/plain" &
-  gsutil_cp /google/logs/output "${{LOGGING_PATH}}" "false" "text/plain" &
+  gsutil_cp /google/logs/action/{user_action}/stdout "${{STDOUT_PATH}}" "true" "text/plain" "${{USER_PROJECT}}" &
+  gsutil_cp /google/logs/action/{user_action}/stderr "${{STDERR_PATH}}" "true" "text/plain" "${{USER_PROJECT}}" &
+  gsutil_cp /google/logs/output "${{LOGGING_PATH}}" "false" "text/plain" "${{USER_PROJECT}}" &
 
   wait
 """)
@@ -176,9 +188,9 @@ _LOCALIZATION_LOOP = textwrap.dedent("""\
 
     echo "Localizing ${!INPUT_VAR}"
     if [[ "${!INPUT_RECURSIVE}" -eq "1" ]]; then
-      gsutil_rsync "${!INPUT_SRC}" "${!INPUT_DST}"
+      gsutil_rsync "${!INPUT_SRC}" "${!INPUT_DST}" "false" "${USER_PROJECT}"
     else
-      gsutil_cp "${!INPUT_SRC}" "${!INPUT_DST}"
+      gsutil_cp "${!INPUT_SRC}" "${!INPUT_DST}" "false" "" "${USER_PROJECT}"
     fi
   done
 """)
@@ -196,16 +208,16 @@ _DELOCALIZATION_LOOP = textwrap.dedent("""\
 
     echo "Delocalizing ${!OUTPUT_VAR}"
     if [[ "${!OUTPUT_RECURSIVE}" -eq "1" ]]; then
-      gsutil_rsync "${!OUTPUT_SRC}" "${!OUTPUT_DST}"
+      gsutil_rsync "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "false" "${USER_PROJECT}"
     else
-      gsutil_cp "${!OUTPUT_SRC}" "${!OUTPUT_DST}"
+      gsutil_cp "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "false" "" "${USER_PROJECT}"
     fi
   done
 """)
 
 _LOCALIZATION_CMD = textwrap.dedent("""\
-  {recursive_cp_cmd}
-  {cp_cmd}
+  {recursive_cp_fn}
+  {cp_fn}
 
   {cp_loop}
 """)
@@ -417,7 +429,7 @@ class GoogleV2JobProvider(base.JobProvider):
     return google_base.prepare_job_metadata(script, job_name, user_id,
                                             create_time)
 
-  def _get_logging_env(self, logging_uri):
+  def _get_logging_env(self, logging_uri, user_project):
     """Returns the environment for actions that copy logging files."""
     if not logging_uri.endswith('.log'):
       raise ValueError('Logging URI must end in ".log": {}'.format(logging_uri))
@@ -426,7 +438,8 @@ class GoogleV2JobProvider(base.JobProvider):
     return {
         'LOGGING_PATH': '{}.log'.format(logging_prefix),
         'STDOUT_PATH': '{}-stdout.log'.format(logging_prefix),
-        'STDERR_PATH': '{}-stderr.log'.format(logging_prefix)
+        'STDERR_PATH': '{}-stderr.log'.format(logging_prefix),
+        'USER_PROJECT': user_project,
     }
 
   def _get_prepare_env(self, script, job_descriptor, inputs, outputs, mounts):
@@ -466,7 +479,7 @@ class GoogleV2JobProvider(base.JobProvider):
 
     return env
 
-  def _get_localization_env(self, inputs):
+  def _get_localization_env(self, inputs, user_project):
     """Return a dict with variables for the 'localization' action."""
 
     # Add variables for paths that need to be localized, for example:
@@ -491,9 +504,11 @@ class GoogleV2JobProvider(base.JobProvider):
         dst = '{}/'.format(path)
       env['INPUT_DST_{}'.format(idx)] = dst
 
+    env['USER_PROJECT'] = user_project
+
     return env
 
-  def _get_delocalization_env(self, outputs):
+  def _get_delocalization_env(self, outputs, user_project):
     """Return a dict with variables for the 'delocalization' action."""
 
     # Add variables for paths that need to be delocalized, for example:
@@ -518,6 +533,8 @@ class GoogleV2JobProvider(base.JobProvider):
       else:
         dst = var.uri
       env['OUTPUT_DST_{}'.format(idx)] = dst
+
+    env['USER_PROJECT'] = user_project
 
     return env
 
@@ -582,6 +599,7 @@ class GoogleV2JobProvider(base.JobProvider):
 
     # Set local variables for the core pipeline values
     script = task_view.job_metadata['script']
+    user_project = task_view.job_metadata['user-project'] or ''
 
     envs = job_params['envs'] | task_params['envs']
     inputs = job_params['inputs'] | task_params['inputs']
@@ -624,7 +642,8 @@ class GoogleV2JobProvider(base.JobProvider):
         log_cp_cmd=log_cp_cmd,
         final_logging_action=final_logging_action,
         log_interval=job_resources.log_interval or '60s')
-    logging_env = self._get_logging_env(task_resources.logging_path.uri)
+    logging_env = self._get_logging_env(task_resources.logging_path.uri,
+                                        user_project)
 
     # Set up command and environments for the prepare, localization, user,
     # and de-localization actions
@@ -638,10 +657,10 @@ class GoogleV2JobProvider(base.JobProvider):
 
     prepare_env = self._get_prepare_env(script, task_view, inputs, outputs,
                                         mounts)
-    localization_env = self._get_localization_env(inputs)
+    localization_env = self._get_localization_env(inputs, user_project)
     user_environment = self._build_user_environment(envs, inputs, outputs,
                                                     mounts)
-    delocalization_env = self._get_delocalization_env(outputs)
+    delocalization_env = self._get_delocalization_env(outputs, user_project)
 
     # Build the list of actions
     actions = []
@@ -685,8 +704,8 @@ class GoogleV2JobProvider(base.JobProvider):
             commands=[
                 '-c',
                 _LOCALIZATION_CMD.format(
-                    recursive_cp_cmd=_GSUTIL_RSYNC_FN,
-                    cp_cmd=_GSUTIL_CP_FN,
+                    recursive_cp_fn=_GSUTIL_RSYNC_FN,
+                    cp_fn=_GSUTIL_CP_FN,
                     cp_loop=_LOCALIZATION_LOOP)
             ]),
         google_v2_pipelines.build_action(
@@ -711,8 +730,8 @@ class GoogleV2JobProvider(base.JobProvider):
             commands=[
                 '-c',
                 _LOCALIZATION_CMD.format(
-                    recursive_cp_cmd=_GSUTIL_RSYNC_FN,
-                    cp_cmd=_GSUTIL_CP_FN,
+                    recursive_cp_fn=_GSUTIL_RSYNC_FN,
+                    cp_fn=_GSUTIL_CP_FN,
                     cp_loop=_DELOCALIZATION_LOOP)
             ]),
         google_v2_pipelines.build_action(
@@ -929,46 +948,42 @@ class GoogleV2JobProvider(base.JobProvider):
     # Now and all of these arguments together.
     return ' AND '.join(or_arguments + and_arguments)
 
-  def _operations_list(self, ops_filter, page_size=0):
+  def _operations_list(self, ops_filter, max_tasks, page_size, page_token):
     """Gets the list of operations for the specified filter.
 
     Args:
       ops_filter: string filter of operations to return
+      max_tasks: the maximum number of job tasks to return or 0 for no limit.
       page_size: the number of operations to requested on each list operation to
         the pipelines API (if 0 or None, the API default is used)
+      page_token: page token returned by a previous _operations_list call.
 
-    Yields:
+    Returns:
       Operations matching the filter criteria.
     """
 
-    page_token = None
-    more_operations = True
-
     # We are not using the documented default page size of 256,
-    # as it causes the operations.list() API to return an error
+    # nor allowing for the maximum page size of 2048 as larger page sizes
+    # currently cause the operations.list() API to return an error:
     # HttpError 429 ... Resource has been exhausted (e.g. check quota).
-    current_best_page_size = 128
-    documented_max_page_size = 2048
+    max_page_size = 128
 
-    if not page_size:
-      page_size = current_best_page_size
-    page_size = min(page_size, documented_max_page_size)
+    # Set the page size to the smallest (non-zero) size we can
+    page_size = min(sz for sz in [page_size, max_page_size, max_tasks] if sz)
 
-    while more_operations:
-      api = self._service.projects().operations().list(
-          name='projects/{}/operations'.format(self._project),
-          filter=ops_filter,
-          pageToken=page_token,
-          pageSize=page_size)
-      response = google_base.Api.execute(api)
+    # Execute operations.list() and return all of the dsub operations
+    api = self._service.projects().operations().list(
+        name='projects/{}/operations'.format(self._project),
+        filter=ops_filter,
+        pageToken=page_token,
+        pageSize=page_size)
+    response = google_base.Api.execute(api)
 
-      ops = response.get('operations', [])
-      for op in ops:
-        if google_v2_operations.is_dsub_operation(op):
-          yield GoogleOperation(op)
-
-      page_token = response.get('nextPageToken')
-      more_operations = bool(page_token)
+    return [
+        GoogleOperation(op)
+        for op in response.get('operations', [])
+        if google_v2_operations.is_dsub_operation(op)
+    ], response.get('nextPageToken')
 
   def lookup_job_tasks(self,
                        statuses,
@@ -1013,20 +1028,29 @@ class GoogleV2JobProvider(base.JobProvider):
       Genomics API Operations objects.
     """
 
+    # Build a filter for operations to return
     ops_filter = self._build_query_filter(
         statuses, user_ids, job_ids, job_names, task_ids, task_attempts, labels,
         create_time_min, create_time_max)
 
-    # The pipelines API returns operations sorted by create-time date. We can
-    # use this sorting guarantee to merge-sort the streams together and only
-    # retrieve more tasks as needed.
-    stream = self._operations_list(ops_filter, page_size=page_size)
-
+    # Execute the operations.list() API to get batches of operations to yield
+    page_token = None
     tasks_yielded = 0
-    for task in stream:
-      yield task
-      tasks_yielded += 1
-      if 0 < max_tasks < tasks_yielded:
+    while True:
+      # If max_tasks is set, let operations.list() know not to send more than
+      # we need.
+      max_to_fetch = None
+      if max_tasks:
+        max_to_fetch = max_tasks - tasks_yielded
+      ops, page_token = self._operations_list(ops_filter, max_to_fetch,
+                                              page_size, page_token)
+
+      for op in ops:
+        yield op
+        tasks_yielded += 1
+
+      assert (max_tasks >= tasks_yielded or not max_tasks)
+      if not page_token or 0 < max_tasks <= tasks_yielded:
         break
 
   def delete_jobs(self,
@@ -1176,6 +1200,9 @@ class GoogleOperation(base.Task):
     value = None
     if field == 'internal-id':
       value = self._op['name']
+    elif field == 'user-project':
+      if self._job_descriptor:
+        value = self._job_descriptor.job_metadata.get(field)
     elif field in [
         'job-id', 'job-name', 'task-id', 'task-attempt', 'user-id',
         'dsub-version'

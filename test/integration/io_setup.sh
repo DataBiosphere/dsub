@@ -21,6 +21,26 @@ readonly INPUT_BAM_FILE="ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3
 readonly INPUT_BAM_FULL_PATH="${GENOMICS_PUBLIC_BUCKET}/${INPUT_BAM_FILE}"
 readonly INPUT_BAM_MD5="4afb9b8908959dbd4e2d5c54bf254c93"
 
+# This bucket is requester-pays enabled.
+# The same test files from above are assumed to be copied over and made public.
+readonly REQUESTER_PAYS_INPUT_BAM_FULL_PATH="gs://${DSUB_BUCKET_REQUESTER_PAYS}/${INPUT_BAM_FILE}"
+readonly REQUESTER_PAYS_POPULATION_FILE_FULL_PATH="gs://${DSUB_BUCKET_REQUESTER_PAYS}/${POPULATION_FILE}"
+
+function io_setup::run_dsub_requester_pays() {
+  run_dsub \
+    ${IMAGE:+--image "${IMAGE}"} \
+    --user-project "$PROJECT_ID" \
+    --script "${SCRIPT_DIR}/script_io_test.sh" \
+    --env TASK_ID="task" \
+    --input INPUT_PATH="${REQUESTER_PAYS_INPUT_BAM_FULL_PATH}" \
+    --output OUTPUT_PATH="${OUTPUTS}/task/*.md5" \
+    --env TEST_NAME="${TEST_NAME}" \
+    --input POPULATION_FILE_PATH="${REQUESTER_PAYS_POPULATION_FILE_FULL_PATH}" \
+    --output OUTPUT_POPULATION_FILE="${OUTPUTS}/*" \
+    --wait
+}
+readonly -f io_setup::run_dsub_requester_pays
+
 function io_setup::run_dsub_fuse() {
   run_dsub \
     ${IMAGE:+--image "${IMAGE}"} \
@@ -88,6 +108,7 @@ function io_setup::check_dstat() {
   local job_id="${1}"
   local check_inputs="${2}"
   local check_mounts="${3}"
+  local check_requester_pays_inputs="${4:-}"
 
   echo
   echo "Checking dstat output..."
@@ -129,6 +150,12 @@ function io_setup::check_dstat() {
   if [[ "${check_mounts}" == "true" ]]; then
     echo "  Checking mounts..."
     util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].mounts.GENOMICS_PUBLIC_BUCKET" "${GENOMICS_PUBLIC_BUCKET}"
+  fi
+
+  if [[ "${check_requester_pays_inputs}" == "true" ]]; then
+    echo "  Checking inputs (for requester pays bucket)..."
+    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].inputs.INPUT_PATH" "${REQUESTER_PAYS_INPUT_BAM_FULL_PATH}"
+    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].inputs.POPULATION_FILE_PATH" "${REQUESTER_PAYS_POPULATION_FILE_FULL_PATH}"
   fi
 
   echo "SUCCESS"

@@ -141,9 +141,11 @@ class TextOutput(OutputFormatter):
         ('internal-id', 'Internal ID'),
         ('logging', 'Logging'),
         ('labels', 'Labels', self.format_pairs),
+        ('envs', 'Environment Variables', self.format_pairs),
         ('inputs', 'Inputs', self.format_pairs),
         ('outputs', 'Outputs', self.format_pairs),
         ('mounts', 'Mounts', self.format_pairs),
+        ('user-project', 'User Project'),
         ('dsub-version', 'Version'),
         # These fields only shows up when summarizing
         ('status', 'Status'),
@@ -167,7 +169,11 @@ class TextOutput(OutputFormatter):
     return new_row
 
   def print_table(self, table):
-    print(tabulate.tabulate(table, headers='keys'))
+    if not table:
+      # Old versions of tabulate (0.7.5)  emit 'k e y s\n--- --- --- ---'
+      print('')
+    else:
+      print(tabulate.tabulate(table, headers='keys'))
     print('')
 
 
@@ -300,6 +306,7 @@ def _prepare_row(task, full, summary):
       row_spec('provider', True, None),
       row_spec('provider-attributes', True, {}),
       row_spec('events', True, []),
+      row_spec('user-project', False, None),
       row_spec('dsub-version', False, None),
   ]
   summary_columns = default_columns + [
@@ -567,6 +574,9 @@ def dstat_job_producer(provider,
 
     formatted_tasks = []
     for task in tasks:
+      if 0 < max_tasks <= len(formatted_tasks):
+        break
+
       # Format tasks as specified.
       if raw_format:
         formatted_tasks.append(task.raw_task_data())
