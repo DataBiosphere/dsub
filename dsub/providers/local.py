@@ -83,6 +83,7 @@ import pytz
 #    status.txt: File for the runner script to record task status (RUNNING,
 #    FAILURE, etc.)
 #    log.txt: File for the runner script to write log messages
+#    runner-log.txt: Capture of all stderr/stdout from the runner script
 #    task.pid: Process ID file for task runner
 #
 # From task directory, the data directory is made available to the Docker
@@ -453,7 +454,7 @@ class LocalJobProvider(base.JobProvider):
       with open(os.path.join(task_dir, 'end-time.txt'), 'wt') as f:
         f.write(today)
       msg = 'Operation canceled at %s\n' % today
-      with open(os.path.join(task_dir, 'log.txt'), 'a') as f:
+      with open(os.path.join(task_dir, 'runner-log.txt'), 'a') as f:
         f.write(msg)
 
     return (canceled, cancel_errors)
@@ -587,7 +588,7 @@ class LocalJobProvider(base.JobProvider):
 
   def _get_last_update_time_from_task_dir(self, task_dir):
     last_update = 0
-    for filename in ['status.txt', 'log.txt', 'meta.yaml']:
+    for filename in ['status.txt', 'runner-log.txt', 'meta.yaml']:
       try:
         mtime = os.path.getmtime(os.path.join(task_dir, filename))
         last_update = max(last_update, mtime)
@@ -622,7 +623,7 @@ class LocalJobProvider(base.JobProvider):
 
   def _get_log_detail_from_task_dir(self, task_dir):
     try:
-      with open(os.path.join(task_dir, 'log.txt'), 'r') as f:
+      with open(os.path.join(task_dir, 'runner-log.txt'), 'r') as f:
         return f.read().splitlines()
     except (IOError, OSError):
       return None

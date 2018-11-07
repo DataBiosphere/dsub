@@ -150,10 +150,15 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
 
 _LOG_CP_CMD = textwrap.dedent("""\
   gsutil_cp /google/logs/action/{user_action}/stdout "${{STDOUT_PATH}}" "true" "text/plain" "${{USER_PROJECT}}" &
+  STDOUT_PID=$!
   gsutil_cp /google/logs/action/{user_action}/stderr "${{STDERR_PATH}}" "true" "text/plain" "${{USER_PROJECT}}" &
+  STDERR_PID=$!
   gsutil_cp /google/logs/output "${{LOGGING_PATH}}" "false" "text/plain" "${{USER_PROJECT}}" &
+  LOG_PID=$!
 
-  wait
+  wait "${{STDOUT_PID}}"
+  wait "${{STDERR_PID}}"
+  wait "${{LOG_PID}}"
 """)
 
 _LOGGING_CMD = textwrap.dedent("""\
@@ -1140,27 +1145,38 @@ class GoogleOperation(base.Task):
         self._op['name']))
 
   def _operation_status_message(self):
-    """Returns the most relevant status string and last updated date string.
+    """Returns the most relevant status string and failed action.
 
     This string is meant for display only.
 
     Returns:
-      A printable status string and date string.
+      A printable status string and name of failed action (if any).
     """
+    msg = None
+    action = None
     if not google_v2_operations.is_done(self._op):
       last_event = google_v2_operations.get_last_event(self._op)
       if last_event:
         msg = last_event['description']
+        action_id = last_event.get('details', {}).get('actionId')
+        action = google_v2_operations.get_action_by_id(self._op, action_id)
       else:
         msg = 'Pending'
     else:
-      error = google_v2_operations.get_error(self._op)
-      if error:
-        msg = error['message']
-      else:
-        msg = 'Success'
+      failed_events = google_v2_operations.get_failed_events(self._op)
+      if failed_events:
+        failed_event = failed_events[-1]
+        msg = failed_event.get('details', {}).get('stderr')
+        action_id = failed_event.get('details', {}).get('actionId')
+        action = google_v2_operations.get_action_by_id(self._op, action_id)
+      if not msg:
+        error = google_v2_operations.get_error(self._op)
+        if error:
+          msg = error['message']
+        else:
+          msg = 'Success'
 
-    return msg
+    return msg, action
 
   def error_message(self):
     """Returns an error message if the operation failed for any reason.
@@ -1259,9 +1275,15 @@ class GoogleOperation(base.Task):
         value = google_base.parse_rfc3339_utc_string(ds)
     elif field == 'status':
       value = self._operation_status()
-    elif field in ['status-message', 'status-detail']:
-      status = self._operation_status_message()
-      value = status
+    elif field == 'status-message':
+      msg, action = self._operation_status_message()
+      value = msg
+    elif field == 'status-detail':
+      msg, action = self._operation_status_message()
+      if action:
+        value = '{}:\n{}'.format(action.get('name'), msg)
+      else:
+        value = msg
     elif field == 'last-update':
       last_update = google_v2_operations.get_last_update(self._op)
       if last_update:

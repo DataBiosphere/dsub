@@ -98,24 +98,31 @@ def get_actions(op):
   return op.get('metadata', {}).get('pipeline').get('actions', [])
 
 
-def get_action(op, name):
+def get_action_by_id(op, action_id):
+  """Return the operation's array of actions."""
+  actions = get_actions(op)
+  if actions and 1 <= action_id < len(actions):
+    return actions[action_id - 1]
+
+
+def _get_action_by_name(op, name):
   """Return the value for the specified action."""
   actions = get_actions(op)
   for action in actions:
-    if action['name'] == name:
+    if action.get('name') == name:
       return action
 
 
 def get_action_environment(op, name):
   """Return the environment for the operation."""
-  action = get_action(op, name)
+  action = _get_action_by_name(op, name)
   if action:
     return action.get('environment')
 
 
 def get_action_image(op, name):
   """Return the image for the operation."""
-  action = get_action(op, name)
+  action = _get_action_by_name(op, name)
   if action:
     return action.get('imageUri')
 
@@ -130,6 +137,16 @@ def get_last_event(op):
   events = get_events(op)
   if events:
     return events[0]
+  return None
+
+
+def get_failed_events(op):
+  """Return the events (if any) with a non-zero exitStatus."""
+  events = get_events(op)
+  if events:
+    return [
+        e for e in events if int(e.get('details', {}).get('exitStatus', 0)) != 0
+    ]
   return None
 
 
