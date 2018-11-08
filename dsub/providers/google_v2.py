@@ -412,7 +412,7 @@ class GoogleV2BatchHandler(object):
       try:
         response = cancel_fn.execute()
       except:  # pylint: disable=bare-except
-        exception = sys.exc_info()[0]
+        exception = sys.exc_info()[1]
 
       self._response_handler(request_id, response, exception)
 
