@@ -13,6 +13,9 @@
 # limitations under the License.
 
 """Interface for job providers."""
+
+from __future__ import print_function
+
 import argparse
 import os
 
@@ -130,6 +133,11 @@ def get_ddel_provider_args(provider_type, project):
   """A string with the arguments to point ddel to the same provider+project."""
   # Change this if the two ever diverge.
   return get_dstat_provider_args(provider_type, project)
+
+
+def emit_provider_message(provider):
+  if provider.status_message:
+    print(provider.status_message)
 
 
 def check_for_unsupported_flag(args):

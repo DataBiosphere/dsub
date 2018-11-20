@@ -205,28 +205,40 @@ function get_test_providers() {
   # We use a naming convention on files that are provider-specific
   if [[ ${test_file} == *.*.sh ]]; then
     # Get the last token before the ".sh"
-    provider="$(echo "${test_file}" | awk -F . '{ print $(NF-1) }')"
-
-    # If an explicit DSUB_PROVIDER was set, then validate against it.
-    if [[ -z "${DSUB_PROVIDER:-}" ]] || \
-       [[ "${provider}" == "${DSUB_PROVIDER}" ]]; then
-      echo -n "${provider}"
-    fi
+    echo -n "${test_file}" | awk -F . '{ print $(NF-1) }'
     return
   fi
 
   case "${test_file}" in
     e2e_requester_pays_buckets.sh)
-      local all_provider_list="${DSUB_PROVIDER:-local google-v2}"
-      ;;
-    *)
-      local all_provider_list="${DSUB_PROVIDER:-local google google-v2}"
+      echo -n "local google-v2"
+      return
       ;;
   esac
 
-  echo -n "${all_provider_list}"
+  echo -n "local google google-v2"
 }
 readonly -f get_test_providers
+
+function string_in_list() {
+  local str="${1}"
+  local str_list=("${2}")
+
+  local s
+  for s in ${str_list[@]}; do
+    if [[ "${str}" == "${s}" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+readonly -f string_in_list
+
+function provider_in_list() {
+  string_in_list "${1}" "${2}"
+}
+readonly -f provider_in_list
 
 # Begin execution
 readonly RUN_TESTS_STARTSEC=$(date +'%s')
@@ -321,8 +333,14 @@ for TEST_TYPE in "${TESTS[@]}"; do
   for TEST in "${TEST_LIST[@]}"; do
     PROVIDER_LIST="$(get_test_providers "${TEST}")"
 
-    if [[ -z "${PROVIDER_LIST}" ]]; then
-      continue
+    # If the user has supplied a DSUB_PROVIDER, then override the PROVIDER_LIST,
+    # but only if that provider was in the list.
+    if [[ -n "${DSUB_PROVIDER:-}" ]]; then
+      if provider_in_list "${DSUB_PROVIDER}" "${PROVIDER_LIST}"; then
+        PROVIDER_LIST="${DSUB_PROVIDER}"
+      else
+        continue
+      fi
     fi
 
     for PROVIDER in ${PROVIDER_LIST}; do

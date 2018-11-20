@@ -64,18 +64,10 @@ readonly -f verify_dstat_output
 
 function verify_dstat_google_provider_fields() {
    local dstat_out="${1}"
-   for (( job=0; job < 3; job++ )); do
-     # Skip the test if the job's state is not yet running or completed.
-     local status="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${job}].status")"
-     if ! [[ "${status}" =~ ^(RUNNING|SUCCESS)$ ]]; then
-       echo "  - NOTICE: status '${status}' may not have compute metadata,"
-       echo "            skipping provider fields tests."
-       exit 0
-     fi
-
+   for (( task=0; task < 3; task++ )); do
      # Run the provider test.
-     local job_name="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${job}].job-name")"
-     local job_provider="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${job}].provider")"
+     local job_name="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].job-name")"
+     local job_provider="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider")"
 
      # Validate provider.
      if [[ "${job_provider}" != "${DSUB_PROVIDER}" ]]; then
@@ -83,14 +75,23 @@ function verify_dstat_google_provider_fields() {
        echo "${dstat_out}"
        exit 1
      fi
-     local job_zone=$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${job}].provider-attributes.zone")
+
+     # Provider fields are both metadata set on task submission and machine
+     # information set when the Pipelines API starts processing the task.
+     local events="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].events")"
+     if [[ "${events}" == "[]" ]]; then
+       echo "  - NOTICE: task $((task+1)) not started; skipping provider instance fields tests."
+       exit 0
+     fi
+
+     local job_zone=$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider-attributes.zone")
      if ! [[ "${job_zone}" =~ ^[a-z]{1,4}-[a-z]{2,15}[0-9]-[a-z]$ ]]; then
-       echo "  - FAILURE: Job zone ${job_zone} for job ${job_name} not valid."
+       echo "  - FAILURE: Zone ${job_zone} for job ${job_name}, task $((task+1)) not valid."
        echo "${dstat_out}"
        exit 1
      fi
    done
-   echo "  - google provider fields verified"
+   echo "  - ${DSUB_PROVIDER} provider fields verified"
 }
 readonly -f verify_dstat_google_provider_fields
 
