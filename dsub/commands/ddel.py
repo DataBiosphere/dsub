@@ -126,6 +126,8 @@ def main():
 
   # Let the user know which jobs we are going to look up
   with dsub_util.replace_print():
+    provider_base.emit_provider_message(provider)
+
     _emit_search_criteria(user_ids, args.jobs, args.tasks, args.label)
     # Delete the requested jobs
     deleted_tasks = ddel_tasks(

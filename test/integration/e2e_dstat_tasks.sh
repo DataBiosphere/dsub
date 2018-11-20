@@ -235,7 +235,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Waiting 5 seconds and checking 'dstat --age 5s'..."
   sleep 5s
 
-  DSTAT_OUTPUT="$(run_dstat_age "5s" --status '*' --jobs "${JOBID}" 2>&1)"
+  DSTAT_OUTPUT="$(run_dstat_age "5s" --status '*' --jobs "${JOBID}")"
   if [[ -n "${DSTAT_OUTPUT}" ]]; then
     echo "dstat output not empty as expected:"
     echo "${DSTAT_OUTPUT}"

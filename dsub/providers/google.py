@@ -610,6 +610,21 @@ class _Operations(object):
 class GoogleJobProvider(base.JobProvider):
   """Interface to dsub and related tools for managing Google cloud jobs."""
 
+  status_message = textwrap.dedent("""
+    ** WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING **
+
+      The google provider is deprecated.
+      The underlying service (Pipelines API v1alpha2) is scheduled for turndown
+      at the end of 2018.
+
+      Please use the google-v2 provider.
+
+      See:
+        https://github.com/DataBiosphere/dsub#deprecation-of-the-google-provider
+
+    ** WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING **
+  """)
+
   def __init__(self, verbose, dry_run, project, zones=None, credentials=None):
     self._verbose = verbose
     self._dry_run = dry_run

@@ -470,6 +470,8 @@ def main():
 
   # Set up the Genomics Pipelines service interface
   provider = provider_base.get_provider(args, resources)
+  with dsub_util.replace_print():
+    provider_base.emit_provider_message(provider)
 
   # Set poll interval to zero if --wait is not set.
   poll_interval = args.poll_interval if args.wait else 0

@@ -1011,6 +1011,9 @@ def run(provider,
         project=None,
         disable_warning=False):
   """Actual dsub body, post-stdout-redirection."""
+  if not dry_run:
+    provider_base.emit_provider_message(provider)
+
   if not disable_warning:
     raise ValueError('Do not user this unstable API component!')
 

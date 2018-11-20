@@ -30,16 +30,19 @@ nomenclature below will indicate "task data" even for such jobs that do not have
 explicit tasks.
 """
 
-from abc import ABCMeta
-from abc import abstractmethod
+import abc
 import six
 
 
-@six.add_metaclass(ABCMeta)
+@six.add_metaclass(abc.ABCMeta)
 class JobProvider(object):
   """Interface all job providers should inherit from."""
 
-  @abstractmethod
+  # A member field that a provider can use to expose a status message
+  # such as a deprecation notice.
+  status_message = None
+
+  @abc.abstractmethod
   def prepare_job_metadata(self, script, job_name, user_id, create_time):
     """Returns a dictionary of metadata fields for the job.
 
@@ -77,7 +80,7 @@ class JobProvider(object):
     """
     raise NotImplementedError()
 
-  @abstractmethod
+  @abc.abstractmethod
   def submit_job(self, job_descriptor, skip_if_output_present):
     """Submit the job to be executed.
 
@@ -101,7 +104,7 @@ class JobProvider(object):
     """
     raise NotImplementedError()
 
-  @abstractmethod
+  @abc.abstractmethod
   def delete_jobs(self,
                   user_ids,
                   job_ids,
@@ -132,7 +135,7 @@ class JobProvider(object):
     """
     raise NotImplementedError()
 
-  @abstractmethod
+  @abc.abstractmethod
   def lookup_job_tasks(self,
                        statuses,
                        user_ids=None,
@@ -177,7 +180,7 @@ class JobProvider(object):
     """
     raise NotImplementedError()
 
-  @abstractmethod
+  @abc.abstractmethod
   def get_tasks_completion_messages(self, tasks):
     """List of the error message of each given task."""
     raise NotImplementedError()
@@ -186,7 +189,7 @@ class JobProvider(object):
 class Task(object):
   """Basic container for task metadata."""
 
-  @abstractmethod
+  @abc.abstractmethod
   def raw_task_data(self):
     """Return a provider-specific representation of task data.
 
@@ -195,7 +198,7 @@ class Task(object):
     """
     raise NotImplementedError()
 
-  @abstractmethod
+  @abc.abstractmethod
   def get_field(self, field, default=None):
     """Return a metadata-field for the task.
 
