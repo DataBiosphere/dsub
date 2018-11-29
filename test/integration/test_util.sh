@@ -113,6 +113,46 @@ function util::get_job_status() {
 }
 readonly -f util::get_job_status
 
+# get_job_status_detail
+#
+# Run dstat and return the "status-detail" field for the specified job.
+function util::get_job_status_detail() {
+  local job_id="$1"
+
+  local dstat_out
+
+  if ! dstat_out=$(
+    run_dstat \
+      --jobs "${job_id}" \
+      --status "*" \
+      --full \
+      --format json); then
+    return 1
+  fi
+
+  python "${SCRIPT_DIR}"/get_data_value.py \
+    "json" "${dstat_out}" "[0].status-detail"
+}
+readonly -f util::get_job_status_detail
+
+# get_job_logging
+#
+# Run dstat and return the "logging" field for the specified job.
+function util::get_job_logging() {
+  local job_id="${1}"
+
+  local dstat_out=$(\
+    run_dstat \
+      --jobs "${job_id}" \
+      --status "*" \
+      --full \
+      --format json)
+
+  python "${SCRIPT_DIR}"/get_data_value.py \
+    "json" "${dstat_out}" "[0].logging"
+}
+readonly -f util::get_job_logging
+
 
 # wait_for_canceled_status
 #

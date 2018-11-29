@@ -23,21 +23,6 @@ set -o nounset
 readonly SCRIPT_DIR="$(dirname "${0}")"
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-function dstat_get_logging() {
-  local job_id="${1}"
-
-  local dstat_out=$(\
-    run_dstat \
-      --jobs "${job_id}" \
-      --status "*" \
-      --full \
-      --format json)
-
-  python "${SCRIPT_DIR}"/get_data_value.py \
-    "json" "${dstat_out}" "[0].logging"
-}
-readonly -f dstat_get_logging
-
 readonly LOGGING_BASE="$(dirname "${LOGGING}")"
 declare LOGGING_OVERRIDE
 
@@ -52,7 +37,7 @@ JOB_ID=$(run_dsub \
            --name "${JOB_NAME}" \
            --command 'echo "Test"')
 
-LOGGING_PATH=$(dstat_get_logging "${JOB_ID}")
+LOGGING_PATH="$(util::get_job_logging "${JOB_ID}")"
 
 if [[ ! "${LOGGING_PATH}" == "${LOGGING_OVERRIDE}/log-test"*.log ]]; then
   echo "ERROR: Unexpected logging path."
@@ -73,7 +58,7 @@ JOB_ID=$(run_dsub \
            --name "${JOB_NAME}" \
            --command 'echo "Test"')
 
-LOGGING_PATH=$(dstat_get_logging "${JOB_ID}")
+LOGGING_PATH="$(util::get_job_logging "${JOB_ID}")"
 
 if [[ ! "${LOGGING_PATH}" == "${LOGGING_OVERRIDE}" ]]; then
   echo "ERROR: Unexpected logging path."
@@ -95,7 +80,7 @@ JOB_ID=$(run_dsub \
            --user "${JOB_USER}" \
            --command 'echo "Test"')
 
-LOGGING_PATH=$(dstat_get_logging "${JOB_ID}")
+LOGGING_PATH="$(util::get_job_logging "${JOB_ID}")"
 
 if [[ ! "${LOGGING_PATH}" == "${LOGGING_BASE}/${JOB_USER}/${JOB_NAME}.test.log" ]]; then
   echo "ERROR: Unexpected logging path."
@@ -118,7 +103,7 @@ JOB_ID=$(run_dsub \
            --wait \
            --command 'echo "Test"')
 
-LOGGING_PATH=$(dstat_get_logging "${JOB_ID}")
+LOGGING_PATH="$(util::get_job_logging "${JOB_ID}")"
 
 if [[ ! "${LOGGING_PATH}" == "${LOGGING_OVERRIDE}/log-test"*.1.log ]]; then
   echo "ERROR: Unexpected logging path."

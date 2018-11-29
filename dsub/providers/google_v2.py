@@ -1277,6 +1277,11 @@ class GoogleOperation(base.Task):
       value = self._operation_status()
     elif field == 'status-message':
       msg, action = self._operation_status_message()
+      if msg.startswith('Execution failed:'):
+        # msg may look something like
+        # "Execution failed: action 2: pulling image..."
+        # Emit the actual message ("pulling image...")
+        msg = msg.split(': ', 2)[-1]
       value = msg
     elif field == 'status-detail':
       msg, action = self._operation_status_message()
