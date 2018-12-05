@@ -809,7 +809,7 @@ class GoogleV2JobProvider(base.JobProvider):
                                                 job_resources.accelerator_count)
       ]
     service_account = google_v2_pipelines.build_service_account(
-        'default', scopes)
+        job_resources.service_account, scopes)
 
     resources = google_v2_pipelines.build_resources(
         self._project,

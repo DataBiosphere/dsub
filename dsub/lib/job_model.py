@@ -377,7 +377,8 @@ class Resources(
         'preemptible', 'image', 'logging', 'logging_path', 'regions', 'zones',
         'scopes', 'keep_alive', 'cpu_platform', 'network', 'subnetwork',
         'use_private_address', 'accelerator_type', 'accelerator_count',
-        'nvidia_driver_version', 'timeout', 'log_interval', 'ssh'
+        'nvidia_driver_version', 'timeout', 'log_interval', 'ssh',
+        'service_account'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -407,6 +408,7 @@ class Resources(
     timeout (string): The max amount of time to give the pipeline to complete.
     log_interval (string): The amount of time to sleep between log uploads.
     ssh (bool): Start an SSH container in the background.
+    service_account (string): The service account to use with the Google Genomics API.
   """
   __slots__ = ()
 
@@ -433,13 +435,14 @@ class Resources(
               nvidia_driver_version=None,
               timeout=None,
               log_interval=None,
-              ssh=None):
+              ssh=None,
+              service_account='default'):
     return super(Resources, cls).__new__(
         cls, min_cores, min_ram, machine_type, disk_size, boot_disk_size,
         preemptible, image, logging, logging_path, regions, zones, scopes,
         keep_alive, cpu_platform, network, subnetwork, use_private_address,
         accelerator_type, accelerator_count, nvidia_driver_version, timeout,
-        log_interval, ssh)
+        log_interval, ssh, service_account)
 
 
 def ensure_job_params_are_complete(job_params):
