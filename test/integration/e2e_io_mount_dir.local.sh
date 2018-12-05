@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 Google Inc. All Rights Reserved.
+# Copyright 2018 Verily Life Sciences Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,12 +17,11 @@
 set -o errexit
 set -o nounset
 
-# Test gcsfuse abilities.
+# This test verifies that mounting a local directory works. The test will copy
+# input files via gsutil to the local disk.
 #
-# This test is designed to verify that named GCS bucket (mount)
-# command-line parameters work correctly.
-#
-# The actual operation performed here is to mount to a bucket containing a BAM
+# The actual operation performed here is to download a BAM and compute
+# the md5, writing it to <filename>.bam.md5.
 # and compute its md5, writing it to <filename>.bam.md5.
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
@@ -34,13 +33,11 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 source "${SCRIPT_DIR}/io_setup.sh"
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
-
+  io_setup::mount_local_path_setup
   echo "Launching pipeline..."
-
-  JOB_ID=$(io_setup::run_dsub_fuse)
-
+  JOB_ID="$(io_setup::run_dsub_with_mount "${TEST_LOCAL_MOUNT_PARAMETER}")"
 fi
 
 # Do validation
 io_setup::check_output
-io_setup::check_dstat "${JOB_ID}" false true
+io_setup::check_dstat "${JOB_ID}" false "${TEST_LOCAL_MOUNT_PARAMETER}"

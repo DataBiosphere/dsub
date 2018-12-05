@@ -121,7 +121,7 @@ def main():
     if key.startswith('[') and key.endswith(']'):
       idx = int(key[1:-1])
       if not isinstance(curr, list):
-        print('Cannot index into a on non-list object.', file=sys.stderr)
+        print('Cannot index into a non-list object.', file=sys.stderr)
         print('Key: %s' % key, file=sys.stderr)
         print('Value: %s' % curr, file=sys.stderr)
         sys.exit(1)

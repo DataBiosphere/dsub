@@ -204,6 +204,23 @@ def get_task_metadata(job_metadata, task_id):
   return task_metadata
 
 
+def build_mount_env(source, mounts):
+  """Return a multi-line string with export statements for the variables.
+
+  Arguments:
+    source: Folder with the data. For example /mnt/data
+    mounts: a list of MountParam
+
+  Returns:
+    a multi-line string with a shell script that sets environment variables
+    corresponding to the mounts.
+  """
+  return '\n'.join([
+      'export {0}={1}/{2}'.format(var.name, source.rstrip('/'),
+                                  var.docker_path.rstrip('/')) for var in mounts
+  ])
+
+
 def get_job_and_task_param(job_params, task_params, field):
   """Returns a dict combining the field for job and task params."""
   return job_params.get(field, set()) | task_params.get(field, set())

@@ -564,7 +564,7 @@ class GoogleV2JobProvider(base.JobProvider):
               image_uri=_GCSFUSE_IMAGE,
               mounts=[mnt_datadisk],
               commands=[
-                  '--implicit-dirs', '--foreground', bucket,
+                  '--implicit-dirs', '--foreground', '-o ro', bucket,
                   os.path.join(providers_util.DATA_MOUNT_POINT, mount_path)
               ]),
           google_v2_pipelines.build_action(
@@ -610,6 +610,25 @@ class GoogleV2JobProvider(base.JobProvider):
     inputs = job_params['inputs'] | task_params['inputs']
     outputs = job_params['outputs'] | task_params['outputs']
     mounts = job_params['mounts']
+    gcs_mounts = param_util.get_gcs_mounts(mounts)
+
+    persistent_disk_mount_params = param_util.get_persistent_disk_mounts(mounts)
+
+    persistent_disks = [
+        google_v2_pipelines.build_disk(
+            name=disk.name.replace('_', '-'),  # Underscores not allowed
+            size_gb=disk.disk_size or job_model.DEFAULT_MOUNTED_DISK_SIZE,
+            source_image=disk.value) for disk in persistent_disk_mount_params
+    ]
+    persistent_disk_mounts = [
+        google_v2_pipelines.build_mount(
+            disk=persistent_disk.get('name'),
+            path=os.path.join(providers_util.DATA_MOUNT_POINT,
+                              persistent_disk_mount_param.docker_path),
+            read_only=True)
+        for persistent_disk, persistent_disk_mount_param in zip(
+            persistent_disks, persistent_disk_mount_params)
+    ]
 
     # The list of "actions" (1-based) will be:
     #   1- continuous copy of log files off to Cloud Storage
@@ -632,7 +651,7 @@ class GoogleV2JobProvider(base.JobProvider):
     if job_resources.ssh:
       optional_actions += 1
 
-    mount_actions = self._get_mount_actions(mounts, mnt_datadisk)
+    mount_actions = self._get_mount_actions(gcs_mounts, mnt_datadisk)
     optional_actions += len(mount_actions)
 
     user_action = 4 + optional_actions
@@ -716,7 +735,7 @@ class GoogleV2JobProvider(base.JobProvider):
         google_v2_pipelines.build_action(
             name='user-command',
             image_uri=job_resources.image,
-            mounts=[mnt_datadisk],
+            mounts=[mnt_datadisk] + persistent_disk_mounts,
             environment=user_environment,
             entrypoint='/bin/bash',
             commands=[
@@ -753,8 +772,10 @@ class GoogleV2JobProvider(base.JobProvider):
 
     # Prepare the VM (resources) configuration
     disks = [
-        google_v2_pipelines.build_disk(_DATA_DISK_NAME, job_resources.disk_size)
+        google_v2_pipelines.build_disk(
+            _DATA_DISK_NAME, job_resources.disk_size, source_image=None)
     ]
+    disks.extend(persistent_disks)
     network = google_v2_pipelines.build_network(
         job_resources.network, job_resources.subnetwork,
         job_resources.use_private_address)

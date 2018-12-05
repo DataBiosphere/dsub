@@ -26,6 +26,45 @@ readonly INPUT_BAM_MD5="4afb9b8908959dbd4e2d5c54bf254c93"
 readonly REQUESTER_PAYS_INPUT_BAM_FULL_PATH="gs://${DSUB_BUCKET_REQUESTER_PAYS}/${INPUT_BAM_FILE}"
 readonly REQUESTER_PAYS_POPULATION_FILE_FULL_PATH="gs://${DSUB_BUCKET_REQUESTER_PAYS}/${POPULATION_FILE}"
 
+# This is the image we use to test the PD mount feature.
+readonly TEST_IMAGE_NAME="dsub-e2e-test-image"
+readonly TEST_IMAGE_GCS_LOCATION="gs://dsub-test-e2e-bucket/dsub-test-image.tar.gz"
+readonly TEST_IMAGE_URL="https://www.googleapis.com/compute/v1/projects/${PROJECT_ID}/global/images/${TEST_IMAGE_NAME}"
+
+# This is the path we use to test local file:// mounts
+readonly TEST_TMP_PATH="/tmp/dsub_test_files"
+readonly TEST_LOCAL_MOUNT_PARAMETER="file://${TEST_TMP_PATH}"
+
+function io_setup::mount_local_path_setup() {
+  mkdir -p "${TEST_TMP_PATH}"
+  if [[ ! -f "${TEST_TMP_PATH}/${POPULATION_FILE}" ]]; then
+    gsutil cp "${POPULATION_FILE_FULL_PATH}" "${TEST_TMP_PATH}/${POPULATION_FILE}"
+  fi
+  if [[ ! -f "${TEST_TMP_PATH}/${INPUT_BAM_FILE}" ]]; then
+    gsutil cp "${INPUT_BAM_FULL_PATH}" "${TEST_TMP_PATH}/${INPUT_BAM_FILE}"
+  fi
+}
+readonly -f io_setup::mount_local_path_setup
+
+function io_setup::exit_handler() {
+  local code="${?}"
+  echo "Deleting image ${TEST_IMAGE_NAME}..."
+  gcloud --quiet compute images delete "${TEST_IMAGE_NAME}"
+  echo "Image successfully deleted."
+  return "${code}"
+}
+readonly -f io_setup::exit_handler
+
+function io_setup::image_setup() {
+  echo "Creating image from ${TEST_IMAGE_GCS_LOCATION}..."
+  gcloud compute images create "${TEST_IMAGE_NAME}" \
+    --source-uri "${TEST_IMAGE_GCS_LOCATION}"
+  echo "Image successfully created."
+  trap "io_setup::exit_handler" EXIT
+}
+readonly -f io_setup::image_setup
+
+
 function io_setup::run_dsub_requester_pays() {
   run_dsub \
     ${IMAGE:+--image "${IMAGE}"} \
@@ -41,7 +80,9 @@ function io_setup::run_dsub_requester_pays() {
 }
 readonly -f io_setup::run_dsub_requester_pays
 
-function io_setup::run_dsub_fuse() {
+function io_setup::run_dsub_with_mount() {
+  local mount_point="${1}"
+
   run_dsub \
     ${IMAGE:+--image "${IMAGE}"} \
     --script "${SCRIPT_DIR}/script_io_test.sh" \
@@ -50,11 +91,11 @@ function io_setup::run_dsub_fuse() {
     --env TEST_NAME="${TEST_NAME}" \
     --env INPUT_BAM="${INPUT_BAM_FILE}" \
     --env POPULATION_FILE="${POPULATION_FILE}" \
-    --mount GENOMICS_PUBLIC_BUCKET="${GENOMICS_PUBLIC_BUCKET}" \
+    --mount MOUNT_POINT="${mount_point}" \
     --output OUTPUT_POPULATION_FILE="${OUTPUTS}/*" \
     --wait
 }
-readonly -f io_setup::run_dsub_fuse
+readonly -f io_setup::run_dsub_with_mount
 
 function io_setup::run_dsub() {
   run_dsub \
@@ -107,7 +148,7 @@ readonly -f io_setup::check_output
 function io_setup::check_dstat() {
   local job_id="${1}"
   local check_inputs="${2}"
-  local check_mounts="${3}"
+  local mount_point="${3:-}"
   local check_requester_pays_inputs="${4:-}"
 
   echo
@@ -147,9 +188,9 @@ function io_setup::check_dstat() {
   util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].outputs.OUTPUT_PATH" "${OUTPUTS}/task/*.md5"
   util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].outputs.OUTPUT_POPULATION_FILE" "${OUTPUTS}/*"
 
-  if [[ "${check_mounts}" == "true" ]]; then
+  if [[ -n "${mount_point:-}" ]]; then
     echo "  Checking mounts..."
-    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].mounts.GENOMICS_PUBLIC_BUCKET" "${GENOMICS_PUBLIC_BUCKET}"
+    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].mounts.MOUNT_POINT" "${mount_point}"
   fi
 
   if [[ "${check_requester_pays_inputs}" == "true" ]]; then

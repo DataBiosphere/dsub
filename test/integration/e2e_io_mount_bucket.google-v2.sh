@@ -17,18 +17,13 @@
 set -o errexit
 set -o nounset
 
-# Test copying input files to and output files from directories.
+# Test gcsfuse abilities.
 #
-# This test is designed to verify that named file input and output path
+# This test is designed to verify that named GCS bucket (mount)
 # command-line parameters work correctly.
 #
-# The actual operation performed here is to download a BAM and compute
-# the md5, writing it to <filename>.bam.md5.
-#
-# An input file (the BAM) is localized to a subdirectory of the default
-# data directory.
-# An output file (the MD5) is de-localized from a different subdirectory
-# of the default data directory.
+# The actual operation performed here is to mount to a bucket containing a BAM
+# and compute its md5, writing it to <filename>.bam.md5.
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
@@ -42,10 +37,10 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
-  JOB_ID=$(io_setup::run_dsub)
+  JOB_ID="$(io_setup::run_dsub_with_mount "${GENOMICS_PUBLIC_BUCKET}")"
 
 fi
 
 # Do validation
 io_setup::check_output
-io_setup::check_dstat "${JOB_ID}" true
+io_setup::check_dstat "${JOB_ID}" false "${GENOMICS_PUBLIC_BUCKET}"

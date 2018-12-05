@@ -106,4 +106,4 @@ fi
 
 # Do validation
 io_setup::check_output
-io_setup::check_dstat "${JOB_ID}" true false
+io_setup::check_dstat "${JOB_ID}" true

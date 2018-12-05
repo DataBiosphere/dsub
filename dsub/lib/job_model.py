@@ -67,6 +67,7 @@ DEFAULT_MIN_RAM = 3.75
 DEFAULT_MACHINE_TYPE = 'n1-standard-1'
 DEFAULT_DISK_SIZE = 200
 DEFAULT_BOOT_DISK_SIZE = 10
+DEFAULT_MOUNTED_DISK_SIZE = 10
 DEFAULT_PREEMPTIBLE = False
 
 # Users may specify their own labels, however dsub also uses an implicit set of
@@ -271,6 +272,7 @@ class FileParam(
         'uri',
         'recursive',
         'file_provider',
+        'disk_size',
     ])):
   """File parameter to be automatically localized or de-localized.
 
@@ -288,6 +290,7 @@ class FileParam(
     uri (UriParts): A uri or local file path.
     recursive (bool): Whether recursive copy is wanted.
     file_provider (enum): Service or infrastructure hosting the file.
+    disk_size (int): Size in Gb for a mounted Google Persistent Disk.
   """
   __slots__ = ()
 
@@ -297,9 +300,10 @@ class FileParam(
               docker_path=None,
               uri=None,
               recursive=False,
-              file_provider=None):
+              file_provider=None,
+              disk_size=None):
     return super(FileParam, cls).__new__(cls, name, value, docker_path, uri,
-                                         recursive, file_provider)
+                                         recursive, file_provider, disk_size)
 
 
 class InputFileParam(FileParam):
@@ -311,10 +315,11 @@ class InputFileParam(FileParam):
               docker_path=None,
               uri=None,
               recursive=False,
-              file_provider=None):
+              file_provider=None,
+              disk_size=None):
     validate_param_name(name, 'Input parameter')
-    return super(InputFileParam, cls).__new__(cls, name, value, docker_path,
-                                              uri, recursive, file_provider)
+    return super(InputFileParam, cls).__new__(
+        cls, name, value, docker_path, uri, recursive, file_provider, disk_size)
 
 
 class OutputFileParam(FileParam):
@@ -326,19 +331,44 @@ class OutputFileParam(FileParam):
               docker_path=None,
               uri=None,
               recursive=False,
-              file_provider=None):
+              file_provider=None,
+              disk_size=None):
     validate_param_name(name, 'Output parameter')
-    return super(OutputFileParam, cls).__new__(cls, name, value, docker_path,
-                                               uri, recursive, file_provider)
+    return super(OutputFileParam, cls).__new__(
+        cls, name, value, docker_path, uri, recursive, file_provider, disk_size)
 
 
 class MountParam(FileParam):
   """Simple typed-derivative of a FileParam."""
 
-  def __new__(cls, name, value, docker_path=None):
+  def __new__(cls, name, value, docker_path=None, uri=None, disk_size=None):
     validate_param_name(name, 'Mount parameter')
+    return super(MountParam, cls).__new__(
+        cls, name, value, docker_path, uri, disk_size=disk_size)
+
+
+class GCSMountParam(MountParam):
+  """A MountParam representing a Cloud Storage bucket to mount via gcsfuse."""
+
+  def __new__(cls, name, value, docker_path):
     validate_bucket_name(value)
-    return super(MountParam, cls).__new__(cls, name, value, docker_path)
+    return super(GCSMountParam, cls).__new__(cls, name, value, docker_path)
+
+
+class PersistentDiskMountParam(MountParam):
+  """A MountParam representing a Google Persistent Disk."""
+
+  def __new__(cls, name, value, docker_path, disk_size):
+    return super(PersistentDiskMountParam, cls).__new__(
+        cls, name, value, docker_path, disk_size=disk_size)
+
+
+class LocalMountParam(MountParam):
+  """A MountParam representing a path on the local machine."""
+
+  def __new__(cls, name, value, docker_path, uri):
+    return super(LocalMountParam, cls).__new__(cls, name, value, docker_path,
+                                               uri)
 
 
 class Resources(

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 Google Inc. All Rights Reserved.
+# Copyright 2018 Verily Life Sciences Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,18 +17,15 @@
 set -o errexit
 set -o nounset
 
-# Test copying input files to and output files from directories.
+# Test persistent disk abilities.
 #
-# This test is designed to verify that named file input and output path
-# command-line parameters work correctly.
+# This test is designed to verify that mounting a Google Persistent Disk works.
+# Input files have been placed inside persistent disk sourced by the test image
+# used here.
 #
 # The actual operation performed here is to download a BAM and compute
 # the md5, writing it to <filename>.bam.md5.
-#
-# An input file (the BAM) is localized to a subdirectory of the default
-# data directory.
-# An output file (the MD5) is de-localized from a different subdirectory
-# of the default data directory.
+# and compute its md5, writing it to <filename>.bam.md5.
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
@@ -39,13 +36,11 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 source "${SCRIPT_DIR}/io_setup.sh"
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
-
+  io_setup::image_setup
   echo "Launching pipeline..."
-
-  JOB_ID=$(io_setup::run_dsub)
-
+  JOB_ID="$(io_setup::run_dsub_with_mount "${TEST_IMAGE_URL} 50")"
 fi
 
 # Do validation
 io_setup::check_output
-io_setup::check_dstat "${JOB_ID}" true
+io_setup::check_dstat "${JOB_ID}" false "${TEST_IMAGE_URL}"
