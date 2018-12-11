@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 Google Inc. All Rights Reserved.
+# Copyright 2018 Verily Life Sciences Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,30 +17,32 @@
 set -o errexit
 set -o nounset
 
-# Test gcsfuse abilities.
-#
-# This test is designed to verify that named GCS bucket (mount)
-# command-line parameters work correctly.
-#
-# The actual operation performed here is to mount to a bucket containing a BAM
-# and compute its md5, writing it to <filename>.bam.md5.
+# Test that even when a job fails early, a useful status message is produced.
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-# Do io setup
-source "${SCRIPT_DIR}/io_setup.sh"
-
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
-
-  echo "Launching pipeline..."
-
-  JOB_ID=$(io_setup::run_dsub_fuse)
-
+# Run the job
+if JOB_ID=$(run_dsub \
+             --image gcr.io/no.such.image \
+             --command 'echo "Test"' \
+             --wait); then
+  echo "ERROR: Job that should fail completed successfully!"
+  exit 1
 fi
 
-# Do validation
-io_setup::check_output
-io_setup::check_dstat "${JOB_ID}" false true
+readonly STATUS_MESSAGE="$(util::get_job_status_detail "${JOB_ID}")"
+
+if [[ ${STATUS_MESSAGE} == *"no.such.image"* ]]; then
+  echo
+  echo "SUCCESS: dstat output for failed job mentions image problem."
+  echo
+else
+  echo
+  echo "ERROR: dstat output for failed job doesn't mention image problem."
+  echo "${dstat_output}"
+  echo
+  exit 1
+fi

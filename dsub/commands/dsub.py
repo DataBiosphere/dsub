@@ -177,6 +177,8 @@ def _google_parse_arguments(args):
     raise ValueError('Not supported with the google provider: --machine-type. '
                      'Use --min-cores and --min-ram instead.'
                      '')
+  if args.mount:
+    raise ValueError('Not supported with the google provider: --mount.')
 
 
 def _google_v2_parse_arguments(args):
@@ -184,15 +186,9 @@ def _google_v2_parse_arguments(args):
   if (args.zones and args.regions) or (not args.zones and not args.regions):
     raise ValueError('Exactly one of --regions and --zones must be specified')
 
-  if args.min_cores:
-    raise ValueError('Not supported with the google-v2 provider: --min-cores. '
-                     'Use --machine-type instead.'
-                     '')
-
-  if args.min_ram:
-    raise ValueError('Not supported with the google-v2 provider: --min-ram. '
-                     'Use --machine-type instead.'
-                     '')
+  if args.machine_type and (args.min_cores or args.min_ram):
+    raise ValueError(
+        '--machine-type not supported together with --min-cores or --min-ram.')
 
 
 def _parse_arguments(prog, argv):
@@ -312,6 +308,14 @@ def _parse_arguments(prog, argv):
       help="""Specify a user project to be billed for all requests to Google
          Cloud Storage (logging, localization, delocalization). This flag exists
          to support accessing Requester Pays buckets""")
+  parser.add_argument(
+      '--mount',
+      nargs='*',
+      action=param_util.ListParamAction,
+      default=[],
+      help="""Mount a resource such as a bucket, disk, or directory into your
+         Docker container""",
+      metavar='KEY=PATH_SPEC')
 
   # Add dsub job management arguments
   parser.add_argument(
@@ -469,14 +473,6 @@ def _parse_arguments(prog, argv):
       action='store_true',
       help="""If set to true, start an ssh container in the background
           to allow you to log in using SSH and debug in real time.""")
-  google_v2.add_argument(
-      '--mount',
-      nargs='*',
-      action=param_util.ListParamAction,
-      default=[],
-      help="""Google Cloud Storage bucket path (gs://bucket) to mount using
-          Cloud Storage FUSE (gcsfuse).""",
-      metavar='KEY=REMOTE_PATH')
 
   args = provider_base.parse_args(
       parser, {
@@ -1015,7 +1011,7 @@ def run(provider,
     provider_base.emit_provider_message(provider)
 
   if not disable_warning:
-    raise ValueError('Do not user this unstable API component!')
+    raise ValueError('Do not use this unstable API component!')
 
   if command and script:
     raise ValueError('Cannot supply both a command and script value.')
@@ -1036,7 +1032,7 @@ def run(provider,
     raise ValueError('One of --command or a script name must be supplied')
 
   if retries and not wait:
-    raise ValueError('Requisting retries requires requesting wait')
+    raise ValueError('Requesting retries requires requesting wait')
 
   # The contract with providers and downstream code is that the job_params
   # and task_params contain 'labels', 'envs', 'inputs', and 'outputs'.

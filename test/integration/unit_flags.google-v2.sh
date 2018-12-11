@@ -93,17 +93,12 @@ function test_min_cores() {
     --regions us-central1 \
     --min-cores 1; then
 
-    2>&1 echo "min-cores set with google-v2 provider - not detected"
-
-    test_failed "${subtest}"
-  else
-
-    assert_output_empty
-
-    assert_err_contains \
-      "ValueError: Not supported with the google-v2 provider: --min-cores. Use --machine-type instead."
-
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.machineType" "custom-1-3840"
     test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
   fi
 }
 readonly -f test_min_cores
@@ -116,17 +111,12 @@ function test_min_ram() {
     --regions us-central1 \
     --min-ram 1; then
 
-    2>&1 echo "min-ram set with google-v2 provider - not detected"
-
-    test_failed "${subtest}"
-  else
-
-    assert_output_empty
-
-    assert_err_contains \
-      "ValueError: Not supported with the google-v2 provider: --min-ram. Use --machine-type instead."
-
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.machineType" "custom-1-1024"
     test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
   fi
 }
 readonly -f test_min_ram
@@ -167,6 +157,30 @@ function test_no_machine_type() {
   fi
 }
 readonly -f test_no_machine_type
+
+function test_machine_type_with_ram_and_cpu() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --machine-type "n1-highmem-2" \
+    --min-cores 1 \
+    --min-ram 1; then
+
+    2>&1 echo "min-ram/min-cores set with machine-type on google-v2 provider - not detected"
+
+    test_failed "${subtest}"
+  else
+    assert_output_empty
+
+    assert_err_contains \
+      "ValueError: --machine-type not supported together with --min-cores or --min-ram."
+
+    test_passed "${subtest}"
+  fi
+}
+readonly -f test_machine_type_with_ram_and_cpu
 
 function test_accelerator_type_and_count() {
   local subtest="${FUNCNAME[0]}"
@@ -460,6 +474,7 @@ test_min_cores
 test_min_ram
 test_machine_type
 test_no_machine_type
+test_machine_type_with_ram_and_cpu
 
 echo
 test_accelerator_type_and_count

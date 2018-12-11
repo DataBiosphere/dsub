@@ -29,7 +29,8 @@
 #
 #   OR
 #
-#   GENOMICS_PUBLIC_BUCKET: A directory mounted to a GCS bucket,
+#   MOUNT_POINT:
+#       A directory mounted to a GCS bucket or a persistent disk,
 #       such as "/mnt/data/bucket"
 #
 #   AND
@@ -42,27 +43,27 @@
 set -o errexit
 set -o nounset
 
-echo "GENOMICS_PUBLIC_BUCKET = ${GENOMICS_PUBLIC_BUCKET:-}"
+echo "MOUNT_POINT = ${MOUNT_POINT:-}"
 echo "POPULATION_FILE_PATH = ${POPULATION_FILE_PATH:-}"
 echo "OUTPUT_POPULATION_FILE = ${OUTPUT_POPULATION_FILE}"
 
 echo "INPUT_PATH = ${INPUT_PATH:-}"
 echo "OUTPUT_PATH = ${OUTPUT_PATH}"
 
-if [[ -n "${GENOMICS_PUBLIC_BUCKET:-}" ]]; then
+if [[ -n "${MOUNT_POINT:-}" ]]; then
   if [[ -n "${INPUT_PATH:-}" ]]; then
-    echo "Invalid test: GENOMICS_PUBLIC_BUCKET and INPUT_PATH should not both be set"
+    echo "Invalid test: MOUNT_POINT and INPUT_PATH should not both be set"
     exit 1
   fi
   if [[ -n "${POPULATION_FILE_PATH:-}" ]]; then
-    echo "Invalid test: GENOMICS_PUBLIC_BUCKET and POPULATION_FILE_PATH should not both be set"
+    echo "Invalid test: MOUNT_POINT and POPULATION_FILE_PATH should not both be set"
     exit 1
   fi
-  # Set the INPUT PATH based on the bucket
-  # GENOMICS_PUBLIC_DATA is the path representing the bucket root.
+  # Set the INPUT PATH based on the mount point.
+  # MOUNT_POINT is the path representing the bucket/disk root.
   # Get the rest of the path from env vars.
-  INPUT_PATH="${GENOMICS_PUBLIC_BUCKET}/${INPUT_BAM}"
-  POPULATION_FILE_PATH="${GENOMICS_PUBLIC_BUCKET}/${POPULATION_FILE}"
+  INPUT_PATH="${MOUNT_POINT}/${INPUT_BAM}"
+  POPULATION_FILE_PATH="${MOUNT_POINT}/${POPULATION_FILE}"
 fi
 
 if [[ -d "${INPUT_PATH}" ]]; then

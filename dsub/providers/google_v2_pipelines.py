@@ -27,10 +27,11 @@ def build_network(name, subnetwork, use_private_address):
   }
 
 
-def build_disk(name, size_gb):
+def build_disk(name, size_gb, source_image):
   return {
       'name': name,
       'sizeGb': size_gb,
+      'sourceImage': source_image,
   }
 
 
@@ -107,7 +108,7 @@ def build_resources(project=None,
   }
 
 
-def build_mount(disk=None, path=None, read_only=None):
+def build_mount(disk, path, read_only):
   """Build a Mount object for a Pipeline request.
 
   Args:

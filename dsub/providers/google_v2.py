@@ -22,6 +22,7 @@ from __future__ import print_function
 
 import ast
 import json
+import math
 import operator
 import os
 import re
@@ -564,7 +565,7 @@ class GoogleV2JobProvider(base.JobProvider):
               image_uri=_GCSFUSE_IMAGE,
               mounts=[mnt_datadisk],
               commands=[
-                  '--implicit-dirs', '--foreground', bucket,
+                  '--implicit-dirs', '--foreground', '-o ro', bucket,
                   os.path.join(providers_util.DATA_MOUNT_POINT, mount_path)
               ]),
           google_v2_pipelines.build_action(
@@ -610,6 +611,25 @@ class GoogleV2JobProvider(base.JobProvider):
     inputs = job_params['inputs'] | task_params['inputs']
     outputs = job_params['outputs'] | task_params['outputs']
     mounts = job_params['mounts']
+    gcs_mounts = param_util.get_gcs_mounts(mounts)
+
+    persistent_disk_mount_params = param_util.get_persistent_disk_mounts(mounts)
+
+    persistent_disks = [
+        google_v2_pipelines.build_disk(
+            name=disk.name.replace('_', '-'),  # Underscores not allowed
+            size_gb=disk.disk_size or job_model.DEFAULT_MOUNTED_DISK_SIZE,
+            source_image=disk.value) for disk in persistent_disk_mount_params
+    ]
+    persistent_disk_mounts = [
+        google_v2_pipelines.build_mount(
+            disk=persistent_disk.get('name'),
+            path=os.path.join(providers_util.DATA_MOUNT_POINT,
+                              persistent_disk_mount_param.docker_path),
+            read_only=True)
+        for persistent_disk, persistent_disk_mount_param in zip(
+            persistent_disks, persistent_disk_mount_params)
+    ]
 
     # The list of "actions" (1-based) will be:
     #   1- continuous copy of log files off to Cloud Storage
@@ -632,7 +652,7 @@ class GoogleV2JobProvider(base.JobProvider):
     if job_resources.ssh:
       optional_actions += 1
 
-    mount_actions = self._get_mount_actions(mounts, mnt_datadisk)
+    mount_actions = self._get_mount_actions(gcs_mounts, mnt_datadisk)
     optional_actions += len(mount_actions)
 
     user_action = 4 + optional_actions
@@ -716,7 +736,7 @@ class GoogleV2JobProvider(base.JobProvider):
         google_v2_pipelines.build_action(
             name='user-command',
             image_uri=job_resources.image,
-            mounts=[mnt_datadisk],
+            mounts=[mnt_datadisk] + persistent_disk_mounts,
             environment=user_environment,
             entrypoint='/bin/bash',
             commands=[
@@ -753,12 +773,20 @@ class GoogleV2JobProvider(base.JobProvider):
 
     # Prepare the VM (resources) configuration
     disks = [
-        google_v2_pipelines.build_disk(_DATA_DISK_NAME, job_resources.disk_size)
+        google_v2_pipelines.build_disk(
+            _DATA_DISK_NAME, job_resources.disk_size, source_image=None)
     ]
+    disks.extend(persistent_disks)
     network = google_v2_pipelines.build_network(
         job_resources.network, job_resources.subnetwork,
         job_resources.use_private_address)
-    machine_type = job_resources.machine_type or job_model.DEFAULT_MACHINE_TYPE
+    if job_resources.machine_type:
+      machine_type = job_resources.machine_type
+    elif job_resources.min_cores or job_resources.min_ram:
+      machine_type = GoogleV2CustomMachine.build_machine_type(
+          job_resources.min_cores, job_resources.min_ram)
+    else:
+      machine_type = job_model.DEFAULT_MACHINE_TYPE
     accelerators = None
     if job_resources.accelerator_type:
       accelerators = [
@@ -1277,6 +1305,11 @@ class GoogleOperation(base.Task):
       value = self._operation_status()
     elif field == 'status-message':
       msg, action = self._operation_status_message()
+      if msg.startswith('Execution failed:'):
+        # msg may look something like
+        # "Execution failed: action 2: pulling image..."
+        # Emit the actual message ("pulling image...")
+        msg = msg.split(': ', 2)[-1]
       value = msg
     elif field == 'status-detail':
       msg, action = self._operation_status_message()
@@ -1326,6 +1359,69 @@ class GoogleOperation(base.Task):
       raise ValueError('Unsupported field: "%s"' % field)
 
     return value if value else default
+
+
+class GoogleV2CustomMachine(object):
+  """Utility class for creating custom machine types."""
+
+  # See documentation on restrictions at
+  # https://cloud.google.com/compute/docs/instances/creating-instance-with-custom-machine-type
+  _MEMORY_MULTIPLE = 256  # The total memory must be a multiple of 256 MB
+  _MIN_MEMORY_PER_CPU_IN_GB = 0.9  # in GB per vCPU
+  _MAX_MEMORY_PER_CPU_IN_GB = 6.5  # in GB per vCPU
+  _MB_PER_GB = 1024  # 1 GB = 1024 MB
+
+  # Memory is input in GB, but we'd like to do our calculations in MB
+  _MIN_MEMORY_PER_CPU = _MIN_MEMORY_PER_CPU_IN_GB * _MB_PER_GB
+  _MAX_MEMORY_PER_CPU = _MAX_MEMORY_PER_CPU_IN_GB * _MB_PER_GB
+
+  @staticmethod
+  def _validate_cores(cores):
+    """Make sure cores is either one or even."""
+    if cores == 1 or cores % 2 == 0:
+      return cores
+    else:
+      return cores + 1
+
+  @staticmethod
+  def _validate_ram(ram_in_mb):
+    """Rounds ram up to the nearest multiple of _MEMORY_MULTIPLE."""
+    return int(GoogleV2CustomMachine._MEMORY_MULTIPLE * math.ceil(
+        ram_in_mb / GoogleV2CustomMachine._MEMORY_MULTIPLE))
+
+  @classmethod
+  def build_machine_type(cls, min_cores, min_ram):
+    """Returns a custom machine type string."""
+    min_cores = min_cores or job_model.DEFAULT_MIN_CORES
+    min_ram = min_ram or job_model.DEFAULT_MIN_RAM
+
+    # First, min_ram is given in GB. Convert to MB.
+    min_ram *= GoogleV2CustomMachine._MB_PER_GB
+
+    # Only machine types with 1 vCPU or an even number of vCPUs can be created.
+    cores = cls._validate_cores(min_cores)
+    # The total memory of the instance must be a multiple of 256 MB.
+    ram = cls._validate_ram(min_ram)
+
+    # Memory must be between 0.9 GB per vCPU, up to 6.5 GB per vCPU.
+    memory_to_cpu_ratio = ram / cores
+
+    if memory_to_cpu_ratio < GoogleV2CustomMachine._MIN_MEMORY_PER_CPU:
+      # If we're under the ratio, top up the memory.
+      adjusted_ram = GoogleV2CustomMachine._MIN_MEMORY_PER_CPU * cores
+      ram = cls._validate_ram(adjusted_ram)
+
+    elif memory_to_cpu_ratio > GoogleV2CustomMachine._MAX_MEMORY_PER_CPU:
+      # If we're over the ratio, top up the CPU.
+      adjusted_cores = math.ceil(
+          ram / GoogleV2CustomMachine._MAX_MEMORY_PER_CPU)
+      cores = cls._validate_cores(adjusted_cores)
+
+    else:
+      # Ratio is within the restrictions - no adjustments needed.
+      pass
+
+    return 'custom-{}-{}'.format(int(cores), int(ram))
 
 
 if __name__ == '__main__':

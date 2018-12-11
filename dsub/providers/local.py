@@ -227,6 +227,7 @@ class LocalJobProvider(base.JobProvider):
 
       inputs = job_params['inputs'] | task_params['inputs']
       outputs = job_params['outputs'] | task_params['outputs']
+      mounts = job_params['mounts']
 
       if skip_if_output_present:
         # check whether the output's already there
@@ -245,7 +246,7 @@ class LocalJobProvider(base.JobProvider):
       self._stage_script(task_dir, script.name, script.value)
 
       # Start the task
-      env = self._make_environment(inputs, outputs)
+      env = self._make_environment(inputs, outputs, mounts)
 
       self._write_task_metadata(task_dir, task_view)
       self._run_docker_via_script(task_dir, env, job_metadata, job_params,
@@ -298,6 +299,8 @@ class LocalJobProvider(base.JobProvider):
       {export_input_dirs}
       # Set environment variables for recursive output directories
       {export_output_dirs}
+      # Set environment variables for mounts
+      {export_mount_dirs}
 
       recursive_localize_data() {{
         true # ensure body is not empty, to avoid error.
@@ -329,6 +332,11 @@ class LocalJobProvider(base.JobProvider):
     # Build the local runner script
     volumes = ('-v ' + task_dir + '/' + _DATA_SUBDIR + '/'
                ':' + providers_util.DATA_MOUNT_POINT)
+    for mount in param_util.get_local_mounts(job_params['mounts']):
+      volumes += '\n'
+      docker_path = os.path.join(providers_util.DATA_MOUNT_POINT,
+                                 mount.docker_path)
+      volumes += '-v {}:{}:ro'.format(mount.uri, docker_path)
 
     script_data = script_header.format(
         volumes=volumes,
@@ -360,6 +368,8 @@ class LocalJobProvider(base.JobProvider):
             job_metadata['user-project']),
         delocalize_logs_command=self._delocalize_logging_command(
             task_resources.logging_path, job_metadata['user-project']),
+        export_mount_dirs=providers_util.build_mount_env(
+            task_dir, param_util.get_local_mounts(job_params['mounts'])),
     )
 
     # Write the runner script and data file to the task_dir
@@ -624,7 +634,7 @@ class LocalJobProvider(base.JobProvider):
   def _get_log_detail_from_task_dir(self, task_dir):
     try:
       with open(os.path.join(task_dir, 'runner-log.txt'), 'r') as f:
-        return f.read().splitlines()
+        return [line.decode('utf-8') for line in f.read().splitlines()]
     except (IOError, OSError):
       return None
 
@@ -759,11 +769,12 @@ class LocalJobProvider(base.JobProvider):
     else:
       return task_dir, None
 
-  def _make_environment(self, inputs, outputs):
+  def _make_environment(self, inputs, outputs, mounts):
     """Return a dictionary of environment variables for the container."""
     env = {}
     env.update(providers_util.get_file_environment_variables(inputs))
     env.update(providers_util.get_file_environment_variables(outputs))
+    env.update(providers_util.get_file_environment_variables(mounts))
     return env
 
   def _localize_inputs_recursive_command(self, task_dir, inputs):
@@ -965,6 +976,10 @@ class LocalTask(base.Task):
         items = providers_util.get_job_and_task_param(job_params, task_params,
                                                       field)
         value.update({item.name: item.value for item in items})
+    elif field == 'mounts':
+      items = providers_util.get_job_and_task_param(job_params, task_params,
+                                                    field)
+      value = {item.name: item.value for item in items}
     elif field == 'provider':
       return _PROVIDER_NAME
     elif field == 'provider-attributes':

@@ -3,13 +3,24 @@
 For the `local` provider, `dsub` launches tasks on your local machine and runs
 as-is. No attempt is made to constrain resources used or ensure capacity.
 
-For the `google` provider, you can specify the compute resources that your job
-tasks will need.
+For the `google` and `google-v2` providers, you can specify the compute
+resources that your job tasks will need.
 
 ## Cores and RAM
 
 By default, `dsub` launches a Compute Engine VM with a single CPU core and
 3.75 GB.
+
+Note: There is inconsistency in technology regarding the use of `GB` as a unit.
+For more background see [Gibibyte](https://en.wikipedia.org/wiki/Gibibyte).
+
+Google Compute Engine treats `GB` as a base-2 value, where:
+
+- 1GB = 2^30 bytes
+- 1GB = 1024 MB
+
+Unit handling by the `dsub` `google` and `google-v2` providers is consistent
+with Google Compute Engine.
 
 ### With the `google` provider (the default):
 
@@ -28,6 +39,12 @@ The `--machine-type` value can be one of the
 [predefined machine types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types)
 or a
 [custom machine type](https://cloud.google.com/compute/docs/machine-types#custom_machine_types).
+
+You may also use the `--min-ram` and/or `--min-cores` flag similarly to the `google` provider above.
+If specified, `dsub` will choose the smallest matching
+[custom machine type](https://cloud.google.com/compute/docs/machine-types#custom_machine_types)
+that fits these
+[specifications](https://cloud.google.com/compute/docs/instances/creating-instance-with-custom-machine-type#specifications).
 
 ## Disks
 

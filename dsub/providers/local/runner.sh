@@ -175,7 +175,7 @@ function get_docker_user() {
 readonly -f get_docker_user
 
 function docker_recursive_chown() {
-  # Calls, in Docker: chown -R $1 $2
+  # In Docker: chown recursively on $2 except for the read-only mount dir
   local usergroup="$1"
   local docker_directory="$2"
   # Not specifying a name because Docker refuses to run if two containers
@@ -186,7 +186,11 @@ function docker_recursive_chown() {
     --entrypoint /bin/bash \
     "${VOLUMES[@]}" \
     "${IMAGE}" \
-    "-c" "chown -R ${usergroup} ${docker_directory}" \
+    "-c" \
+    "find ${docker_directory} \
+       -path '${docker_directory}/mount*' \
+       -prune -o -print0 \
+       | xargs -0 chown ${usergroup}" \
     >> "${TASK_DIR}/stdout.txt" 2>> "${TASK_DIR}/stderr.txt"
 }
 readonly -f docker_recursive_chown

@@ -184,7 +184,7 @@ Replacing `v1alpha2` is [v2alpha1](https://cloud.google.com/genomics/reference/r
 `dsub` has added the `google-v2` provider which use `v2alpha1` as the backend
 for running `dsub` jobs on Google Cloud.
 
-**dsub users are encourage today to use the google-v2 provider. At the end of
+**`dsub` users are encouraged today to use the `google-v2` provider. At the end of
 2018, the Pipelines API `v1alpha2` will be turned down and the `google` provider
 for `dsub` will be removed.**
 
@@ -194,13 +194,46 @@ To migrate existing `dsub` calls from the `google` provider to the `google-v2`
 provider:
 
 - Add `--provider google-v2` to your command-line
-- Use `--machine-type` (default is `n1-standard-1`) instead of `--min-cpu`
-  and `--min-ram`.
+- Set the `--machine-type` or `--min-ram` and `--min-cores` if your tasks need
+other than 1 core and 3.75 GB of memory
 
-The `--machine-type` value can be one of the
-[Predefined Machine Types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types)
-or a
-[Custom Machine Type](https://cloud.google.com/compute/docs/machine-types#custom_machine_types).
+**NOTE: The conversion of `--min-ram` and `--min-cores` is different with the
+`google-v2` provider than the `google` provider. Please read the section below
+to set your parameters appropriately.**
+
+#### `--machine-type` vs. `--min-ram` and `--min-cores` with `google-v2`
+
+The `google` provider was backed by the Pipelines API `v1alpha2`, which accepted
+minimum ram and minimum cores as parameters and made a "best fit" attempt to
+translate those parameters into one of the
+[Compute Engine Predefined Machine Types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types).
+
+The `google-v2` provider is backed by the Pipelines API `v2alpha1`, which does
+not perform this "best fit" computation, but requires an explicit machine type
+to be specified.
+
+However, the `v2alpha1` API also supports
+[Compute Engine Custom Machine Types](https://cloud.google.com/compute/docs/machine-types#custom_machine_types),
+which allow for greater control over machine resources than the predefined
+machine types do. This allows users to reduce costs by limiting any
+over-provisioning of Compute Engine VMs.
+
+The `google-v2` provider takes advantage of this by translating
+`--min-ram` and `--min-cores` into a custom machine type specification.
+When migrating existing `dsub` jobs from `google` to `google-v2` you may find
+that tasks are allocated smaller VMs with `google-v2` than with `google`
+because the `--min-ram` and `--min-cores` specified for the job are more
+precisely translated with `google-v2`. You will need to adjust your resource
+parameters accordingly.
+
+Notes for `google-v2` resource specifications:
+- `n1-standard-1` is the default machine type as it was with the `google`
+provider.
+- *Either* `--machine-type` or `--min-ram` and `--min-cores` may be specified,
+but not both.
+- To use one of the
+[Shared-core machine types](https://cloud.google.com/compute/docs/machine-types#sharedcore),
+use the `--machine-type` flag.
 
 ## `dsub` features
 
@@ -320,33 +353,60 @@ To copy folders rather than files, use the `--input-recursive` or
         --input-recursive FOLDER=gs://my-bucket/my-folder \
         --command 'find ${FOLDER} -name "foo*"'
 
-#### Mounting buckets
+#### Mounting "resource data"
 
-The `google-v2` provider supports mounting a Cloud Storage bucket using
-[Cloud Storage FUSE](https://cloud.google.com/storage/docs/gcs-fuse). This
-capability is currently experimental, but may be most useful when:
+If you have one of the following:
 
-1. You have a large input file in Cloud Storage over which your code makes
-a single read pass or only needs to read a small range of bytes.
-2. You have a large set of resource files in Cloud Storage, your code only reads
-a subset of those files, and the decision of which files to read is determined
-at runtime.
+1. A large set of resource files, your code only reads a subset of those files,
+and the decision of which files to read is determined at runtime, or
+2. A large input file over which your code makes a single read pass or only
+needs to read a small range of bytes,
 
-Writing to a mounted bucket is not recommended.
+then you may find it more efficient at runtime to access this resource data via
+mounting a Google Cloud Storage bucket read-only or mounting a persistent disk
+created from a
+[Compute Engine Image](https://cloud.google.com/compute/docs/images) read-only.
 
-Please read
+The `google-v2` provider supports these two methods of providing access to
+resource data. The `local` provider supports mounting a local directory in a
+similar fashion to support your local development.
+
+To have the `google-v2` provider mount a Cloud Storage bucket using
+Cloud Storage FUSE, use the `--mount` command line flag:
+
+    --mount MYBUCKET=gs://mybucket
+
+The bucket will be mounted into the Docker container running your `--script`
+or `--command` and the location made available via the environment variable
+`${MYBUCKET}`. Inside your script, you can reference the mounted path using the
+environment variable. Please read
 [Key differences from a POSIX file system](https://cloud.google.com/storage/docs/gcs-fuse#notes)
 and [Semantics](https://github.com/GoogleCloudPlatform/gcsfuse/blob/master/docs/semantics.md)
 before using Cloud Storage FUSE.
 
-To mount a Cloud Storage bucket with the `google-v2` provider, use the `--mount`
-command line flag:
+To have the `google-v2` provider mount a persistent disk created from an image,
+use the `--mount` command line flag and the url of the source image and the size
+(in GB) of the disk:
 
-    --mount MYBUCKET=gs://mybucket
+    --mount MYDISK=https://www.googleapis.com/compute/v1/projects/your-project/global/images/your-image 50
 
-The bucket will be mounted to a local path given by the environment variable
-`${MYBUCKET}`. Inside your script, you can reference the local path using the
-environment variable.
+The image will be used to create a new persistent disk, which will be attached
+to a Compute Engine VM. The disk will mounted into the Docker container running
+your `--script` or `--command` and the location made available by the
+environment variable `${MYDISK}`. Inside your script, you can reference the
+mounted path using the environment variable.
+
+To create an image, see [Creating a custom image](https://cloud.google.com/compute/docs/images/create-delete-deprecate-private-images).
+
+To have the `local` provider mount a directory read-only, use the `--mount`
+command line flag and a `file://` prefix:
+
+    --mount LOCAL_MOUNT=file://path/to/my/dir
+
+The local directory will be mounted into the Docker container running your
+`--script`or `--command` and the location made available via the environment
+variable `${LOCAL_MOUNT}`. Inside your script, you can reference the mounted
+path using the environment variable.
 
 ##### Notice
 

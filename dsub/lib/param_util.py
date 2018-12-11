@@ -138,71 +138,10 @@ class FileParamUtil(object):
     if file_provider == job_model.P_GCS:
       normalized, docker_path = _gcs_uri_rewriter(raw_uri)
     elif file_provider == job_model.P_LOCAL:
-      normalized, docker_path = self._local_uri_rewriter(raw_uri)
+      normalized, docker_path = _local_uri_rewriter(raw_uri)
     else:
       raise ValueError('File provider not supported: %r' % file_provider)
     return normalized, os.path.join(self._relative_path, docker_path)
-
-  @staticmethod
-  def _local_uri_rewriter(raw_uri):
-    """Rewrite local file URIs as required by the rewrite_uris method.
-
-    Local file paths, unlike GCS paths, may have their raw URI simplified by
-    os.path.normpath which collapses extraneous indirect characters.
-
-    >>> FileParamUtil._local_uri_rewriter('/tmp/a_path/../B_PATH/file.txt')
-    ('/tmp/B_PATH/file.txt', 'file/tmp/B_PATH/file.txt')
-    >>> FileParamUtil._local_uri_rewriter('/myhome/./mydir/')
-    ('/myhome/mydir/', 'file/myhome/mydir/')
-
-    The local path rewriter will also work to preserve relative paths even
-    when creating the docker path. This prevents leaking of information on the
-    invoker's system to the remote system. Doing this requires a number of path
-    substitutions denoted with the _<rewrite>_ convention.
-
-    >>> FileParamUtil._local_uri_rewriter('./../upper_dir/')[1]
-    'file/_dotdot_/upper_dir/'
-    >>> FileParamUtil._local_uri_rewriter('~/localdata/*.bam')[1]
-    'file/_home_/localdata/*.bam'
-
-    Args:
-      raw_uri: (str) the raw file or directory path.
-
-    Returns:
-      normalized: a simplified and/or expanded version of the uri.
-      docker_path: the uri rewritten in the format required for mounting inside
-                   a docker worker.
-
-    """
-    # The path is split into components so that the filename is not rewritten.
-    raw_path, filename = os.path.split(raw_uri)
-    # Generate the local path that can be resolved by filesystem operations,
-    # this removes special shell characters, condenses indirects and replaces
-    # any unnecessary prefix.
-    prefix_replacements = [('file:///', '/'), ('~/', os.getenv('HOME')),
-                           ('./', ''), ('file:/', '/')]
-    normed_path = raw_path
-    for prefix, replacement in prefix_replacements:
-      if normed_path.startswith(prefix):
-        normed_path = os.path.join(replacement, normed_path[len(prefix):])
-    # Because abspath strips the trailing '/' from bare directory references
-    # other than root, this ensures that all directory references end with '/'.
-    normed_uri = directory_fmt(os.path.abspath(normed_path))
-    normed_uri = os.path.join(normed_uri, filename)
-
-    # Generate the path used inside the docker image;
-    #  1) Get rid of extra indirects: /this/./that -> /this/that
-    #  2) Rewrite required indirects as synthetic characters.
-    #  3) Strip relative or absolute path leading character.
-    #  4) Add 'file/' prefix.
-    docker_rewrites = [(r'/\.\.', '/_dotdot_'), (r'^\.\.', '_dotdot_'),
-                       (r'^~/', '_home_/'), (r'^file:/', '')]
-    docker_path = os.path.normpath(raw_path)
-    for pattern, replacement in docker_rewrites:
-      docker_path = re.sub(pattern, replacement, docker_path)
-    docker_path = docker_path.lstrip('./')  # Strips any of '.' './' '/'.
-    docker_path = directory_fmt('file/' + docker_path) + filename
-    return normed_uri, docker_path
 
   @staticmethod
   def parse_file_provider(uri):
@@ -296,24 +235,55 @@ class OutputFileParamUtil(FileParamUtil):
 
 
 class MountParamUtil(object):
-  """Utility class for gcsfuse mounted buckets."""
+  """Utility class for --mount parameter."""
 
   def __init__(self, docker_path):
     self._relative_path = docker_path
-    self.param_class = job_model.MountParam
 
-  def parse_uri(self, raw_uri):
-    """Return a valid docker_path, uri, and file provider from a flag value."""
+  def _parse_image_uri(self, raw_uri):
+    """Return a valid docker_path from a Google Persistent Disk url."""
+    # The string replace is so we don't have colons and double slashes in the
+    # mount path. The idea is the resulting mount path would look like:
+    # /mnt/data/mount/http/www.googleapis.com/compute/v1/projects/...
+    docker_uri = os.path.join(self._relative_path,
+                              raw_uri.replace('https://', 'https/', 1))
+    return docker_uri
+
+  def _parse_local_mount_uri(self, raw_uri):
+    """Return a valid docker_path for a local file path."""
+    raw_uri = directory_fmt(raw_uri)
+    _, docker_path = _local_uri_rewriter(raw_uri)
+    local_path = docker_path[len('file'):]
+    docker_uri = os.path.join(self._relative_path, docker_path)
+    return local_path, docker_uri
+
+  def _parse_gcs_uri(self, raw_uri):
+    """Return a valid docker_path for a GCS bucket."""
     # Assume URI is a directory path.
     raw_uri = directory_fmt(raw_uri)
     _, docker_path = _gcs_uri_rewriter(raw_uri)
     docker_uri = os.path.join(self._relative_path, docker_path)
     return docker_uri
 
-  def make_param(self, name, raw_uri):
-    """Return a MountParam given the uri for a GCS bucket."""
-    docker_path = self.parse_uri(raw_uri)
-    return self.param_class(name, raw_uri, docker_path)
+  def make_param(self, name, raw_uri, disk_size):
+    """Return a MountParam given a GCS bucket, disk image or local path."""
+    if raw_uri.startswith('https://www.googleapis.com/compute'):
+      # Full Image URI should look something like:
+      # https://www.googleapis.com/compute/v1/projects/<project>/global/images/
+      # But don't validate further, should the form of a valid image URI
+      # change (v1->v2, for example)
+      docker_path = self._parse_image_uri(raw_uri)
+      return job_model.PersistentDiskMountParam(name, raw_uri, docker_path,
+                                                disk_size)
+    elif raw_uri.startswith('file://'):
+      local_path, docker_path = self._parse_local_mount_uri(raw_uri)
+      return job_model.LocalMountParam(name, raw_uri, docker_path, local_path)
+    elif raw_uri.startswith('gs://'):
+      docker_path = self._parse_gcs_uri(raw_uri)
+      return job_model.GCSMountParam(name, raw_uri, docker_path)
+    else:
+      raise ValueError(
+          'Mount parameter {} must begin with valid prefix.'.format(raw_uri))
 
 
 def _gcs_uri_rewriter(raw_uri):
@@ -333,6 +303,88 @@ def _gcs_uri_rewriter(raw_uri):
   """
   docker_path = raw_uri.replace('gs://', 'gs/', 1)
   return raw_uri, docker_path
+
+
+def _local_uri_rewriter(raw_uri):
+  """Rewrite local file URIs as required by the rewrite_uris method.
+
+  Local file paths, unlike GCS paths, may have their raw URI simplified by
+  os.path.normpath which collapses extraneous indirect characters.
+
+  >>> _local_uri_rewriter('/tmp/a_path/../B_PATH/file.txt')
+  ('/tmp/B_PATH/file.txt', 'file/tmp/B_PATH/file.txt')
+  >>> _local_uri_rewriter('/myhome/./mydir/')
+  ('/myhome/mydir/', 'file/myhome/mydir/')
+
+  The local path rewriter will also work to preserve relative paths even
+  when creating the docker path. This prevents leaking of information on the
+  invoker's system to the remote system. Doing this requires a number of path
+  substitutions denoted with the _<rewrite>_ convention.
+
+  >>> _local_uri_rewriter('./../upper_dir/')[1]
+  'file/_dotdot_/upper_dir/'
+  >>> _local_uri_rewriter('~/localdata/*.bam')[1]
+  'file/_home_/localdata/*.bam'
+
+  Args:
+    raw_uri: (str) the raw file or directory path.
+
+  Returns:
+    normalized: a simplified and/or expanded version of the uri.
+    docker_path: the uri rewritten in the format required for mounting inside
+                 a docker worker.
+
+  """
+  # The path is split into components so that the filename is not rewritten.
+  raw_path, filename = os.path.split(raw_uri)
+  # Generate the local path that can be resolved by filesystem operations,
+  # this removes special shell characters, condenses indirects and replaces
+  # any unnecessary prefix.
+  prefix_replacements = [('file:///', '/'), ('~/', os.getenv('HOME')), ('./',
+                                                                        ''),
+                         ('file:/', '/')]
+  normed_path = raw_path
+  for prefix, replacement in prefix_replacements:
+    if normed_path.startswith(prefix):
+      normed_path = os.path.join(replacement, normed_path[len(prefix):])
+  # Because abspath strips the trailing '/' from bare directory references
+  # other than root, this ensures that all directory references end with '/'.
+  normed_uri = directory_fmt(os.path.abspath(normed_path))
+  normed_uri = os.path.join(normed_uri, filename)
+
+  # Generate the path used inside the docker image;
+  #  1) Get rid of extra indirects: /this/./that -> /this/that
+  #  2) Rewrite required indirects as synthetic characters.
+  #  3) Strip relative or absolute path leading character.
+  #  4) Add 'file/' prefix.
+  docker_rewrites = [(r'/\.\.', '/_dotdot_'), (r'^\.\.', '_dotdot_'),
+                     (r'^~/', '_home_/'), (r'^file:/', '')]
+  docker_path = os.path.normpath(raw_path)
+  for pattern, replacement in docker_rewrites:
+    docker_path = re.sub(pattern, replacement, docker_path)
+  docker_path = docker_path.lstrip('./')  # Strips any of '.' './' '/'.
+  docker_path = directory_fmt('file/' + docker_path) + filename
+  return normed_uri, docker_path
+
+
+def get_gcs_mounts(mounts):
+  """Returns the GCS mounts from mounts."""
+  return _get_filtered_mounts(mounts, job_model.GCSMountParam)
+
+
+def get_persistent_disk_mounts(mounts):
+  """Returns the persistent disk mounts from mounts."""
+  return _get_filtered_mounts(mounts, job_model.PersistentDiskMountParam)
+
+
+def get_local_mounts(mounts):
+  """Returns the local mounts from mounts."""
+  return _get_filtered_mounts(mounts, job_model.LocalMountParam)
+
+
+def _get_filtered_mounts(mounts, mount_param_type):
+  """Helper function to return an appropriate set of mount parameters."""
+  return set([mount for mount in mounts if isinstance(mount, mount_param_type)])
 
 
 def build_logging_param(logging_uri, util_class=OutputFileParamUtil):
@@ -607,9 +659,16 @@ def args_to_job_params(envs, labels, inputs, inputs_recursive, outputs,
 
   mount_data = set()
   for arg in mounts:
-    name, value = split_pair(arg, '=', 1)
-    mount_data.add(mount_param_util.make_param(name, value))
-
+    # Mounts can look like `--mount VAR=PATH` or `--mount VAR=PATH {num}`,
+    # where num is the size of the disk in Gb. We assume a space is the
+    # separator between path and disk size.
+    if ' ' in arg:
+      key_value_pair, disk_size = arg.split(' ')
+      name, value = split_pair(key_value_pair, '=', 1)
+      mount_data.add(mount_param_util.make_param(name, value, disk_size))
+    else:
+      name, value = split_pair(arg, '=', 1)
+      mount_data.add(mount_param_util.make_param(name, value, disk_size=None))
   return {
       'envs': env_data,
       'inputs': input_data,
