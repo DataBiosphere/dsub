@@ -186,15 +186,9 @@ def _google_v2_parse_arguments(args):
   if (args.zones and args.regions) or (not args.zones and not args.regions):
     raise ValueError('Exactly one of --regions and --zones must be specified')
 
-  if args.min_cores:
-    raise ValueError('Not supported with the google-v2 provider: --min-cores. '
-                     'Use --machine-type instead.'
-                     '')
-
-  if args.min_ram:
-    raise ValueError('Not supported with the google-v2 provider: --min-ram. '
-                     'Use --machine-type instead.'
-                     '')
+  if args.machine_type and (args.min_cores or args.min_ram):
+    raise ValueError(
+        '--machine-type not supported together with --min-cores or --min-ram.')
 
 
 def _parse_arguments(prog, argv):
@@ -1017,7 +1011,7 @@ def run(provider,
     provider_base.emit_provider_message(provider)
 
   if not disable_warning:
-    raise ValueError('Do not user this unstable API component!')
+    raise ValueError('Do not use this unstable API component!')
 
   if command and script:
     raise ValueError('Cannot supply both a command and script value.')

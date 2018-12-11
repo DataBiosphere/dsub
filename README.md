@@ -184,7 +184,7 @@ Replacing `v1alpha2` is [v2alpha1](https://cloud.google.com/genomics/reference/r
 `dsub` has added the `google-v2` provider which use `v2alpha1` as the backend
 for running `dsub` jobs on Google Cloud.
 
-**dsub users are encourage today to use the google-v2 provider. At the end of
+**`dsub` users are encouraged today to use the `google-v2` provider. At the end of
 2018, the Pipelines API `v1alpha2` will be turned down and the `google` provider
 for `dsub` will be removed.**
 
@@ -194,13 +194,46 @@ To migrate existing `dsub` calls from the `google` provider to the `google-v2`
 provider:
 
 - Add `--provider google-v2` to your command-line
-- Use `--machine-type` (default is `n1-standard-1`) instead of `--min-cpu`
-  and `--min-ram`.
+- Set the `--machine-type` or `--min-ram` and `--min-cores` if your tasks need
+other than 1 core and 3.75 GB of memory
 
-The `--machine-type` value can be one of the
-[Predefined Machine Types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types)
-or a
-[Custom Machine Type](https://cloud.google.com/compute/docs/machine-types#custom_machine_types).
+**NOTE: The conversion of `--min-ram` and `--min-cores` is different with the
+`google-v2` provider than the `google` provider. Please read the section below
+to set your parameters appropriately.**
+
+#### `--machine-type` vs. `--min-ram` and `--min-cores` with `google-v2`
+
+The `google` provider was backed by the Pipelines API `v1alpha2`, which accepted
+minimum ram and minimum cores as parameters and made a "best fit" attempt to
+translate those parameters into one of the
+[Compute Engine Predefined Machine Types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types).
+
+The `google-v2` provider is backed by the Pipelines API `v2alpha1`, which does
+not perform this "best fit" computation, but requires an explicit machine type
+to be specified.
+
+However, the `v2alpha1` API also supports
+[Compute Engine Custom Machine Types](https://cloud.google.com/compute/docs/machine-types#custom_machine_types),
+which allow for greater control over machine resources than the predefined
+machine types do. This allows users to reduce costs by limiting any
+over-provisioning of Compute Engine VMs.
+
+The `google-v2` provider takes advantage of this by translating
+`--min-ram` and `--min-cores` into a custom machine type specification.
+When migrating existing `dsub` jobs from `google` to `google-v2` you may find
+that tasks are allocated smaller VMs with `google-v2` than with `google`
+because the `--min-ram` and `--min-cores` specified for the job are more
+precisely translated with `google-v2`. You will need to adjust your resource
+parameters accordingly.
+
+Notes for `google-v2` resource specifications:
+- `n1-standard-1` is the default machine type as it was with the `google`
+provider.
+- *Either* `--machine-type` or `--min-ram` and `--min-cores` may be specified,
+but not both.
+- To use one of the
+[Shared-core machine types](https://cloud.google.com/compute/docs/machine-types#sharedcore),
+use the `--machine-type` flag.
 
 ## `dsub` features
 
