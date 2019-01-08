@@ -704,8 +704,11 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
     # preference for the former).
     message_task = None
 
+    task_dict = dict()
     for t in tasks:
       task_id = job_model.numeric_task_id(t.get_field('task-id'))
+      task_dict[task_id] = t
+
       status = t.get_field('task-status')
       if status == 'FAILURE':
         # Could compute this from task-attempt as well.
@@ -740,8 +743,12 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
       return []
 
     for task_id in retry_tasks:
-      print('  %s failed. Retrying.' % ('Task %s' % task_id
-                                        if task_id else 'Task'))
+      identifier = '{}.{}'.format(job_id, task_id) if task_id else job_id
+      print('  {} (attempt {}) failed. Retrying.'.format(
+          identifier, task_fail_count[task_id]))
+      msg = task_dict[task_id].get_field('status-message')
+      print('  Failure message: {}'.format(msg))
+
       _retry_task(provider, job_descriptor, task_id,
                   task_fail_count[task_id] + 1)
 

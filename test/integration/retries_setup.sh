@@ -64,6 +64,7 @@ function retries_setup::check_job_attr() {
       --format yaml)"
 
   # Check the expected values
+  echo "Checking expected values."
   local num=0
   local expected
   for expected in ${expected_values}; do
@@ -83,6 +84,7 @@ function retries_setup::check_job_attr() {
   done
 
   # Check that there were no extra attempts
+  echo "Checking that there are no unexpected attempts"
   local -r beyond="$(
       python "${SCRIPT_DIR}"/get_data_value.py \
         yaml "${dstat_out}" "[${num}].${attr}")"
