@@ -559,7 +559,7 @@ By default, dstat outputs one line per task. If you're using a batch job with
 many tasks then you may benefit from `--summary`.
 
 ```
-$ dstat --provider google-v2 --project my-project --summary
+$ dstat --provider google-v2 --project my-project --status '*' --summary
 
 Job Name        Status         Task Count
 -------------   -------------  -------------
