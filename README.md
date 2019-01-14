@@ -264,6 +264,9 @@ by passing the `--image` flag.
         --image ubuntu:16.04 \
         --script hello.sh
 
+Note: your `--image` must include the
+[Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) shell interpreter.
+
 ### Passing parameters to your script
 
 You can pass environment variables to your script using the `--env` flag.

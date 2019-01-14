@@ -1030,7 +1030,7 @@ def run(provider,
       command_name = _name_for_command(command)
 
     # Add the shebang line to ensure the command is treated as Bash
-    script = job_model.Script(command_name, '#!/bin/bash\n' + command)
+    script = job_model.Script(command_name, '#!/usr/bin/env bash\n' + command)
   elif script:
     # Read the script file
     script_file = dsub_util.load_file(script)

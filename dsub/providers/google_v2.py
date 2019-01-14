@@ -738,9 +738,9 @@ class GoogleV2JobProvider(base.JobProvider):
             image_uri=job_resources.image,
             mounts=[mnt_datadisk] + persistent_disk_mounts,
             environment=user_environment,
-            entrypoint='/bin/bash',
+            entrypoint='/usr/bin/env',
             commands=[
-                '-c',
+                'bash', '-c',
                 _USER_CMD.format(
                     tmp_dir=providers_util.TMP_DIR,
                     working_dir=providers_util.WORKING_DIR,

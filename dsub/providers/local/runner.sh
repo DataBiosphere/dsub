@@ -55,12 +55,12 @@ function cleanup() {
     # as the writer.
     2>&1 docker run \
       --name "${NAME}-cleanup" \
-      --entrypoint /bin/bash \
+      --entrypoint /usr/bin/env \
       --workdir "${DATA_MOUNT_POINT}/${WORKING_DIR}" \
       "${VOLUMES[@]}" \
       --env-file "${ENV_FILE}" \
       "${IMAGE}" \
-      "-c" \
+      "bash" "-c" \
       "rm -rf" \
         "${DATA_MOUNT_POINT}/input" \
         "${DATA_MOUNT_POINT}/output" \
@@ -178,9 +178,9 @@ function get_docker_user() {
   # Get the userid and groupid the Docker image is set to run as.
   docker run \
     --name "${NAME}-get-docker-userid" \
-    --entrypoint /bin/bash \
+    --entrypoint /usr/bin/env \
     "${IMAGE}" \
-    '-c' 'echo "$(id -u):$(id -g)"' 2>> "${TASK_DIR}/stderr.txt"
+    'bash' '-c' 'echo "$(id -u):$(id -g)"' 2>> "${TASK_DIR}/stderr.txt"
 }
 readonly -f get_docker_user
 
@@ -193,9 +193,10 @@ function docker_recursive_chown() {
   # after they return.
   docker run \
     --user 0 \
-    --entrypoint /bin/bash \
+    --entrypoint /usr/bin/env \
     "${VOLUMES[@]}" \
     "${IMAGE}" \
+    "bash" \
     "-c" \
     "find ${docker_directory} \
        -path '${docker_directory}/mount*' \
@@ -246,6 +247,7 @@ log_info "Localizing inputs."
 localize_data
 
 log_info "Checking image userid."
+log_info "Task image: ${IMAGE}"
 DOCKER_USERGROUP="$(get_docker_user)"
 if [[ "${DOCKER_USERGROUP}" != "0:0" ]]; then
   log_info "Ensuring docker user (${DOCKER_USERGROUP} can access ${DATA_MOUNT_POINT}."
@@ -261,12 +263,12 @@ log_info "Running Docker image."
 docker run \
    --detach \
    --name "${NAME}" \
-   --entrypoint /bin/bash \
+   --entrypoint /usr/bin/env \
    --workdir "${DATA_MOUNT_POINT}/${WORKING_DIR}" \
    "${VOLUMES[@]}" \
    --env-file "${ENV_FILE}" \
    "${IMAGE}" \
-   "-c" "${SCRIPT_FILE}"
+   "bash" "-c" "${SCRIPT_FILE}"
 
 # Start a log writer in the background
 docker logs --follow "${NAME}" \
