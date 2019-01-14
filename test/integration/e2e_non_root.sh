@@ -52,8 +52,10 @@ function check_jobid {
     exit 1
   fi
 
-  if [[ -d "${task_dir}/data" ]]; then
+  if [[ "$(/bin/ls ${task_dir}/data)" != "script" ]]; then
+    # It has only one script subdirectory and no other content
     echo "Directory not deleted: ${task_dir}/data"
+    echo "$(/bin/ls ${task_dir}/data)"
     exit 1
   fi
 }

@@ -308,6 +308,8 @@ def _prepare_row(task, full, summary):
       row_spec('events', True, []),
       row_spec('user-project', False, None),
       row_spec('dsub-version', False, None),
+      row_spec('script-name', False, None),
+      row_spec('script', False, None),
   ]
   summary_columns = default_columns + [
       row_spec('job-id', True, None),

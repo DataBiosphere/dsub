@@ -608,9 +608,9 @@ class JobDescriptor(object):
         'create-time': job_metadata.get('create-time'),
         'dsub-version': job_metadata.get('dsub-version'),
         'user-project': job_metadata.get('user-project'),
+        'task-ids': job_metadata.get('task-ids'),
+        'script-name': job_metadata['script'].name,
     }
-
-    job['task-ids'] = job_metadata.get('task-ids')
 
     # logging is specified as a command-line argument and is typically
     # transformed (substituting job-id). The transformed value is saved
@@ -802,7 +802,7 @@ class JobDescriptor(object):
     job_metadata = {}
     for key in [
         'job-id', 'job-name', 'task-ids', 'user-id', 'dsub-version',
-        'user-project'
+        'user-project', 'script-name'
     ]:
       if job.get(key) is not None:
         job_metadata[key] = job.get(key)

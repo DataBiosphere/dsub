@@ -47,11 +47,12 @@ function cleanup() {
   log_info "Copying the logs before cleanup"
   delocalize_logs
 
-  # Clean up files staged from outside Docker
   if [[ "${rm_data_dir}" == "true" ]]; then
-    echo "cleaning up ${DATA_DIR}"
+    # Clean up the data directory, except the "script" and "mount" subdirs.
+    echo "Cleaning up ${DATA_DIR}"
 
-    # Clean up files written from inside Docker
+    # Clean up files written from inside Docker, using the same permissions
+    # as the writer.
     2>&1 docker run \
       --name "${NAME}-cleanup" \
       --entrypoint /bin/bash \
@@ -59,10 +60,19 @@ function cleanup() {
       "${VOLUMES[@]}" \
       --env-file "${ENV_FILE}" \
       "${IMAGE}" \
-      "-c" "rm -rf ${DATA_MOUNT_POINT}/*" \
+      "-c" \
+      "rm -rf" \
+        "${DATA_MOUNT_POINT}/input" \
+        "${DATA_MOUNT_POINT}/output" \
+        "${DATA_MOUNT_POINT}/tmp" \
+        "${DATA_MOUNT_POINT}/workingdir" \
       | tee -a "${TASK_DIR}/log.txt"
 
-    rm -rf "${DATA_DIR}" || echo "sorry, unable to delete ${DATA_DIR}."
+   # Clean up files staged from outside Docker
+   rm -rf "${DATA_DIR}/input"
+   rm -rf "${DATA_DIR}/output"
+   rm -rf "${DATA_DIR}/tmp"
+   rm -rf "${DATA_DIR}/workingdir"
   fi
 }
 readonly -f cleanup

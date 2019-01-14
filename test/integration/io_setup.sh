@@ -165,6 +165,13 @@ function io_setup::check_dstat() {
   echo "  Checking status"
   util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].status" "SUCCESS"
 
+  if [[ "${DSUB_PROVIDER}" != "google" ]]; then
+    echo "  Checking script"
+    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].script-name" "script_io_test.sh"
+    local expected_script=$(cat "${SCRIPT_DIR}/script_io_test.sh")
+    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].script" "${expected_script}"
+  fi
+
   echo "  Checking datetime fields..."
   for field in 'create-time' 'end-time' 'start-time' 'last-update'; do
     if ! util::dstat_yaml_job_has_valid_datetime_field "${dstat_output}" "[0].${field}"; then

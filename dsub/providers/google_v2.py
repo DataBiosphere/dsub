@@ -1151,6 +1151,11 @@ class GoogleOperation(base.Task):
 
     return job_model.JobDescriptor.from_yaml(ast.literal_eval(meta))
 
+  def _try_op_to_script_body(self):
+    env = google_v2_operations.get_action_environment(self._op, _ACTION_PREPARE)
+    if env:
+      return ast.literal_eval(env.get(_SCRIPT_VARNAME))
+
   def _operation_status(self):
     """Returns the status of this operation.
 
@@ -1355,6 +1360,11 @@ class GoogleOperation(base.Task):
             value['disk-size'] = datadisk['sizeGb']
     elif field == 'events':
       value = GoogleV2EventMap(self._op).get_filtered_normalized_events()
+    elif field == 'script-name':
+      if self._job_descriptor:
+        value = self._job_descriptor.job_metadata.get(field)
+    elif field == 'script':
+      value = self._try_op_to_script_body()
     else:
       raise ValueError('Unsupported field: "%s"' % field)
 
