@@ -71,13 +71,8 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
   function gsutil_cp() {
     local src="${1}"
     local dst="${2}"
-    local check_src="${3}"
-    local content_type="${4}"
-    local user_project_name="${5}"
-
-    if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
-      return
-    fi
+    local content_type="${3}"
+    local user_project_name="${4}"
 
     local headers=""
     if [[ -n "${content_type}" ]]; then
@@ -100,6 +95,26 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
     2>&1 echo "ERROR: gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
     exit 1
   }
+
+  function log_cp() {
+    local src="${1}"
+    local dst="${2}"
+    local tmp="${3}"
+    local check_src="${4}"
+    local user_project_name="${5}"
+
+    if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
+      return
+    fi
+
+    # Copy the log files to a local temporary location so that our "gsutil cp" is never
+    # executed on a file that is changing.
+
+    local tmp_path="${tmp}/$(basename ${src})"
+    cp "${src}" "${tmp_path}"
+
+    gsutil_cp "${tmp_path}" "${dst}" "text/plain" "${user_project_name}"
+  }
 """)
 
 # Define a bash function for "gsutil rsync" to be used by the logging,
@@ -108,12 +123,7 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
   function gsutil_rsync() {
     local src="${1}"
     local dst="${2}"
-    local check_src="${3}"
-    local user_project_name="${4}"
-
-    if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
-      return
-    fi
+    local user_project_name="${3}"
 
     local user_project_flag=""
     if [[ -n "${user_project_name}" ]]; then
@@ -150,11 +160,13 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
 # the operation to indicate why it failed.
 
 _LOG_CP_CMD = textwrap.dedent("""\
-  gsutil_cp /google/logs/action/{user_action}/stdout "${{STDOUT_PATH}}" "true" "text/plain" "${{USER_PROJECT}}" &
+  mkdir -p /tmp/{logging_action}
+  log_cp /google/logs/action/{user_action}/stdout "${{STDOUT_PATH}}" /tmp/{logging_action} "true" "${{USER_PROJECT}}" &
   STDOUT_PID=$!
-  gsutil_cp /google/logs/action/{user_action}/stderr "${{STDERR_PATH}}" "true" "text/plain" "${{USER_PROJECT}}" &
+  log_cp /google/logs/action/{user_action}/stderr "${{STDERR_PATH}}" /tmp/{logging_action} "true" "${{USER_PROJECT}}" &
   STDERR_PID=$!
-  gsutil_cp /google/logs/output "${{LOGGING_PATH}}" "false" "text/plain" "${{USER_PROJECT}}" &
+
+  log_cp /google/logs/output "${{LOGGING_PATH}}" /tmp/{logging_action} "false" "${{USER_PROJECT}}" &
   LOG_PID=$!
 
   wait "${{STDOUT_PID}}"
@@ -194,9 +206,9 @@ _LOCALIZATION_LOOP = textwrap.dedent("""\
 
     echo "Localizing ${!INPUT_VAR}"
     if [[ "${!INPUT_RECURSIVE}" -eq "1" ]]; then
-      gsutil_rsync "${!INPUT_SRC}" "${!INPUT_DST}" "false" "${USER_PROJECT}"
+      gsutil_rsync "${!INPUT_SRC}" "${!INPUT_DST}" "${USER_PROJECT}"
     else
-      gsutil_cp "${!INPUT_SRC}" "${!INPUT_DST}" "false" "" "${USER_PROJECT}"
+      gsutil_cp "${!INPUT_SRC}" "${!INPUT_DST}" "" "${USER_PROJECT}"
     fi
   done
 """)
@@ -214,9 +226,9 @@ _DELOCALIZATION_LOOP = textwrap.dedent("""\
 
     echo "Delocalizing ${!OUTPUT_VAR}"
     if [[ "${!OUTPUT_RECURSIVE}" -eq "1" ]]; then
-      gsutil_rsync "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "false" "${USER_PROJECT}"
+      gsutil_rsync "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "${USER_PROJECT}"
     else
-      gsutil_cp "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "false" "" "${USER_PROJECT}"
+      gsutil_cp "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "" "${USER_PROJECT}"
     fi
   done
 """)
@@ -659,12 +671,15 @@ class GoogleV2JobProvider(base.JobProvider):
     final_logging_action = 6 + optional_actions
 
     # Set up the commands and environment for the logging actions
-    log_cp_cmd = _LOG_CP_CMD.format(user_action=user_action)
     logging_cmd = _LOGGING_CMD.format(
-        log_cp_fn=_GSUTIL_CP_FN, log_cp_cmd=log_cp_cmd)
+        log_cp_fn=_GSUTIL_CP_FN,
+        log_cp_cmd=_LOG_CP_CMD.format(
+            user_action=user_action, logging_action='logging_action'))
     continuous_logging_cmd = _CONTINUOUS_LOGGING_CMD.format(
         log_cp_fn=_GSUTIL_CP_FN,
-        log_cp_cmd=log_cp_cmd,
+        log_cp_cmd=_LOG_CP_CMD.format(
+            user_action=user_action,
+            logging_action='continuous_logging_action'),
         final_logging_action=final_logging_action,
         log_interval=job_resources.log_interval or '60s')
     logging_env = self._get_logging_env(task_resources.logging_path.uri,
