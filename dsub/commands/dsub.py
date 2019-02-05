@@ -473,6 +473,13 @@ def _parse_arguments(prog, argv):
       action='store_true',
       help="""If set to true, start an ssh container in the background
           to allow you to log in using SSH and debug in real time.""")
+  google_v2.add_argument(
+      '--nvidia-driver-version',
+      help="""The NVIDIA driver version to use when attaching an NVIDIA GPU
+          accelerator. The version specified here must be compatible with the
+          GPU libraries contained in the container being executed, and must be
+          one of the drivers hosted in the nvidia-drivers-us-public bucket on
+          Google Cloud Storage.""")
 
   args = provider_base.parse_args(
       parser, {
@@ -524,6 +531,7 @@ def _get_job_resources(args):
       use_private_address=args.use_private_address,
       accelerator_type=args.accelerator_type,
       accelerator_count=args.accelerator_count,
+      nvidia_driver_version=args.nvidia_driver_version,
       timeout=timeout,
       log_interval=log_interval,
       ssh=args.ssh)

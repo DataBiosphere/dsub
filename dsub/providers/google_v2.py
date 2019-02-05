@@ -823,6 +823,7 @@ class GoogleV2JobProvider(base.JobProvider):
             boot_disk_size_gb=job_resources.boot_disk_size,
             disks=disks,
             accelerators=accelerators,
+            nvidia_driver_version=job_resources.nvidia_driver_version,
             labels=labels,
             cpu_platform=job_resources.cpu_platform),
     )
@@ -1364,10 +1365,16 @@ class GoogleOperation(base.Task):
         value['zones'] = resources['zones']
       if 'virtualMachine' in resources:
         vm = resources['virtualMachine']
-        value['machine-type'] = vm['machineType']
-        value['preemptible'] = vm['preemptible']
+        value['machine-type'] = vm.get('machineType')
+        value['preemptible'] = vm.get('preemptible')
 
-        value['boot-disk-size'] = vm['bootDiskSizeGb']
+        value['boot-disk-size'] = vm.get('bootDiskSizeGb')
+        value['network'] = vm.get('network', {}).get('name')
+        value['subnetwork'] = vm.get('network', {}).get('subnetwork')
+        value['use_private_address'] = vm.get('network',
+                                              {}).get('usePrivateAddress')
+        value['cpu_platform'] = vm.get('cpuPlatform')
+        value['accelerators'] = vm.get('accelerators')
         if 'disks' in vm:
           datadisk = next(
               (d for d in vm['disks'] if d['name'] == _DATA_DISK_NAME))

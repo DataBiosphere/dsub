@@ -377,7 +377,7 @@ class Resources(
         'preemptible', 'image', 'logging', 'logging_path', 'regions', 'zones',
         'scopes', 'keep_alive', 'cpu_platform', 'network', 'subnetwork',
         'use_private_address', 'accelerator_type', 'accelerator_count',
-        'timeout', 'log_interval', 'ssh'
+        'nvidia_driver_version', 'timeout', 'log_interval', 'ssh'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -402,6 +402,8 @@ class Resources(
     accelerator_type (string): Accelerator type (e.g. 'nvidia-tesla-k80').
     accelerator_count (int): Number of accelerators of the specified type to
       attach.
+    nvidia_driver_version (string): The NVIDIA driver version to use when
+      attaching an NVIDIA GPU accelerator.
     timeout (string): The max amount of time to give the pipeline to complete.
     log_interval (string): The amount of time to sleep between log uploads.
     ssh (bool): Start an SSH container in the background.
@@ -428,6 +430,7 @@ class Resources(
               use_private_address=None,
               accelerator_type=None,
               accelerator_count=0,
+              nvidia_driver_version=None,
               timeout=None,
               log_interval=None,
               ssh=None):
@@ -435,7 +438,8 @@ class Resources(
         cls, min_cores, min_ram, machine_type, disk_size, boot_disk_size,
         preemptible, image, logging, logging_path, regions, zones, scopes,
         keep_alive, cpu_platform, network, subnetwork, use_private_address,
-        accelerator_type, accelerator_count, timeout, log_interval, ssh)
+        accelerator_type, accelerator_count, nvidia_driver_version, timeout,
+        log_interval, ssh)
 
 
 def ensure_job_params_are_complete(job_params):
