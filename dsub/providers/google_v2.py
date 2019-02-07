@@ -71,13 +71,8 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
   function gsutil_cp() {
     local src="${1}"
     local dst="${2}"
-    local check_src="${3}"
-    local content_type="${4}"
-    local user_project_name="${5}"
-
-    if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
-      return
-    fi
+    local content_type="${3}"
+    local user_project_name="${4}"
 
     local headers=""
     if [[ -n "${content_type}" ]]; then
@@ -100,6 +95,26 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
     2>&1 echo "ERROR: gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
     exit 1
   }
+
+  function log_cp() {
+    local src="${1}"
+    local dst="${2}"
+    local tmp="${3}"
+    local check_src="${4}"
+    local user_project_name="${5}"
+
+    if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
+      return
+    fi
+
+    # Copy the log files to a local temporary location so that our "gsutil cp" is never
+    # executed on a file that is changing.
+
+    local tmp_path="${tmp}/$(basename ${src})"
+    cp "${src}" "${tmp_path}"
+
+    gsutil_cp "${tmp_path}" "${dst}" "text/plain" "${user_project_name}"
+  }
 """)
 
 # Define a bash function for "gsutil rsync" to be used by the logging,
@@ -108,12 +123,7 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
   function gsutil_rsync() {
     local src="${1}"
     local dst="${2}"
-    local check_src="${3}"
-    local user_project_name="${4}"
-
-    if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
-      return
-    fi
+    local user_project_name="${3}"
 
     local user_project_flag=""
     if [[ -n "${user_project_name}" ]]; then
@@ -150,11 +160,13 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
 # the operation to indicate why it failed.
 
 _LOG_CP_CMD = textwrap.dedent("""\
-  gsutil_cp /google/logs/action/{user_action}/stdout "${{STDOUT_PATH}}" "true" "text/plain" "${{USER_PROJECT}}" &
+  mkdir -p /tmp/{logging_action}
+  log_cp /google/logs/action/{user_action}/stdout "${{STDOUT_PATH}}" /tmp/{logging_action} "true" "${{USER_PROJECT}}" &
   STDOUT_PID=$!
-  gsutil_cp /google/logs/action/{user_action}/stderr "${{STDERR_PATH}}" "true" "text/plain" "${{USER_PROJECT}}" &
+  log_cp /google/logs/action/{user_action}/stderr "${{STDERR_PATH}}" /tmp/{logging_action} "true" "${{USER_PROJECT}}" &
   STDERR_PID=$!
-  gsutil_cp /google/logs/output "${{LOGGING_PATH}}" "false" "text/plain" "${{USER_PROJECT}}" &
+
+  log_cp /google/logs/output "${{LOGGING_PATH}}" /tmp/{logging_action} "false" "${{USER_PROJECT}}" &
   LOG_PID=$!
 
   wait "${{STDOUT_PID}}"
@@ -194,9 +206,9 @@ _LOCALIZATION_LOOP = textwrap.dedent("""\
 
     echo "Localizing ${!INPUT_VAR}"
     if [[ "${!INPUT_RECURSIVE}" -eq "1" ]]; then
-      gsutil_rsync "${!INPUT_SRC}" "${!INPUT_DST}" "false" "${USER_PROJECT}"
+      gsutil_rsync "${!INPUT_SRC}" "${!INPUT_DST}" "${USER_PROJECT}"
     else
-      gsutil_cp "${!INPUT_SRC}" "${!INPUT_DST}" "false" "" "${USER_PROJECT}"
+      gsutil_cp "${!INPUT_SRC}" "${!INPUT_DST}" "" "${USER_PROJECT}"
     fi
   done
 """)
@@ -214,9 +226,9 @@ _DELOCALIZATION_LOOP = textwrap.dedent("""\
 
     echo "Delocalizing ${!OUTPUT_VAR}"
     if [[ "${!OUTPUT_RECURSIVE}" -eq "1" ]]; then
-      gsutil_rsync "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "false" "${USER_PROJECT}"
+      gsutil_rsync "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "${USER_PROJECT}"
     else
-      gsutil_cp "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "false" "" "${USER_PROJECT}"
+      gsutil_cp "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "" "${USER_PROJECT}"
     fi
   done
 """)
@@ -659,12 +671,15 @@ class GoogleV2JobProvider(base.JobProvider):
     final_logging_action = 6 + optional_actions
 
     # Set up the commands and environment for the logging actions
-    log_cp_cmd = _LOG_CP_CMD.format(user_action=user_action)
     logging_cmd = _LOGGING_CMD.format(
-        log_cp_fn=_GSUTIL_CP_FN, log_cp_cmd=log_cp_cmd)
+        log_cp_fn=_GSUTIL_CP_FN,
+        log_cp_cmd=_LOG_CP_CMD.format(
+            user_action=user_action, logging_action='logging_action'))
     continuous_logging_cmd = _CONTINUOUS_LOGGING_CMD.format(
         log_cp_fn=_GSUTIL_CP_FN,
-        log_cp_cmd=log_cp_cmd,
+        log_cp_cmd=_LOG_CP_CMD.format(
+            user_action=user_action,
+            logging_action='continuous_logging_action'),
         final_logging_action=final_logging_action,
         log_interval=job_resources.log_interval or '60s')
     logging_env = self._get_logging_env(task_resources.logging_path.uri,
@@ -738,9 +753,9 @@ class GoogleV2JobProvider(base.JobProvider):
             image_uri=job_resources.image,
             mounts=[mnt_datadisk] + persistent_disk_mounts,
             environment=user_environment,
-            entrypoint='/bin/bash',
+            entrypoint='/usr/bin/env',
             commands=[
-                '-c',
+                'bash', '-c',
                 _USER_CMD.format(
                     tmp_dir=providers_util.TMP_DIR,
                     working_dir=providers_util.WORKING_DIR,
@@ -808,6 +823,7 @@ class GoogleV2JobProvider(base.JobProvider):
             boot_disk_size_gb=job_resources.boot_disk_size,
             disks=disks,
             accelerators=accelerators,
+            nvidia_driver_version=job_resources.nvidia_driver_version,
             labels=labels,
             cpu_platform=job_resources.cpu_platform),
     )
@@ -1151,6 +1167,11 @@ class GoogleOperation(base.Task):
 
     return job_model.JobDescriptor.from_yaml(ast.literal_eval(meta))
 
+  def _try_op_to_script_body(self):
+    env = google_v2_operations.get_action_environment(self._op, _ACTION_PREPARE)
+    if env:
+      return ast.literal_eval(env.get(_SCRIPT_VARNAME))
+
   def _operation_status(self):
     """Returns the status of this operation.
 
@@ -1344,10 +1365,16 @@ class GoogleOperation(base.Task):
         value['zones'] = resources['zones']
       if 'virtualMachine' in resources:
         vm = resources['virtualMachine']
-        value['machine-type'] = vm['machineType']
-        value['preemptible'] = vm['preemptible']
+        value['machine-type'] = vm.get('machineType')
+        value['preemptible'] = vm.get('preemptible')
 
-        value['boot-disk-size'] = vm['bootDiskSizeGb']
+        value['boot-disk-size'] = vm.get('bootDiskSizeGb')
+        value['network'] = vm.get('network', {}).get('name')
+        value['subnetwork'] = vm.get('network', {}).get('subnetwork')
+        value['use_private_address'] = vm.get('network',
+                                              {}).get('usePrivateAddress')
+        value['cpu_platform'] = vm.get('cpuPlatform')
+        value['accelerators'] = vm.get('accelerators')
         if 'disks' in vm:
           datadisk = next(
               (d for d in vm['disks'] if d['name'] == _DATA_DISK_NAME))
@@ -1355,6 +1382,11 @@ class GoogleOperation(base.Task):
             value['disk-size'] = datadisk['sizeGb']
     elif field == 'events':
       value = GoogleV2EventMap(self._op).get_filtered_normalized_events()
+    elif field == 'script-name':
+      if self._job_descriptor:
+        value = self._job_descriptor.job_metadata.get(field)
+    elif field == 'script':
+      value = self._try_op_to_script_body()
     else:
       raise ValueError('Unsupported field: "%s"' % field)
 

@@ -473,6 +473,13 @@ def _parse_arguments(prog, argv):
       action='store_true',
       help="""If set to true, start an ssh container in the background
           to allow you to log in using SSH and debug in real time.""")
+  google_v2.add_argument(
+      '--nvidia-driver-version',
+      help="""The NVIDIA driver version to use when attaching an NVIDIA GPU
+          accelerator. The version specified here must be compatible with the
+          GPU libraries contained in the container being executed, and must be
+          one of the drivers hosted in the nvidia-drivers-us-public bucket on
+          Google Cloud Storage.""")
 
   args = provider_base.parse_args(
       parser, {
@@ -524,6 +531,7 @@ def _get_job_resources(args):
       use_private_address=args.use_private_address,
       accelerator_type=args.accelerator_type,
       accelerator_count=args.accelerator_count,
+      nvidia_driver_version=args.nvidia_driver_version,
       timeout=timeout,
       log_interval=log_interval,
       ssh=args.ssh)
@@ -704,8 +712,11 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
     # preference for the former).
     message_task = None
 
+    task_dict = dict()
     for t in tasks:
       task_id = job_model.numeric_task_id(t.get_field('task-id'))
+      task_dict[task_id] = t
+
       status = t.get_field('task-status')
       if status == 'FAILURE':
         # Could compute this from task-attempt as well.
@@ -740,8 +751,12 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
       return []
 
     for task_id in retry_tasks:
-      print('  %s failed. Retrying.' % ('Task %s' % task_id
-                                        if task_id else 'Task'))
+      identifier = '{}.{}'.format(job_id, task_id) if task_id else job_id
+      print('  {} (attempt {}) failed. Retrying.'.format(
+          identifier, task_fail_count[task_id]))
+      msg = task_dict[task_id].get_field('status-message')
+      print('  Failure message: {}'.format(msg))
+
       _retry_task(provider, job_descriptor, task_id,
                   task_fail_count[task_id] + 1)
 
@@ -1023,7 +1038,7 @@ def run(provider,
       command_name = _name_for_command(command)
 
     # Add the shebang line to ensure the command is treated as Bash
-    script = job_model.Script(command_name, '#!/bin/bash\n' + command)
+    script = job_model.Script(command_name, '#!/usr/bin/env bash\n' + command)
   elif script:
     # Read the script file
     script_file = dsub_util.load_file(script)

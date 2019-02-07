@@ -1019,7 +1019,7 @@ class GoogleOperation(base.Task):
               event['endTime'])
 
         value.append(event_value)
-    elif field == 'user-project':
+    elif field in ['user-project', 'script-name', 'script']:
       # Supported in local and google-v2 providers.
       value = None
 

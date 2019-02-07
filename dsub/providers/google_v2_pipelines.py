@@ -54,7 +54,8 @@ def build_machine(network=None,
                   disks=None,
                   accelerators=None,
                   labels=None,
-                  cpu_platform=None):
+                  cpu_platform=None,
+                  nvidia_driver_version=None):
   """Build a VirtualMachine object for a Pipeline request.
 
   Args:
@@ -67,6 +68,8 @@ def build_machine(network=None,
     accelerators (list[dict]): List of accelerators to attach to the VM.
     labels (dict[string, string]): Labels for the VM.
     cpu_platform (str): The CPU platform to request.
+    nvidia_driver_version (str): The NVIDIA driver version to use when attaching
+      an NVIDIA GPU accelerator.
 
   Returns:
     An object representing a VirtualMachine.
@@ -81,6 +84,7 @@ def build_machine(network=None,
       'accelerators': accelerators,
       'labels': labels,
       'cpuPlatform': cpu_platform,
+      'nvidiaDriverVersion': nvidia_driver_version,
   }
 
 

@@ -77,7 +77,7 @@ function test_with_command() {
     'echo "${TEST_NAME}"'; then
 
     # Check that the output contains expected values
-    local expected=$(echo -e '#!/bin/bash\necho "${TEST_NAME}"')
+    local expected=$(echo -e '#!/usr/bin/env bash\necho "${TEST_NAME}"')
     assert_pipeline_environment_variable_equals \
       0 "_SCRIPT" "${expected}"
 

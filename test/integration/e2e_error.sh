@@ -29,7 +29,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Launching pipeline..."
 
   if run_dsub \
-    --image 'ubuntu' \
+    --image 'debian:stable-slim' \
     --name 'e2e-error' \
     --command 'idontknowhowtounix' \
     --wait; then

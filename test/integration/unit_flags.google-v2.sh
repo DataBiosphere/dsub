@@ -189,11 +189,14 @@ function test_accelerator_type_and_count() {
     --command 'echo "${TEST_NAME}"' \
     --regions us-central1 \
     --accelerator-type "nvidia-tesla-k80" \
+    --nvidia-driver-version "390.46" \
     --accelerator-count 2; then
 
     # Check that the output contains expected values
     assert_err_value_equals \
      "[0].pipeline.resources.virtualMachine.accelerators.[0].type" "nvidia-tesla-k80"
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.nvidiaDriverVersion" "390.46"
     assert_err_value_equals \
      "[0].pipeline.resources.virtualMachine.accelerators.[0].count" "2"
 
@@ -214,6 +217,8 @@ function test_no_accelerator_type_and_count() {
     # Check that the output contains expected values
     assert_err_value_equals \
      "[0].pipeline.resources.virtualMachine.accelerators" "None"
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.nvidiaDriverVersion" "None"
 
     test_passed "${subtest}"
   else

@@ -44,7 +44,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   run_dsub \
     --project "${PROJECT_ID}" \
     --logging "${LOGGING}" \
-    --image "ubuntu" \
+    --image "debian:stable-slim" \
     --name "google_env.sh" \
     --command "${COMMAND}" \
     --wait

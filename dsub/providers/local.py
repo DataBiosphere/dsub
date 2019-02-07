@@ -243,7 +243,7 @@ class LocalJobProvider(base.JobProvider):
                           job_params['outputs'] | task_params['outputs'])
 
       script = job_metadata.get('script')
-      self._stage_script(task_dir, script.name, script.value)
+      self._write_script(task_dir, script.name, script.value)
 
       # Start the task
       env = self._make_environment(inputs, outputs, mounts)
@@ -669,6 +669,12 @@ class LocalJobProvider(base.JobProvider):
     except (IOError, OSError):
       pass
 
+    # Get the script contents
+    script = None
+    script_name = job_descriptor.job_metadata.get('script-name')
+    if script_name:
+      script = self._read_script(task_dir, script_name)
+
     # Read the files written by the runner.sh.
     # For new tasks, these may not have been written yet.
     end_time = self._get_end_time_from_task_dir(task_dir)
@@ -689,7 +695,8 @@ class LocalJobProvider(base.JobProvider):
         job_descriptor=job_descriptor,
         end_time=end_time,
         last_update=last_update,
-        pid=pid)
+        pid=pid,
+        script=script)
 
   def _provider_root(self):
     return tempfile.gettempdir() + '/dsub-local'
@@ -891,18 +898,29 @@ class LocalJobProvider(base.JobProvider):
 
     return '\n'.join(commands)
 
-  def _stage_script(self, task_dir, script_name, script_text):
-    path = (
-        task_dir + '/' + _DATA_SUBDIR + '/' + _SCRIPT_DIR + '/' + script_name)
+  def _get_script_path(self, task_dir, script_name):
+    return os.path.join(task_dir, _DATA_SUBDIR, _SCRIPT_DIR, script_name)
+
+  def _write_script(self, task_dir, script_name, script_text):
+    path = self._get_script_path(task_dir, script_name)
     os.makedirs(os.path.dirname(path))
-    f = open(path, 'w')
-    f.write(script_text)
-    f.write('\n')
-    f.close()
+    with open(path, 'w') as f:
+      f.write(script_text)
+      f.write('\n')
     st = os.stat(path)
     # Ensure the user script is executable.
     os.chmod(path, st.st_mode | 0o100)
 
+  def _read_script(self, task_dir, script_name):
+    path = self._get_script_path(task_dir, script_name)
+
+    try:
+      with open(path, 'r') as f:
+        script = f.read()
+    except (IOError, OSError):
+      script = None
+
+    return script
 
 # The task object for this provider.
 _RawTask = namedtuple('_RawTask', [
@@ -913,6 +931,7 @@ _RawTask = namedtuple('_RawTask', [
     'end_time',
     'last_update',
     'pid',
+    'script',
 ])
 
 
@@ -941,7 +960,8 @@ class LocalTask(base.Task):
 
     value = None
     if field in [
-        'job-id', 'job-name', 'user-id', 'dsub-version', 'user-project'
+        'job-id', 'job-name', 'user-id', 'dsub-version', 'user-project',
+        'script-name'
     ]:
       value = job_metadata.get(field)
     elif field == 'create-time':
@@ -1007,6 +1027,8 @@ class LocalTask(base.Task):
       elif field == 'status-detail':
         # Return the last three lines of output
         value = self._last_lines(tad.get('log-detail'), 3)
+      elif field == 'script':
+        value = self._raw.script
       else:
         value = tad.get(field)
 

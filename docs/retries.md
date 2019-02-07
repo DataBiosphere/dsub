@@ -43,7 +43,7 @@ as `task-attempt`.
 
 ## Logging
 
-Logs for the retry will overwrite the original logs for that task.
+See documentation on [Logging](logging.md).
 
 ## Limitations
 

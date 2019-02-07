@@ -210,7 +210,8 @@ function get_test_providers() {
   fi
 
   case "${test_file}" in
-    e2e_requester_pays_buckets.sh)
+    e2e_requester_pays_buckets.sh | \
+    e2e_image.sh)
       echo -n "local google-v2"
       return
       ;;
