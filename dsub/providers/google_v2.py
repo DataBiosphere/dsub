@@ -1208,7 +1208,8 @@ class GoogleOperation(base.Task):
       if last_event:
         msg = last_event['description']
         action_id = last_event.get('details', {}).get('actionId')
-        action = google_v2_operations.get_action_by_id(self._op, action_id)
+        if action_id:
+          action = google_v2_operations.get_action_by_id(self._op, action_id)
       else:
         msg = 'Pending'
     else:
@@ -1217,7 +1218,8 @@ class GoogleOperation(base.Task):
         failed_event = failed_events[-1]
         msg = failed_event.get('details', {}).get('stderr')
         action_id = failed_event.get('details', {}).get('actionId')
-        action = google_v2_operations.get_action_by_id(self._op, action_id)
+        if action_id:
+          action = google_v2_operations.get_action_by_id(self._op, action_id)
       if not msg:
         error = google_v2_operations.get_error(self._op)
         if error:
