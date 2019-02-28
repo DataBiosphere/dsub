@@ -631,7 +631,8 @@ class GoogleV2JobProvider(base.JobProvider):
         google_v2_pipelines.build_disk(
             name=disk.name.replace('_', '-'),  # Underscores not allowed
             size_gb=disk.disk_size or job_model.DEFAULT_MOUNTED_DISK_SIZE,
-            source_image=disk.value) for disk in persistent_disk_mount_params
+            source_image=disk.value,
+            disk_type=disk.type or job_model.DEFAULT_DISK_TYPE) for disk in persistent_disk_mount_params
     ]
     persistent_disk_mounts = [
         google_v2_pipelines.build_mount(
@@ -789,7 +790,7 @@ class GoogleV2JobProvider(base.JobProvider):
     # Prepare the VM (resources) configuration
     disks = [
         google_v2_pipelines.build_disk(
-            _DATA_DISK_NAME, job_resources.disk_size, source_image=None)
+            _DATA_DISK_NAME, job_resources.disk_size, source_image=None, disk_type=job_resources.disk_type or job_model.DEFAULT_DISK_TYPE)
     ]
     disks.extend(persistent_disks)
     network = google_v2_pipelines.build_network(

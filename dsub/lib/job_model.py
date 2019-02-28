@@ -69,6 +69,7 @@ DEFAULT_DISK_SIZE = 200
 DEFAULT_BOOT_DISK_SIZE = 10
 DEFAULT_MOUNTED_DISK_SIZE = 10
 DEFAULT_PREEMPTIBLE = False
+DEFAULT_DISK_TYPE = 'pd-standard'
 
 # Users may specify their own labels, however dsub also uses an implicit set of
 # labels (in the google provider). Reserve these labels such that users do
@@ -377,7 +378,7 @@ class Resources(
         'preemptible', 'image', 'logging', 'logging_path', 'regions', 'zones',
         'scopes', 'keep_alive', 'cpu_platform', 'network', 'subnetwork',
         'use_private_address', 'accelerator_type', 'accelerator_count',
-        'nvidia_driver_version', 'timeout', 'log_interval', 'ssh'
+        'nvidia_driver_version', 'timeout', 'log_interval', 'ssh','disk_type'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -407,6 +408,7 @@ class Resources(
     timeout (string): The max amount of time to give the pipeline to complete.
     log_interval (string): The amount of time to sleep between log uploads.
     ssh (bool): Start an SSH container in the background.
+    disk_type (string): disk_type for the data disk
   """
   __slots__ = ()
 
@@ -433,13 +435,14 @@ class Resources(
               nvidia_driver_version=None,
               timeout=None,
               log_interval=None,
-              ssh=None):
+              ssh=None,
+              disk_type=None):
     return super(Resources, cls).__new__(
         cls, min_cores, min_ram, machine_type, disk_size, boot_disk_size,
         preemptible, image, logging, logging_path, regions, zones, scopes,
         keep_alive, cpu_platform, network, subnetwork, use_private_address,
         accelerator_type, accelerator_count, nvidia_driver_version, timeout,
-        log_interval, ssh)
+        log_interval, ssh,disk_type)
 
 
 def ensure_job_params_are_complete(job_params):

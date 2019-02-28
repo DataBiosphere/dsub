@@ -480,6 +480,10 @@ def _parse_arguments(prog, argv):
           GPU libraries contained in the container being executed, and must be
           one of the drivers hosted in the nvidia-drivers-us-public bucket on
           Google Cloud Storage.""")
+  google_v2.add_argument(
+      '--disk-type',
+      help="""The disk type to use for the data disk"""
+  )
 
   args = provider_base.parse_args(
       parser, {
@@ -534,7 +538,8 @@ def _get_job_resources(args):
       nvidia_driver_version=args.nvidia_driver_version,
       timeout=timeout,
       log_interval=log_interval,
-      ssh=args.ssh)
+      ssh=args.ssh,
+      disk_type=args.disk_type)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids,

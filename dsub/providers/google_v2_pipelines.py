@@ -27,10 +27,11 @@ def build_network(name, subnetwork, use_private_address):
   }
 
 
-def build_disk(name, size_gb, source_image):
+def build_disk(name, size_gb, source_image,disk_type):
   return {
       'name': name,
       'sizeGb': size_gb,
+      'type': disk_type,
       'sourceImage': source_image,
   }
 
