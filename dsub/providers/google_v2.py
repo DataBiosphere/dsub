@@ -963,9 +963,11 @@ class GoogleV2JobProvider(base.JobProvider):
 
     # 'OR' filtering arguments.
     status_filters = self._get_status_filters(statuses)
-    user_id_filters = self._get_label_filters('user-id', user_ids)
+    user_id_filters = self._get_label_filters(
+        'user-id', google_base.prepare_query_label_value(user_ids))
     job_id_filters = self._get_label_filters('job-id', job_ids)
-    job_name_filters = self._get_label_filters('job-name', job_names)
+    job_name_filters = self._get_label_filters(
+        'job-name', google_base.prepare_query_label_value(job_names))
     task_id_filters = self._get_label_filters('task-id', task_ids)
     task_attempt_filters = self._get_label_filters('task-attempt',
                                                    task_attempts)

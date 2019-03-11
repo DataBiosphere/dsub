@@ -187,6 +187,14 @@ def convert_to_label_chars(s):
   # So we can't base-64 encode it.
   #   * If upper-case: lower-case it
   #   * If the char is not a standard letter or digit. make it a dash
+
+  # March 2019 note: underscores are now allowed in labels.
+  # However, removing the conversion of underscores to dashes here would
+  # create inconsistencies between old jobs and new jobs.
+  # With existing code, $USER "jane_doe" has a user-id label of "jane-doe".
+  # If we remove the conversion, the user-id label for new jobs is "jane_doe".
+  # This makes looking up old jobs more complicated.
+
   accepted_characters = string.ascii_lowercase + string.digits + '-'
 
   def label_char_transform(char):
@@ -794,7 +802,7 @@ class JobDescriptor(object):
   @classmethod
   def from_yaml(cls, yaml_string):
     """Populate and return a JobDescriptor from a YAML string."""
-    job = yaml.load(yaml_string)
+    job = yaml.full_load(yaml_string)
 
     # If the YAML does not contain a top-level dsub version, then assume that
     # the string is coming from the local provider, reading an old version of

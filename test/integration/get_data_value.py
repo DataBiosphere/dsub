@@ -83,7 +83,7 @@ def main():
   if doc_type == 'json':
     data = json.loads(doc_string)
   elif doc_type == 'yaml':
-    data = yaml.load(doc_string)
+    data = yaml.full_load(doc_string)
   else:
     raise ValueError('Unsupported doc type: %s' % doc_type)
 
