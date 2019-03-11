@@ -802,7 +802,7 @@ class JobDescriptor(object):
   @classmethod
   def from_yaml(cls, yaml_string):
     """Populate and return a JobDescriptor from a YAML string."""
-    job = yaml.full_load(yaml_string)
+    job = yaml.load(yaml_string)
 
     # If the YAML does not contain a top-level dsub version, then assume that
     # the string is coming from the local provider, reading an old version of
