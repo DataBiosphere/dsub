@@ -809,7 +809,7 @@ class GoogleV2JobProvider(base.JobProvider):
                                                 job_resources.accelerator_count)
       ]
     service_account = google_v2_pipelines.build_service_account(
-        'default', scopes)
+        job_resources.service_account or 'default', scopes)
 
     resources = google_v2_pipelines.build_resources(
         self._project,
@@ -1379,6 +1379,7 @@ class GoogleOperation(base.Task):
                                               {}).get('usePrivateAddress')
         value['cpu_platform'] = vm.get('cpuPlatform')
         value['accelerators'] = vm.get('accelerators')
+        value['service-account'] = vm.get('serviceAccount', {}).get('email')
         if 'disks' in vm:
           datadisk = next(
               (d for d in vm['disks'] if d['name'] == _DATA_DISK_NAME))

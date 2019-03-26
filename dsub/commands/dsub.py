@@ -480,6 +480,12 @@ def _parse_arguments(prog, argv):
           GPU libraries contained in the container being executed, and must be
           one of the drivers hosted in the nvidia-drivers-us-public bucket on
           Google Cloud Storage.""")
+  google_v2.add_argument(
+      '--service-account',
+      type=str,
+      help="""Email address of the service account to be authorized on the
+          Compute Engine VM for each job task. If not specified, the default
+          Compute Engine service account for the project will be used.""")
 
   args = provider_base.parse_args(
       parser, {
@@ -523,6 +529,7 @@ def _get_job_resources(args):
       zones=args.zones,
       logging=logging,
       logging_path=None,
+      service_account=args.service_account,
       scopes=args.scopes,
       keep_alive=args.keep_alive,
       cpu_platform=args.cpu_platform,

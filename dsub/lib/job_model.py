@@ -383,9 +383,10 @@ class Resources(
     collections.namedtuple('Resources', [
         'min_cores', 'min_ram', 'machine_type', 'disk_size', 'boot_disk_size',
         'preemptible', 'image', 'logging', 'logging_path', 'regions', 'zones',
-        'scopes', 'keep_alive', 'cpu_platform', 'network', 'subnetwork',
-        'use_private_address', 'accelerator_type', 'accelerator_count',
-        'nvidia_driver_version', 'timeout', 'log_interval', 'ssh'
+        'service_account', 'scopes', 'keep_alive', 'cpu_platform', 'network',
+        'subnetwork', 'use_private_address', 'accelerator_type',
+        'accelerator_count', 'nvidia_driver_version', 'timeout', 'log_interval',
+        'ssh'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -401,6 +402,8 @@ class Resources(
     logging_path (param_util.LoggingParam): resolved location for jobs logs
     regions (List[str]): region list in which to run the job
     zones (List[str]): zone list in which to run the job
+    service_account (string): Email address of the service account to be
+      authorized on the Compute Engine VM for each job task.
     scopes (List[str]): OAuth2 scopes for the job
     keep_alive (int): Seconds to keep VM alive on failure
     cpu_platform (string): The CPU platform to request (e.g. 'Intel Skylake')
@@ -430,6 +433,7 @@ class Resources(
               logging_path=None,
               regions=None,
               zones=None,
+              service_account=None,
               scopes=None,
               keep_alive=None,
               cpu_platform=None,
@@ -444,10 +448,10 @@ class Resources(
               ssh=None):
     return super(Resources, cls).__new__(
         cls, min_cores, min_ram, machine_type, disk_size, boot_disk_size,
-        preemptible, image, logging, logging_path, regions, zones, scopes,
-        keep_alive, cpu_platform, network, subnetwork, use_private_address,
-        accelerator_type, accelerator_count, nvidia_driver_version, timeout,
-        log_interval, ssh)
+        preemptible, image, logging, logging_path, regions, zones,
+        service_account, scopes, keep_alive, cpu_platform, network, subnetwork,
+        use_private_address, accelerator_type, accelerator_count,
+        nvidia_driver_version, timeout, log_interval, ssh)
 
 
 def ensure_job_params_are_complete(job_params):
