@@ -69,6 +69,7 @@ DEFAULT_DISK_SIZE = 200
 DEFAULT_BOOT_DISK_SIZE = 10
 DEFAULT_MOUNTED_DISK_SIZE = 10
 DEFAULT_PREEMPTIBLE = False
+DEFAULT_DISK_TYPE = 'pd-standard'
 
 # Users may specify their own labels, however dsub also uses an implicit set of
 # labels (in the google provider). Reserve these labels such that users do
@@ -281,6 +282,7 @@ class FileParam(
         'recursive',
         'file_provider',
         'disk_size',
+        'disk_type',
     ])):
   """File parameter to be automatically localized or de-localized.
 
@@ -299,19 +301,24 @@ class FileParam(
     recursive (bool): Whether recursive copy is wanted.
     file_provider (enum): Service or infrastructure hosting the file.
     disk_size (int): Size in Gb for a mounted Google Persistent Disk.
+    disk_type (string): Disk type for a mounted Google Persistent Disk.
   """
   __slots__ = ()
 
-  def __new__(cls,
-              name,
-              value=None,
-              docker_path=None,
-              uri=None,
-              recursive=False,
-              file_provider=None,
-              disk_size=None):
-    return super(FileParam, cls).__new__(cls, name, value, docker_path, uri,
-                                         recursive, file_provider, disk_size)
+  def __new__(
+      cls,
+      name,
+      value=None,
+      docker_path=None,
+      uri=None,
+      recursive=False,
+      file_provider=None,
+      disk_size=None,
+      disk_type=None,
+  ):
+    return super(FileParam,
+                 cls).__new__(cls, name, value, docker_path, uri, recursive,
+                              file_provider, disk_size, disk_type)
 
 
 class InputFileParam(FileParam):
@@ -324,10 +331,12 @@ class InputFileParam(FileParam):
               uri=None,
               recursive=False,
               file_provider=None,
-              disk_size=None):
+              disk_size=None,
+              disk_type=None):
     validate_param_name(name, 'Input parameter')
-    return super(InputFileParam, cls).__new__(
-        cls, name, value, docker_path, uri, recursive, file_provider, disk_size)
+    return super(InputFileParam,
+                 cls).__new__(cls, name, value, docker_path, uri, recursive,
+                              file_provider, disk_size, disk_type)
 
 
 class OutputFileParam(FileParam):
@@ -340,19 +349,33 @@ class OutputFileParam(FileParam):
               uri=None,
               recursive=False,
               file_provider=None,
-              disk_size=None):
+              disk_size=None,
+              disk_type=None):
     validate_param_name(name, 'Output parameter')
-    return super(OutputFileParam, cls).__new__(
-        cls, name, value, docker_path, uri, recursive, file_provider, disk_size)
+    return super(OutputFileParam,
+                 cls).__new__(cls, name, value, docker_path, uri, recursive,
+                              file_provider, disk_size, disk_type)
 
 
 class MountParam(FileParam):
   """Simple typed-derivative of a FileParam."""
 
-  def __new__(cls, name, value, docker_path=None, uri=None, disk_size=None):
+  def __new__(cls,
+              name,
+              value,
+              docker_path=None,
+              uri=None,
+              disk_size=None,
+              disk_type=None):
     validate_param_name(name, 'Mount parameter')
     return super(MountParam, cls).__new__(
-        cls, name, value, docker_path, uri, disk_size=disk_size)
+        cls,
+        name,
+        value,
+        docker_path,
+        uri,
+        disk_size=disk_size,
+        disk_type=disk_type)
 
 
 class GCSMountParam(MountParam):
@@ -366,9 +389,9 @@ class GCSMountParam(MountParam):
 class PersistentDiskMountParam(MountParam):
   """A MountParam representing a Google Persistent Disk."""
 
-  def __new__(cls, name, value, docker_path, disk_size):
+  def __new__(cls, name, value, docker_path, disk_size, disk_type):
     return super(PersistentDiskMountParam, cls).__new__(
-        cls, name, value, docker_path, disk_size=disk_size)
+        cls, name, value, docker_path, disk_size=disk_size, disk_type=disk_type)
 
 
 class LocalMountParam(MountParam):
@@ -381,12 +404,12 @@ class LocalMountParam(MountParam):
 
 class Resources(
     collections.namedtuple('Resources', [
-        'min_cores', 'min_ram', 'machine_type', 'disk_size', 'boot_disk_size',
-        'preemptible', 'image', 'logging', 'logging_path', 'regions', 'zones',
-        'service_account', 'scopes', 'keep_alive', 'cpu_platform', 'network',
-        'subnetwork', 'use_private_address', 'accelerator_type',
-        'accelerator_count', 'nvidia_driver_version', 'timeout', 'log_interval',
-        'ssh'
+        'min_cores', 'min_ram', 'machine_type', 'disk_size', 'disk_type',
+        'boot_disk_size', 'preemptible', 'image', 'logging', 'logging_path',
+        'regions', 'zones', 'service_account', 'scopes', 'keep_alive',
+        'cpu_platform', 'network', 'subnetwork', 'use_private_address',
+        'accelerator_type', 'accelerator_count', 'nvidia_driver_version',
+        'timeout', 'log_interval', 'ssh'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -395,6 +418,7 @@ class Resources(
     min_ram (float): amount of memory (in GB)
     machine_type (str): machine type (e.g. 'n1-standard-1', 'custom-1-4096')
     disk_size (int): size of the data disk (in GB)
+    disk_type (string): Set the disk type of the data disk
     boot_disk_size (int): size of the boot disk (in GB)
     preemptible (bool): use a preemptible VM for the job
     image (str): Docker image name
@@ -426,6 +450,7 @@ class Resources(
               min_ram=None,
               machine_type=None,
               disk_size=None,
+              disk_type=None,
               boot_disk_size=None,
               preemptible=None,
               image=None,
@@ -446,12 +471,14 @@ class Resources(
               timeout=None,
               log_interval=None,
               ssh=None):
-    return super(Resources, cls).__new__(
-        cls, min_cores, min_ram, machine_type, disk_size, boot_disk_size,
-        preemptible, image, logging, logging_path, regions, zones,
-        service_account, scopes, keep_alive, cpu_platform, network, subnetwork,
-        use_private_address, accelerator_type, accelerator_count,
-        nvidia_driver_version, timeout, log_interval, ssh)
+    return super(Resources,
+                 cls).__new__(cls, min_cores, min_ram, machine_type, disk_size,
+                              disk_type, boot_disk_size, preemptible, image,
+                              logging, logging_path, regions, zones,
+                              service_account, scopes, keep_alive, cpu_platform,
+                              network, subnetwork, use_private_address,
+                              accelerator_type, accelerator_count,
+                              nvidia_driver_version, timeout, log_interval, ssh)
 
 
 def ensure_job_params_are_complete(job_params):

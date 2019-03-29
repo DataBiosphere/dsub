@@ -486,6 +486,11 @@ def _parse_arguments(prog, argv):
       help="""Email address of the service account to be authorized on the
           Compute Engine VM for each job task. If not specified, the default
           Compute Engine service account for the project will be used.""")
+  google_v2.add_argument(
+      '--disk-type',
+      help="""
+          The disk type to use for the data disk. Valid values are pd-standard
+          pd-ssd and local-ssd. The default value is pd-standard.""")
 
   args = provider_base.parse_args(
       parser, {
@@ -522,6 +527,7 @@ def _get_job_resources(args):
       min_ram=args.min_ram,
       machine_type=args.machine_type,
       disk_size=args.disk_size,
+      disk_type=args.disk_type,
       boot_disk_size=args.boot_disk_size,
       preemptible=args.preemptible,
       image=args.image,

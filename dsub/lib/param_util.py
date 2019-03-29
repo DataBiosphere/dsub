@@ -273,8 +273,8 @@ class MountParamUtil(object):
       # But don't validate further, should the form of a valid image URI
       # change (v1->v2, for example)
       docker_path = self._parse_image_uri(raw_uri)
-      return job_model.PersistentDiskMountParam(name, raw_uri, docker_path,
-                                                disk_size)
+      return job_model.PersistentDiskMountParam(
+          name, raw_uri, docker_path, disk_size, disk_type=None)
     elif raw_uri.startswith('file://'):
       local_path, docker_path = self._parse_local_mount_uri(raw_uri)
       return job_model.LocalMountParam(name, raw_uri, docker_path, local_path)
