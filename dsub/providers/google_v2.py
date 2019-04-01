@@ -631,7 +631,9 @@ class GoogleV2JobProvider(base.JobProvider):
         google_v2_pipelines.build_disk(
             name=disk.name.replace('_', '-'),  # Underscores not allowed
             size_gb=disk.disk_size or job_model.DEFAULT_MOUNTED_DISK_SIZE,
-            source_image=disk.value) for disk in persistent_disk_mount_params
+            source_image=disk.value,
+            disk_type=disk.disk_type or job_model.DEFAULT_DISK_TYPE)
+        for disk in persistent_disk_mount_params
     ]
     persistent_disk_mounts = [
         google_v2_pipelines.build_mount(
@@ -789,7 +791,10 @@ class GoogleV2JobProvider(base.JobProvider):
     # Prepare the VM (resources) configuration
     disks = [
         google_v2_pipelines.build_disk(
-            _DATA_DISK_NAME, job_resources.disk_size, source_image=None)
+            _DATA_DISK_NAME,
+            job_resources.disk_size,
+            source_image=None,
+            disk_type=job_resources.disk_type or job_model.DEFAULT_DISK_TYPE)
     ]
     disks.extend(persistent_disks)
     network = google_v2_pipelines.build_network(
@@ -809,7 +814,7 @@ class GoogleV2JobProvider(base.JobProvider):
                                                 job_resources.accelerator_count)
       ]
     service_account = google_v2_pipelines.build_service_account(
-        'default', scopes)
+        job_resources.service_account or 'default', scopes)
 
     resources = google_v2_pipelines.build_resources(
         self._project,
@@ -963,9 +968,11 @@ class GoogleV2JobProvider(base.JobProvider):
 
     # 'OR' filtering arguments.
     status_filters = self._get_status_filters(statuses)
-    user_id_filters = self._get_label_filters('user-id', user_ids)
+    user_id_filters = self._get_label_filters(
+        'user-id', google_base.prepare_query_label_value(user_ids))
     job_id_filters = self._get_label_filters('job-id', job_ids)
-    job_name_filters = self._get_label_filters('job-name', job_names)
+    job_name_filters = self._get_label_filters(
+        'job-name', google_base.prepare_query_label_value(job_names))
     task_id_filters = self._get_label_filters('task-id', task_ids)
     task_attempt_filters = self._get_label_filters('task-attempt',
                                                    task_attempts)
@@ -1208,7 +1215,8 @@ class GoogleOperation(base.Task):
       if last_event:
         msg = last_event['description']
         action_id = last_event.get('details', {}).get('actionId')
-        action = google_v2_operations.get_action_by_id(self._op, action_id)
+        if action_id:
+          action = google_v2_operations.get_action_by_id(self._op, action_id)
       else:
         msg = 'Pending'
     else:
@@ -1217,7 +1225,8 @@ class GoogleOperation(base.Task):
         failed_event = failed_events[-1]
         msg = failed_event.get('details', {}).get('stderr')
         action_id = failed_event.get('details', {}).get('actionId')
-        action = google_v2_operations.get_action_by_id(self._op, action_id)
+        if action_id:
+          action = google_v2_operations.get_action_by_id(self._op, action_id)
       if not msg:
         error = google_v2_operations.get_error(self._op)
         if error:
@@ -1375,11 +1384,13 @@ class GoogleOperation(base.Task):
                                               {}).get('usePrivateAddress')
         value['cpu_platform'] = vm.get('cpuPlatform')
         value['accelerators'] = vm.get('accelerators')
+        value['service-account'] = vm.get('serviceAccount', {}).get('email')
         if 'disks' in vm:
           datadisk = next(
               (d for d in vm['disks'] if d['name'] == _DATA_DISK_NAME))
           if datadisk:
-            value['disk-size'] = datadisk['sizeGb']
+            value['disk-size'] = datadisk.get('sizeGb')
+            value['disk-type'] = datadisk.get('type')
     elif field == 'events':
       value = GoogleV2EventMap(self._op).get_filtered_normalized_events()
     elif field == 'script-name':

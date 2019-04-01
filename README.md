@@ -552,6 +552,10 @@ each job includes:
 *   `task-id`: if the job is submitted with the `--tasks` parameter, each task
     gets a sequential value of the form "task-*n*" where *n* is 1-based.
 
+Note that the job metadata values will be modified to conform with the "Label
+Restrictions" listed in the [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
+guide.
+
 Metadata can be used to cancel a job or individual tasks within a batch job.
 
 For more details, see [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)

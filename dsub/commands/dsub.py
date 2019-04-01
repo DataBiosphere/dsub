@@ -480,6 +480,17 @@ def _parse_arguments(prog, argv):
           GPU libraries contained in the container being executed, and must be
           one of the drivers hosted in the nvidia-drivers-us-public bucket on
           Google Cloud Storage.""")
+  google_v2.add_argument(
+      '--service-account',
+      type=str,
+      help="""Email address of the service account to be authorized on the
+          Compute Engine VM for each job task. If not specified, the default
+          Compute Engine service account for the project will be used.""")
+  google_v2.add_argument(
+      '--disk-type',
+      help="""
+          The disk type to use for the data disk. Valid values are pd-standard
+          pd-ssd and local-ssd. The default value is pd-standard.""")
 
   args = provider_base.parse_args(
       parser, {
@@ -516,6 +527,7 @@ def _get_job_resources(args):
       min_ram=args.min_ram,
       machine_type=args.machine_type,
       disk_size=args.disk_size,
+      disk_type=args.disk_type,
       boot_disk_size=args.boot_disk_size,
       preemptible=args.preemptible,
       image=args.image,
@@ -523,6 +535,7 @@ def _get_job_resources(args):
       zones=args.zones,
       logging=logging,
       logging_path=None,
+      service_account=args.service_account,
       scopes=args.scopes,
       keep_alive=args.keep_alive,
       cpu_platform=args.cpu_platform,
@@ -1099,12 +1112,13 @@ def run(provider,
     if launched_job.get('task-id'):
       print('%s task(s)' % len(launched_job['task-id']))
     print('To check the status, run:')
-    print("  dstat %s --jobs '%s' --status '*'" %
+    print("  dstat %s --jobs '%s' --users '%s' --status '*'" %
           (provider_base.get_dstat_provider_args(provider, project),
-           launched_job['job-id']))
+           launched_job['job-id'], launched_job['user-id']))
     print('To cancel the job, run:')
-    print("  ddel %s --jobs '%s'" % (provider_base.get_ddel_provider_args(
-        provider, project), launched_job['job-id']))
+    print("  ddel %s --jobs '%s' --users '%s'" %
+          (provider_base.get_ddel_provider_args(provider, project),
+           launched_job['job-id'], launched_job['user-id']))
 
   # Poll for job completion
   if wait:

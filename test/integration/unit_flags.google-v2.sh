@@ -465,6 +465,81 @@ function test_no_user_project() {
 }
 readonly -f test_no_user_project
 
+function test_service_account() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --service-account 'foo@bar.com'; then
+
+    # Check for the service account email
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.serviceAccount.email" "foo@bar.com"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_service_account
+
+function test_no_service_account() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+     assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.serviceAccount.email" "default"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_service_account
+
+
+function test_disk_type() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --disk-type 'pd-ssd'; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.disks.[0].type" "pd-ssd"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+
+function test_no_disk_type() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 ; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.disks.[0].type" "pd-standard"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+
+
+
 # Run the tests
 trap "exit_handler" EXIT
 
@@ -508,3 +583,11 @@ test_no_ssh
 echo
 test_user_project
 test_no_user_project
+
+echo
+test_service_account
+test_no_service_account
+
+echo
+test_disk_type
+test_no_disk_type

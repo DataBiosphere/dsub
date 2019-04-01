@@ -164,7 +164,7 @@ Rules for setting labels follow the
 - Label keys and values must conform to the following restrictions:
   - Keys and values cannot be longer than 63 characters each.
   - Keys and values can only contain lowercase letters, numeric characters,
-    underscores, and dashes.
+    and dashes.
   - Label keys must start with a lowercase letter.
   - Label keys cannot be empty.
 
