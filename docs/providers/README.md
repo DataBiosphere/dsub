@@ -10,8 +10,8 @@ implements a consistent runtime environment. The current supported providers
 are:
 
 - local
-- google (the default, deprecated: please use `google-v2`)
-- google-v2
+- google (deprecated: use `google-v2`)
+- google-v2 (the default)
 
 ## Runtime environment
 

@@ -166,8 +166,8 @@ To this end, `dsub` provides multiple "backend providers", each of which
 implements a consistent runtime environment. The current providers are:
 
 - local
-- google (the default, but deprecated)
-- google-v2
+- google (deprecated: use `google-v2`)
+- google-v2 (the default)
 
 More details on the runtime environment implemented by the backend providers
 can be found in [dsub backend providers](./docs/providers/README.md).
@@ -176,7 +176,7 @@ can be found in [dsub backend providers](./docs/providers/README.md).
 
 The original `dsub` provider was the `google` provider, built on top of the
 Google Genomics Pipelines API `v1alpha2`. The Pipelines API `v1alpha2` has
-been deprecated and will be turned down at the end of 2018.
+been deprecated and was scheduled for turn down at the end of 2018.
 For more details, see
 [Cloud Genomics v1alpha2 Migration Guide](https://cloud.google.com/genomics/docs/how-tos/migration)
 
@@ -184,9 +184,9 @@ Replacing `v1alpha2` is [v2alpha1](https://cloud.google.com/genomics/reference/r
 `dsub` has added the `google-v2` provider which use `v2alpha1` as the backend
 for running `dsub` jobs on Google Cloud.
 
-**`dsub` users are encouraged today to use the `google-v2` provider. At the end of
-2018, the Pipelines API `v1alpha2` will be turned down and the `google` provider
-for `dsub` will be removed.**
+**`dsub` users are encouraged today to use the `google-v2` provider. The
+`google-v2` provider is now the default. The `google` provider for `dsub` will
+be removed in a future release.**
 
 ### Migrating existing code from `google` to `google-v2`
 

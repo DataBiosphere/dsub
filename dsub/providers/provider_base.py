@@ -77,12 +77,11 @@ def create_parser(prog):
 
   parser.add_argument(
       '--provider',
-      default='google',
+      default='google-v2',
       choices=['local', 'google', 'google-v2', 'test-fails'],
-      help="""Job service provider. Valid values are "google" (Google's
-        Pipeline API) and "local" (local Docker execution). "google-v2"
-        (Google's Pipelines API v2alpha1 is in development). "test-*" providers
-        are for testing purposes only.""",
+      help="""Job service provider. Valid values are "google-v2" (Google's
+        Pipeline API v2) and "local" (local Docker execution). "test-*"
+        providers are for testing purposes only.""",
       metavar='PROVIDER')
 
   return parser
