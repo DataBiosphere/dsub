@@ -65,6 +65,21 @@ _GCSFUSE_IMAGE = 'gcr.io/cloud-genomics-pipelines/gcsfuse:latest'
 # Name of the data disk
 _DATA_DISK_NAME = 'datadisk'
 
+# Define a bash function for "echo" that includes timestamps
+_LOG_MSG_FN = textwrap.dedent("""\
+  function get_datestamp() {
+    date "+%Y-%m-%d %H:%M:%S"
+  }
+
+  function log_info() {
+    echo "$(get_datestamp) INFO: $@"
+  }
+
+  function log_error() {
+    echo "$(get_datestamp) ERROR: $@"
+  }
+""")
+
 # Define a bash function for "gsutil cp" to be used by the logging,
 # localization, and delocalization actions.
 _GSUTIL_CP_FN = textwrap.dedent("""\
@@ -86,13 +101,13 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
 
     local i
     for ((i = 0; i < 3; i++)); do
-      echo "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
+      log_info "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
       if gsutil ${headers} ${user_project_flag} -mq cp "${src}" "${dst}"; then
         return
       fi
     done
 
-    2>&1 echo "ERROR: gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
+    2>&1 log_error "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
     exit 1
   }
 
@@ -132,13 +147,13 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
 
     local i
     for ((i = 0; i < 3; i++)); do
-      echo "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
+      log_info "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
       if gsutil ${user_project_flag} -mq rsync -r "${src}" "${dst}"; then
         return
       fi
     done
 
-    2>&1 echo "ERROR: gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
+    2>&1 log_error "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
     exit 1
   }
 """)
@@ -184,6 +199,7 @@ _CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
   set -o errexit
   set -o nounset
 
+  {log_msg_fn}
   {log_cp_fn}
 
   while [[ ! -d /google/logs/action/{final_logging_action} ]]; do
@@ -204,7 +220,7 @@ _LOCALIZATION_LOOP = textwrap.dedent("""\
     INPUT_SRC="INPUT_SRC_${i}"
     INPUT_DST="INPUT_DST_${i}"
 
-    echo "Localizing ${!INPUT_VAR}"
+    log_info "Localizing ${!INPUT_VAR}"
     if [[ "${!INPUT_RECURSIVE}" -eq "1" ]]; then
       gsutil_rsync "${!INPUT_SRC}" "${!INPUT_DST}" "${USER_PROJECT}"
     else
@@ -224,7 +240,7 @@ _DELOCALIZATION_LOOP = textwrap.dedent("""\
     OUTPUT_SRC="OUTPUT_SRC_${i}"
     OUTPUT_DST="OUTPUT_DST_${i}"
 
-    echo "Delocalizing ${!OUTPUT_VAR}"
+    log_info "Delocalizing ${!OUTPUT_VAR}"
     if [[ "${!OUTPUT_RECURSIVE}" -eq "1" ]]; then
       gsutil_rsync "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "${USER_PROJECT}"
     else
@@ -234,6 +250,7 @@ _DELOCALIZATION_LOOP = textwrap.dedent("""\
 """)
 
 _LOCALIZATION_CMD = textwrap.dedent("""\
+  {log_msg_fn}
   {recursive_cp_fn}
   {cp_fn}
 
@@ -272,7 +289,7 @@ _MK_IO_DIRS = textwrap.dedent("""\
   for ((i=0; i < DIR_COUNT; i++)); do
     DIR_VAR="DIR_${i}"
 
-    echo "mkdir -m 777 -p \"${!DIR_VAR}\""
+    log_info "mkdir -m 777 -p \"${!DIR_VAR}\""
     mkdir -m 777 -p "${!DIR_VAR}"
   done
 """)
@@ -283,6 +300,7 @@ _PREPARE_CMD = textwrap.dedent("""\
   set -o errexit
   set -o nounset
 
+  {log_msg_fn}
   {mk_runtime_dirs}
 
   echo "${{{script_var}}}" \
@@ -678,6 +696,7 @@ class GoogleV2JobProvider(base.JobProvider):
         log_cp_cmd=_LOG_CP_CMD.format(
             user_action=user_action, logging_action='logging_action'))
     continuous_logging_cmd = _CONTINUOUS_LOGGING_CMD.format(
+        log_msg_fn=_LOG_MSG_FN,
         log_cp_fn=_GSUTIL_CP_FN,
         log_cp_cmd=_LOG_CP_CMD.format(
             user_action=user_action,
@@ -691,6 +710,7 @@ class GoogleV2JobProvider(base.JobProvider):
     # and de-localization actions
     script_path = os.path.join(providers_util.SCRIPT_DIR, script.name)
     prepare_command = _PREPARE_CMD.format(
+        log_msg_fn=_LOG_MSG_FN,
         mk_runtime_dirs=_MK_RUNTIME_DIRS_CMD,
         script_var=_SCRIPT_VARNAME,
         python_decode_script=_PYTHON_DECODE_SCRIPT,
@@ -746,6 +766,7 @@ class GoogleV2JobProvider(base.JobProvider):
             commands=[
                 '-c',
                 _LOCALIZATION_CMD.format(
+                    log_msg_fn=_LOG_MSG_FN,
                     recursive_cp_fn=_GSUTIL_RSYNC_FN,
                     cp_fn=_GSUTIL_CP_FN,
                     cp_loop=_LOCALIZATION_LOOP)
@@ -772,6 +793,7 @@ class GoogleV2JobProvider(base.JobProvider):
             commands=[
                 '-c',
                 _LOCALIZATION_CMD.format(
+                    log_msg_fn=_LOG_MSG_FN,
                     recursive_cp_fn=_GSUTIL_RSYNC_FN,
                     cp_fn=_GSUTIL_CP_FN,
                     cp_loop=_DELOCALIZATION_LOOP)
