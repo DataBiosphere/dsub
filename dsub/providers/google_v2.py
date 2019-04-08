@@ -1320,22 +1320,15 @@ class GoogleOperation(base.Task):
             self._job_descriptor.job_params,
             self._job_descriptor.task_descriptors[0].task_params, field)
         value = {item.name: item.value for item in items}
-    elif field == 'inputs':
+    elif field in [
+        'inputs', 'outputs', 'input-recursives', 'output-recursives'
+    ]:
       if self._job_descriptor:
         value = {}
-        for field in ['inputs', 'input-recursives']:
-          items = providers_util.get_job_and_task_param(
-              self._job_descriptor.job_params,
-              self._job_descriptor.task_descriptors[0].task_params, field)
-          value.update({item.name: item.value for item in items})
-    elif field == 'outputs':
-      if self._job_descriptor:
-        value = {}
-        for field in ['outputs', 'output-recursives']:
-          items = providers_util.get_job_and_task_param(
-              self._job_descriptor.job_params,
-              self._job_descriptor.task_descriptors[0].task_params, field)
-          value.update({item.name: item.value for item in items})
+        items = providers_util.get_job_and_task_param(
+            self._job_descriptor.job_params,
+            self._job_descriptor.task_descriptors[0].task_params, field)
+        value.update({item.name: item.value for item in items})
     elif field == 'mounts':
       if self._job_descriptor:
         items = providers_util.get_job_and_task_param(

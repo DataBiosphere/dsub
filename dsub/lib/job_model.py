@@ -483,7 +483,10 @@ class Resources(
 
 def ensure_job_params_are_complete(job_params):
   """For the job, ensure that each param entry is not None."""
-  for param in 'labels', 'envs', 'inputs', 'outputs', 'mounts':
+  for param in [
+      'labels', 'envs', 'inputs', 'outputs', 'mounts', 'input-recursives',
+      'output-recursives'
+  ]:
     if not job_params.get(param):
       job_params[param] = set()
 
@@ -491,7 +494,10 @@ def ensure_job_params_are_complete(job_params):
 def ensure_task_params_are_complete(task_descriptors):
   """For each task, ensure that each task param entry is not None."""
   for task_desc in task_descriptors:
-    for param in 'labels', 'envs', 'inputs', 'outputs':
+    for param in [
+        'labels', 'envs', 'inputs', 'outputs', 'input-recursives',
+        'output-recursives'
+    ]:
       if not task_desc.task_params.get(param):
         task_desc.task_params[param] = set()
 
@@ -860,11 +866,13 @@ class JobDescriptor(object):
     job_params['labels'] = cls._label_params_from_dict(job.get('labels', {}))
     job_params['envs'] = cls._env_params_from_dict(job.get('envs', {}))
     job_params['inputs'] = cls._input_file_params_from_dict(
-        job.get('inputs', {}), False) | cls._input_file_params_from_dict(
-            job.get('input-recursives', {}), True)
+        job.get('inputs', {}), False)
+    job_params['input-recursives'] = cls._input_file_params_from_dict(
+        job.get('input-recursives', {}), True)
     job_params['outputs'] = cls._output_file_params_from_dict(
-        job.get('outputs', {}), False) | cls._output_file_params_from_dict(
-            job.get('output-recursives', {}), True)
+        job.get('outputs', {}), False)
+    job_params['output-recursives'] = cls._output_file_params_from_dict(
+        job.get('output-recursives', {}), True)
     job_params['mounts'] = cls._mount_params_from_dict(job.get('mounts', {}))
 
     task_descriptors = []
@@ -885,11 +893,13 @@ class JobDescriptor(object):
           task.get('labels', {}))
       task_params['envs'] = cls._env_params_from_dict(task.get('envs', {}))
       task_params['inputs'] = cls._input_file_params_from_dict(
-          task.get('inputs', {}), False) | cls._input_file_params_from_dict(
-              task.get('input-recursives', {}), True)
+          task.get('inputs', {}), False)
+      task_params['input-recursives'] = cls._input_file_params_from_dict(
+          task.get('input-recursives', {}), True)
       task_params['outputs'] = cls._output_file_params_from_dict(
-          task.get('outputs', {}), False) | cls._output_file_params_from_dict(
-              task.get('output-recursives', {}), True)
+          task.get('outputs', {}), False)
+      task_params['output-recursives'] = cls._output_file_params_from_dict(
+          task.get('output-recursives', {}), True)
 
       task_resources = Resources(logging_path=task.get('logging-path'))
 

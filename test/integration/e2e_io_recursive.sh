@@ -70,7 +70,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
-  run_dsub \
+  JOB_ID="$(run_dsub \
     --image "google/cloud-sdk:latest" \
     --script "${SCRIPT_DIR}/script_io_recursive.sh" \
     --env FILE_CONTENTS="${FILE_CONTENTS}" \
@@ -78,8 +78,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --input-recursive INPUT_PATH_DEEP="${INPUTS}/deep/" \
     --output OUTPUT_PATH_SHALLOW="${OUTPUTS}/shallow/*" \
     --output-recursive OUTPUT_PATH_DEEP="${OUTPUTS}/deep/" \
-    --wait
-
+    --wait)"
 fi
 
 echo
@@ -163,4 +162,17 @@ fi
 echo
 echo "GCS output file list matches expected"
 
+# Verify dstat
+if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 && "${DSUB_PROVIDER}" != "google" ]]; then
+  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${JOB_ID}")"; then
+    echo "dstat exited with a non-zero exit code!"
+    echo "Output:"
+    echo "${DSTAT_OUTPUT}"
+    exit 1
+  fi
+  util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].inputs" "{'INPUT_PATH_SHALLOW': '${INPUTS}/shallow/*'}"
+  util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].outputs" "{'OUTPUT_PATH_SHALLOW': '${OUTPUTS}/shallow/*'}"
+  util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].input-recursives" "{'INPUT_PATH_DEEP': '${INPUTS}/deep/'}"
+  util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].output-recursives" "{'OUTPUT_PATH_DEEP': '${OUTPUTS}/deep/'}"
+fi
 echo "SUCCESS"

@@ -984,18 +984,13 @@ class LocalTask(base.Task):
       items = providers_util.get_job_and_task_param(job_params, task_params,
                                                     field)
       value = {item.name: item.value for item in items}
-    elif field == 'inputs':
+    elif field in [
+        'inputs', 'outputs', 'input-recursives', 'output-recursives'
+    ]:
       value = {}
-      for field in ['inputs', 'input-recursives']:
-        items = providers_util.get_job_and_task_param(job_params, task_params,
-                                                      field)
-        value.update({item.name: item.value for item in items})
-    elif field == 'outputs':
-      value = {}
-      for field in ['outputs', 'output-recursives']:
-        items = providers_util.get_job_and_task_param(job_params, task_params,
-                                                      field)
-        value.update({item.name: item.value for item in items})
+      items = providers_util.get_job_and_task_param(job_params, task_params,
+                                                    field)
+      value.update({item.name: item.value for item in items})
     elif field == 'mounts':
       items = providers_util.get_job_and_task_param(job_params, task_params,
                                                     field)
