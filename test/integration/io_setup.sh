@@ -67,6 +67,7 @@ readonly -f io_setup::image_setup
 
 function io_setup::run_dsub_requester_pays() {
   run_dsub \
+    --unique-job-id \
     ${IMAGE:+--image "${IMAGE}"} \
     --user-project "$PROJECT_ID" \
     --script "${SCRIPT_DIR}/script_io_test.sh" \
@@ -84,6 +85,7 @@ function io_setup::run_dsub_with_mount() {
   local mount_point="${1}"
 
   run_dsub \
+    --unique-job-id \
     ${IMAGE:+--image "${IMAGE}"} \
     --script "${SCRIPT_DIR}/script_io_test.sh" \
     --env TASK_ID="task" \
@@ -99,6 +101,7 @@ readonly -f io_setup::run_dsub_with_mount
 
 function io_setup::run_dsub() {
   run_dsub \
+    --unique-job-id \
     ${IMAGE:+--image "${IMAGE}"} \
     --script "${SCRIPT_DIR}/script_io_test.sh" \
     --env TASK_ID="task" \

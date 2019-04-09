@@ -30,7 +30,7 @@ source "${SCRIPT_DIR}/logging_paths_tasks_setup.sh"
 readonly LOGGING_BASE="$(dirname "${LOGGING}")"
 declare LOGGING_OVERRIDE
 
-readonly JOB_NAME="log-tasks"
+readonly JOB_NAME=$(logging_paths_tasks_setup::get_job_name)
 readonly JOB_USER="${USER}"
 
 # Set up the tasks file
@@ -38,11 +38,8 @@ logging_paths_tasks_setup::write_tasks_file
 
 # Launch the job
 LOGGING_OVERRIDE="${LOGGING_BASE}/{user-id}/{job-name}.{task-id}.test.log"
-JOB_ID=$(run_dsub \
-           --name "${JOB_NAME}" \
-           --user "${JOB_USER}" \
-           --tasks "${TASKS_FILE}" \
-           --command 'echo "Test"')
+JOB_ID=$(logging_paths_tasks_setup::run_dsub \
+           --user "${JOB_USER}")
 
 # Verify output
 LOGGING_PATH=$(logging_paths_tasks_setup::dstat_get_logging "${JOB_ID}" "1")

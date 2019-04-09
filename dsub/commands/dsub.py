@@ -25,6 +25,7 @@ import os
 import re
 import sys
 import time
+import uuid
 from dateutil.tz import tzlocal
 
 from ..lib import dsub_errors
@@ -211,6 +212,12 @@ def _parse_arguments(prog, argv):
   parser.add_argument(
       '--version', '-v', default=False, help='Print the dsub version and exit.')
 
+  parser.add_argument(
+      '--unique-job-id',
+      default=False,
+      action='store_true',
+      help="""Experimental: create a unique 32 character UUID for the dsub
+          job-id using https://docs.python.org/3/library/uuid.html.""")
   parser.add_argument(
       '--name',
       help="""Name for pipeline. Defaults to the script name or
@@ -551,7 +558,7 @@ def _get_job_resources(args):
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids,
-                      user_project):
+                      user_project, unique_job_id):
   """Allow provider to extract job-specific metadata from command-line args.
 
   Args:
@@ -561,6 +568,7 @@ def _get_job_metadata(provider, user_id, job_name, script, task_ids,
     script: the script to run
     task_ids: a set of the task-ids for all tasks in the job
     user_project: name of the project to be billed for the request
+    unique_job_id: generate a unique job id
 
   Returns:
     A dictionary of job-specific metadata (such as job id, name, etc.)
@@ -569,6 +577,8 @@ def _get_job_metadata(provider, user_id, job_name, script, task_ids,
   user_id = user_id or dsub_util.get_os_user()
   job_metadata = provider.prepare_job_metadata(script.name, job_name, user_id,
                                                create_time)
+  if unique_job_id:
+    job_metadata['job-id'] = uuid.uuid4().hex
 
   job_metadata['create-time'] = create_time
   job_metadata['script'] = script
@@ -1014,7 +1024,8 @@ def run_main(args):
       after=args.after,
       skip=args.skip,
       project=args.project,
-      disable_warning=True)
+      disable_warning=True,
+      unique_job_id=args.unique_job_id)
 
 
 def run(provider,
@@ -1033,7 +1044,8 @@ def run(provider,
         after=None,
         skip=False,
         project=None,
-        disable_warning=False):
+        disable_warning=False,
+        unique_job_id=False):
   """Actual dsub body, post-stdout-redirection."""
   if not dry_run:
     provider_base.emit_provider_message(provider)
@@ -1078,7 +1090,7 @@ def run(provider,
   #  job_metadata such as the job-id, create-time, user-id, etc.
   #  task_resources such as the logging_path (which may include job-id, task-id)
   job_metadata = _get_job_metadata(provider, user, name, script, task_ids,
-                                   user_project)
+                                   user_project, unique_job_id)
   _resolve_task_resources(job_metadata, job_resources, task_descriptors)
 
   # Job and task properties are now all resolved. Begin execution!
