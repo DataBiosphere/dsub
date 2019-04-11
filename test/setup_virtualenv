@@ -25,7 +25,7 @@ else
 fi
 readonly PY_VERSION
 
-if [[ "${PY_VERSION}" -eq "python2" ]]; then
+if [[ "${PY_VERSION}" == "python2" ]]; then
   LIBS_FOLDER="dsub_libs"
 else
   LIBS_FOLDER="dsub_libs$VERSION_ARG"

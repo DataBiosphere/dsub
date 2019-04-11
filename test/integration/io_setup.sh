@@ -27,7 +27,8 @@ readonly REQUESTER_PAYS_INPUT_BAM_FULL_PATH="gs://${DSUB_BUCKET_REQUESTER_PAYS}/
 readonly REQUESTER_PAYS_POPULATION_FILE_FULL_PATH="gs://${DSUB_BUCKET_REQUESTER_PAYS}/${POPULATION_FILE}"
 
 # This is the image we use to test the PD mount feature.
-readonly TEST_IMAGE_NAME="dsub-e2e-test-image"
+# Inject the TEST_TOKEN into the name so that multiple test can run concurrently.
+readonly TEST_IMAGE_NAME="dsub-e2e-test-image-$(echo ${TEST_TOKEN} | tr '_' '-')"
 readonly TEST_IMAGE_GCS_LOCATION="gs://dsub-test-e2e-bucket/dsub-test-image.tar.gz"
 readonly TEST_IMAGE_URL="https://www.googleapis.com/compute/v1/projects/${PROJECT_ID}/global/images/${TEST_IMAGE_NAME}"
 
