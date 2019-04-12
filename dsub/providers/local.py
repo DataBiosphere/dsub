@@ -464,7 +464,7 @@ class LocalJobProvider(base.JobProvider):
       with open(os.path.join(task_dir, 'end-time.txt'), 'wt') as f:
         f.write(today)
       msg = 'Operation canceled at %s\n' % today
-      with open(os.path.join(task_dir, 'runner-log.txt'), 'a') as f:
+      with open(os.path.join(task_dir, 'runner-log.txt'), 'at') as f:
         f.write(msg)
 
     return (canceled, cancel_errors)
@@ -634,7 +634,7 @@ class LocalJobProvider(base.JobProvider):
   def _get_log_detail_from_task_dir(self, task_dir):
     try:
       with open(os.path.join(task_dir, 'runner-log.txt'), 'r') as f:
-        return [line.decode('utf-8') for line in f.read().splitlines()]
+        return [line for line in f.read().splitlines()]
     except (IOError, OSError):
       return None
 
