@@ -209,15 +209,7 @@ function get_test_providers() {
     return
   fi
 
-  case "${test_file}" in
-    e2e_requester_pays_buckets.sh | \
-    e2e_image.sh)
-      echo -n "local google-v2"
-      return
-      ;;
-  esac
-
-  echo -n "local google google-v2"
+  echo -n "local google-v2"
 }
 readonly -f get_test_providers
 
