@@ -209,15 +209,7 @@ function get_test_providers() {
     return
   fi
 
-  case "${test_file}" in
-    e2e_requester_pays_buckets.sh | \
-    e2e_image.sh)
-      echo -n "local google-v2"
-      return
-      ;;
-  esac
-
-  echo -n "local google google-v2"
+  echo -n "local google-v2"
 }
 readonly -f get_test_providers
 
@@ -309,6 +301,11 @@ for TEST_TYPE in "${TESTS[@]}"; do
 
   # Run tests in test/unit
   if [[ "${TEST_TYPE}" == "pythonunit_*.py" ]]; then
+    if [[ ${NO_PY_MODULE_TESTS:-0} -eq 1 ]]; then
+      echo "Test test/unit/*: SKIPPED"
+      continue
+    fi
+
     start_test "test/unit"
 
     # for unit tests, also include the Python unit tests
@@ -332,6 +329,13 @@ for TEST_TYPE in "${TESTS[@]}"; do
   fi
 
   for TEST in "${TEST_LIST[@]}"; do
+    if [[ ${NO_PY_MODULE_TESTS:-0} -eq 1 ]]; then
+      if [[ ${TEST} == *.py ]]; then
+        echo "Test ${TEST}: SKIPPED"
+        continue
+      fi
+    fi
+
     PROVIDER_LIST="$(get_test_providers "${TEST}")"
 
     # If the user has supplied a DSUB_PROVIDER, then override the PROVIDER_LIST,

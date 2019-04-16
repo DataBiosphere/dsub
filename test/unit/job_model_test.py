@@ -179,19 +179,23 @@ _ENV_LIST_JOB_DESCRIPTOR = job_model.JobDescriptor(
         'labels': set(),
         'inputs': set(),
         'outputs': set(),
+        'input-recursives': set(),
+        'output-recursives': set(),
         'mounts': set(),
     },
     task_descriptors=[
         job_model.TaskDescriptor(
             task_metadata={'task-id': None},
             task_resources=job_model.Resources(
-                logging_path=
-                'gs://b/dsub/sh/local/env_list/env_list/logging/env_list.log'),
+                logging_path='gs://b/dsub/sh/local/env_list/env_list/logging/env_list.log'  # pylint: disable=line-too-long
+            ),
             task_params={
                 'envs': set(),
                 'labels': set(),
                 'inputs': set(),
                 'outputs': set(),
+                'input-recursives': set(),
+                'output-recursives': set(),
             })
     ])
 
@@ -282,6 +286,8 @@ _IO_TASKS_JOB_DESCRIPTOR = job_model.JobDescriptor(
                 'gs://b/dsub/sh/local/io_tasks/output/*',
                 recursive=False),
         },
+        'input-recursives': set(),
+        'output-recursives': set(),
         'mounts': set(),
     },
     task_descriptors=[
@@ -306,6 +312,8 @@ _IO_TASKS_JOB_DESCRIPTOR = job_model.JobDescriptor(
                         'gs://b/dsub/sh/local/io_tasks/output/3/*.md5',
                         recursive=False),
                 },
+                'input-recursives': set(),
+                'output-recursives': set(),
             })
     ])
 
@@ -373,23 +381,27 @@ _IO_RECURSIVE_JOB_DESCRIPTOR = job_model.JobDescriptor(
         'labels': set(),
         'inputs': {
             job_model.InputFileParam(
-                'INPUT_PATH_DEEP',
-                'gs://b/dsub/sh/local/io_recursive/input/deep/',
-                recursive=True),
-            job_model.InputFileParam(
                 'INPUT_PATH_SHALLOW',
                 'gs://b/dsub/sh/local/io_recursive/input/shallow/*',
                 recursive=False),
         },
-        'outputs': {
-            job_model.OutputFileParam(
-                'OUTPUT_PATH_DEEP',
-                'gs://b/dsub/sh/local/io_recursive/output/deep/',
+        'input-recursives': {
+            job_model.InputFileParam(
+                'INPUT_PATH_DEEP',
+                'gs://b/dsub/sh/local/io_recursive/input/deep/',
                 recursive=True),
+        },
+        'outputs': {
             job_model.OutputFileParam(
                 'OUTPUT_PATH_SHALLOW',
                 'gs://b/dsub/sh/local/io_recursive/output/shallow/*',
                 recursive=False),
+        },
+        'output-recursives': {
+            job_model.OutputFileParam(
+                'OUTPUT_PATH_DEEP',
+                'gs://b/dsub/sh/local/io_recursive/output/deep/',
+                recursive=True),
         },
         'mounts': set(),
     },
@@ -397,13 +409,15 @@ _IO_RECURSIVE_JOB_DESCRIPTOR = job_model.JobDescriptor(
         job_model.TaskDescriptor(
             task_metadata={'task-id': None},
             task_resources=job_model.Resources(
-                logging_path=
-                'gs://b/dsub/sh/local/io_recursive/logging/io_recursive.log'),
+                logging_path='gs://b/dsub/sh/local/io_recursive/logging/io_recursive.log'
+            ),
             task_params={
                 'envs': set(),
                 'labels': set(),
                 'inputs': set(),
                 'outputs': set(),
+                'input-recursives': set(),
+                'output-recursives': set(),
             })
     ])
 
@@ -467,6 +481,8 @@ _LABELS_JOB_DESCRIPTOR = job_model.JobDescriptor(
         'labels': {job_model.LabelParam('batch', 'hello-world')},
         'inputs': set(),
         'outputs': set(),
+        'input-recursives': set(),
+        'output-recursives': set(),
         'mounts': set(),
     },
     task_descriptors=[
@@ -480,6 +496,8 @@ _LABELS_JOB_DESCRIPTOR = job_model.JobDescriptor(
                 'labels': {job_model.LabelParam('item-number', '2')},
                 'inputs': set(),
                 'outputs': set(),
+                'input-recursives': set(),
+                'output-recursives': set(),
             })
     ])
 
@@ -549,10 +567,12 @@ class JobDescriptorTest(unittest.TestCase):
       src_params[param_type] = set()
 
     # local meta.yaml did not mark recursive inputs/outputs as recursive
-    for param_type in 'inputs', 'outputs':
-      for param in dst_params[param_type]:
-        dst_params[param_type].remove(param)
+    for param_type, recursive_param_type in zip(
+        ['inputs', 'outputs'], ['input-recursives', 'output-recursives']):
+      for param in dst_params[recursive_param_type]:
         dst_params[param_type].add(param._replace(recursive=False))
+    dst_params['input-recursives'] = set()
+    dst_params['output-recursives'] = set()
 
     self.assert_job_descriptors_equal(actual, expected)
 

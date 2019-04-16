@@ -82,7 +82,8 @@ else:
   print("Checking configured gcloud project")
   PROJECT_ID = subprocess.check_output(
       'gcloud config list core/project --format="value(core.project)"',
-      shell=True).strip()
+      shell=True,
+      universal_newlines=True).strip()
 
 if not PROJECT_ID:
   print("Your project ID could not be determined.")
