@@ -31,6 +31,7 @@ readonly DIR_LIST=(
   dir_1/dir_b
   dir_2/dir_a
   dir_2/dir_b
+  "dir_3/dir with space"
 )
 
 # Emit for debugging
@@ -64,8 +65,16 @@ for OUTPUT_PATH_VAR in ${!OUTPUT_PATH_*}; do
     mkdir -p "${OUTPUT_PATH_VAL}/${DIR}"
   done
 
-  DIRS=($(find "${OUTPUT_PATH_VAL}" -type d))
-  for DIR in "${DIRS[@]}"; do
+  # Get a list of subdirectories
+  declare OUTPUT_DIR_LIST="$(find "${OUTPUT_PATH_VAL}" -type d)"
+
+  # Convert the newline-separated string output to an array
+  OLDIFS="${IFS}"
+  IFS=$'\n'
+  OUTPUT_DIR_LIST=(${OUTPUT_DIR_LIST})
+  IFS="${OLDIFS}"
+
+  for DIR in "${OUTPUT_DIR_LIST[@]}"; do
     echo "Populating ${DIR}"
 
     echo "${FILE_CONTENTS}" > "${DIR}/file1.txt"

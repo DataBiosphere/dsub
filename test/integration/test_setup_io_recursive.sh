@@ -36,6 +36,7 @@ DIR_LIST=(
   dir_1/dir_b
   dir_2/dir_a
   dir_2/dir_b
+  "dir_3/dir with space"
 )
 
 
@@ -55,8 +56,16 @@ function build_recursive_files() {
       mkdir -p "${INPUT_DIR}/${DIR}"
     done
 
-    DIRS=($(find "${INPUT_DIR}" -type d))
-    for DIR in "${DIRS[@]}"; do
+    # Find all subdirectories
+    declare INPUT_DIR_LIST="$(find "${INPUT_DIR}" -type d)"
+
+    # Convert the newline-separated string output to an array
+    OLDIFS="${IFS}"
+    IFS=$'\n'
+    INPUT_DIR_LIST=(${INPUT_DIR_LIST})
+    IFS="${OLDIFS}"
+
+    for DIR in "${INPUT_DIR_LIST[@]}"; do
       echo "${FILE_CONTENTS}" > "${DIR}/in_file1.txt"
       echo "${FILE_CONTENTS}" > "${DIR}/in_file2.txt"
       chmod o-rwx "${DIR}"/in_file*
@@ -81,6 +90,10 @@ function setup_expected_fs_input_entries() {
   /mnt/data/input/"${PREFIX}"/deep/dir_2/dir_b/in_file2.txt
   /mnt/data/input/"${PREFIX}"/deep/dir_2/in_file1.txt
   /mnt/data/input/"${PREFIX}"/deep/dir_2/in_file2.txt
+  /mnt/data/input/"${PREFIX}"/deep/dir_3/"dir with space"/in_file1.txt
+  /mnt/data/input/"${PREFIX}"/deep/dir_3/"dir with space"/in_file2.txt
+  /mnt/data/input/"${PREFIX}"/deep/dir_3/in_file1.txt
+  /mnt/data/input/"${PREFIX}"/deep/dir_3/in_file2.txt
   /mnt/data/input/"${PREFIX}"/deep/in_file1.txt
   /mnt/data/input/"${PREFIX}"/deep/in_file2.txt
   /mnt/data/input/"${PREFIX}"/shallow/in_file1.txt
@@ -104,6 +117,10 @@ function setup_expected_fs_output_entries() {
   /mnt/data/output/"${PREFIX}"/deep/dir_2/dir_b/file2.txt
   /mnt/data/output/"${PREFIX}"/deep/dir_2/file1.txt
   /mnt/data/output/"${PREFIX}"/deep/dir_2/file2.txt
+  /mnt/data/output/"${PREFIX}"/deep/dir_3/"dir with space"/file1.txt
+  /mnt/data/output/"${PREFIX}"/deep/dir_3/"dir with space"/file2.txt
+  /mnt/data/output/"${PREFIX}"/deep/dir_3/file1.txt
+  /mnt/data/output/"${PREFIX}"/deep/dir_3/file2.txt
   /mnt/data/output/"${PREFIX}"/deep/file1.txt
   /mnt/data/output/"${PREFIX}"/deep/file2.txt
   /mnt/data/output/"${PREFIX}"/shallow/dir_1/dir_a/file1.txt
@@ -118,6 +135,10 @@ function setup_expected_fs_output_entries() {
   /mnt/data/output/"${PREFIX}"/shallow/dir_2/dir_b/file2.txt
   /mnt/data/output/"${PREFIX}"/shallow/dir_2/file1.txt
   /mnt/data/output/"${PREFIX}"/shallow/dir_2/file2.txt
+  /mnt/data/output/"${PREFIX}"/shallow/dir_3/"dir with space"/file1.txt
+  /mnt/data/output/"${PREFIX}"/shallow/dir_3/"dir with space"/file2.txt
+  /mnt/data/output/"${PREFIX}"/shallow/dir_3/file1.txt
+  /mnt/data/output/"${PREFIX}"/shallow/dir_3/file2.txt
   /mnt/data/output/"${PREFIX}"/shallow/file1.txt
   /mnt/data/output/"${PREFIX}"/shallow/file2.txt
   )
@@ -146,6 +167,12 @@ function setup_expected_remote_output_entries() {
   "${PREFIX}"/deep/dir_2/dir_b/file2.txt
   "${PREFIX}"/deep/dir_2/file1.txt
   "${PREFIX}"/deep/dir_2/file2.txt
+  "${PREFIX}"/deep/dir_3
+  "${PREFIX}"/deep/dir_3/"dir with space"
+  "${PREFIX}"/deep/dir_3/"dir with space"/file1.txt
+  "${PREFIX}"/deep/dir_3/"dir with space"/file2.txt
+  "${PREFIX}"/deep/dir_3/file1.txt
+  "${PREFIX}"/deep/dir_3/file2.txt
   "${PREFIX}"/deep/file1.txt
   "${PREFIX}"/deep/file2.txt
   "${PREFIX}"/shallow

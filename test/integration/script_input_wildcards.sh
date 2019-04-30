@@ -62,8 +62,10 @@ readonly INPUT_FILES_PATTERN="$(basename "${INPUT_WITH_SPACE}")"
 # shellcheck disable=SC2086
 declare INPUT_FILE_LIST="$(ls -1 "${INPUT_FILES_PATH}"/${INPUT_FILES_PATTERN})"
 # shellcheck enable=SC2086
-IFS=$'\n' INPUT_FILE_LIST=(${INPUT_FILE_LIST})
-readonly INPUT_FILE_LIST
+OLDIFS="${IFS}"
+IFS=$'\n'
+readonly INPUT_FILE_LIST=(${INPUT_FILE_LIST})
+IFS="${OLDIFS}"
 
 for FILE in "${INPUT_FILE_LIST[@]}"; do
   FILE_PATH="$(dirname "${FILE}")"

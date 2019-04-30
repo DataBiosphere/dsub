@@ -827,7 +827,13 @@ def _dominant_task_for_jobs(tasks):
 
   ret = []
   for job_id in per_job.keys():
-    tasks_in_salience_order = sorted(per_job[job_id], key=_importance_of_task)
+    try:
+      tasks_in_salience_order = sorted(per_job[job_id], key=_importance_of_task)
+    except TypeError as ex:
+      print(ex)
+      print(per_job)
+      raise ex
+
     ret.append(tasks_in_salience_order[0])
   return ret
 
