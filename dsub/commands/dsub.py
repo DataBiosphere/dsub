@@ -827,13 +827,7 @@ def _dominant_task_for_jobs(tasks):
 
   ret = []
   for job_id in per_job.keys():
-    try:
-      tasks_in_salience_order = sorted(per_job[job_id], key=_importance_of_task)
-    except TypeError as ex:
-      print(ex)
-      print(per_job)
-      raise ex
-
+    tasks_in_salience_order = sorted(per_job[job_id], key=_importance_of_task)
     ret.append(tasks_in_salience_order[0])
   return ret
 
@@ -860,8 +854,10 @@ def _importance_of_task(task):
   # 2- The first RUNNING task, or if none
   # 3- The first SUCCESS task.
   importance = {'FAILURE': 0, 'CANCELED': 0, 'RUNNING': 1, 'SUCCESS': 2}
-  return (importance[task.get_field('task-status')], task.get_field(
-      'end-time', datetime.datetime.max))
+  return (importance[task.get_field('task-status')],
+          task.get_field(
+              'end-time',
+              dsub_util.replace_timezone(datetime.datetime.max, tzlocal())))
 
 
 def _wait_for_any_job(provider, job_ids, poll_interval):
