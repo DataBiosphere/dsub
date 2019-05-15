@@ -778,7 +778,7 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
       print('  {} (attempt {}) failed. Retrying.'.format(
           identifier, task_fail_count[task_id]))
       msg = task_dict[task_id].get_field('status-message')
-      print('  Failure message: {}'.format(msg))
+      print('  Failure message: ' + msg)
 
       _retry_task(provider, job_descriptor, task_id,
                   task_fail_count[task_id] + 1)

@@ -1359,7 +1359,7 @@ class GoogleOperation(base.Task):
     elif field == 'status-detail':
       msg, action = self._operation_status_message()
       if action:
-        value = '{}:\n{}'.format(action.get('name'), msg)
+        value = action.get('name') + ':\n' + msg
       else:
         value = msg
     elif field == 'last-update':
