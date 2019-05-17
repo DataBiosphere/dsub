@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -953,7 +954,11 @@ def call(argv):
   return dsub_main('%s.call' % __name__, argv)
 
 
-def main(prog=sys.argv[0], argv=sys.argv[1:]):
+def main(prog=None, argv=None):
+  if prog is None and argv is None:
+    prog = sys.argv[0]
+    argv = sys.argv[1:]
+
   try:
     dsub_main(prog, argv)
   except dsub_errors.PredecessorJobFailureError as e:

@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2018 Verily Life Sciences Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,6 +39,7 @@ from ..lib import dsub_util
 from ..lib import job_model
 from ..lib import param_util
 from ..lib import providers_util
+from six.moves import zip
 
 _PROVIDER_NAME = 'google-v2'
 
@@ -400,7 +402,7 @@ class GoogleV2EventMap(object):
 
       events[name] = mapped
 
-    return sorted(events.values(), key=operator.itemgetter('start-time'))
+    return sorted(list(events.values()), key=operator.itemgetter('start-time'))
 
   def _map(self, event):
     """Extract elements from an operation event and map to a named event."""

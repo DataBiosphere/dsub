@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -197,7 +198,7 @@ class YamlOutput(OutputFormatter):
       return dumper.represent_scalar('tag:yaml.org,2002:str', data)
 
   def dict_representer(self, dumper, data):
-    return dumper.represent_dict(data.items())
+    return dumper.represent_dict(list(data.items()))
 
   def print_table(self, table):
     print(yaml.dump(table, default_flow_style=False))

@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2018 Verily Life Sciences Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,6 +36,7 @@ from ..lib import job_model
 import oauth2client.client
 import pytz
 import retrying
+from six.moves import range
 
 # The google v1 provider directly added the bigquery scope, but the v1alpha2
 # API automatically added:
