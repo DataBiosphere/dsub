@@ -192,6 +192,11 @@ _LOG_CP_CMD = textwrap.dedent("""\
 """)
 
 _LOGGING_CMD = textwrap.dedent("""\
+  set -o errexit
+  set -o nounset
+  set -o pipefail
+
+  {log_msg_fn}
   {log_cp_fn}
   {log_cp_cmd}
 """)
@@ -200,6 +205,7 @@ _LOGGING_CMD = textwrap.dedent("""\
 _CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
   set -o errexit
   set -o nounset
+  set -o pipefail
 
   {log_msg_fn}
   {log_cp_fn}
@@ -301,6 +307,7 @@ _PREPARE_CMD = textwrap.dedent("""\
 
   set -o errexit
   set -o nounset
+  set -o pipefail
 
   {log_msg_fn}
   {mk_runtime_dirs}
@@ -694,6 +701,7 @@ class GoogleV2JobProvider(base.JobProvider):
 
     # Set up the commands and environment for the logging actions
     logging_cmd = _LOGGING_CMD.format(
+        log_msg_fn=_LOG_MSG_FN,
         log_cp_fn=_GSUTIL_CP_FN,
         log_cp_cmd=_LOG_CP_CMD.format(
             user_action=user_action, logging_action='logging_action'))
