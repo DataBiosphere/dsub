@@ -48,6 +48,11 @@ The Docker container will receive the environment variable:
 INPUT_FILE=/mnt/data/input/gs/bucket/path/file.bam
 ```
 
+Multiple `--input` parameters can be specified and they can be specified in any
+order. Since it will be used as an environment variable, the name of the input
+parameter must comply with the
+[Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_235).
+
 ### 2. Copy a file pattern from Cloud Storage.
 
 To copy a set of files from Cloud Storage, specify the full URL pattern on
@@ -124,6 +129,11 @@ for INPUT_FILE in "${INPUT_FILE_LIST[@]}"; do
 done
 ```
 
+Multiple `--input` parameters can be specified and they can be specified in any
+order. Since it will be used as an environment variable, the name of the input
+parameter must comply with the
+[Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_235).
+
 ### 3. Copy a directory recursively from Cloud Storage.
 
 To recursively copy a directory from Cloud Storage, use the
@@ -141,6 +151,11 @@ The Docker container will receive the environment variable:
 ```
 INPUT_PATH=/mnt/data/input/gs/bucket/path
 ```
+
+Multiple `--input-recursive` parameters can be specified and they can be
+specified in any order. Since it will be used as an environment variable,
+the name of the input parameter must comply with the
+[Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_235).
 
 ## Output
 
@@ -163,6 +178,11 @@ The Docker container will receive the environment variable:
 ```
 OUTPUT_FILE=/mnt/data/output/gs/bucket/path/file.bam
 ```
+
+Multiple `--output` parameters can be specified and they can be specified in any
+order. Since it will be used as an environment variable, the name of the input
+parameter must comply with the
+[Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_235).
 
 ### 2. Copy a file pattern to Cloud Storage.
 
@@ -203,6 +223,11 @@ OUTPUT_FILE_PATTERN="$(basename "${OUTPUT_FILES}")"
 OUTPUT_EXTENSION="${OUTPUT_FILE_PATTERN##*.}"
 ```
 
+Multiple `--output` parameters can be specified and they can be specified in any
+order. Since it will be used as an environment variable, the name of the input
+parameter must comply with the
+[Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_235).
+
 ### 3. Copy a directory recursively to Cloud Storage.
 
 To recursively copy a directory of output to Cloud Storage, use the
@@ -223,6 +248,11 @@ The Docker container will receive the environment variable:
 ```
 OUTPUT_PATH=/mnt/data/output/gs/bucket/path
 ```
+
+Multiple `--output-recursive` parameters can be specified and they can be
+specified in any order. Since it will be used as an environment variable,
+the name of the input parameter must comply with the
+[Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_235).
 
 ## Notice
 
