@@ -499,6 +499,11 @@ def _parse_arguments(prog, argv):
       help="""
           The disk type to use for the data disk. Valid values are pd-standard
           pd-ssd and local-ssd. The default value is pd-standard.""")
+  google_v2.add_argument(
+      '--enable-stackdriver-monitoring',
+      default=False,
+      action='store_true',
+      help='If set to true, enables Stackdriver monitoring on the VM.')
 
   args = provider_base.parse_args(
       parser, {
@@ -555,7 +560,8 @@ def _get_job_resources(args):
       nvidia_driver_version=args.nvidia_driver_version,
       timeout=timeout,
       log_interval=log_interval,
-      ssh=args.ssh)
+      ssh=args.ssh,
+      enable_stackdriver_monitoring=args.enable_stackdriver_monitoring)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids,

@@ -862,7 +862,9 @@ class GoogleV2JobProvider(base.JobProvider):
             accelerators=accelerators,
             nvidia_driver_version=job_resources.nvidia_driver_version,
             labels=labels,
-            cpu_platform=job_resources.cpu_platform),
+            cpu_platform=job_resources.cpu_platform,
+            enable_stackdriver_monitoring=job_resources
+            .enable_stackdriver_monitoring),
     )
 
     # Build the pipeline request
@@ -1112,7 +1114,7 @@ class GoogleV2JobProvider(base.JobProvider):
     Raises:
       ValueError: if both a job id list and a job name list are provided
 
-    Yeilds:
+    Yields:
       Genomics API Operations objects.
     """
 
@@ -1409,6 +1411,8 @@ class GoogleOperation(base.Task):
                                               {}).get('usePrivateAddress')
         value['cpu_platform'] = vm.get('cpuPlatform')
         value['accelerators'] = vm.get('accelerators')
+        value['enable-stackdriver-monitoring'] = vm.get(
+            'enableStackdriverMonitoring')
         value['service-account'] = vm.get('serviceAccount', {}).get('email')
         if 'disks' in vm:
           datadisk = next(

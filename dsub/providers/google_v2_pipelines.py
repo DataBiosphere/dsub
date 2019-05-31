@@ -56,7 +56,8 @@ def build_machine(network=None,
                   accelerators=None,
                   labels=None,
                   cpu_platform=None,
-                  nvidia_driver_version=None):
+                  nvidia_driver_version=None,
+                  enable_stackdriver_monitoring=None):
   """Build a VirtualMachine object for a Pipeline request.
 
   Args:
@@ -71,6 +72,8 @@ def build_machine(network=None,
     cpu_platform (str): The CPU platform to request.
     nvidia_driver_version (str): The NVIDIA driver version to use when attaching
       an NVIDIA GPU accelerator.
+    enable_stackdriver_monitoring (bool): Enable stackdriver monitoring
+      on the VM.
 
   Returns:
     An object representing a VirtualMachine.
@@ -86,6 +89,7 @@ def build_machine(network=None,
       'labels': labels,
       'cpuPlatform': cpu_platform,
       'nvidiaDriverVersion': nvidia_driver_version,
+      'enableStackdriverMonitoring': enable_stackdriver_monitoring,
   }
 
 
