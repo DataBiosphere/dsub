@@ -577,7 +577,8 @@ def dstat_job_producer(provider,
         create_time_min=create_time_min,
         create_time_max=create_time_max,
         max_tasks=max_tasks,
-        page_size=max_tasks)
+        page_size=max_tasks,
+        verbose=(poll_interval == 0))
 
     some_job_running = False
 

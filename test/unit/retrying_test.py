@@ -49,9 +49,10 @@ class ResponseMock(object):
 
 class TestRetrying(unittest.TestCase):
 
-  def test_success(self):
+  @parameterized.parameterized.expand([(True,), (False,)])
+  def test_success(self, verbose):
     exception_list = []
-    api_wrapper_to_test = google_base.Api()
+    api_wrapper_to_test = google_base.Api(verbose)
     mock_api_object = GoogleApiMock(exception_list)
     start = current_time_ms()
     api_wrapper_to_test.execute(mock_api_object)
@@ -60,15 +61,18 @@ class TestRetrying(unittest.TestCase):
     self.assertLess(current_time_ms() - start, 500)
 
   @parameterized.parameterized.expand(
-      [(error_code,)
+      [(True, error_code)
+       for error_code in list(google_base.TRANSIENT_HTTP_ERROR_CODES) +
+       list(google_base.HTTP_AUTH_ERROR_CODES)] +
+      [(False, error_code)
        for error_code in list(google_base.TRANSIENT_HTTP_ERROR_CODES) +
        list(google_base.HTTP_AUTH_ERROR_CODES)])
-  def test_retry_once(self, error_code):
+  def test_retry_once(self, verbose, error_code):
     exception_list = [
         apiclient.errors.HttpError(
             ResponseMock(error_code, None), b'test_exception'),
     ]
-    api_wrapper_to_test = google_base.Api()
+    api_wrapper_to_test = google_base.Api(verbose)
     mock_api_object = GoogleApiMock(exception_list)
     start = current_time_ms()
     api_wrapper_to_test.execute(mock_api_object)
@@ -77,7 +81,8 @@ class TestRetrying(unittest.TestCase):
     self.assertGreaterEqual(current_time_ms() - start, 1000)
     self.assertLess(current_time_ms() - start, 1500)
 
-  def test_auth_failure(self):
+  @parameterized.parameterized.expand([(True,), (False,)])
+  def test_auth_failure(self, verbose):
     exception_list = [
         apiclient.errors.HttpError(ResponseMock(403, None), b'test_exception'),
         apiclient.errors.HttpError(ResponseMock(401, None), b'test_exception'),
@@ -85,7 +90,7 @@ class TestRetrying(unittest.TestCase):
         apiclient.errors.HttpError(ResponseMock(401, None), b'test_exception'),
         apiclient.errors.HttpError(ResponseMock(403, None), b'test_exception'),
     ]
-    api_wrapper_to_test = google_base.Api()
+    api_wrapper_to_test = google_base.Api(verbose)
     mock_api_object = GoogleApiMock(exception_list)
     # We don't want to retry auth errors as aggressively, so we expect
     # this exception to be raised after 4 retries,
@@ -96,12 +101,13 @@ class TestRetrying(unittest.TestCase):
     self.assertGreaterEqual(current_time_ms() - start, 15000)
     self.assertLess(current_time_ms() - start, 15500)
 
-  def test_transient_retries(self):
+  @parameterized.parameterized.expand([(True,), (False,)])
+  def test_transient_retries(self, verbose):
     exception_list = [
         apiclient.errors.HttpError(ResponseMock(500, None), b'test_exception'),
         apiclient.errors.HttpError(ResponseMock(503, None), b'test_exception'),
     ]
-    api_wrapper_to_test = google_base.Api()
+    api_wrapper_to_test = google_base.Api(verbose)
     mock_api_object = GoogleApiMock(exception_list)
     start = current_time_ms()
     api_wrapper_to_test.execute(mock_api_object)

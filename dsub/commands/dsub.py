@@ -679,7 +679,9 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
     jobs_completed = job_ids_to_check.difference(jobs_left)
 
     # Get all tasks for the newly completed jobs
-    tasks_completed = provider.lookup_job_tasks({'*'}, job_ids=jobs_completed)
+    tasks_completed = provider.lookup_job_tasks({'*'},
+                                                job_ids=jobs_completed,
+                                                verbose=False)
 
     # We don't want to overwhelm the user with output when there are many
     # tasks per job. So we get a single "dominant" task for each of the
@@ -730,7 +732,7 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
   """
 
   while True:
-    tasks = provider.lookup_job_tasks({'*'}, job_ids=[job_id])
+    tasks = provider.lookup_job_tasks({'*'}, job_ids=[job_id], verbose=False)
 
     running_tasks = set()
     completed_tasks = set()
@@ -885,7 +887,7 @@ def _wait_for_any_job(provider, job_ids, poll_interval):
   if not job_ids:
     return
   while True:
-    tasks = provider.lookup_job_tasks({'*'}, job_ids=job_ids)
+    tasks = provider.lookup_job_tasks({'*'}, job_ids=job_ids, verbose=False)
     running_jobs = set()
     failed_jobs = set()
     for t in tasks:
