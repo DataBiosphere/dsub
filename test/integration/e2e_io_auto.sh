@@ -74,18 +74,18 @@ readonly FIND=$(echo "${RESULT}" | sed -n '/^BEGIN: find$/,/^END: find$/p')
 
 for REC in "${EXPECTED_IO_VARS[@]}"; do
   if ! echo "${ENV}" | grep --quiet --fixed-strings "${REC}"; then
-    2>&1 echo "Output does not match expected"
-    2>&1 echo "Did not find ${REC} in:"
-    2>&1 echo "${ENV}"
+    1>&2 echo "Output does not match expected"
+    1>&2 echo "Did not find ${REC} in:"
+    1>&2 echo "${ENV}"
     exit 1
   fi
 done
 
 for REC in "${EXPECTED_FS_INPUT_ENTRIES[@]}" "${EXPECTED_FS_OUTPUT_ENTRIES[@]}"; do
   if ! echo "${FIND}" | grep --quiet --fixed-strings "${REC}"; then
-    2>&1 echo "Output does not match expected"
-    2>&1 echo "Did not find ${REC} in:"
-    2>&1 echo "${FIND}"
+    1>&2 echo "Output does not match expected"
+    1>&2 echo "Did not find ${REC} in:"
+    1>&2 echo "${FIND}"
     exit 1
   fi
 done

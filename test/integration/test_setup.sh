@@ -45,7 +45,7 @@ if [[ -z "${DSUB_PROVIDER:-}" ]]; then
   readonly DSUB_PROVIDER="${SCRIPT_DEFAULT_PROVIDER:-local}"
 elif [[ -n "${SCRIPT_DEFAULT_PROVIDER}" ]]; then
   if [[ "${DSUB_PROVIDER:-}" != "${SCRIPT_DEFAULT_PROVIDER}" ]]; then
-    2>&1 echo "DSUB_PROVIDER is '${DSUB_PROVIDER:-}' not '${SCRIPT_DEFAULT_PROVIDER}'"
+    1>&2 echo "DSUB_PROVIDER is '${DSUB_PROVIDER:-}' not '${SCRIPT_DEFAULT_PROVIDER}'"
     exit 1
   fi
 fi

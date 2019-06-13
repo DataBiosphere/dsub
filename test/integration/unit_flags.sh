@@ -48,7 +48,7 @@ function test_missing_command_and_script() {
 
   if call_dsub; then
 
-    2>&1 echo "Neither command nor script specified - not detected"
+    1>&2 echo "Neither command nor script specified - not detected"
 
     test_failed "${subtest}"
   else
@@ -70,7 +70,7 @@ function test_having_command_and_script() {
     'echo "Hello World"' \
     "dummy.sh"; then
 
-    2>&1 echo "Command and script specified - not detected"
+    1>&2 echo "Command and script specified - not detected"
 
     test_failed "${subtest}"
   else

@@ -59,7 +59,7 @@ function test_input_bad_wildcard() {
     gs://bucket/*/file.bam \
     gs://bucket/path/*; then
 
-    2>&1 echo "Wildcard error on input not detected"
+    1>&2 echo "Wildcard error on input not detected"
 
     test_failed "${subtest}"
   else
@@ -81,7 +81,7 @@ function test_input_bad_recursive_wildcard() {
     gs://bucket/path/file**.bam \
     gs://bucket/path/*; then
 
-    2>&1 echo "Recursive wildcard error on input not detected"
+    1>&2 echo "Recursive wildcard error on input not detected"
 
     test_failed "${subtest}"
   else
@@ -103,7 +103,7 @@ function test_output_bad_path() {
     gs://bucket/path/file.bam \
     gs://bucket/path/; then
 
-    2>&1 echo "Output path error not detected"
+    1>&2 echo "Output path error not detected"
 
     test_failed "${subtest}"
   else

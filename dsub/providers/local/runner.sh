@@ -109,7 +109,7 @@ function write_status() {
     RUNNING)
       ;;
     *)
-      echo 2>&1 "Unexpected status: ${status}"
+      echo 1>&2 "Unexpected status: ${status}"
       exit 1
       ;;
   esac

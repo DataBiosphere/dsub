@@ -45,7 +45,7 @@ function test_task_max() {
 
   if call_dsub \
     --tasks "${TSV_FILE}" "-3"; then
-    2>&1 echo "Invalid tasks lines range specified, but not detected"
+    1>&2 echo "Invalid tasks lines range specified, but not detected"
 
     test_failed "${subtest}"
   else
@@ -66,7 +66,7 @@ function test_duplicate_label() {
     --tasks "${TSV_FILE}" \
     --label "my-label=banana"; then
 
-    2>&1 echo "Duplicate label specified, but not detected"
+    1>&2 echo "Duplicate label specified, but not detected"
 
     test_failed "${subtest}"
   else
@@ -87,7 +87,7 @@ function test_duplicate_env() {
     --tasks "${TSV_FILE}" \
     --env "MY_ENV=value"; then
 
-    2>&1 echo "Duplicate env specified, but not detected"
+    1>&2 echo "Duplicate env specified, but not detected"
 
     test_failed "${subtest}"
   else
@@ -108,7 +108,7 @@ function test_duplicate_input() {
     --tasks "${TSV_FILE}" \
     --input "INPUT_PATH=value"; then
 
-    2>&1 echo "Duplicate input specified, but not detected"
+    1>&2 echo "Duplicate input specified, but not detected"
 
     test_failed "${subtest}"
   else
@@ -129,7 +129,7 @@ function test_duplicate_output() {
     --tasks "${TSV_FILE}" \
     --output "OUTPUT_PATH=value"; then
 
-    2>&1 echo "Duplicate output specified, but not detected"
+    1>&2 echo "Duplicate output specified, but not detected"
 
     test_failed "${subtest}"
   else
@@ -150,7 +150,7 @@ function test_duplicate_env_and_input() {
     --tasks "${TSV_FILE}" \
     --env "INPUT_PATH=value"; then
 
-    2>&1 echo "Duplicate output specified, but not detected"
+    1>&2 echo "Duplicate output specified, but not detected"
 
     test_failed "${subtest}"
   else

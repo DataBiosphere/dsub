@@ -109,7 +109,7 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
       fi
     done
 
-    2>&1 log_error "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
+    log_error "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
     exit 1
   }
 
@@ -155,7 +155,7 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
       fi
     done
 
-    2>&1 log_error "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
+    log_error "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
     exit 1
   }
 """)

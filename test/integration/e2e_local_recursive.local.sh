@@ -83,7 +83,7 @@ readonly LOCAL_LOG_PREFIX="${LOCAL_LOGGING%.*}"
 for SUFFIX in "-stdout.log" "-stderr.log" ".log"; do
   LOG_FILE="${LOCAL_LOG_PREFIX}${SUFFIX}"
   if [[ ! -e "${LOG_FILE}" ]]; then
-    2>&1 echo "Expected log file does not exist: ${LOG_FILE}"
+    1>&2 echo "Expected log file does not exist: ${LOG_FILE}"
     exit 1
   fi
 done
@@ -104,17 +104,17 @@ readonly FS_FIND_IN=$(echo "${RESULT}" | sed -n '/^BEGIN: find$/,/^END: find$/p'
 
 for REC in "${EXPECTED_FS_INPUT_ENTRIES[@]}"; do
   if ! echo "${FS_FIND_IN}" | grep --quiet --fixed-strings "${REC}"; then
-    2>&1 echo "Input does not match expected"
-    2>&1 echo "Did not find ${REC} in:"
-    2>&1 echo "${FS_FIND_IN}"
+    1>&2 echo "Input does not match expected"
+    1>&2 echo "Did not find ${REC} in:"
+    1>&2 echo "${FS_FIND_IN}"
     exit 1
   fi
 done
 
 readonly FS_REC_IN_COUNT=$(echo "${FS_FIND_IN}" | wc -l)
 if [[ "${FS_REC_IN_COUNT}" -ne "${#EXPECTED_FS_INPUT_ENTRIES[@]}" ]]; then
-  2>&1 echo "Number of records in /mnt/data/input does not match expected"
-  2>&1 echo "${FS_REC_IN_COUNT} != ${#EXPECTED_FS_INPUT_ENTRIES[@]}"
+  1>&2 echo "Number of records in /mnt/data/input does not match expected"
+  1>&2 echo "${FS_REC_IN_COUNT} != ${#EXPECTED_FS_INPUT_ENTRIES[@]}"
   exit 1
 fi
 
@@ -127,17 +127,17 @@ readonly FS_FIND_OUT=$(echo "${RESULT}" | sed -n '/^BEGIN: find$/,/^END: find$/p
 
 for REC in "${EXPECTED_FS_OUTPUT_ENTRIES[@]}"; do
   if ! echo "${FS_FIND_OUT}" | grep --quiet --fixed-strings "${REC}"; then
-    2>&1 echo "Output does not match expected"
-    2>&1 echo "Did not find ${REC} in:"
-    2>&1 echo "${FS_FIND_OUT}"
+    1>&2 echo "Output does not match expected"
+    1>&2 echo "Did not find ${REC} in:"
+    1>&2 echo "${FS_FIND_OUT}"
     exit 1
   fi
 done
 
 readonly FS_REC_OUT_COUNT=$(echo "${FS_FIND_OUT}" | wc -l)
 if [[ "${FS_REC_OUT_COUNT}" -ne "${#EXPECTED_FS_OUTPUT_ENTRIES[@]}" ]]; then
-  2>&1 echo "Number of records in /mnt/data/output does not match expected"
-  2>&1 echo "${FS_REC_OUT_COUNT} != ${#EXPECTED_FS_OUTPUT_ENTRIES[@]}"
+  1>&2 echo "Number of records in /mnt/data/output does not match expected"
+  1>&2 echo "${FS_REC_OUT_COUNT} != ${#EXPECTED_FS_OUTPUT_ENTRIES[@]}"
   exit 1
 fi
 
@@ -150,17 +150,17 @@ readonly LOCAL_FIND="$(find "${LOCAL_OUTPUTS}" | grep -v '^ *$')"
 
 for REC in "${EXPECTED_REMOTE_OUTPUT_ENTRIES[@]}"; do
   if ! echo "${LOCAL_FIND}" | grep --quiet --fixed-strings "${REC}"; then
-    2>&1 echo "Output does not match expected"
-    2>&1 echo "Did not find ${REC} in:"
-    2>&1 echo "${LOCAL_FIND}"
+    1>&2 echo "Output does not match expected"
+    1>&2 echo "Did not find ${REC} in:"
+    1>&2 echo "${LOCAL_FIND}"
     exit 1
   fi
 done
 
 GCS_REC_COUNT=$(echo "${LOCAL_FIND}" | wc -l)
 if [[ "${GCS_REC_COUNT}" -ne "${#EXPECTED_REMOTE_OUTPUT_ENTRIES[@]}" ]]; then
-  2>&1 echo "Number of records in ${OUTPUTS} does not match expected"
-  2>&1 echo "${GCS_REC_COUNT} != ${#EXPECTED_REMOTE_OUTPUT_ENTRIES[@]}"
+  1>&2 echo "Number of records in ${OUTPUTS} does not match expected"
+  1>&2 echo "${GCS_REC_COUNT} != ${#EXPECTED_REMOTE_OUTPUT_ENTRIES[@]}"
   exit 1
 fi
 

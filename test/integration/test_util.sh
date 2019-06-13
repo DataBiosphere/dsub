@@ -233,8 +233,8 @@ function util::dstat_yaml_assert_field_equal() {
 
   actual=$(util::dstat_yaml_output_value "${dstat_out}" "${field}")
   if [[ "${actual}" != "${expected}" ]]; then
-    2>&1 echo "Assert: actual value for ${field}, ${actual}, does not match expected: ${expected}"
-    2>&1 echo "${dstat_out}"
+    1>&2 echo "Assert: actual value for ${field}, ${actual}, does not match expected: ${expected}"
+    1>&2 echo "${dstat_out}"
     exit 1
   fi
 }

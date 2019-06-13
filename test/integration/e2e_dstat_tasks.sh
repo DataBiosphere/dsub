@@ -81,8 +81,8 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   readonly TASKS_LAUNCH_COUNT="$(echo "${TASKS_STATUS}" | wc -l)"
 
   if [[ "${TASKS_LAUNCH_COUNT}" -ne "${EXPECTED_TASKS_COUNT}" ]]; then
-    2>&1 echo "Unexpected count of launched tasks: ${TASKS_LAUNCH_COUNT}"
-    2>&1 echo "Expected count of launched tasks: ${EXPECTED_TASKS_COUNT}"
+    1>&2 echo "Unexpected count of launched tasks: ${TASKS_LAUNCH_COUNT}"
+    1>&2 echo "Expected count of launched tasks: ${EXPECTED_TASKS_COUNT}"
     exit 1
   fi
 

@@ -337,7 +337,7 @@ function test_with_machine_type() {
     --zones 'us-*' \
     --machine-type "n1-standard-1"; then
 
-    2>&1 echo "machine-type set with google provider - not detected"
+    1>&2 echo "machine-type set with google provider - not detected"
 
     test_failed "${subtest}"
   else
