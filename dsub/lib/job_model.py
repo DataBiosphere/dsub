@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -409,7 +410,7 @@ class Resources(
         'regions', 'zones', 'service_account', 'scopes', 'keep_alive',
         'cpu_platform', 'network', 'subnetwork', 'use_private_address',
         'accelerator_type', 'accelerator_count', 'nvidia_driver_version',
-        'timeout', 'log_interval', 'ssh'
+        'timeout', 'log_interval', 'ssh', 'enable_stackdriver_monitoring'
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -442,6 +443,8 @@ class Resources(
     timeout (string): The max amount of time to give the pipeline to complete.
     log_interval (string): The amount of time to sleep between log uploads.
     ssh (bool): Start an SSH container in the background.
+    enable_stackdriver_monitoring (bool): Enable stackdriver monitoring
+      on the VM.
   """
   __slots__ = ()
 
@@ -470,7 +473,8 @@ class Resources(
               nvidia_driver_version=None,
               timeout=None,
               log_interval=None,
-              ssh=None):
+              ssh=None,
+              enable_stackdriver_monitoring=None):
     return super(Resources,
                  cls).__new__(cls, min_cores, min_ram, machine_type, disk_size,
                               disk_type, boot_disk_size, preemptible, image,
@@ -478,7 +482,8 @@ class Resources(
                               service_account, scopes, keep_alive, cpu_platform,
                               network, subnetwork, use_private_address,
                               accelerator_type, accelerator_count,
-                              nvidia_driver_version, timeout, log_interval, ssh)
+                              nvidia_driver_version, timeout, log_interval, ssh,
+                              enable_stackdriver_monitoring)
 
 
 def ensure_job_params_are_complete(job_params):

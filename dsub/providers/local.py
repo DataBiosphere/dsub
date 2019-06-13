@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -481,8 +482,9 @@ class LocalJobProvider(base.JobProvider):
       create_time_min=None,
       create_time_max=None,
       max_tasks=0,
-      # page_size is ignored for the LocalJobProvider
-      page_size=0):
+      # page_size and verbose are ignored for the LocalJobProvider
+      page_size=0,
+      verbose=True):
 
     # 'OR' filtering arguments.
     statuses = None if statuses == {'*'} else statuses

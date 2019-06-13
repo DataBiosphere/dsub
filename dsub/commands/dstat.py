@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -197,7 +198,7 @@ class YamlOutput(OutputFormatter):
       return dumper.represent_scalar('tag:yaml.org,2002:str', data)
 
   def dict_representer(self, dumper, data):
-    return dumper.represent_dict(data.items())
+    return dumper.represent_dict(list(data.items()))
 
   def print_table(self, table):
     print(yaml.dump(table, default_flow_style=False))
@@ -576,7 +577,8 @@ def dstat_job_producer(provider,
         create_time_min=create_time_min,
         create_time_max=create_time_max,
         max_tasks=max_tasks,
-        page_size=max_tasks)
+        page_size=max_tasks,
+        verbose=(poll_interval == 0))
 
     some_job_running = False
 

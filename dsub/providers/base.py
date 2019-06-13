@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -147,7 +148,8 @@ class JobProvider(object):
                        create_time_min=None,
                        create_time_max=None,
                        max_tasks=0,
-                       page_size=0):
+                       page_size=0,
+                       verbose=True):
     """Return a list of tasks based on the search criteria.
 
     If any of the filters are empty or {'*'}, then no filtering is performed on
@@ -171,6 +173,7 @@ class JobProvider(object):
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
       page_size: the page size to use for each query to the backend. May be
                  ignored by provider implementations.
+      verbose: if set to true, will output retrying error messages
 
     Returns:
       A list of Task objects.

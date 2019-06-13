@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,8 +33,8 @@ class PriorityIterEntry(object):
     # compared in alphabetical order and the first non-equal value is used
     # for comparison.
     if self.priority == other.priority:
-      localkeys = self.next_value.keys()
-      otherkeys = other.next_value.keys()
+      localkeys = list(self.next_value.keys())
+      otherkeys = list(other.next_value.keys())
       shared_keys = sorted(set(localkeys).intersection(otherkeys))
       for key in shared_keys:
         if self.next_value[key] != other.next_value[key]:
@@ -71,7 +72,7 @@ class SortedGeneratorIterator(collections.Iterator):
     return entry.next_value
 
   def __next__(self):
-    return self.next()
+    return next(self)
 
   def add_generator(self, generator):
     try:

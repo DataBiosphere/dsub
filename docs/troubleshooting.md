@@ -102,9 +102,9 @@ a9<tab>august-2017<tab>sam001<tab>...
 h25<tab>august-2017<tab>sam002<tab>...
 ```
 
-#### Lookup by labels with `dstat`
+#### Looking up by labels with `dstat`
 
-To lookup jobs by label with `dstat`, specify one or more `--label` flags
+To look up jobs by label with `dstat`, specify one or more `--label` flags
 on the command line. Lookups match *all* labels specified (a logical `AND`).
 
 For example, looking up all tasks from the above `--tasks` example:

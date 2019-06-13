@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -81,7 +82,8 @@ class StubJobProvider(base.JobProvider):
                        labels=None,
                        create_time_min=None,
                        create_time_max=None,
-                       max_tasks=0):
+                       max_tasks=0,
+                       verbose=True):
     """Return a list of operations. See base.py for additional detail."""
     statuses = None if statuses == {'*'} else statuses
     user_ids = None if user_ids == {'*'} else user_ids

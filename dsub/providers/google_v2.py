@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2018 Verily Life Sciences Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,6 +39,7 @@ from ..lib import dsub_util
 from ..lib import job_model
 from ..lib import param_util
 from ..lib import providers_util
+from six.moves import zip
 
 _PROVIDER_NAME = 'google-v2'
 
@@ -190,6 +192,11 @@ _LOG_CP_CMD = textwrap.dedent("""\
 """)
 
 _LOGGING_CMD = textwrap.dedent("""\
+  set -o errexit
+  set -o nounset
+  set -o pipefail
+
+  {log_msg_fn}
   {log_cp_fn}
   {log_cp_cmd}
 """)
@@ -198,6 +205,7 @@ _LOGGING_CMD = textwrap.dedent("""\
 _CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
   set -o errexit
   set -o nounset
+  set -o pipefail
 
   {log_msg_fn}
   {log_cp_fn}
@@ -299,6 +307,7 @@ _PREPARE_CMD = textwrap.dedent("""\
 
   set -o errexit
   set -o nounset
+  set -o pipefail
 
   {log_msg_fn}
   {mk_runtime_dirs}
@@ -400,7 +409,7 @@ class GoogleV2EventMap(object):
 
       events[name] = mapped
 
-    return sorted(events.values(), key=operator.itemgetter('start-time'))
+    return sorted(list(events.values()), key=operator.itemgetter('start-time'))
 
   def _map(self, event):
     """Extract elements from an operation event and map to a named event."""
@@ -692,6 +701,7 @@ class GoogleV2JobProvider(base.JobProvider):
 
     # Set up the commands and environment for the logging actions
     logging_cmd = _LOGGING_CMD.format(
+        log_msg_fn=_LOG_MSG_FN,
         log_cp_fn=_GSUTIL_CP_FN,
         log_cp_cmd=_LOG_CP_CMD.format(
             user_action=user_action, logging_action='logging_action'))
@@ -852,7 +862,9 @@ class GoogleV2JobProvider(base.JobProvider):
             accelerators=accelerators,
             nvidia_driver_version=job_resources.nvidia_driver_version,
             labels=labels,
-            cpu_platform=job_resources.cpu_platform),
+            cpu_platform=job_resources.cpu_platform,
+            enable_stackdriver_monitoring=job_resources
+            .enable_stackdriver_monitoring),
     )
 
     # Build the pipeline request
@@ -862,7 +874,8 @@ class GoogleV2JobProvider(base.JobProvider):
     return {'pipeline': pipeline, 'labels': labels}
 
   def _submit_pipeline(self, request):
-    operation = google_base.Api.execute(
+    google_base_api = google_base.Api(verbose=True)
+    operation = google_base_api.execute(
         self._service.pipelines().run(body=request))
     if self._verbose:
       print('Launched operation {}'.format(operation['name']))
@@ -1026,7 +1039,8 @@ class GoogleV2JobProvider(base.JobProvider):
     # Now and all of these arguments together.
     return ' AND '.join(or_arguments + and_arguments)
 
-  def _operations_list(self, ops_filter, max_tasks, page_size, page_token):
+  def _operations_list(self, ops_filter, max_tasks, page_size, page_token,
+                       verbose):
     """Gets the list of operations for the specified filter.
 
     Args:
@@ -1035,6 +1049,7 @@ class GoogleV2JobProvider(base.JobProvider):
       page_size: the number of operations to requested on each list operation to
         the pipelines API (if 0 or None, the API default is used)
       page_token: page token returned by a previous _operations_list call.
+      verbose: if set to true, will output retrying error messages.
 
     Returns:
       Operations matching the filter criteria.
@@ -1055,7 +1070,8 @@ class GoogleV2JobProvider(base.JobProvider):
         filter=ops_filter,
         pageToken=page_token,
         pageSize=page_size)
-    response = google_base.Api.execute(api)
+    google_base_api = google_base.Api(verbose)
+    response = google_base_api.execute(api)
 
     return [
         GoogleOperation(op)
@@ -1074,7 +1090,8 @@ class GoogleV2JobProvider(base.JobProvider):
                        create_time_min=None,
                        create_time_max=None,
                        max_tasks=0,
-                       page_size=0):
+                       page_size=0,
+                       verbose=True):
     """Yields operations based on the input criteria.
 
     If any of the filters are empty or {'*'}, then no filtering is performed on
@@ -1098,11 +1115,12 @@ class GoogleV2JobProvider(base.JobProvider):
                        create time of a task, inclusive.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
       page_size: the page size to use for each query to the pipelins API.
+      verbose: if set to true, will output retrying error messages.
 
     Raises:
       ValueError: if both a job id list and a job name list are provided
 
-    Yeilds:
+    Yields:
       Genomics API Operations objects.
     """
 
@@ -1121,7 +1139,7 @@ class GoogleV2JobProvider(base.JobProvider):
       if max_tasks:
         max_to_fetch = max_tasks - tasks_yielded
       ops, page_token = self._operations_list(ops_filter, max_to_fetch,
-                                              page_size, page_token)
+                                              page_size, page_token, verbose)
 
       for op in ops:
         yield op
@@ -1359,7 +1377,7 @@ class GoogleOperation(base.Task):
     elif field == 'status-detail':
       msg, action = self._operation_status_message()
       if action:
-        value = '{}:\n{}'.format(action.get('name'), msg)
+        value = action.get('name') + ':\n' + msg
       else:
         value = msg
     elif field == 'last-update':
@@ -1399,6 +1417,8 @@ class GoogleOperation(base.Task):
                                               {}).get('usePrivateAddress')
         value['cpu_platform'] = vm.get('cpuPlatform')
         value['accelerators'] = vm.get('accelerators')
+        value['enable-stackdriver-monitoring'] = vm.get(
+            'enableStackdriverMonitoring')
         value['service-account'] = vm.get('serviceAccount', {}).get('email')
         if 'disks' in vm:
           datadisk = next(

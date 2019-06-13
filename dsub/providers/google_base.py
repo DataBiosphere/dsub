@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2018 Verily Life Sciences Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,6 +36,7 @@ from ..lib import job_model
 import oauth2client.client
 import pytz
 import retrying
+from six.moves import range
 
 # The google v1 provider directly added the bigquery scope, but the v1alpha2
 # API automatically added:
@@ -466,45 +468,71 @@ def cancel(batch_fn, cancel_fn, ops):
   return canceled_ops, error_messages
 
 
-def retry_api_check(exception):
+def _print_retry_error(exception, verbose):
+  """Prints an error message if appropriate."""
+  if not verbose:
+    return
+
+  now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+  try:
+    status_code = exception.resp.status
+  except AttributeError:
+    status_code = ''
+
+  _print_error('{}: Caught exception {} {}'.format(now,
+                                                   type(exception).__name__,
+                                                   status_code))
+  _print_error('{}: This request is being retried'.format(now))
+
+
+def retry_api_check(exception, verbose):
   """Return True if we should retry. False otherwise.
 
   Args:
     exception: An exception to test for transience.
+    verbose: If true, output retry messages
 
   Returns:
     True if we should retry. False otherwise.
   """
   if isinstance(exception, apiclient.errors.HttpError):
     if exception.resp.status in TRANSIENT_HTTP_ERROR_CODES:
-      _print_error('Retrying...')
+      _print_retry_error(exception, verbose)
       return True
 
   if isinstance(exception, socket.error):
     if exception.errno in TRANSIENT_SOCKET_ERROR_CODES:
-      _print_error('Retrying...')
+      _print_retry_error(exception, verbose)
       return True
 
   if isinstance(exception, oauth2client.client.AccessTokenRefreshError):
-    _print_error('Retrying...')
+    _print_retry_error(exception, verbose)
     return True
 
   # For a given installation, this could be a permanent error, but has only
   # been observed as transient.
   if isinstance(exception, SSLError):
-    _print_error('Retrying...')
+    _print_retry_error(exception, verbose)
     return True
 
   # This has been observed as a transient error:
   #   ServerNotFoundError: Unable to find the server at genomics.googleapis.com
   if isinstance(exception, ServerNotFoundError):
-    _print_error('Retrying...')
+    _print_retry_error(exception, verbose)
     return True
 
   return False
 
 
-def retry_auth_check(exception):
+def retry_api_check_quiet(exception):
+  return retry_api_check(exception, False)
+
+
+def retry_api_check_verbose(exception):
+  return retry_api_check(exception, True)
+
+
+def retry_auth_check(exception, verbose):
   """Specific check for auth error codes.
 
   Return True if we should retry.
@@ -512,30 +540,39 @@ def retry_auth_check(exception):
   False otherwise.
   Args:
     exception: An exception to test for transience.
+    verbose: If true, output retry messages
 
   Returns:
     True if we should retry. False otherwise.
   """
   if isinstance(exception, apiclient.errors.HttpError):
     if exception.resp.status in HTTP_AUTH_ERROR_CODES:
-      _print_error('Retrying...')
+      _print_retry_error(exception, verbose)
       return True
 
   return False
+
+
+def retry_auth_check_quiet(exception):
+  return retry_auth_check(exception, False)
+
+
+def retry_auth_check_verbose(exception):
+  return retry_auth_check(exception, True)
 
 
 # Exponential backoff retrying API discovery.
 # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
 @retrying.retry(
     stop_max_attempt_number=24,
-    retry_on_exception=retry_api_check,
+    retry_on_exception=retry_api_check_verbose,
     wait_exponential_multiplier=500,
     wait_exponential_max=64000)
 # For API errors dealing with auth, we want to retry, but not as often
 # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
 @retrying.retry(
     stop_max_attempt_number=5,
-    retry_on_exception=retry_auth_check,
+    retry_on_exception=retry_auth_check_verbose,
     wait_exponential_multiplier=500,
     wait_exponential_max=8000)
 def setup_service(api_name, api_version, credentials=None):
@@ -559,22 +596,10 @@ def setup_service(api_name, api_version, credentials=None):
 class Api(object):
   """Wrapper around API execution with exponential backoff retries."""
 
-  # Exponential backoff retrying API execution.
-  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
-  @staticmethod
-  @retrying.retry(
-      stop_max_attempt_number=24,
-      retry_on_exception=retry_api_check,
-      wait_exponential_multiplier=500,
-      wait_exponential_max=64000)
-  # For API errors dealing with auth, we want to retry, but not as often
-  # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
-  @retrying.retry(
-      stop_max_attempt_number=5,
-      retry_on_exception=retry_auth_check,
-      wait_exponential_multiplier=500,
-      wait_exponential_max=8000)
-  def execute(api):
+  def __init__(self, verbose):
+    self._verbose = verbose
+
+  def execute(self, api):
     """Executes operation.
 
     Args:
@@ -583,14 +608,61 @@ class Api(object):
     Returns:
        A response body object
     """
-    try:
-      return api.execute()
-    except Exception as exception:
-      now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-      _print_error('%s: Exception %s: %s' % (now, type(exception).__name__,
-                                             str(exception)))
-      # Re-raise exception to be handled by retry logic
-      raise exception
+    if self._verbose:
+      return self.execute_verbose(api)
+    else:
+      return self.execute_quiet(api)
+
+  # Exponential backoff retrying API execution, verbose version
+  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
+  @retrying.retry(
+      stop_max_attempt_number=24,
+      retry_on_exception=retry_api_check_verbose,
+      wait_exponential_multiplier=500,
+      wait_exponential_max=64000)
+  # For API errors dealing with auth, we want to retry, but not as often
+  # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
+  @retrying.retry(
+      stop_max_attempt_number=5,
+      retry_on_exception=retry_auth_check_verbose,
+      wait_exponential_multiplier=500,
+      wait_exponential_max=8000)
+  def execute_verbose(self, api):
+    """Executes operation.
+
+    Args:
+      api: The base API object
+
+    Returns:
+       A response body object
+    """
+    return api.execute()
+
+  # Exponential backoff retrying API execution, quiet version
+  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
+  @retrying.retry(
+      stop_max_attempt_number=24,
+      retry_on_exception=retry_api_check_quiet,
+      wait_exponential_multiplier=500,
+      wait_exponential_max=64000)
+  # For API errors dealing with auth, we want to retry, but not as often
+  # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
+  @retrying.retry(
+      stop_max_attempt_number=5,
+      retry_on_exception=retry_auth_check_quiet,
+      wait_exponential_multiplier=500,
+      wait_exponential_max=8000)
+  def execute_quiet(self, api):
+    """Executes operation.
+
+    Args:
+      api: The base API object
+
+    Returns:
+       A response body object
+    """
+
+    return api.execute()
 
 
 if __name__ == '__main__':

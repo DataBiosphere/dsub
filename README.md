@@ -333,28 +333,42 @@ To specify input and output files, use the `--input` and `--output` flags:
 
     dsub \
         ... \
-        --input INPUT_FILE=gs://my-bucket/my-input-file \
+        --input INPUT_FILE_1=gs://my-bucket/my-input-file-1 \
+        --input INPUT_FILE_2=gs://my-bucket/my-input-file-2 \
         --output OUTPUT_FILE=gs://my-bucket/my-output-file \
-        --command 'cat ${INPUT_FILE} > ${OUTPUT_FILE}'
+        --command 'cat "${INPUT_FILE_1}" "${INPUT_FILE_2}" > "${OUTPUT_FILE}"'
 
-The input file will be copied from `gs://my-bucket/my-input-file` to a local
-path given by the environment variable `${INPUT_FILE}`. Inside your script, you
-can reference the local file path using the environment variable.
+In this example:
 
-The output file will be written to local disk at the location given by
-`${OUTPUT_FILE}`. Inside your script, you can reference the local file path
-using the environment variable. After the script completes, the output file
-will be copied to the bucket path `gs://my-bucket/my-output-file`.
+- a file will be copied from `gs://my-bucket/my-input-file-1` to a path on the data disk
+- the path to the file on the data disk will be set in the environment variable `${INPUT_FILE_1}`
+- a file will be copied from `gs://my-bucket/my-input-file-2` to a path on the data disk
+- the path to the file on the data disk will be set in the environment variable `${INPUT_FILE_2}`
+
+The `--command` can reference the file paths using the environment variables.
+
+Also in this example:
+
+- a path on the data disk will be set in the environment variable `${OUTPUT_FILE}`
+- the output file will written to the data disk at the location given by `${OUTPUT_FILE}`
+
+After the `--command` completes, the output file will be copied to the bucket path `gs://my-bucket/my-output-file`
+
+Multiple `--input`, and `--output` parameters can be specified and
+they can be specified in any order.
 
 #### Folders
 
-To copy folders rather than files, use the `--input-recursive` or
+To copy folders rather than files, use the `--input-recursive` and
 `output-recursive` flags:
 
     dsub \
         ... \
         --input-recursive FOLDER=gs://my-bucket/my-folder \
         --command 'find ${FOLDER} -name "foo*"'
+
+Multiple `--input-recursive`, and `--output-recursive` parameters can be
+specified and they can be specified in any order.
 
 #### Mounting "resource data"
 

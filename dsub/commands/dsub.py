@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -498,6 +499,11 @@ def _parse_arguments(prog, argv):
       help="""
           The disk type to use for the data disk. Valid values are pd-standard
           pd-ssd and local-ssd. The default value is pd-standard.""")
+  google_v2.add_argument(
+      '--enable-stackdriver-monitoring',
+      default=False,
+      action='store_true',
+      help='If set to true, enables Stackdriver monitoring on the VM.')
 
   args = provider_base.parse_args(
       parser, {
@@ -554,7 +560,8 @@ def _get_job_resources(args):
       nvidia_driver_version=args.nvidia_driver_version,
       timeout=timeout,
       log_interval=log_interval,
-      ssh=args.ssh)
+      ssh=args.ssh,
+      enable_stackdriver_monitoring=args.enable_stackdriver_monitoring)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids,
@@ -672,7 +679,9 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
     jobs_completed = job_ids_to_check.difference(jobs_left)
 
     # Get all tasks for the newly completed jobs
-    tasks_completed = provider.lookup_job_tasks({'*'}, job_ids=jobs_completed)
+    tasks_completed = provider.lookup_job_tasks({'*'},
+                                                job_ids=jobs_completed,
+                                                verbose=False)
 
     # We don't want to overwhelm the user with output when there are many
     # tasks per job. So we get a single "dominant" task for each of the
@@ -723,7 +732,7 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
   """
 
   while True:
-    tasks = provider.lookup_job_tasks({'*'}, job_ids=[job_id])
+    tasks = provider.lookup_job_tasks({'*'}, job_ids=[job_id], verbose=False)
 
     running_tasks = set()
     completed_tasks = set()
@@ -778,7 +787,7 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
       print('  {} (attempt {}) failed. Retrying.'.format(
           identifier, task_fail_count[task_id]))
       msg = task_dict[task_id].get_field('status-message')
-      print('  Failure message: {}'.format(msg))
+      print('  Failure message: ' + msg)
 
       _retry_task(provider, job_descriptor, task_id,
                   task_fail_count[task_id] + 1)
@@ -854,8 +863,10 @@ def _importance_of_task(task):
   # 2- The first RUNNING task, or if none
   # 3- The first SUCCESS task.
   importance = {'FAILURE': 0, 'CANCELED': 0, 'RUNNING': 1, 'SUCCESS': 2}
-  return (importance[task.get_field('task-status')], task.get_field(
-      'end-time', datetime.datetime.max))
+  return (importance[task.get_field('task-status')],
+          task.get_field(
+              'end-time',
+              dsub_util.replace_timezone(datetime.datetime.max, tzlocal())))
 
 
 def _wait_for_any_job(provider, job_ids, poll_interval):
@@ -876,7 +887,7 @@ def _wait_for_any_job(provider, job_ids, poll_interval):
   if not job_ids:
     return
   while True:
-    tasks = provider.lookup_job_tasks({'*'}, job_ids=job_ids)
+    tasks = provider.lookup_job_tasks({'*'}, job_ids=job_ids, verbose=False)
     running_jobs = set()
     failed_jobs = set()
     for t in tasks:
@@ -951,7 +962,11 @@ def call(argv):
   return dsub_main('%s.call' % __name__, argv)
 
 
-def main(prog=sys.argv[0], argv=sys.argv[1:]):
+def main(prog=None, argv=None):
+  if prog is None and argv is None:
+    prog = sys.argv[0]
+    argv = sys.argv[1:]
+
   try:
     dsub_main(prog, argv)
   except dsub_errors.PredecessorJobFailureError as e:

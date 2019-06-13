@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -456,7 +457,8 @@ class _Pipelines(object):
 
   @staticmethod
   def run_pipeline(service, pipeline):
-    return google_base.Api.execute(service.pipelines().run(body=pipeline))
+    google_base_api = google_base.Api(verbose=True)
+    return google_base_api.execute(service.pipelines().run(body=pipeline))
 
 
 class _Operations(object):
@@ -568,7 +570,7 @@ class _Operations(object):
     return True
 
   @classmethod
-  def list(cls, service, ops_filter, page_size=0):
+  def list(cls, service, ops_filter, verbose, page_size=0):
     """Gets the list of operations for the specified filter.
 
     Args:
@@ -596,7 +598,8 @@ class _Operations(object):
           filter=ops_filter,
           pageToken=page_token,
           pageSize=page_size)
-      response = google_base.Api.execute(api)
+      google_base_api = google_base.Api(verbose)
+      response = google_base_api.execute(api)
 
       ops = response.get('operations', [])
       for op in ops:
@@ -762,7 +765,8 @@ class GoogleJobProvider(base.JobProvider):
                        create_time_min=None,
                        create_time_max=None,
                        max_tasks=0,
-                       page_size=0):
+                       page_size=0,
+                       verbose=True):
     """Yields operations based on the input criteria.
 
     If any of the filters are empty or {'*'}, then no filtering is performed on
@@ -786,6 +790,7 @@ class GoogleJobProvider(base.JobProvider):
                        create time of a task, inclusive.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
       page_size: the page size to use for each query to the pipelins API.
+      verbose: if set to true, will output retrying error messages.
 
     Raises:
       ValueError: if both a job id list and a job name list are provided
@@ -848,7 +853,8 @@ class GoogleJobProvider(base.JobProvider):
       # The pipelines API returns operations sorted by create-time date. We can
       # use this sorting guarantee to merge-sort the streams together and only
       # retrieve more tasks as needed.
-      stream = _Operations.list(self._service, ops_filter, page_size=page_size)
+      stream = _Operations.list(
+          self._service, ops_filter, verbose, page_size=page_size)
       query_queue.add_generator(stream)
 
     tasks_yielded = 0
