@@ -101,11 +101,15 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
       user_project_flag="-u ${user_project_name}"
     fi
 
-    local i
-    for ((i = 0; i < 3; i++)); do
+    local attempt
+    for ((attempt = 0; attempt < 4; attempt++)); do
       log_info "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
       if gsutil ${headers} ${user_project_flag} -mq cp "${src}" "${dst}"; then
         return
+      fi
+      if (( attempt < 3 )); then
+        log_info "Sleeping 10s before the next attempt."
+        sleep 10s
       fi
     done
 
@@ -147,11 +151,15 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
       user_project_flag="-u ${user_project_name}"
     fi
 
-    local i
-    for ((i = 0; i < 3; i++)); do
+    local attempt
+    for ((attempt = 0; attempt < 4; attempt++)); do
       log_info "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
       if gsutil ${user_project_flag} -mq rsync -r "${src}" "${dst}"; then
         return
+      fi
+      if (( attempt < 3 )); then
+        log_info "Sleeping 10s before the next attempt."
+        sleep 10s
       fi
     done
 

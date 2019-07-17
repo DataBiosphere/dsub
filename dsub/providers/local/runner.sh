@@ -151,8 +151,10 @@ function fetch_image() {
     if gcloud docker -- pull "${image}"; then
       return
     fi
-    log_info "Sleeping 30s before the next attempt."
-    sleep 30s
+    if (( attempt < 2 )); then
+      log_info "Sleeping 30s before the next attempt."
+      sleep 30s
+    fi
   done
 
   log_error "FAILED to fetch ${image}"
