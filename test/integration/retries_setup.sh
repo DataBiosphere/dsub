@@ -50,6 +50,32 @@ function retries_setup::run_dsub () {
 }
 readonly -f retries_setup::run_dsub
 
+function retries_setup::run_dsub_preemptible () {
+  local -r job_name="${1}"
+  local -r retries="${2}"
+  local -r preemptible_retries="${3}"
+  local -r command="${4}"
+
+  if run_dsub \
+      --name "${job_name}" \
+      --label test-token="${TEST_TOKEN}" \
+      --command "${command}" \
+      --retries "${retries}" \
+      --preemptible "${preemptible_retries}" \
+      --wait; then
+    if [[ "${command}" == "false" ]]; then
+      echo "dsub did not have non-zero exit code as expected."
+      exit 1
+    fi
+  else
+    if [[ "${command}" == "true" ]]; then
+      echo "dsub had non-zero exit code and should not have."
+      exit 1
+    fi
+  fi
+}
+readonly -f retries_setup::run_dsub_preemptible
+
 function retries_setup::check_job_attr() {
   local -r job_name="${1}"
   local -r attr="${2}"

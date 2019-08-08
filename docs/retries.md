@@ -31,10 +31,37 @@ A task is considered to be retryable if:
   - the latest attempt was not canceled (status CANCELED)
 - the task has not been retried the maximum number of times
 
+Note that no attempt is made to interpret the reason for failure.
+If a task fails due to a "permanent" error such as permissions or insufficient
+disk space, the task will still be retried.
+
 ### --retries flag
 
 To specify the maximum number of per-task retries, use the `--retries` flag.
 For example `--retries 3` will retry each task 3 times before failing.
+
+### ---preemptible flag
+
+Using the `--preemptible` flag will make your jobs run on a preemptible VM.
+The `--preemptible` flag can be used as a boolean flag where all attempts are
+made using preemptible VMs, or with an integer such that a maximum specified
+number of attempts are executed using preemptible VMs.
+
+The following will make at most 4 total attempts (one initial and 3 retries)
+all on preemptible VMs:
+
+         dsub --preemptible --retries 3 --wait ...
+
+The following will make at most 4 total attempts (one initial and 3 retries)
+with the first 3 attempts on a preemptible VM and the last on a full-priced VM:
+
+         dsub --preemptible 3 --retries 3 --wait ...
+
+Note that no attempt is made to interpret the reason for task failure.
+If a preemptible task fails due to a reason other than VM preemption, the
+current attempt will still be treated as a preemptible attempt used.
+Transient failure rates should be much lower in practice than preemption rates
+and more complex retry logic is not clearly more desirable.
 
 ## Tracking task attempts
 
@@ -75,5 +102,4 @@ features:
 - Enable retries with changes to the runtime environment:
   - more disk
   - more memory
-  - switch from preemptible to non-preemptible VMs
 - Add a maximum total number of retries for all tasks for a job

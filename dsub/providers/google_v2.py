@@ -863,7 +863,9 @@ class GoogleV2JobProvider(base.JobProvider):
         google_v2_pipelines.build_machine(
             network=network,
             machine_type=machine_type,
-            preemptible=job_resources.preemptible,
+            # Preemptible comes from task_resources because it may change
+            # on retry attempts
+            preemptible=task_resources.preemptible,
             service_account=service_account,
             boot_disk_size_gb=job_resources.boot_disk_size,
             disks=disks,
