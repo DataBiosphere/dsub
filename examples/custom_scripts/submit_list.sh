@@ -30,11 +30,11 @@ set -o nounset
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
 if [[ $# -ne 3 ]]; then
-  2>&1 echo "Usage: ${0} project-id bucket script"
-  2>&1 echo
-  2>&1 echo "  script is either of:"
-  2>&1 echo "    ${SCRIPT_DIR}/get_vcf_sample_ids.sh"
-  2>&1 echo "    ${SCRIPT_DIR}/get_vcf_sample_ids.py"
+  1>&2 echo "Usage: ${0} project-id bucket script"
+  1>&2 echo
+  1>&2 echo "  script is either of:"
+  1>&2 echo "    ${SCRIPT_DIR}/get_vcf_sample_ids.sh"
+  1>&2 echo "    ${SCRIPT_DIR}/get_vcf_sample_ids.py"
   exit 1
 fi
 

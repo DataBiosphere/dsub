@@ -405,12 +405,34 @@ class LocalMountParam(MountParam):
 
 class Resources(
     collections.namedtuple('Resources', [
-        'min_cores', 'min_ram', 'machine_type', 'disk_size', 'disk_type',
-        'boot_disk_size', 'preemptible', 'image', 'logging', 'logging_path',
-        'regions', 'zones', 'service_account', 'scopes', 'keep_alive',
-        'cpu_platform', 'network', 'subnetwork', 'use_private_address',
-        'accelerator_type', 'accelerator_count', 'nvidia_driver_version',
-        'timeout', 'log_interval', 'ssh', 'enable_stackdriver_monitoring'
+        'min_cores',
+        'min_ram',
+        'machine_type',
+        'disk_size',
+        'disk_type',
+        'boot_disk_size',
+        'preemptible',
+        'image',
+        'logging',
+        'logging_path',
+        'regions',
+        'zones',
+        'service_account',
+        'scopes',
+        'keep_alive',
+        'cpu_platform',
+        'network',
+        'subnetwork',
+        'use_private_address',
+        'accelerator_type',
+        'accelerator_count',
+        'nvidia_driver_version',
+        'timeout',
+        'log_interval',
+        'ssh',
+        'enable_stackdriver_monitoring',
+        'max_retries',
+        'max_preemptible_attempts',
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -445,6 +467,10 @@ class Resources(
     ssh (bool): Start an SSH container in the background.
     enable_stackdriver_monitoring (bool): Enable stackdriver monitoring
       on the VM.
+    max_retries (int): Maximum allowed number of retry attempts.
+    max_preemptible_attempts (param_util.PreemptibleParam): Int representing
+      maximum allowed number of attempts on a preemptible machine, or boolean
+      representing always preemtible.
   """
   __slots__ = ()
 
@@ -474,16 +500,16 @@ class Resources(
               timeout=None,
               log_interval=None,
               ssh=None,
-              enable_stackdriver_monitoring=None):
-    return super(Resources,
-                 cls).__new__(cls, min_cores, min_ram, machine_type, disk_size,
-                              disk_type, boot_disk_size, preemptible, image,
-                              logging, logging_path, regions, zones,
-                              service_account, scopes, keep_alive, cpu_platform,
-                              network, subnetwork, use_private_address,
-                              accelerator_type, accelerator_count,
-                              nvidia_driver_version, timeout, log_interval, ssh,
-                              enable_stackdriver_monitoring)
+              enable_stackdriver_monitoring=None,
+              max_retries=None,
+              max_preemptible_attempts=None):
+    return super(Resources, cls).__new__(
+        cls, min_cores, min_ram, machine_type, disk_size, disk_type,
+        boot_disk_size, preemptible, image, logging, logging_path, regions,
+        zones, service_account, scopes, keep_alive, cpu_platform, network,
+        subnetwork, use_private_address, accelerator_type, accelerator_count,
+        nvidia_driver_version, timeout, log_interval, ssh,
+        enable_stackdriver_monitoring, max_retries, max_preemptible_attempts)
 
 
 def ensure_job_params_are_complete(job_params):

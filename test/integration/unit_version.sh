@@ -42,7 +42,7 @@ function test_shell_util_version() {
   # Stderr must be empty and stdout should have the version.
   assert_err_empty
   if [[ "$(cat "${TEST_STDOUT}")" != "${EXPECTED_STRING}" ]] ; then
-    2>&1 echo "Assert: version was not printed by '$@ --version'"
+    1>&2 echo "Assert: version was not printed by '$@ --version'"
 
     test_failed "${subtest}"
   fi

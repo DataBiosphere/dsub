@@ -47,7 +47,7 @@ function test_neither_region_nor_zone() {
   if call_dsub \
     --command 'echo "${TEST_NAME}"'; then
 
-    2>&1 echo "Neither regions nor zones specified - not detected"
+    1>&2 echo "Neither regions nor zones specified - not detected"
 
     test_failed "${subtest}"
   else
@@ -70,7 +70,7 @@ function test_region_and_zone() {
     --zones us-central1-f \
     --regions us-central1; then
 
-    2>&1 echo "Both regions and zones specified - not detected"
+    1>&2 echo "Both regions and zones specified - not detected"
 
     test_failed "${subtest}"
   else
@@ -168,7 +168,7 @@ function test_machine_type_with_ram_and_cpu() {
     --min-cores 1 \
     --min-ram 1; then
 
-    2>&1 echo "min-ram/min-cores set with machine-type on google-v2 provider - not detected"
+    1>&2 echo "min-ram/min-cores set with machine-type on google-v2 provider - not detected"
 
     test_failed "${subtest}"
   else

@@ -119,7 +119,7 @@ def build_recursive_localize_command(destination, inputs, file_provider):
         if {command} {source_uri} {data_mount}/{docker_path}; then
           break
         elif ((i == 2)); then
-          2>&1 echo "Recursive localization failed."
+          1>&2 echo "Recursive localization failed."
           exit 1
         fi
       done
@@ -184,7 +184,7 @@ def build_recursive_delocalize_command(source, outputs, file_provider):
         if {command} {data_mount}/{docker_path} {destination_uri}; then
           break
         elif ((i == 2)); then
-          2>&1 echo "Recursive de-localization failed."
+          1>&2 echo "Recursive de-localization failed."
           exit 1
         fi
       done

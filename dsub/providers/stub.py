@@ -26,7 +26,7 @@ class StubJobProvider(base.JobProvider):
   # 1) Methods that are supposed to do something. Use mocks
   #    if you need to check that they are called.
 
-  def submit_job(self, job_descriptor):
+  def submit_job(self, job_descriptor, skip_if_output_present):
     pass
 
   def delete_jobs(self,
@@ -126,6 +126,15 @@ class StubTask(base.Task):
   def get_field(self, field, default=None):
     if field == 'task-status':
       return self.op['status'][0]
+    elif field == 'task-id':
+      return self.op['task-id']
+    elif field == 'provider-attributes':
+      preempted = self.op.get('error-message') == 'preempted'
+      return {'preempted': preempted}
+    elif field == 'status-message':
+      return self.op['status-message']
+    elif field == 'error-message':
+      return self.op.get('error-message')
     return self.op.get(field, None)
 
   def raw_task_data(self):

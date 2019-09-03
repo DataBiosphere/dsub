@@ -667,7 +667,7 @@ class GoogleJobProvider(base.JobProvider):
         min_ram=job_resources.min_ram,
         disk_size=job_resources.disk_size,
         boot_disk_size=job_resources.boot_disk_size,
-        preemptible=job_resources.preemptible,
+        preemptible=task_resources.preemptible,
         accelerator_type=job_resources.accelerator_type,
         accelerator_count=job_resources.accelerator_count,
         image=job_resources.image,
@@ -683,7 +683,7 @@ class GoogleJobProvider(base.JobProvider):
     pipeline.update(
         _Pipelines.build_pipeline_args(self._project, script.value, job_params,
                                        task_params, reserved_labels,
-                                       job_resources.preemptible, logging_uri,
+                                       task_resources.preemptible, logging_uri,
                                        scopes, job_resources.keep_alive))
 
     return pipeline

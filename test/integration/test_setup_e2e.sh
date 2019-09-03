@@ -47,8 +47,8 @@ else
 fi
 
 if [[ -z "${PROJECT_ID}" ]]; then
-  2>&1 echo "Your project ID could not be determined."
-  2>&1 echo "Set the environment variable YOUR_PROJECT or run \"gcloud init\"."
+  1>&2 echo "Your project ID could not be determined."
+  1>&2 echo "Set the environment variable YOUR_PROJECT or run \"gcloud init\"."
   exit 1
 fi
 
@@ -65,12 +65,12 @@ echo "  Bucket detected as: ${DSUB_BUCKET}"
 
 echo "  Checking if bucket exists"
 if ! gsutil ls "gs://${DSUB_BUCKET}" 2>/dev/null; then
-  2>&1 echo "Bucket does not exist (or we have no access): ${DSUB_BUCKET}"
-  2>&1 echo "Create the bucket with \"gsutil mb\"."
-  2>&1 echo "Current gcloud settings:"
-  2>&1 echo "  account: $(gcloud config get-value account 2>/dev/null)"
-  2>&1 echo "  project: $(gcloud config get-value project 2>/dev/null)"
-  2>&1 echo "  pass_credentials_to_gsutil: $(gcloud config get-value pass_credentials_to_gsutil 2>/dev/null)"
+  1>&2 echo "Bucket does not exist (or we have no access): ${DSUB_BUCKET}"
+  1>&2 echo "Create the bucket with \"gsutil mb\"."
+  1>&2 echo "Current gcloud settings:"
+  1>&2 echo "  account: $(gcloud config get-value account 2>/dev/null)"
+  1>&2 echo "  project: $(gcloud config get-value project 2>/dev/null)"
+  1>&2 echo "  pass_credentials_to_gsutil: $(gcloud config get-value pass_credentials_to_gsutil 2>/dev/null)"
   exit 1
 fi
 
@@ -119,9 +119,9 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]] && \
 
   echo "  Checking if remote test files already exists"
   if gsutil ls "${TEST_GCS_ROOT}/**" 2>/dev/null; then
-    2>&1 echo "Test files exist: ${TEST_GCS_ROOT}"
-    2>&1 echo "Remove contents:"
-    2>&1 echo "  gsutil -m rm ${TEST_GCS_ROOT}/**"
+    1>&2 echo "Test files exist: ${TEST_GCS_ROOT}"
+    1>&2 echo "Remove contents:"
+    1>&2 echo "  gsutil -m rm ${TEST_GCS_ROOT}/**"
     exit 1
   fi
 

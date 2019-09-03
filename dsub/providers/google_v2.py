@@ -101,15 +101,19 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
       user_project_flag="-u ${user_project_name}"
     fi
 
-    local i
-    for ((i = 0; i < 3; i++)); do
+    local attempt
+    for ((attempt = 0; attempt < 4; attempt++)); do
       log_info "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
       if gsutil ${headers} ${user_project_flag} -mq cp "${src}" "${dst}"; then
         return
       fi
+      if (( attempt < 3 )); then
+        log_info "Sleeping 10s before the next attempt."
+        sleep 10s
+      fi
     done
 
-    2>&1 log_error "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
+    log_error "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
     exit 1
   }
 
@@ -147,15 +151,19 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
       user_project_flag="-u ${user_project_name}"
     fi
 
-    local i
-    for ((i = 0; i < 3; i++)); do
+    local attempt
+    for ((attempt = 0; attempt < 4; attempt++)); do
       log_info "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
       if gsutil ${user_project_flag} -mq rsync -r "${src}" "${dst}"; then
         return
       fi
+      if (( attempt < 3 )); then
+        log_info "Sleeping 10s before the next attempt."
+        sleep 10s
+      fi
     done
 
-    2>&1 log_error "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
+    log_error "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
     exit 1
   }
 """)
@@ -855,7 +863,9 @@ class GoogleV2JobProvider(base.JobProvider):
         google_v2_pipelines.build_machine(
             network=network,
             machine_type=machine_type,
-            preemptible=job_resources.preemptible,
+            # Preemptible comes from task_resources because it may change
+            # on retry attempts
+            preemptible=task_resources.preemptible,
             service_account=service_account,
             boot_disk_size_gb=job_resources.boot_disk_size,
             disks=disks,

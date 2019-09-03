@@ -76,7 +76,7 @@ function assert_err_value_equals() {
 
   local actual=$(get_stderr_value "${key}")
   if [[ "${actual}" != "${value}" ]]; then
-    2>&1 echo "Assert: actual value for ${key}, ${actual}, does not match expected: ${value}"
+    1>&2 echo "Assert: actual value for ${key}, ${actual}, does not match expected: ${value}"
 
     exit 1
   fi
@@ -89,11 +89,11 @@ function assert_err_value_matches() {
 
   local actual=$(get_stderr_value "${key}")
   if ! echo "${actual}" | grep --quiet "${re}"; then
-    2>&1 echo "Assert: value for ${key} does not match expected pattern:"
-    2>&1 echo "EXPECTED pattern:"
-    2>&1 echo "${re}"
-    2>&1 echo "ACTUAL:"
-    2>&1 echo "${actual}"
+    1>&2 echo "Assert: value for ${key} does not match expected pattern:"
+    1>&2 echo "EXPECTED pattern:"
+    1>&2 echo "${re}"
+    1>&2 echo "ACTUAL:"
+    1>&2 echo "${actual}"
 
     exit 1
   fi
@@ -104,11 +104,11 @@ function assert_output_contains() {
   local expected="${1}"
 
   if ! grep --quiet --fixed-strings "${expected}" "${TEST_STDOUT}"; then
-    2>&1 echo "Assert: stdout does not contain expected output:"
-    2>&1 echo "EXPECTED:"
-    2>&1 echo "${expected}"
-    2>&1 echo "ACTUAL:"
-    2>&1 echo "$(<$"${TEST_STDOUT}")"
+    1>&2 echo "Assert: stdout does not contain expected output:"
+    1>&2 echo "EXPECTED:"
+    1>&2 echo "${expected}"
+    1>&2 echo "ACTUAL:"
+    1>&2 echo "$(<$"${TEST_STDOUT}")"
 
     exit 1
   fi
@@ -119,11 +119,11 @@ function assert_err_contains() {
   local expected="${1}"
 
   if ! grep --quiet --fixed-strings "${expected}" "${TEST_STDERR}"; then
-    2>&1 echo "Assert: stderr does not contain expected output:"
-    2>&1 echo "EXPECTED:"
-    2>&1 echo "${expected}"
-    2>&1 echo "ACTUAL:"
-    2>&1 echo "$(<$"${TEST_STDERR}")"
+    1>&2 echo "Assert: stderr does not contain expected output:"
+    1>&2 echo "EXPECTED:"
+    1>&2 echo "${expected}"
+    1>&2 echo "ACTUAL:"
+    1>&2 echo "$(<$"${TEST_STDERR}")"
 
     exit 1
   fi
@@ -134,11 +134,11 @@ function assert_err_not_contains() {
   local expected="${1}"
 
   if grep --quiet --fixed-strings "${expected}" "${TEST_STDERR}"; then
-    2>&1 echo "Assert: stderr does contains unexpected output:"
-    2>&1 echo "UNEXPECTED:"
-    2>&1 echo "${expected}"
-    2>&1 echo "ACTUAL:"
-    2>&1 echo "$(<$"${TEST_STDERR}")"
+    1>&2 echo "Assert: stderr does contains unexpected output:"
+    1>&2 echo "UNEXPECTED:"
+    1>&2 echo "${expected}"
+    1>&2 echo "ACTUAL:"
+    1>&2 echo "$(<$"${TEST_STDERR}")"
 
     exit 1
   fi

@@ -390,9 +390,13 @@ def _parse_arguments(prog, argv):
       help='Size (in GB) of the boot disk')
   google_common.add_argument(
       '--preemptible',
-      default=False,
-      action='store_true',
-      help='Use a preemptible VM for the job')
+      const=param_util.preemptile_param_type(True),
+      default=param_util.preemptile_param_type(False),
+      nargs='?',  # Be careful if we ever add positional arguments
+      type=param_util.preemptile_param_type,
+      help="""If --preemptible is given without a number, enables preemptible
+          VMs for all attempts for all tasks. If a number value N is used,
+          enables preemptible VMs for up to N attempts for each task.""")
   google_common.add_argument(
       '--zones', nargs='+', help='List of Google Compute Engine zones.')
   google_common.add_argument(
@@ -542,7 +546,6 @@ def _get_job_resources(args):
       disk_size=args.disk_size,
       disk_type=args.disk_type,
       boot_disk_size=args.boot_disk_size,
-      preemptible=args.preemptible,
       image=args.image,
       regions=args.regions,
       zones=args.zones,
@@ -561,7 +564,9 @@ def _get_job_resources(args):
       timeout=timeout,
       log_interval=log_interval,
       ssh=args.ssh,
-      enable_stackdriver_monitoring=args.enable_stackdriver_monitoring)
+      enable_stackdriver_monitoring=args.enable_stackdriver_monitoring,
+      max_retries=args.retries,
+      max_preemptible_attempts=args.preemptible)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids,
@@ -624,22 +629,44 @@ def _resolve_task_logging(job_metadata, job_resources, task_descriptors):
           logging_path=logging_path)
 
 
+def _resolve_preemptible(job_resources, task_descriptors):
+  """Resolve whether or not to use a preemptible machine.
+
+  Args:
+    job_resources: Resources specified such as max_preemptible_attempts.
+    task_descriptors: Task metadata, parameters, and resources.
+  """
+  # Determine if the next attempt should be preemptible
+  for task_descriptor in task_descriptors:
+    # The original attempt is attempt number 1.
+    # The first retry is attempt number 2.
+    attempt_number = task_descriptor.task_metadata.get('task-attempt', 1)
+    max_preemptible_attempts = job_resources.max_preemptible_attempts
+    if max_preemptible_attempts:
+      use_preemptible = max_preemptible_attempts.should_use_preemptible(
+          attempt_number)
+    else:
+      use_preemptible = job_model.DEFAULT_PREEMPTIBLE
+    task_descriptor.task_resources = task_descriptor.task_resources._replace(
+        preemptible=use_preemptible)
+
+
 def _resolve_task_resources(job_metadata, job_resources, task_descriptors):
   """Resolve task properties (such as the logging path) from job properties.
 
   Args:
     job_metadata: Job metadata, such as job-id, job-name, and user-id.
     job_resources: Resources specified such as ram, cpu, and logging path.
-    task_descriptors: Task metadata, parameters, and resources.
-
-  This function exists to be called at the point that all job properties have
-  been validated and resolved. It is also called prior to re-trying a task.
-
-  The only property to be resolved right now is the logging path,
-  which may have substitution parameters such as
-  job-id, task-id, task-attempt, user-id, and job-name.
+    task_descriptors: Task metadata, parameters, and resources.  This function
+      exists to be called at the point that all job properties have been
+      validated and resolved. It is also called prior to re-trying a task.
+  Right now we resolve two properties: 1) the logging path, which may have
+    substitution parameters such as job-id, task-id, task-attempt, user-id, and
+    job-name. and 2) preemptible, which depends on how many preemptible attempts
+    we have done.
   """
   _resolve_task_logging(job_metadata, job_resources, task_descriptors)
+  _resolve_preemptible(job_resources, task_descriptors)
 
 
 def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
@@ -806,7 +833,7 @@ def _retry_task(provider, job_descriptor, task_id, task_attempt):
       }, td_orig.task_params, td_orig.task_resources)
   ]
 
-  # Update the logging path.
+  # Update the logging path and preemptible field.
   _resolve_task_resources(job_descriptor.job_metadata,
                           job_descriptor.job_resources, new_task_descriptors)
 
@@ -1035,6 +1062,7 @@ def run_main(args):
       user_project=args.user_project,
       wait=args.wait,
       retries=args.retries,
+      max_preemptible_attempts=args.preemptible,
       poll_interval=args.poll_interval,
       after=args.after,
       skip=args.skip,
@@ -1055,6 +1083,7 @@ def run(provider,
         user_project=None,
         wait=False,
         retries=0,
+        max_preemptible_attempts=None,
         poll_interval=10,
         after=None,
         skip=False,
@@ -1088,6 +1117,9 @@ def run(provider,
 
   if retries and not wait:
     raise ValueError('Requesting retries requires requesting wait')
+
+  if max_preemptible_attempts:
+    max_preemptible_attempts.validate(retries)
 
   # The contract with providers and downstream code is that the job_params
   # and task_params contain 'labels', 'envs', 'inputs', and 'outputs'.

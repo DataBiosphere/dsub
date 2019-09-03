@@ -923,3 +923,55 @@ def timeout_in_seconds(timeout):
 
 def log_interval_in_seconds(log_interval):
   return _interval_to_seconds(log_interval, valid_units='smh')
+
+
+class PreemptibleParam(object):
+  """Utility class for user specified --preemptible argument.
+
+  The --preemptible arg can be set to one of three 'modes':
+  1) Not given. Never run on a preemptible VM. Internally stored as 'False'.
+  2) Given. Always run on a preemptible VM. Internally stored as 'True'.
+  3) Given, and passed an integer p. Run on a preemptible VM up to p times
+    before falling back to a full-price VM. Internally stored as an integer.
+  """
+
+  def __init__(self, p):
+    self._max_preemptible_attempts = p
+
+  def should_use_preemptible(self, attempt_number):
+    if bool is type(self._max_preemptible_attempts):
+      return self._max_preemptible_attempts
+    else:
+      return self._max_preemptible_attempts >= attempt_number
+
+  def validate(self, retries):
+    """Validates that preemptible arguments make sense with retries."""
+    if int is type(self._max_preemptible_attempts):
+      if not retries:
+        # This means user specified a preemptible number
+        # but didn't specify a retries number
+        raise ValueError(
+            'Requesting 1 or more preemptible attempts requires setting retries'
+        )
+
+      if self._max_preemptible_attempts > retries:
+        raise ValueError(
+            'Value passed for --preemptible cannot be larger than --retries.')
+
+      if retries < 0 or self._max_preemptible_attempts < 0:
+        raise ValueError('--retries and --preemptible must be 0 or greater')
+
+
+def preemptile_param_type(preemptible):
+  """Wrapper function to create a PreemptibleParam object from argparse."""
+  if bool is type(preemptible):
+    return PreemptibleParam(preemptible)
+  elif str is type(preemptible):
+    try:
+      return PreemptibleParam(int(preemptible))
+    except ValueError:
+      raise argparse.ArgumentTypeError(
+          'Invalid value {} for --preemptible.'.format(preemptible))
+  else:
+    raise argparse.ArgumentTypeError(
+        'Invalid value {} for --preemptible.'.format(preemptible))

@@ -52,8 +52,8 @@ readonly TASKS_LAUNCH_COUNT="$(echo "${TASKS_STATUS}" | wc -l)"
 echo "Tasks launched: ${TASKS_LAUNCH_COUNT}"
 
 if [[ "${TASKS_LAUNCH_COUNT}" -ne "${EXPECTED_TASKS_COUNT}" ]]; then
-  2>&1 echo "Unexpected count of launched tasks: ${TASKS_LAUNCH_COUNT}"
-  2>&1 echo "Expected count of launched tasks: ${EXPECTED_TASKS_COUNT}"
+  1>&2 echo "Unexpected count of launched tasks: ${TASKS_LAUNCH_COUNT}"
+  1>&2 echo "Expected count of launched tasks: ${EXPECTED_TASKS_COUNT}"
   exit 1
 fi
 
@@ -98,8 +98,8 @@ for ((WAITED = 0; WAITED <= TOTAL_WAIT_SECONDS; WAITED += WAIT_INTERVAL)); do
 done
 
 if [[ "${WAITED}" -ge "${TOTAL_WAIT_SECONDS}" ]]; then
-  2>&1 echo "Still waiting for tasks to reach CANCELED state after ${TOTAL_WAIT_SECONDS}"
-  2>&1 echo "FAILED"
+  1>&2 echo "Still waiting for tasks to reach CANCELED state after ${TOTAL_WAIT_SECONDS}"
+  1>&2 echo "FAILED"
   exit 1
 fi
 
