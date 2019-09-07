@@ -245,6 +245,11 @@ def _parse_arguments(prog, argv):
           Docker image service. The pipeline must have READ access to the
           image.""")
   parser.add_argument(
+      '--verbose',
+      default=False,
+      action='store_true',
+      help='Enable verbose mode logging.')
+  parser.add_argument(
       '--dry-run',
       default=False,
       action='store_true',
