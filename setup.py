@@ -107,6 +107,7 @@ setup(
 
         # dependencies for test code
         'parameterized',
+        'mock',
     ],
 
     # Define a test suite for Python unittests only.
