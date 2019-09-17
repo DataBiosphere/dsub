@@ -468,8 +468,7 @@ class GoogleV2BatchHandler(object):
 class GoogleV2JobProvider(base.JobProvider):
   """dsub provider implementation managing Jobs on Google Cloud."""
 
-  def __init__(self, verbose, dry_run, project, credentials=None):
-    self._verbose = verbose
+  def __init__(self, dry_run, project, credentials=None):
     self._dry_run = dry_run
 
     self._project = project
@@ -887,8 +886,7 @@ class GoogleV2JobProvider(base.JobProvider):
     google_base_api = google_base.Api(verbose=True)
     operation = google_base_api.execute(
         self._service.pipelines().run(body=request))
-    if self._verbose:
-      print('Launched operation {}'.format(operation['name']))
+    print('Provider internal-id (operation): {}'.format(operation['name']))
 
     return GoogleOperation(operation).get_field('task-id')
 

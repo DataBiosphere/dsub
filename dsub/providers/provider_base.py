@@ -45,8 +45,7 @@ def get_provider(args, resources):
         getattr(args, 'dry_run', False), args.project)
   elif provider == 'google-v2':
     return google_v2.GoogleV2JobProvider(
-        getattr(args, 'verbose', False), getattr(args, 'dry_run', False),
-        args.project)
+        getattr(args, 'dry_run', False), args.project)
   elif provider == 'local':
     return local.LocalJobProvider(resources)
   elif provider == 'test-fails':
