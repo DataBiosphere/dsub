@@ -33,10 +33,12 @@ import apiclient.discovery
 import apiclient.errors
 from httplib2 import ServerNotFoundError
 from ..lib import job_model
-import oauth2client.client
 import pytz
 import retrying
 from six.moves import range
+
+import google.auth
+
 
 # The google v1 provider directly added the bigquery scope, but the v1alpha2
 # API automatically added:
@@ -505,7 +507,7 @@ def retry_api_check(exception, verbose):
       _print_retry_error(exception, verbose)
       return True
 
-  if isinstance(exception, oauth2client.client.AccessTokenRefreshError):
+  if isinstance(exception, google.auth.exceptions.RefreshError):
     _print_retry_error(exception, verbose)
     return True
 
@@ -587,8 +589,7 @@ def setup_service(api_name, api_version, credentials=None):
     A configured Google Genomics API client with appropriate credentials.
   """
   if not credentials:
-    credentials = oauth2client.client.GoogleCredentials.get_application_default(
-    )
+    credentials, _ = google.auth.default()
   return apiclient.discovery.build(
       api_name, api_version, credentials=credentials)
 
