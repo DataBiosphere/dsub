@@ -517,6 +517,12 @@ def tasks_file_to_task_descriptors(tasks, retries, input_file_param_util,
   task_min = tasks.get('min')
   task_max = tasks.get('max')
 
+  # First check for any empty lines
+  param_file = dsub_util.load_file(path)
+  if any([not line for line in param_file]):
+    raise ValueError('Blank line(s) found in {}'.format(path))
+  param_file.close()
+
   # Load the file and set up a Reader that tokenizes the fields
   param_file = dsub_util.load_file(path)
   reader = csv.reader(param_file, delimiter='\t')
@@ -537,8 +543,9 @@ def tasks_file_to_task_descriptors(tasks, retries, input_file_param_util,
       continue
 
     if len(row) != len(job_params):
-      dsub_util.print_error('Unexpected number of fields %s vs %s: line %s' %
-                            (len(row), len(job_params), reader.line_num))
+      raise ValueError(
+          'Unexpected number of fields {} vs {}: in {} line {}'.format(
+              len(row), len(job_params), path, reader.line_num))
 
     # Each row can contain "envs", "inputs", "outputs"
     envs = set()
