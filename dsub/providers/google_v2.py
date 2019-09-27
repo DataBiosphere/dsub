@@ -49,13 +49,9 @@ _SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 
-# Action steps that interact with GCS need gsutil.
-# Use the 'slim' variant of the cloud-sdk Docker image as it is much smaller.
-_CLOUD_SDK_IMAGE = 'google/cloud-sdk:slim'
-
-# The prepare step needs Python.
-# Use the 'slim' variant of the python Docker image as it is much smaller.
-_PYTHON_IMAGE = 'python:2.7-slim'
+# Action steps that interact with GCS need gsutil and Python.
+# Use the 'slim' variant of the cloud-sdk image as it is much smaller.
+_CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
 
 # This image is for an optional ssh container.
 _SSH_IMAGE = 'gcr.io/cloud-genomics-pipelines/tools'
@@ -765,7 +761,7 @@ class GoogleV2JobProvider(base.JobProvider):
     actions.append(
         google_v2_pipelines.build_action(
             name='prepare',
-            image_uri=_PYTHON_IMAGE,
+            image_uri=_CLOUD_SDK_IMAGE,
             mounts=[mnt_datadisk],
             environment=prepare_env,
             entrypoint='/bin/bash',
