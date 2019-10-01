@@ -27,9 +27,10 @@ import sys
 from apiclient import discovery
 from apiclient import errors
 from apiclient.http import MediaIoBaseDownload
-import oauth2client.client
 import retrying
 import six
+
+import google.auth
 
 
 # this is the Job ID for jobs that are skipped.
@@ -131,8 +132,7 @@ def compact_interval_string(value_list):
 def _get_storage_service(credentials):
   """Get a storage client using the provided credentials or defaults."""
   if credentials is None:
-    credentials = oauth2client.client.GoogleCredentials.get_application_default(
-    )
+    credentials, _ = google.auth.default()
   return discovery.build('storage', 'v1', credentials=credentials)
 
 
@@ -141,7 +141,7 @@ def _retry_storage_check(exception):
   now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
   print_error(
       '%s: Exception %s: %s' % (now, type(exception).__name__, str(exception)))
-  return isinstance(exception, oauth2client.client.AccessTokenRefreshError)
+  return isinstance(exception, google.auth.exceptions.RefreshError)
 
 
 # Exponential backoff retrying downloads of GCS object chunks.

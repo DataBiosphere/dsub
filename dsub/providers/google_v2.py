@@ -49,13 +49,9 @@ _SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 
-# Action steps that interact with GCS need gsutil.
-# Use the 'slim' variant of the cloud-sdk Docker image as it is much smaller.
-_CLOUD_SDK_IMAGE = 'google/cloud-sdk:slim'
-
-# The prepare step needs Python.
-# Use the 'slim' variant of the python Docker image as it is much smaller.
-_PYTHON_IMAGE = 'python:2.7-slim'
+# Action steps that interact with GCS need gsutil and Python.
+# Use the 'slim' variant of the cloud-sdk image as it is much smaller.
+_CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:264.0.0-slim'
 
 # This image is for an optional ssh container.
 _SSH_IMAGE = 'gcr.io/cloud-genomics-pipelines/tools'
@@ -468,8 +464,7 @@ class GoogleV2BatchHandler(object):
 class GoogleV2JobProvider(base.JobProvider):
   """dsub provider implementation managing Jobs on Google Cloud."""
 
-  def __init__(self, verbose, dry_run, project, credentials=None):
-    self._verbose = verbose
+  def __init__(self, dry_run, project, credentials=None):
     self._dry_run = dry_run
 
     self._project = project
@@ -766,7 +761,7 @@ class GoogleV2JobProvider(base.JobProvider):
     actions.append(
         google_v2_pipelines.build_action(
             name='prepare',
-            image_uri=_PYTHON_IMAGE,
+            image_uri=_CLOUD_SDK_IMAGE,
             mounts=[mnt_datadisk],
             environment=prepare_env,
             entrypoint='/bin/bash',
@@ -887,8 +882,7 @@ class GoogleV2JobProvider(base.JobProvider):
     google_base_api = google_base.Api(verbose=True)
     operation = google_base_api.execute(
         self._service.pipelines().run(body=request))
-    if self._verbose:
-      print('Launched operation {}'.format(operation['name']))
+    print('Provider internal-id (operation): {}'.format(operation['name']))
 
     return GoogleOperation(operation).get_field('task-id')
 

@@ -46,7 +46,7 @@ def get_dsub_provider():
   elif test.DSUB_PROVIDER == 'google':
     return google.GoogleJobProvider(False, False, test.PROJECT_ID)
   elif test.DSUB_PROVIDER == 'google-v2':
-    return google_v2.GoogleV2JobProvider(False, False, test.PROJECT_ID)
+    return google_v2.GoogleV2JobProvider(False, test.PROJECT_ID)
   else:
     print('Invalid provider specified.', file=sys.stderr)
     sys.exit(1)

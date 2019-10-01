@@ -97,7 +97,7 @@ setup(
     install_requires=[
         # dependencies for dsub, ddel, dstat
         'google-api-python-client',
-        'oauth2client',
+        'google-auth',
         'python-dateutil',
         'pytz',
         'pyyaml',
@@ -107,6 +107,7 @@ setup(
 
         # dependencies for test code
         'parameterized',
+        'mock',
     ],
 
     # Define a test suite for Python unittests only.
