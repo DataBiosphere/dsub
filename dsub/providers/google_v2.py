@@ -51,7 +51,7 @@ _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 
 # Action steps that interact with GCS need gsutil and Python.
 # Use the 'slim' variant of the cloud-sdk image as it is much smaller.
-_CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+_CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:264.0.0-slim'
 
 # This image is for an optional ssh container.
 _SSH_IMAGE = 'gcr.io/cloud-genomics-pipelines/tools'
