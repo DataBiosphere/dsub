@@ -23,6 +23,7 @@ import io
 import os
 import pwd
 import sys
+import warnings
 
 from apiclient import discovery
 from apiclient import errors
@@ -131,6 +132,9 @@ def compact_interval_string(value_list):
 
 def _get_storage_service(credentials):
   """Get a storage client using the provided credentials or defaults."""
+  # dsub is not a server application, so it is ok to filter this warning.
+  warnings.filterwarnings(
+      'ignore', 'Your application has authenticated using end user credentials')
   if credentials is None:
     credentials, _ = google.auth.default()
   return discovery.build('storage', 'v1', credentials=credentials)

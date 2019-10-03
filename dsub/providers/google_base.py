@@ -27,6 +27,7 @@ import re
 import socket
 from ssl import SSLError
 import sys
+import warnings
 
 from .._dsub_version import DSUB_VERSION
 import apiclient.discovery
@@ -588,6 +589,9 @@ def setup_service(api_name, api_version, credentials=None):
   Returns:
     A configured Google Genomics API client with appropriate credentials.
   """
+  # dsub is not a server application, so it is ok to filter this warning.
+  warnings.filterwarnings(
+      'ignore', 'Your application has authenticated using end user credentials')
   if not credentials:
     credentials, _ = google.auth.default()
   return apiclient.discovery.build(
