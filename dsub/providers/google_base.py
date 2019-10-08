@@ -352,7 +352,7 @@ def parse_rfc3339_utc_string(rfc3339_utc_string):
     micros = int(fraction)
   elif len(fraction) == 9:
     # When nanoseconds are provided, we round
-    micros = int(round(int(fraction) / 1000))
+    micros = int(round(int(fraction) // 1000))
   else:
     assert False, 'Fraction length not 0, 6, or 9: {}'.len(fraction)
 
