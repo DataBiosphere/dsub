@@ -37,6 +37,7 @@ from ..lib import job_model
 import pytz
 import retrying
 from six.moves import range
+import six.moves.http_client
 
 import google.auth
 
@@ -521,6 +522,13 @@ def retry_api_check(exception, verbose):
   # This has been observed as a transient error:
   #   ServerNotFoundError: Unable to find the server at genomics.googleapis.com
   if isinstance(exception, ServerNotFoundError):
+    _print_retry_error(exception, verbose)
+    return True
+
+  # Observed to be thrown transiently from auth libraries which use httplib2
+  # Use the one from six because httlib no longer exists in Python3
+  # https://docs.python.org/2/library/httplib.html
+  if isinstance(exception, six.moves.http_client.ResponseNotReady):
     _print_retry_error(exception, verbose)
     return True
 
