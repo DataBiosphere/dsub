@@ -73,8 +73,12 @@ _LOG_MSG_FN = textwrap.dedent("""\
     echo "$(get_datestamp) INFO: $@"
   }
 
+  function log_warning() {
+    1>&2 echo "$(get_datestamp) WARNING: $@"
+  }
+
   function log_error() {
-    echo "$(get_datestamp) ERROR: $@"
+    1>&2 echo "$(get_datestamp) ERROR: $@"
   }
 """)
 
@@ -104,7 +108,8 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
         return
       fi
       if (( attempt < 3 )); then
-        log_info "Sleeping 10s before the next attempt."
+        log_warning "Sleeping 10s before the next attempt of failed gsutil command"
+        log_warning "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
         sleep 10s
       fi
     done
@@ -154,7 +159,7 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
         return
       fi
       if (( attempt < 3 )); then
-        log_info "Sleeping 10s before the next attempt."
+        log_warning "Sleeping 10s before the next attempt."
         sleep 10s
       fi
     done
