@@ -27,6 +27,7 @@ import re
 import socket
 from ssl import SSLError
 import sys
+import warnings
 
 from .._dsub_version import DSUB_VERSION
 import apiclient.discovery
@@ -36,6 +37,7 @@ from ..lib import job_model
 import pytz
 import retrying
 from six.moves import range
+import six.moves.http_client
 
 import google.auth
 
@@ -102,6 +104,9 @@ _ZONES = [
     'asia-northeast1-a',
     'asia-northeast1-b',
     'asia-northeast1-c',
+    'asia-northeast2-a',
+    'asia-northeast2-b',
+    'asia-northeast2-c',
     'asia-south1-a',
     'asia-south1-b',
     'asia-south1-c',
@@ -126,6 +131,9 @@ _ZONES = [
     'europe-west4-a',
     'europe-west4-b',
     'europe-west4-c',
+    'europe-west6-a',
+    'europe-west6-b',
+    'europe-west6-c',
     'northamerica-northeast1-a',
     'northamerica-northeast1-b',
     'northamerica-northeast1-c',
@@ -350,7 +358,7 @@ def parse_rfc3339_utc_string(rfc3339_utc_string):
     micros = int(fraction)
   elif len(fraction) == 9:
     # When nanoseconds are provided, we round
-    micros = int(round(int(fraction) / 1000))
+    micros = int(round(int(fraction) // 1000))
   else:
     assert False, 'Fraction length not 0, 6, or 9: {}'.len(fraction)
 
@@ -523,6 +531,13 @@ def retry_api_check(exception, verbose):
     _print_retry_error(exception, verbose)
     return True
 
+  # Observed to be thrown transiently from auth libraries which use httplib2
+  # Use the one from six because httlib no longer exists in Python3
+  # https://docs.python.org/2/library/httplib.html
+  if isinstance(exception, six.moves.http_client.ResponseNotReady):
+    _print_retry_error(exception, verbose)
+    return True
+
   return False
 
 
@@ -588,6 +603,9 @@ def setup_service(api_name, api_version, credentials=None):
   Returns:
     A configured Google Genomics API client with appropriate credentials.
   """
+  # dsub is not a server application, so it is ok to filter this warning.
+  warnings.filterwarnings(
+      'ignore', 'Your application has authenticated using end user credentials')
   if not credentials:
     credentials, _ = google.auth.default()
   return apiclient.discovery.build(
