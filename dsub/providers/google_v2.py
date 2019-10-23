@@ -159,7 +159,8 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
         return
       fi
       if (( attempt < 3 )); then
-        log_warning "Sleeping 10s before the next attempt."
+        log_warning "Sleeping 10s before the next attempt of failed gsutil command"
+        log_warning "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
         sleep 10s
       fi
     done
