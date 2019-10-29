@@ -17,8 +17,8 @@ and Azure Batch.
 
 ## Getting started
 
-You can install `dsub` from [PyPI](pypi.python.org), or you can clone and
-install from this github repository.
+You can install `dsub` from [PyPI](https://pypi.org/project/dsub/), or you can clone and
+install from [github](https://github.com/DataBiosphere/dsub).
 
 ### Pre-installation steps
 
@@ -166,7 +166,7 @@ implements a consistent runtime environment. The current providers are:
 - google-v2 (the default)
 
 More details on the runtime environment implemented by the backend providers
-can be found in [dsub backend providers](./docs/providers/README.md).
+can be found in [dsub backend providers](https://github.com/DataBiosphere/dsub/blob/master/docs/providers/README.md).
 
 ### Deprecation of the `google` provider
 
@@ -281,7 +281,7 @@ environment variable, as `${MESSAGE}`.
 **Be sure to enclose your command string in single quotes and not double
 quotes. If you use double quotes, the command will be expanded in your local
 shell before being passed to dsub. For more information on using the
-`--command` flag, see [Scripts, Commands, and Docker](docs/code.md)**
+`--command` flag, see [Scripts, Commands, and Docker](https://github.com/DataBiosphere/dsub/blob/master/docs/code.md)**
 
 To set multiple environment variables, you can repeat the flag:
 
@@ -302,7 +302,8 @@ the cloud storage bucket path. Paths can be:
 * folder paths like `gs://my-bucket/my-folder`
 * wildcard paths like `gs://my-bucket/my-folder/*`
 
-See the [inputs and outputs](docs/input_output.md) documentation for more details.
+See the [inputs and outputs](https://github.com/DataBiosphere/dsub/blob/master/docs/input_output.md)
+documentation for more details.
 
 ### Transferring input files to a Google Cloud Storage bucket.
 
@@ -449,8 +450,8 @@ your local machine.
 `dsub` tasks run using the `google` or `google-v2` providers can take advantage
 of a wide range of CPU, RAM, disk, and hardware accelerator (eg. GPU) options.
 
-See the [Compute Resources](docs/compute_resources.md) documentation for
-details.
+See the [Compute Resources](https://github.com/DataBiosphere/dsub/blob/master/docs/compute_resources.md)
+documentation for details.
 
 ### Submitting a batch job
 
@@ -464,7 +465,8 @@ a tab-separated values (TSV) file containing the variables,
 inputs, and outputs for each task, and then call `dsub` once.
 The result will be a single `job-id` with multiple tasks. The tasks will
 be scheduled and run independently, but can be
-[monitored](#viewing-job-status) and [deleted](#deleting-a-job) as a group.
+[monitored](https://github.com/DataBiosphere/dsub#viewing-job-status) and
+[deleted](https://github.com/DataBiosphere/dsub#deleting-a-job) as a group.
 
 #### Tasks file format
 
@@ -513,17 +515,17 @@ The task range values can take any of the following forms:
 ### Logging
 
 The `--logging` flag points to a location for `dsub` task log files. For details
-on how to specify your logging path, see [Logging](docs/logging.md).
+on how to specify your logging path, see [Logging](https://github.com/DataBiosphere/dsub/blob/master/docs/logging.md).
 
 ### Job control
 
 It's possible to wait for a job to complete before starting another.
-For details, see [job control with dsub](docs/job_control.md).
+For details, see [job control with dsub](https://github.com/DataBiosphere/dsub/blob/master/docs/job_control.md).
 
 ### Retries
 
 It is possible for `dsub` to automatically retry failed tasks.
-For details, see [retries with dsub](docs/retries.md).
+For details, see [retries with dsub](https://github.com/DataBiosphere/dsub/blob/master/docs/retries.md).
 
 ### Labeling jobs and tasks
 
@@ -532,7 +534,7 @@ cancel tasks using your own identifiers. In addition, with the `google`
 provider, labeling a task will label associated compute resources such as
 virtual machines and disks.
 
-For more details, see [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
+For more details, see [Checking Status and Troubleshooting Jobs](https://github.com/DataBiosphere/dsub/blob/master/docs/troubleshooting.md)
 
 ### Viewing job status
 
@@ -563,12 +565,12 @@ each job includes:
     gets a sequential value of the form "task-*n*" where *n* is 1-based.
 
 Note that the job metadata values will be modified to conform with the "Label
-Restrictions" listed in the [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
+Restrictions" listed in the [Checking Status and Troubleshooting Jobs](https://github.com/DataBiosphere/dsub/blob/master/docs/troubleshooting.md)
 guide.
 
 Metadata can be used to cancel a job or individual tasks within a batch job.
 
-For more details, see [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
+For more details, see [Checking Status and Troubleshooting Jobs](https://github.com/DataBiosphere/dsub/blob/master/docs/troubleshooting.md)
 
 #### Summarizing job status
 
@@ -617,18 +619,18 @@ To delete all running jobs for the current user:
 
 *   See the examples:
 
-    *   [Custom scripts](examples/custom_scripts)
-    *   [Decompress files](examples/decompress)
-    *   [FastQC](examples/fastqc)
-    *   [Samtools index](examples/samtools)
+    *   [Custom scripts](https://github.com/DataBiosphere/dsub/tree/master/examples/custom_scripts)
+    *   [Decompress files](https://github.com/DataBiosphere/dsub/tree/master/examples/decompress)
+    *   [FastQC](https://github.com/DataBiosphere/dsub/tree/master/examples/fastqc)
+    *   [Samtools index](https://github.com/DataBiosphere/dsub/tree/master/examples/samtools)
 
 *   See more documentation for:
 
-    *   [Scripts, Commands, and Docker](docs/code.md)
-    *   [Input and Output File Handling](docs/input_output.md)
-    *   [Logging](docs/logging.md)
-    *   [Compute Resources](docs/compute_resources.md)
-    *   [Job Control](docs/job_control.md)
-    *   [Retries](docs/retries.md)
-    *   [Checking Status and Troubleshooting Jobs](docs/troubleshooting.md)
-    *   [Backend providers](docs/providers/README.md)
+    *   [Scripts, Commands, and Docker](https://github.com/DataBiosphere/dsub/blob/master/docs/code.md)
+    *   [Input and Output File Handling](https://github.com/DataBiosphere/dsub/blob/master/docs/input_output.md)
+    *   [Logging](https://github.com/DataBiosphere/dsub/blob/master/docs/logging.md)
+    *   [Compute Resources](https://github.com/DataBiosphere/dsub/blob/master/docs/compute_resources.md)
+    *   [Job Control](https://github.com/DataBiosphere/dsub/blob/master/docs/job_control.md)
+    *   [Retries](https://github.com/DataBiosphere/dsub/blob/master/docs/retries.md)
+    *   [Checking Status and Troubleshooting Jobs](https://github.com/DataBiosphere/dsub/blob/master/docs/troubleshooting.md)
+    *   [Backend providers](https://github.com/DataBiosphere/dsub/blob/master/docs/providers/README.md)
