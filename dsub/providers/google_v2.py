@@ -110,6 +110,9 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
       if (( attempt < 3 )); then
         log_warning "Sleeping 10s before the next attempt of failed gsutil command"
         log_warning "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
+        # Workaround for gsutil/gcloud issue that prevents re-authentication
+        # See https://github.com/googlegenomics/pipelines-tools/commit/464fd9c4a894b9144944459e47b64871aebd033a
+        rm -f "${HOME}/.config/gcloud/gce"
         sleep 10s
       fi
     done
@@ -161,6 +164,9 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
       if (( attempt < 3 )); then
         log_warning "Sleeping 10s before the next attempt of failed gsutil command"
         log_warning "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
+        # Workaround for gsutil issue that prevents re-authentication
+        # See https://github.com/googlegenomics/pipelines-tools/commit/464fd9c4a894b9144944459e47b64871aebd033a
+        rm -f "${HOME}/.config/gcloud/gce"
         sleep 10s
       fi
     done
