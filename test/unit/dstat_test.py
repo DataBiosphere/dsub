@@ -21,7 +21,7 @@ python dstat_test.py
 import collections
 import unittest
 
-from dsub.commands import dstat as dstat_command
+from dsub.lib import output_formatter
 
 
 class TestSummarize(unittest.TestCase):
@@ -39,7 +39,7 @@ class TestSummarize(unittest.TestCase):
         collections.OrderedDict([('job-name', 'job1'), ('status', 'RUNNING'),
                                  ('task-count', 2)])
     ]
-    table = dstat_command._prepare_summary_table(fake_tasks_table)
+    table = output_formatter.prepare_summary_table(fake_tasks_table)
     self.assertEqual(table, expected_table)
 
   def test_summarize_removes_extra_fields(self):
@@ -52,7 +52,7 @@ class TestSummarize(unittest.TestCase):
         collections.OrderedDict([('job-name', 'job1'), ('status', 'RUNNING'),
                                  ('task-count', 1)])
     ]
-    table = dstat_command._prepare_summary_table(fake_tasks_table)
+    table = output_formatter.prepare_summary_table(fake_tasks_table)
     self.assertEqual(table, expected_table)
 
   def test_summarize_keeps_jobs_separate(self):
@@ -69,7 +69,7 @@ class TestSummarize(unittest.TestCase):
         collections.OrderedDict([('job-name', 'job2'), ('status', 'RUNNING'),
                                  ('task-count', 1)])
     ]
-    table = dstat_command._prepare_summary_table(fake_tasks_table)
+    table = output_formatter.prepare_summary_table(fake_tasks_table)
     self.assertEqual(table, expected_table)
 
   def test_summarize_keeps_status_separate(self):
@@ -86,7 +86,7 @@ class TestSummarize(unittest.TestCase):
         collections.OrderedDict([('job-name', 'job1'), ('status', 'FAILURE'),
                                  ('task-count', 1)])
     ]
-    table = dstat_command._prepare_summary_table(fake_tasks_table)
+    table = output_formatter.prepare_summary_table(fake_tasks_table)
     self.assertEqual(table, expected_table)
 
   def test_summarize_puts_running_before_failure(self):
@@ -103,7 +103,7 @@ class TestSummarize(unittest.TestCase):
         collections.OrderedDict([('job-name', 'job1'), ('status', 'FAILURE'),
                                  ('task-count', 1)])
     ]
-    table = dstat_command._prepare_summary_table(fake_tasks_table)
+    table = output_formatter.prepare_summary_table(fake_tasks_table)
     self.assertEqual(table, expected_table)
 
   def test_summarize_keeps_nonstandard_status(self):
@@ -112,7 +112,7 @@ class TestSummarize(unittest.TestCase):
         collections.OrderedDict([('job-name', 'job1'), ('status', 'FLYING'),
                                  ('task-count', 1)])
     ]
-    table = dstat_command._prepare_summary_table(fake_tasks_table)
+    table = output_formatter.prepare_summary_table(fake_tasks_table)
     self.assertEqual(table, expected_table)
 
 

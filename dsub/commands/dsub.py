@@ -32,6 +32,7 @@ from dateutil.tz import tzlocal
 from ..lib import dsub_errors
 from ..lib import dsub_util
 from ..lib import job_model
+from ..lib import output_formatter
 from ..lib import param_util
 from ..lib import resources
 from ..lib.dsub_util import print_error
@@ -354,6 +355,12 @@ def _parse_arguments(prog, argv):
           and --output-recursive parameters already exist. Note that wildcard
           and recursive outputs cannot be strictly verified. See the
           documentation for details.""")
+  parser.add_argument(
+      '--summary',
+      default=False,
+      action='store_true',
+      help="""During the --wait loop, display a summary of the results,
+          grouped by (job, status).""")
 
   # Add dsub resource requirement arguments
   parser.add_argument(
@@ -669,7 +676,7 @@ def _resolve_task_resources(job_metadata, job_resources, task_descriptors):
   _resolve_preemptible(job_resources, task_descriptors)
 
 
-def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
+def _wait_after(provider, job_ids, poll_interval, stop_on_failure, summary):
   """Print status info as we wait for those jobs.
 
   Blocks until either all of the listed jobs succeed,
@@ -680,6 +687,7 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
     job_ids: a set of job IDs (string) to wait for
     poll_interval: integer seconds to wait between iterations
     stop_on_failure: whether to stop waiting if one of the tasks fails.
+    summary: whether to output summary messages
 
   Returns:
     Empty list if there was no error,
@@ -700,7 +708,8 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
     print('Waiting for: %s.' % (', '.join(job_ids_to_check)))
 
     # Poll until any remaining jobs have completed
-    jobs_left = _wait_for_any_job(provider, job_ids_to_check, poll_interval)
+    jobs_left = _wait_for_any_job(provider, job_ids_to_check, poll_interval,
+                                  summary)
 
     # Calculate which jobs just completed
     jobs_completed = job_ids_to_check.difference(jobs_left)
@@ -896,7 +905,7 @@ def _importance_of_task(task):
               dsub_util.replace_timezone(datetime.datetime.max, tzlocal())))
 
 
-def _wait_for_any_job(provider, job_ids, poll_interval):
+def _wait_for_any_job(provider, job_ids, poll_interval, summary):
   """Waits until any of the listed jobs is not running.
 
   In particular, if any of the jobs sees one of its tasks fail,
@@ -907,6 +916,7 @@ def _wait_for_any_job(provider, job_ids, poll_interval):
     provider: job service provider
     job_ids: a list of job IDs (string) to wait for
     poll_interval: integer seconds to wait between iterations
+    summary: whether to output summary messages
 
   Returns:
     A set of the jobIDs with still at least one running task.
@@ -914,6 +924,7 @@ def _wait_for_any_job(provider, job_ids, poll_interval):
   if not job_ids:
     return
   while True:
+    formatted_tasks = []
     tasks = provider.lookup_job_tasks({'*'}, job_ids=job_ids, verbose=False)
     running_jobs = set()
     failed_jobs = set()
@@ -924,6 +935,15 @@ def _wait_for_any_job(provider, job_ids, poll_interval):
         failed_jobs.add(job_id)
       if status == 'RUNNING':
         running_jobs.add(job_id)
+
+      if summary:
+        formatted_tasks.append(
+            output_formatter.prepare_row(t, full=False, summary=True))
+
+    if summary:
+      formatter = output_formatter.TextOutput(full=False)
+      formatter.prepare_and_print_table(formatted_tasks, summary)
+
     remaining_jobs = running_jobs.difference(failed_jobs)
     if failed_jobs or len(remaining_jobs) != len(job_ids):
       return remaining_jobs
@@ -1068,7 +1088,8 @@ def run_main(args):
       skip=args.skip,
       project=args.project,
       disable_warning=True,
-      unique_job_id=args.unique_job_id)
+      unique_job_id=args.unique_job_id,
+      summary=args.summary)
 
 
 def run(provider,
@@ -1089,7 +1110,8 @@ def run(provider,
         skip=False,
         project=None,
         disable_warning=False,
-        unique_job_id=False):
+        unique_job_id=False,
+        summary=False):
   """Actual dsub body, post-stdout-redirection."""
   if not dry_run:
     provider_base.emit_provider_message(provider)
@@ -1117,6 +1139,9 @@ def run(provider,
 
   if retries and not wait:
     raise ValueError('Requesting retries requires requesting wait')
+
+  if summary and not wait:
+    raise ValueError('Requesting summary requires requesting wait')
 
   if max_preemptible_attempts:
     max_preemptible_attempts.validate(retries)
@@ -1150,7 +1175,8 @@ def run(provider,
       print('(Pretend) waiting for: %s.' % after)
     else:
       print('Waiting for predecessor jobs to complete...')
-      error_messages = _wait_after(provider, after, poll_interval, True)
+      error_messages = _wait_after(provider, after, poll_interval, True,
+                                   summary)
       if error_messages:
         for msg in error_messages:
           print_error(msg)
@@ -1188,7 +1214,7 @@ def run(provider,
                                        poll_interval, retries, job_descriptor)
     else:
       error_messages = _wait_after(provider, [job_metadata['job-id']],
-                                   poll_interval, False)
+                                   poll_interval, False, summary)
     if error_messages:
       for msg in error_messages:
         print_error(msg)
