@@ -59,21 +59,10 @@ def get_provider_name(provider):
   return PROVIDER_NAME_MAP[provider.__class__]
 
 
-class DsubHelpFormatter(argparse.ArgumentDefaultsHelpFormatter,
-                        argparse.RawDescriptionHelpFormatter):
-  """Display defaults in help and display the epilog in its raw format.
-
-  As described in https://bugs.python.org/issue13023, there is not a built-in
-  class to provide both display of defaults as well as displaying the epilog
-  just as you want it to. The recommended approach is to create a simple
-  subclass of both Formatters.
-  """
-  pass
-
-
 def create_parser(prog):
   """Create an argument parser, adding in the list of providers."""
-  parser = argparse.ArgumentParser(prog=prog, formatter_class=DsubHelpFormatter)
+  parser = argparse.ArgumentParser(
+      prog=prog, formatter_class=argparse.RawDescriptionHelpFormatter)
 
   parser.add_argument(
       '--provider',
@@ -81,7 +70,7 @@ def create_parser(prog):
       choices=['local', 'google', 'google-v2', 'test-fails'],
       help="""Job service provider. Valid values are "google-v2" (Google's
         Pipeline API v2) and "local" (local Docker execution). "test-*"
-        providers are for testing purposes only.""",
+        providers are for testing purposes only. (default: google-v2)""",
       metavar='PROVIDER')
 
   return parser
