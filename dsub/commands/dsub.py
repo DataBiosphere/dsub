@@ -1225,6 +1225,9 @@ def run(provider,
     print('Waiting for job to complete...')
 
     if retries:
+      print('Monitoring for failed tasks to retry...')
+      print(
+          '*** This dsub process must continue running to retry failed tasks.')
       error_messages = _wait_and_retry(provider, job_metadata['job-id'],
                                        poll_interval, retries, job_descriptor)
     else:
