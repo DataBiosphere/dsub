@@ -402,7 +402,7 @@ To have the `google-v2` provider mount a persistent disk created from an image,
 use the `--mount` command line flag and the url of the source image and the size
 (in GB) of the disk:
 
-    --mount MYDISK=https://www.googleapis.com/compute/v1/projects/your-project/global/images/your-image 50
+    --mount MYDISK="https://www.googleapis.com/compute/v1/projects/your-project/global/images/your-image 50"
 
 The image will be used to create a new persistent disk, which will be attached
 to a Compute Engine VM. The disk will mounted into the Docker container running
