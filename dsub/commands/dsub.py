@@ -32,6 +32,7 @@ from dateutil.tz import tzlocal
 from ..lib import dsub_errors
 from ..lib import dsub_util
 from ..lib import job_model
+from ..lib import output_formatter
 from ..lib import param_util
 from ..lib import resources
 from ..lib.dsub_util import print_error
@@ -218,10 +219,11 @@ def _parse_arguments(prog, argv):
       default=False,
       action='store_true',
       help="""Experimental: create a unique 32 character UUID for the dsub
-          job-id using https://docs.python.org/3/library/uuid.html.""")
+          job-id using https://docs.python.org/3/library/uuid.html.
+          (default: False)""")
   parser.add_argument(
       '--name',
-      help="""Name for pipeline. Defaults to the script name or
+      help="""Name for the job. Defaults to the script name or
           first token of the --command if specified.""")
   parser.add_argument(
       '--tasks',
@@ -236,19 +238,21 @@ def _parse_arguments(prog, argv):
           and each subsequent line specifies the values for a task.
 
           Optionally specify tasks from the file to submit. Can take the form
-          "m", "m-", or "m-n" where m and n are task numbers starting at 1.""",
+          "m", "m-", or "m-n" where m and n are task numbers starting at 1.
+          (default: None)""",
       metavar='FILE M-N')
   parser.add_argument(
       '--image',
       default='ubuntu:14.04',
       help="""Image name from Docker Hub, Google Container Repository, or other
-          Docker image service. The pipeline must have READ access to the
-          image.""")
+          Docker image service. The task must have READ access to the
+          image. (default: ubuntu:14.04)""")
   parser.add_argument(
       '--dry-run',
       default=False,
       action='store_true',
-      help='Print the pipeline(s) that would be run and then exit.')
+      help='Print the task(s) that would be run and then exit. (default: False)'
+  )
   parser.add_argument(
       '--command',
       help="""Command to run inside the job\'s Docker container. This argument
@@ -315,7 +319,7 @@ def _parse_arguments(prog, argv):
       '--user-project',
       help="""Specify a user project to be billed for all requests to Google
          Cloud Storage (logging, localization, delocalization). This flag exists
-         to support accessing Requester Pays buckets""")
+         to support accessing Requester Pays buckets (default: None)""")
   parser.add_argument(
       '--mount',
       nargs='*',
@@ -329,18 +333,18 @@ def _parse_arguments(prog, argv):
   parser.add_argument(
       '--wait',
       action='store_true',
-      help='Wait for the job to finish all its tasks.')
+      help='Wait for the job to finish all its tasks. (default: False)')
   parser.add_argument(
       '--retries',
       default=0,
       type=int,
-      help='Number of retries to perform on failed tasks.')
+      help='Number of retries to perform on failed tasks. (default: 0)')
   parser.add_argument(
       '--poll-interval',
       default=10,
       type=int,
       help='Polling interval (in seconds) for checking job status '
-      'when --wait or --after are set.')
+      'when --wait or --after are set. (default: 10)')
   parser.add_argument(
       '--after',
       nargs='+',
@@ -353,22 +357,34 @@ def _parse_arguments(prog, argv):
       help="""Do not submit the job if all output specified using the --output
           and --output-recursive parameters already exist. Note that wildcard
           and recursive outputs cannot be strictly verified. See the
-          documentation for details.""")
+          documentation for details. (default: False)""")
+  parser.add_argument(
+      '--summary',
+      default=False,
+      action='store_true',
+      help="""During the --wait loop, display a summary of the results,
+          grouped by (job, status). (default: False)""")
 
   # Add dsub resource requirement arguments
   parser.add_argument(
       '--min-cores',
       type=int,
-      help='Minimum CPU cores for each job')
+      help="""Minimum CPU cores for each job. The default is provider-specific.
+           The google-v2 provider default is 1 core.
+           The local provider does not allocate resources, but uses available
+           resources of your machine.""")
   parser.add_argument(
       '--min-ram',
       type=float,
-      help='Minimum RAM per job in GB')
+      help="""Minimum RAM per job in GB. The default is provider-specific.
+           The google-v2 provider default is 3.75 GB.
+           The local provider does not allocate resources, but uses available
+           resources of your machine.""")
   parser.add_argument(
       '--disk-size',
       default=job_model.DEFAULT_DISK_SIZE,
       type=int,
-      help='Size (in GB) of data disk to attach for each job')
+      help='Size (in GB) of data disk to attach for each job (default: 200)')
 
   parser.add_argument(
       '--logging',
@@ -382,12 +398,13 @@ def _parse_arguments(prog, argv):
       title='google-common',
       description='Options common to the "google" and "google-v2" providers')
   google_common.add_argument(
-      '--project', help='Cloud project ID in which to run the pipeline')
+      '--project', help='Cloud project ID in which to run the job')
   google_common.add_argument(
       '--boot-disk-size',
       default=job_model.DEFAULT_BOOT_DISK_SIZE,
       type=int,
-      help='Size (in GB) of the boot disk')
+      help='Size (in GB) of the boot disk (default: {})'.format(
+          job_model.DEFAULT_BOOT_DISK_SIZE))
   google_common.add_argument(
       '--preemptible',
       const=param_util.preemptile_param_type(True),
@@ -396,7 +413,8 @@ def _parse_arguments(prog, argv):
       type=param_util.preemptile_param_type,
       help="""If --preemptible is given without a number, enables preemptible
           VMs for all attempts for all tasks. If a number value N is used,
-          enables preemptible VMs for up to N attempts for each task.""")
+          enables preemptible VMs for up to N attempts for each task.
+          Defaults to not using preemptible VMs.""")
   google_common.add_argument(
       '--zones', nargs='+', help='List of Google Compute Engine zones.')
   google_common.add_argument(
@@ -414,7 +432,7 @@ def _parse_arguments(prog, argv):
           https://cloud.google.com/compute/docs/gpus/ for supported GPU types
           and
           https://cloud.google.com/genomics/reference/rest/v1alpha2/pipelines#pipelineresources
-          for more details.""")
+          for more details. (default: None)""")
   google_common.add_argument(
       '--accelerator-count',
       type=int,
@@ -422,7 +440,8 @@ def _parse_arguments(prog, argv):
       help="""The number of accelerators of the specified type to attach.
           By specifying this parameter, you will download and install the
           following third-party software onto your job's Compute Engine
-          instances: NVIDIA(R) Tesla(R) drivers and NVIDIA(R) CUDA toolkit.""")
+          instances: NVIDIA(R) Tesla(R) drivers and NVIDIA(R) CUDA toolkit.
+          (default: 0)""")
 
   google = parser.add_argument_group(
       title='"google" provider options',
@@ -444,38 +463,39 @@ def _parse_arguments(prog, argv):
       help="""List of Google Compute Engine regions.
           Only one of --zones and --regions may be specified.""")
   google_v2.add_argument(
-      '--machine-type', help='Provider-specific machine type')
+      '--machine-type', help='Provider-specific machine type (default: None)')
   google_v2.add_argument(
       '--cpu-platform',
       help="""The CPU platform to request. Supported values can be found at
-      https://cloud.google.com/compute/docs/instances/specify-min-cpu-platform"""
-  )
+      https://cloud.google.com/compute/docs/instances/specify-min-cpu-platform
+      (default: None)""")
   google_v2.add_argument(
       '--network',
       help="""The Compute Engine VPC network name to attach the VM's network
           interface to. The value will be prefixed with global/networks/ unless
           it contains a /, in which case it is assumed to be a fully specified
-          network resource URL.""")
+          network resource URL. (default: None)""")
   google_v2.add_argument(
       '--subnetwork',
       help="""The name of the Compute Engine subnetwork to attach the instance
-          to.""")
+          to. (default: None)""")
   google_v2.add_argument(
       '--use-private-address',
       default=False,
       action='store_true',
-      help='If set to true, do not attach a public IP address to the VM.')
+      help="""If set to true, do not attach a public IP address to the VM.
+      (default: False)""")
   google_v2.add_argument(
       '--timeout',
-      help="""The maximum amount of time to give the pipeline to complete.
+      help="""The maximum amount of time to give the task to complete.
           This includes the time spent waiting for a worker to be allocated.
           Time can be listed using a number followed by a unit. Supported units
-          are s (seconds), m (minutes), h (hours), d (days), w (weeks).
-          Example: '7d' (7 days).""")
+          are s (seconds), m (minutes), h (hours), d (days), w (weeks). The
+          provider-specific default is 7 days. Example: '7d' (7 days).""")
   google_v2.add_argument(
       '--log-interval',
       help="""The amount of time to sleep between copies of log files from
-          the pipeline to the logging path.
+          the task to the logging path.
           Time can be listed using a number followed by a unit. Supported units
           are s (seconds), m (minutes), h (hours).
           Example: '5m' (5 minutes). Default is '1m'.""")
@@ -484,14 +504,15 @@ def _parse_arguments(prog, argv):
       default=False,
       action='store_true',
       help="""If set to true, start an ssh container in the background
-          to allow you to log in using SSH and debug in real time.""")
+          to allow you to log in using SSH and debug in real time.
+          (default: False)""")
   google_v2.add_argument(
       '--nvidia-driver-version',
       help="""The NVIDIA driver version to use when attaching an NVIDIA GPU
           accelerator. The version specified here must be compatible with the
           GPU libraries contained in the container being executed, and must be
           one of the drivers hosted in the nvidia-drivers-us-public bucket on
-          Google Cloud Storage.""")
+          Google Cloud Storage. (default: None)""")
   google_v2.add_argument(
       '--service-account',
       type=str,
@@ -507,7 +528,8 @@ def _parse_arguments(prog, argv):
       '--enable-stackdriver-monitoring',
       default=False,
       action='store_true',
-      help='If set to true, enables Stackdriver monitoring on the VM.')
+      help="""If set to true, enables Stackdriver monitoring on the VM.
+              (default: False)""")
 
   args = provider_base.parse_args(
       parser, {
@@ -669,7 +691,7 @@ def _resolve_task_resources(job_metadata, job_resources, task_descriptors):
   _resolve_preemptible(job_resources, task_descriptors)
 
 
-def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
+def _wait_after(provider, job_ids, poll_interval, stop_on_failure, summary):
   """Print status info as we wait for those jobs.
 
   Blocks until either all of the listed jobs succeed,
@@ -680,6 +702,7 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
     job_ids: a set of job IDs (string) to wait for
     poll_interval: integer seconds to wait between iterations
     stop_on_failure: whether to stop waiting if one of the tasks fails.
+    summary: whether to output summary messages
 
   Returns:
     Empty list if there was no error,
@@ -700,7 +723,8 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure):
     print('Waiting for: %s.' % (', '.join(job_ids_to_check)))
 
     # Poll until any remaining jobs have completed
-    jobs_left = _wait_for_any_job(provider, job_ids_to_check, poll_interval)
+    jobs_left = _wait_for_any_job(provider, job_ids_to_check, poll_interval,
+                                  summary)
 
     # Calculate which jobs just completed
     jobs_completed = job_ids_to_check.difference(jobs_left)
@@ -896,7 +920,7 @@ def _importance_of_task(task):
               dsub_util.replace_timezone(datetime.datetime.max, tzlocal())))
 
 
-def _wait_for_any_job(provider, job_ids, poll_interval):
+def _wait_for_any_job(provider, job_ids, poll_interval, summary):
   """Waits until any of the listed jobs is not running.
 
   In particular, if any of the jobs sees one of its tasks fail,
@@ -907,6 +931,7 @@ def _wait_for_any_job(provider, job_ids, poll_interval):
     provider: job service provider
     job_ids: a list of job IDs (string) to wait for
     poll_interval: integer seconds to wait between iterations
+    summary: whether to output summary messages
 
   Returns:
     A set of the jobIDs with still at least one running task.
@@ -914,6 +939,7 @@ def _wait_for_any_job(provider, job_ids, poll_interval):
   if not job_ids:
     return
   while True:
+    formatted_tasks = []
     tasks = provider.lookup_job_tasks({'*'}, job_ids=job_ids, verbose=False)
     running_jobs = set()
     failed_jobs = set()
@@ -924,6 +950,15 @@ def _wait_for_any_job(provider, job_ids, poll_interval):
         failed_jobs.add(job_id)
       if status == 'RUNNING':
         running_jobs.add(job_id)
+
+      if summary:
+        formatted_tasks.append(
+            output_formatter.prepare_row(t, full=False, summary=True))
+
+    if summary:
+      formatter = output_formatter.TextOutput(full=False)
+      formatter.prepare_and_print_table(formatted_tasks, summary)
+
     remaining_jobs = running_jobs.difference(failed_jobs)
     if failed_jobs or len(remaining_jobs) != len(job_ids):
       return remaining_jobs
@@ -1068,7 +1103,8 @@ def run_main(args):
       skip=args.skip,
       project=args.project,
       disable_warning=True,
-      unique_job_id=args.unique_job_id)
+      unique_job_id=args.unique_job_id,
+      summary=args.summary)
 
 
 def run(provider,
@@ -1089,7 +1125,8 @@ def run(provider,
         skip=False,
         project=None,
         disable_warning=False,
-        unique_job_id=False):
+        unique_job_id=False,
+        summary=False):
   """Actual dsub body, post-stdout-redirection."""
   if not dry_run:
     provider_base.emit_provider_message(provider)
@@ -1117,6 +1154,9 @@ def run(provider,
 
   if retries and not wait:
     raise ValueError('Requesting retries requires requesting wait')
+
+  if summary and not wait:
+    raise ValueError('Requesting summary requires requesting wait')
 
   if max_preemptible_attempts:
     max_preemptible_attempts.validate(retries)
@@ -1150,7 +1190,8 @@ def run(provider,
       print('(Pretend) waiting for: %s.' % after)
     else:
       print('Waiting for predecessor jobs to complete...')
-      error_messages = _wait_after(provider, after, poll_interval, True)
+      error_messages = _wait_after(provider, after, poll_interval, True,
+                                   summary)
       if error_messages:
         for msg in error_messages:
           print_error(msg)
@@ -1184,11 +1225,14 @@ def run(provider,
     print('Waiting for job to complete...')
 
     if retries:
+      print('Monitoring for failed tasks to retry...')
+      print(
+          '*** This dsub process must continue running to retry failed tasks.')
       error_messages = _wait_and_retry(provider, job_metadata['job-id'],
                                        poll_interval, retries, job_descriptor)
     else:
       error_messages = _wait_after(provider, [job_metadata['job-id']],
-                                   poll_interval, False)
+                                   poll_interval, False, summary)
     if error_messages:
       for msg in error_messages:
         print_error(msg)

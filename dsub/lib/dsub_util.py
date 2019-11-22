@@ -25,9 +25,9 @@ import pwd
 import sys
 import warnings
 
-from apiclient import discovery
-from apiclient import errors
-from apiclient.http import MediaIoBaseDownload
+from googleapiclient import discovery
+from googleapiclient import errors
+from googleapiclient.http import MediaIoBaseDownload
 import retrying
 import six
 

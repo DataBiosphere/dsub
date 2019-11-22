@@ -46,6 +46,12 @@ def get_dsub_version():
   raise ValueError('Could not find version.')
 
 
+def get_readme_contents():
+  """Get the README.md contents."""
+  with open('README.md', 'r') as f:
+    return f.read()
+
+
 setup(
     name='dsub',
 
@@ -53,6 +59,8 @@ setup(
     version=get_dsub_version(),
     description=('A command-line tool that makes it easy to submit and run'
                  ' batch scripts in the cloud'),
+    long_description=get_readme_contents(),
+    long_description_content_type='text/markdown',
 
     # The project's main homepage.
     url='https://github.com/DataBiosphere/dsub',

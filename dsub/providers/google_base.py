@@ -30,8 +30,8 @@ import sys
 import warnings
 
 from .._dsub_version import DSUB_VERSION
-import apiclient.discovery
-import apiclient.errors
+import googleapiclient.discovery
+import googleapiclient.errors
 from httplib2 import ServerNotFoundError
 from ..lib import job_model
 import pytz
@@ -505,7 +505,7 @@ def retry_api_check(exception, verbose):
   Returns:
     True if we should retry. False otherwise.
   """
-  if isinstance(exception, apiclient.errors.HttpError):
+  if isinstance(exception, googleapiclient.errors.HttpError):
     if exception.resp.status in TRANSIENT_HTTP_ERROR_CODES:
       _print_retry_error(exception, verbose)
       return True
@@ -562,7 +562,7 @@ def retry_auth_check(exception, verbose):
   Returns:
     True if we should retry. False otherwise.
   """
-  if isinstance(exception, apiclient.errors.HttpError):
+  if isinstance(exception, googleapiclient.errors.HttpError):
     if exception.resp.status in HTTP_AUTH_ERROR_CODES:
       _print_retry_error(exception, verbose)
       return True
@@ -608,7 +608,7 @@ def setup_service(api_name, api_version, credentials=None):
       'ignore', 'Your application has authenticated using end user credentials')
   if not credentials:
     credentials, _ = google.auth.default()
-  return apiclient.discovery.build(
+  return googleapiclient.discovery.build(
       api_name, api_version, credentials=credentials)
 
 
