@@ -21,6 +21,7 @@ import argparse
 import os
 
 from . import google
+from . import google_cls_v2
 from . import google_v2
 from . import local
 from . import test_fails
@@ -29,6 +30,7 @@ from . import test_fails
 PROVIDER_NAME_MAP = {
     google.GoogleJobProvider: 'google',
     google_v2.GoogleV2JobProvider: 'google-v2',
+    google_cls_v2.GoogleCLSV2JobProvider: 'google-cls-v2',
     local.LocalJobProvider: 'local',
     test_fails.FailsJobProvider: 'test-fails',
 }
@@ -45,6 +47,9 @@ def get_provider(args, resources):
         getattr(args, 'dry_run', False), args.project)
   elif provider == 'google-v2':
     return google_v2.GoogleV2JobProvider(
+        getattr(args, 'dry_run', False), args.project)
+  elif provider == 'google-cls-v2':
+    return google_cls_v2.GoogleCLSV2JobProvider(
         getattr(args, 'dry_run', False), args.project)
   elif provider == 'local':
     return local.LocalJobProvider(resources)
@@ -67,10 +72,13 @@ def create_parser(prog):
   parser.add_argument(
       '--provider',
       default='google-v2',
-      choices=['local', 'google', 'google-v2', 'test-fails'],
+      choices=['local', 'google', 'google-v2', 'google-cls-v2', 'test-fails'],
       help="""Job service provider. Valid values are "google-v2" (Google's
-        Pipeline API v2) and "local" (local Docker execution). "test-*"
-        providers are for testing purposes only. (default: google-v2)""",
+        Pipeline API v2) and "local" (local Docker execution). "google-cls-v2"
+        (Google Cloud Life Science's Pipelines API v2beta is in development).
+        "google" provider is deprecated.
+        "test-*" providers are for testing purposes only.
+        (default: google-v2)""",
       metavar='PROVIDER')
 
   return parser
@@ -105,6 +113,8 @@ def get_dstat_provider_args(provider, project):
     args.append('--project %s' % project)
   elif provider_name == 'google-v2':
     args.append('--project %s' % project)
+  elif provider_name == 'google-cls-v2':
+    args.append('--project %s' % project)
   elif provider_name == 'local':
     pass
   elif provider_name == 'test-fails':
@@ -131,7 +141,7 @@ def emit_provider_message(provider):
 def check_for_unsupported_flag(args):
   """Raise an error if the provider doesn't support a provided flag."""
   if args.label and args.provider not in [
-      'test-fails', 'local', 'google', 'google-v2'
+      'test-fails', 'local', 'google', 'google-v2', 'google-cls-v2'
   ]:
     raise ValueError(
         '--label is not supported by the "%s" provider.' % args.provider)

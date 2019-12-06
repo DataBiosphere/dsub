@@ -531,10 +531,21 @@ def _parse_arguments(prog, argv):
       help="""If set to true, enables Stackdriver monitoring on the VM.
               (default: False)""")
 
+  google_cls_v2 = parser.add_argument_group(
+      title='"google-cls-v2" provider options',
+      description='See also the "google-common" options listed above')
+  google_cls_v2.add_argument(
+      '--location',
+      help="""Specifies the Google Compute Engine region for the pipeline
+        request to be sent and operation metadata to be stored. The associated
+        dsub task may be executed in another region if the --regions or --zones
+        arguments are specified.""")
+
   args = provider_base.parse_args(
       parser, {
           'google': ['project', 'zones', 'logging'],
           'google-v2': ['project', 'logging'],
+          'google-cls-v2': ['project', 'logging', 'location'],
           'test-fails': [],
           'local': ['logging'],
       }, argv)
