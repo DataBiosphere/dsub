@@ -20,6 +20,11 @@ and Azure Batch.
 You can install `dsub` from [PyPI](https://pypi.org/project/dsub/), or you can clone and
 install from [github](https://github.com/DataBiosphere/dsub).
 
+### Sunsetting Python 2 support
+
+Python 2 support will end in January 2020. We will turn off our tests running on Python 2.
+See [Python's official article](https://www.python.org/doc/sunset-python-2/) for details.
+
 ### Pre-installation steps
 
 1. This is optional, but whether installing from PyPI or from github,

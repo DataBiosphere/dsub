@@ -6,13 +6,29 @@ File is based on this template: https://github.com/pypa/sampleproject
 import os
 import sys
 import unittest
-import warnings
 # Always prefer setuptools over distutils
 from setuptools import find_packages
 from setuptools import setup
 
-if sys.version_info[0] != 2:
-  warnings.warn('Python 3.x support is experimental.')
+
+_DEPENDENCIES = [
+    # dependencies for dsub, ddel, dstat
+    'google-api-python-client',
+    'google-auth',
+    'python-dateutil',
+    'pytz',
+    'pyyaml',
+    'retrying',
+    'six',
+    'tabulate',
+
+    # dependencies for test code
+    'parameterized',
+    'mock',
+]
+
+if sys.version_info[0] == 2:
+  _DEPENDENCIES.append('cachetools==3.1.1')
 
 
 def unittest_suite():
@@ -75,8 +91,7 @@ setup(
         #   3 - Alpha
         #   4 - Beta
         #   5 - Production/Stable
-        'Development Status :: 1 - Planning',
-        # 'Development Status :: 3 - Alpha',
+        'Development Status :: 3 - Alpha',
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
@@ -91,6 +106,9 @@ setup(
         # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
 
     # What does your project relate to?
@@ -102,21 +120,7 @@ setup(
 
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed.
-    install_requires=[
-        # dependencies for dsub, ddel, dstat
-        'google-api-python-client',
-        'google-auth',
-        'python-dateutil',
-        'pytz',
-        'pyyaml',
-        'retrying',
-        'six',
-        'tabulate',
-
-        # dependencies for test code
-        'parameterized',
-        'mock',
-    ],
+    install_requires=_DEPENDENCIES,
 
     # Define a test suite for Python unittests only.
     test_suite='setup.unittest_suite',
