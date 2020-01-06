@@ -17,7 +17,7 @@ _DEPENDENCIES = [
     'google-auth',
     'python-dateutil',
     'pytz',
-    'pyyaml',
+    'pyyaml<=5.2',
     'retrying',
     'six',
     'tabulate',
