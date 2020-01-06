@@ -11,19 +11,18 @@ USAGE:
 Sets up a virtualenv in the current working directory and runs the specified
 tests (or all if none is specified).
 
-A Python version number (2|3|2.N|3.N) may be passed as the first argument and
-the virtualenv will be created with this version of Python. If no version is
-specified, "2" will be used by default.
+A Python version number (2|3|2.N|3.N) must be passed as the first argument and
+the virtualenv will be created with this version of Python.
 EOF
   exit 0
 fi
 
 # Get the python version.
-if grep -qP "^[23]\.?[567]?$" <<< "${1}" ; then
-    PYTHON_VERSION="${1}"
-    shift
+if grep -qP "^[23]\.?[567]?.?[1-9]$" <<< "${1}" ; then
+  PYTHON_VERSION="${1}"
+  shift
 else
-    PYTHON_VERSION="2"
+  echo "Bad python version found: ${PYTHON_VERSION}"
 fi
 
 
@@ -38,6 +37,13 @@ echo ""
 set +o nounset
 source test/setup_virtualenv "${PYTHON_VERSION}"
 set -o nounset
+
+# Verify that we have picked up the correct Python version
+readonly VER="$(2>&1 python --version | awk '{print $2}')"
+if [[ "${VER}" != "${PYTHON_VERSION}" ]]; then
+  1>&2 echo "Unexpected Python version: ${VER} != ${PYTHON_VERSION}"
+  exit 1
+fi
 
 echo ""
 echo "Starting tests."
