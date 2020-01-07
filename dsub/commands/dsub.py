@@ -772,7 +772,8 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure, summary):
   return error_messages
 
 
-def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
+def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor,
+                    summary):
   """Wait for job and retry any tasks that fail.
 
   Stops retrying an individual task when: it succeeds, is canceled, or has been
@@ -787,6 +788,7 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
     poll_interval: integer seconds to wait between iterations
     retries: number of retries
     job_descriptor: job descriptor used to originally submit job
+    summary: whether to output summary messages
 
   Returns:
     Empty list if there was no error,
@@ -794,6 +796,7 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
   """
 
   while True:
+    formatted_tasks = []
     tasks = provider.lookup_job_tasks({'*'}, job_ids=[job_id], verbose=False)
 
     running_tasks = set()
@@ -826,6 +829,14 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
         completed_tasks.add(task_id)
       elif status == 'RUNNING':
         running_tasks.add(task_id)
+
+      if summary:
+        formatted_tasks.append(
+            output_formatter.prepare_row(t, full=False, summary=True))
+
+    if summary:
+      formatter = output_formatter.TextOutput(full=False)
+      formatter.prepare_and_print_table(formatted_tasks, summary)
 
     retry_tasks = (
         set(task_fail_count).difference(fully_failed_tasks)
@@ -1240,7 +1251,8 @@ def run(provider,
       print(
           '*** This dsub process must continue running to retry failed tasks.')
       error_messages = _wait_and_retry(provider, job_metadata['job-id'],
-                                       poll_interval, retries, job_descriptor)
+                                       poll_interval, retries, job_descriptor,
+                                       summary)
     else:
       error_messages = _wait_after(provider, [job_metadata['job-id']],
                                    poll_interval, False, summary)

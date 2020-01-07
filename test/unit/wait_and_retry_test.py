@@ -107,8 +107,13 @@ class TestWaitAndRetry(unittest.TestCase):
         ])
 
     poll_interval = 1
-    ret = dsub_command._wait_and_retry(self.provider, 'job-1', poll_interval,
-                                       retries, job_descriptor)
+    ret = dsub_command._wait_and_retry(
+        self.provider,
+        'job-1',
+        poll_interval,
+        retries,
+        job_descriptor,
+        summary=False)
     tasks = self.provider.lookup_job_tasks({'*'})
 
     # First, the number of tasks returned by lookup_job_tasks should be equal
