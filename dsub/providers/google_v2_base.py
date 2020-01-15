@@ -14,8 +14,9 @@
 # limitations under the License.
 """Provider for running jobs on Google Cloud Platform.
 
-This module implements job creation, listing, and canceling using the
-Google Genomics Pipelines and Operations APIs v2alpha1.
+This module serves as the base class for the google-v2 and google-cls-v2
+providers. The APIs they are based on are very similar and can benefit from
+sharing code.
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -34,14 +35,13 @@ from . import base
 from . import google_base
 from . import google_v2_operations
 from . import google_v2_pipelines
+from . import google_v2_versions
 
 from ..lib import dsub_util
 from ..lib import job_model
 from ..lib import param_util
 from ..lib import providers_util
 from six.moves import zip
-
-_PROVIDER_NAME = 'google-v2'
 
 # Create file provider whitelist.
 _SUPPORTED_FILE_PROVIDERS = frozenset([job_model.P_GCS])
@@ -473,16 +473,17 @@ class GoogleV2BatchHandler(object):
       self._response_handler(request_id, response, exception)
 
 
-class GoogleV2JobProvider(base.JobProvider):
+class GoogleV2JobProviderBase(base.JobProvider):
   """dsub provider implementation managing Jobs on Google Cloud."""
 
-  def __init__(self, dry_run, project, credentials=None):
-    self._dry_run = dry_run
+  def __init__(self, provider_name, api_version, credentials, project, dry_run):
+    service = google_base.setup_service(
+        google_v2_versions.get_api_name(api_version), api_version, credentials)
 
+    self._provider_name = provider_name
+    self._service = service
     self._project = project
-
-    self._service = google_base.setup_service('genomics', 'v2alpha1',
-                                              credentials)
+    self._dry_run = dry_run
 
   def prepare_job_metadata(self, script, job_name, user_id, create_time):
     """Returns a dictionary of metadata fields for the job."""
@@ -896,7 +897,7 @@ class GoogleV2JobProvider(base.JobProvider):
         self._service.pipelines().run(body=request))
     print('Provider internal-id (operation): {}'.format(operation['name']))
 
-    return GoogleOperation(operation).get_field('task-id')
+    return GoogleOperation(self._provider_name, operation).get_field('task-id')
 
   def submit_job(self, job_descriptor, skip_if_output_present):
     """Submit the job (or tasks) to be executed.
@@ -916,7 +917,7 @@ class GoogleV2JobProvider(base.JobProvider):
     # Validate task data and resources.
     param_util.validate_submit_args_or_fail(
         job_descriptor,
-        provider_name=_PROVIDER_NAME,
+        provider_name=self._provider_name,
         input_providers=_SUPPORTED_INPUT_PROVIDERS,
         output_providers=_SUPPORTED_OUTPUT_PROVIDERS,
         logging_providers=_SUPPORTED_LOGGING_PROVIDERS)
@@ -1090,7 +1091,7 @@ class GoogleV2JobProvider(base.JobProvider):
     response = google_base_api.execute(api)
 
     return [
-        GoogleOperation(op)
+        GoogleOperation(self._provider_name, op)
         for op in response.get('operations', [])
         if google_v2_operations.is_dsub_operation(op)
     ], response.get('nextPageToken')
@@ -1208,7 +1209,8 @@ class GoogleV2JobProvider(base.JobProvider):
 class GoogleOperation(base.Task):
   """Task wrapper around a Pipelines API operation object."""
 
-  def __init__(self, operation_data):
+  def __init__(self, provider_name, operation_data):
+    self._provider_name = provider_name
     self._op = operation_data
     self._job_descriptor = self._try_op_to_job_descriptor()
 
@@ -1401,7 +1403,7 @@ class GoogleOperation(base.Task):
       if last_update:
         value = google_base.parse_rfc3339_utc_string(last_update)
     elif field == 'provider':
-      return _PROVIDER_NAME
+      return self._provider_name
     elif field == 'provider-attributes':
       value = {}
 

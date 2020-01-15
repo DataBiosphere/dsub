@@ -15,7 +15,7 @@
 
 import unittest
 import apiclient.errors
-from dsub.providers import google_v2
+from dsub.providers import google_v2_base
 
 
 def callback_mock(request_id, response, exception):
@@ -38,7 +38,7 @@ class TestBatchHandling(unittest.TestCase):
     # Make a handler that executes a function that raises an http error,
     # make sure the handler catches the error correctly
 
-    api_handler_to_test = google_v2.GoogleV2BatchHandler(callback_mock)
+    api_handler_to_test = google_v2_base.GoogleV2BatchHandler(callback_mock)
     api_handler_to_test.add(CancelMock(), 'test_request_id')
     with self.assertRaises(apiclient.errors.HttpError):
       api_handler_to_test.execute()

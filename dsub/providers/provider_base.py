@@ -22,7 +22,7 @@ import os
 
 from . import google
 from . import google_cls_v2
-from . import google_v2
+from . import google_v2_provider as google_v2
 from . import local
 from . import test_fails
 
