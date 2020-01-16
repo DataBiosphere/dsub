@@ -13,18 +13,32 @@ from setuptools import setup
 
 _DEPENDENCIES = [
     # dependencies for dsub, ddel, dstat
-    'google-api-python-client',
-    'google-auth',
-    'python-dateutil',
-    'pytz',
+    # Pin to known working versions to prevent episodic breakage from library
+    # version mismatches.
+    # This version list generated: 01/10/2020
+
+    # direct dependencies
+    'google-api-python-client<=1.7.11',
+    'google-auth<=1.10.0',
+    'python-dateutil<=2.8.1',
+    'pytz<=2019.3',
     'pyyaml<=5.2',
-    'retrying',
-    'six',
-    'tabulate',
+    'retrying<=1.3.3',
+    'six<=1.13.0',
+    'tabulate<=0.8.6',
+
+    # downstream dependencies
+    'funcsigs<=1.0.2',
+    'google-auth-httplib2<=0.0.3',
+    'httplib2<=0.15.0',
+    'pyasn1<=0.4.8',
+    'pyasn1-modules<=0.2.8',
+    'rsa<=4.0',
+    'uritemplate<=3.0.1',
 
     # dependencies for test code
-    'parameterized',
-    'mock',
+    'parameterized<=0.7.1',
+    'mock<=3.0.5',
 ]
 
 if sys.version_info[0] == 2:
