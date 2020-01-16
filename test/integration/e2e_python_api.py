@@ -25,7 +25,7 @@ from dsub.lib import job_model
 from dsub.lib import param_util
 from dsub.lib import resources
 from dsub.providers import google
-from dsub.providers import google_v2_provider as google_v2
+from dsub.providers import google_v2
 from dsub.providers import local
 import six
 
