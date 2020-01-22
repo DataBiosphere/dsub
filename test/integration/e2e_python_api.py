@@ -25,6 +25,7 @@ from dsub.lib import job_model
 from dsub.lib import param_util
 from dsub.lib import resources
 from dsub.providers import google
+from dsub.providers import google_cls_v2
 from dsub.providers import google_v2
 from dsub.providers import local
 import six
@@ -41,10 +42,14 @@ except SystemError:
 
 
 def get_dsub_provider():
+  """Return the appropriate google_base.JobProvider instance."""
   if test.DSUB_PROVIDER == 'local':
     return local.LocalJobProvider(resources)
   elif test.DSUB_PROVIDER == 'google':
     return google.GoogleJobProvider(False, False, test.PROJECT_ID)
+  elif test.DSUB_PROVIDER == 'google-cls-v2':
+    return google_cls_v2.GoogleCLSV2JobProvider(False, test.PROJECT_ID,
+                                                'us-central1')
   elif test.DSUB_PROVIDER == 'google-v2':
     return google_v2.GoogleV2JobProvider(False, test.PROJECT_ID)
   else:
@@ -61,6 +66,7 @@ def dsub_start_job(command,
                    outputs=None,
                    outputs_recursive=None,
                    wait=False):
+  """Build up test parameters and call dsub.run()."""
 
   envs = envs or {}
   labels = labels or {}
@@ -129,6 +135,8 @@ def dstat_get_jobs(statuses=None,
                    labels=None,
                    create_time_min=None,
                    create_time_max=None):
+  """Build up test parameters and call dstat.dstat_job_producer()."""
+
   statuses = statuses or {'*'}
   labels = labels or {}
   labels['test-token'] = test_setup.TEST_TOKEN
@@ -173,6 +181,8 @@ def dstat_check_job_names(err_message,
                           labels=None,
                           create_time_min=None,
                           create_time_max=None):
+  """Call the dstat API, get the job names and verify they are as expected."""
+
   actual = dstat_get_job_names(statuses, job_ids, task_ids, labels,
                                create_time_min, create_time_max)
 

@@ -45,11 +45,11 @@ def get_provider(args, resources):
     return google.GoogleJobProvider(
         getattr(args, 'verbose', False),
         getattr(args, 'dry_run', False), args.project)
-  elif provider == 'google-v2':
-    return google_v2.GoogleV2JobProvider(
-        getattr(args, 'dry_run', False), args.project)
   elif provider == 'google-cls-v2':
     return google_cls_v2.GoogleCLSV2JobProvider(
+        getattr(args, 'dry_run', False), args.project, args.location)
+  elif provider == 'google-v2':
+    return google_v2.GoogleV2JobProvider(
         getattr(args, 'dry_run', False), args.project)
   elif provider == 'local':
     return local.LocalJobProvider(resources)
@@ -104,16 +104,16 @@ def parse_args(parser, provider_required_args, argv):
   return args
 
 
-def get_dstat_provider_args(provider, project):
+def get_dstat_provider_args(provider, project, location):
   """A string with the arguments to point dstat to the same provider+project."""
   provider_name = get_provider_name(provider)
 
   args = []
   if provider_name == 'google':
     args.append('--project %s' % project)
-  elif provider_name == 'google-v2':
-    args.append('--project %s' % project)
   elif provider_name == 'google-cls-v2':
+    args.append('--project %s --location %s' % (project, location))
+  elif provider_name == 'google-v2':
     args.append('--project %s' % project)
   elif provider_name == 'local':
     pass
@@ -127,10 +127,10 @@ def get_dstat_provider_args(provider, project):
   return ' '.join(args)
 
 
-def get_ddel_provider_args(provider_type, project):
+def get_ddel_provider_args(provider_type, project, location):
   """A string with the arguments to point ddel to the same provider+project."""
   # Change this if the two ever diverge.
-  return get_dstat_provider_args(provider_type, project)
+  return get_dstat_provider_args(provider_type, project, location)
 
 
 def emit_provider_message(provider):

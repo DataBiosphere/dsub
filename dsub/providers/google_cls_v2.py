@@ -22,53 +22,34 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from . import base
-from . import google_base
+from . import google_v2_base
+from . import google_v2_versions
 
 _PROVIDER_NAME = 'google-cls-v2'
 
 
-class GoogleCLSV2JobProvider(base.JobProvider):
+class GoogleCLSV2JobProvider(google_v2_base.GoogleV2JobProviderBase):
   """dsub provider implementation managing Jobs on Google Cloud."""
 
-  def __init__(self, dry_run, project, credentials=None):
-    self._dry_run = dry_run
+  def __init__(self, dry_run, project, location, credentials=None):
+    super(GoogleCLSV2JobProvider,
+          self).__init__(_PROVIDER_NAME, google_v2_versions.V2BETA, credentials,
+                         project, dry_run)
 
-    self._project = project
+    self._location = location
 
-    self._service = google_base.setup_service('lifesciences', 'v2beta',
-                                              credentials)
+  def _pipelines_run_api(self, request):
+    parent = 'projects/{}/locations/{}'.format(self._project, self._location)
+    return self._service.projects().locations().pipelines().run(
+        parent=parent, body=request)
 
-  def submit_job(self, job_descriptor):
-    raise NotImplementedError()
+  def _operations_list_api(self, ops_filter, page_token, page_size):
+    name = 'projects/{}/locations/{}'.format(self._project, self._location)
+    return self._service.projects().locations().operations().list(
+        name=name, filter=ops_filter, pageToken=page_token, pageSize=page_size)
 
-  def get_tasks_completion_messages(self, tasks):
-    """List of the error message of each given task."""
-    raise NotImplementedError()
-
-  def delete_jobs(self,
-                  user_ids,
-                  job_ids,
-                  task_ids,
-                  labels,
-                  create_time_min=None,
-                  create_time_max=None):
-    raise NotImplementedError()
-
-  def prepare_job_metadata(self, script, job_name, user_id, create_time):
-    raise NotImplementedError()
-
-  def lookup_job_tasks(self,
-                       statuses,
-                       user_ids=None,
-                       job_ids=None,
-                       job_names=None,
-                       task_ids=None,
-                       labels=None,
-                       create_time_min=None,
-                       create_time_max=None,
-                       max_tasks=0):
-    raise NotImplementedError()
+  def _operations_cancel_api_def(self):
+    return self._service.projects().locations().operations().cancel
 
 
 if __name__ == '__main__':

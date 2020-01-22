@@ -71,6 +71,7 @@ DEFAULT_BOOT_DISK_SIZE = 10
 DEFAULT_MOUNTED_DISK_SIZE = 10
 DEFAULT_PREEMPTIBLE = False
 DEFAULT_DISK_TYPE = 'pd-standard'
+DEFAULT_LOCATION = 'us-central1'
 
 # Users may specify their own labels, however dsub also uses an implicit set of
 # labels (in the google provider). Reserve these labels such that users do

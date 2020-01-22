@@ -209,7 +209,7 @@ function get_test_providers() {
     return
   fi
 
-  echo -n "local google-v2"
+  echo -n "local google-v2 google-cls-v2"
 }
 readonly -f get_test_providers
 

@@ -40,7 +40,9 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   DSTAT_OUTPUT=$(run_dstat --status '*' --names e2e-error --full)
 
   declare -a EXPECTED_EVENTS
-  if [[ "${DSUB_PROVIDER}" == "google" || "${DSUB_PROVIDER}" == "google-v2" ]]; then
+  if [[ "${DSUB_PROVIDER}" == "google" ]] || \
+     [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
+     [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
     EXPECTED_EVENTS=(start pulling-image localizing-files running-docker fail)
   else
     # The local provider has slightly different events in this error case

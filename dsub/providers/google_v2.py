@@ -36,6 +36,17 @@ class GoogleV2JobProvider(google_v2_base.GoogleV2JobProviderBase):
           self).__init__(_PROVIDER_NAME, google_v2_versions.V2ALPHA1,
                          credentials, project, dry_run)
 
+  def _pipelines_run_api(self, request):
+    return self._service.pipelines().run(body=request)
+
+  def _operations_list_api(self, ops_filter, page_token, page_size):
+    name = 'projects/{}/operations'.format(self._project)
+    return self._service.projects().operations().list(
+        name=name, filter=ops_filter, pageToken=page_token, pageSize=page_size)
+
+  def _operations_cancel_api_def(self):
+    return self._service.projects().operations().cancel
+
 
 if __name__ == '__main__':
   pass

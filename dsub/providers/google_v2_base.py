@@ -477,6 +477,9 @@ class GoogleV2JobProviderBase(base.JobProvider):
   """dsub provider implementation managing Jobs on Google Cloud."""
 
   def __init__(self, provider_name, api_version, credentials, project, dry_run):
+    google_v2_pipelines.set_api_version(api_version)
+    google_v2_operations.set_api_version(api_version)
+
     service = google_base.setup_service(
         google_v2_versions.get_api_name(api_version), api_version, credentials)
 
@@ -616,7 +619,8 @@ class GoogleV2JobProviderBase(base.JobProvider):
       actions_to_add.extend([
           google_v2_pipelines.build_action(
               name='mount-{}'.format(bucket),
-              flags=['ENABLE_FUSE', 'RUN_IN_BACKGROUND'],
+              enable_fuse=True,
+              run_in_background=True,
               image_uri=_GCSFUSE_IMAGE,
               mounts=[mnt_datadisk],
               commands=[
@@ -625,7 +629,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
               ]),
           google_v2_pipelines.build_action(
               name='mount-wait-{}'.format(bucket),
-              flags=['ENABLE_FUSE'],
+              enable_fuse=True,
               image_uri=_GCSFUSE_IMAGE,
               mounts=[mnt_datadisk],
               commands=[
@@ -755,7 +759,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     actions.append(
         google_v2_pipelines.build_action(
             name='logging',
-            flags='RUN_IN_BACKGROUND',
+            run_in_background=True,
             image_uri=_CLOUD_SDK_IMAGE,
             environment=logging_env,
             entrypoint='/bin/bash',
@@ -769,7 +773,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
               mounts=[mnt_datadisk],
               entrypoint='ssh-server',
               port_mappings={_DEFAULT_SSH_PORT: _DEFAULT_SSH_PORT},
-              flags='RUN_IN_BACKGROUND'))
+              run_in_background=True))
 
     actions.append(
         google_v2_pipelines.build_action(
@@ -826,7 +830,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
             ]),
         google_v2_pipelines.build_action(
             name='final_logging',
-            flags='ALWAYS_RUN',
+            always_run=True,
             image_uri=_CLOUD_SDK_IMAGE,
             environment=logging_env,
             entrypoint='/bin/bash',
@@ -893,8 +897,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
 
   def _submit_pipeline(self, request):
     google_base_api = google_base.Api(verbose=True)
-    operation = google_base_api.execute(
-        self._service.pipelines().run(body=request))
+    operation = google_base_api.execute(self._pipelines_run_api(request))
     print('Provider internal-id (operation): {}'.format(operation['name']))
 
     return GoogleOperation(self._provider_name, operation).get_field('task-id')
@@ -1082,11 +1085,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     page_size = min(sz for sz in [page_size, max_page_size, max_tasks] if sz)
 
     # Execute operations.list() and return all of the dsub operations
-    api = self._service.projects().operations().list(
-        name='projects/{}/operations'.format(self._project),
-        filter=ops_filter,
-        pageToken=page_token,
-        pageSize=page_size)
+    api = self._operations_list_api(ops_filter, page_token, page_size)
     google_base_api = google_base.Api(verbose)
     response = google_base_api.execute(api)
 
@@ -1202,8 +1201,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     print('Found %d tasks to delete.' % len(tasks))
 
     return google_base.cancel(GoogleV2BatchHandler,
-                              self._service.projects().operations().cancel,
-                              tasks)
+                              self._operations_cancel_api_def(), tasks)
 
 
 class GoogleOperation(base.Task):
