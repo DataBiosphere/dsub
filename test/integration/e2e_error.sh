@@ -28,16 +28,19 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   echo "Launching pipeline..."
 
-  if run_dsub \
+  set +o errexit
+  JOB_ID="$(run_dsub \
     --image 'debian:stable-slim' \
     --name 'e2e-error' \
     --command 'idontknowhowtounix' \
-    --wait; then
+    --wait)"
+  if [[ $? -eq 0 ]]; then
     echo "dsub did not report the failure as it should have."
     exit 1
   fi
+  set -o errexit
 
-  DSTAT_OUTPUT=$(run_dstat --status '*' --names e2e-error --full)
+  DSTAT_OUTPUT=$(run_dstat --status '*' --jobs "${JOB_ID}" --full)
 
   declare -a EXPECTED_EVENTS
   if [[ "${DSUB_PROVIDER}" == "google" ]] || \

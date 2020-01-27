@@ -36,6 +36,18 @@ class GoogleV2JobProvider(google_v2_base.GoogleV2JobProviderBase):
           self).__init__(_PROVIDER_NAME, google_v2_versions.V2ALPHA1,
                          credentials, project, dry_run)
 
+  def _get_pipeline_regions(self, regions, zones):
+    """Returns the list of regions to use for a pipeline request.
+
+    For v2alpha1, just return the regions value that was set, even if it is
+    empty.
+
+    Args:
+      regions (str): A space separated list of regions to use for the pipeline.
+      zones (str): A space separated list of zones to use for the pipeline.
+    """
+    return regions or []
+
   def _pipelines_run_api(self, request):
     return self._service.pipelines().run(body=request)
 

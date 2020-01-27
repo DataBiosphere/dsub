@@ -870,7 +870,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
 
     resources = google_v2_pipelines.build_resources(
         self._project,
-        job_resources.regions,
+        self._get_pipeline_regions(job_resources.regions, job_resources.zones),
         google_base.get_zones(job_resources.zones),
         google_v2_pipelines.build_machine(
             network=network,
@@ -1408,33 +1408,35 @@ class GoogleOperation(base.Task):
       # The VM instance name and zone can be found in the WorkerAssignedEvent.
       # For a given operation, this may have occurred multiple times, so be
       # sure to grab the most recent.
-      assigned_events = google_v2_operations.get_worker_assigned_events(
+      assigned_event_details = google_v2_operations.get_worker_assigned_event_details(
           self._op)
-      if assigned_events:
-        details = assigned_events[0].get('details', {})
-        value['instance-name'] = details.get('instance')
-        value['zone'] = details.get('zone')
+      if assigned_event_details:
+        value['instance-name'] = assigned_event_details.get('instance')
+        value['zone'] = assigned_event_details.get('zone')
 
       # The rest of the information comes from the request itself.
+      # Note that for the v2alpha1 API, the returned operation contains
+      # default values in the response, while the v2beta API omits fields
+      # that match empty defaults (hence the "False", "[]", and empty string
+      # default values in the get() calls below).
       resources = google_v2_operations.get_resources(self._op)
-      if 'regions' in resources:
-        value['regions'] = resources['regions']
-      if 'zones' in resources:
-        value['zones'] = resources['zones']
+      value['regions'] = resources.get('regions', [])
+      value['zones'] = resources.get('zones', [])
       if 'virtualMachine' in resources:
         vm = resources['virtualMachine']
         value['machine-type'] = vm.get('machineType')
-        value['preemptible'] = vm.get('preemptible')
+        value['preemptible'] = vm.get('preemptible', False)
 
         value['boot-disk-size'] = vm.get('bootDiskSizeGb')
-        value['network'] = vm.get('network', {}).get('name')
-        value['subnetwork'] = vm.get('network', {}).get('subnetwork')
+        value['network'] = google_v2_operations.get_vm_network_name(vm) or ''
+        value['subnetwork'] = vm.get('network', {}).get('subnetwork', '')
         value['use_private_address'] = vm.get('network',
-                                              {}).get('usePrivateAddress')
-        value['cpu_platform'] = vm.get('cpuPlatform')
-        value['accelerators'] = vm.get('accelerators')
+                                              {}).get('usePrivateAddress',
+                                                      False)
+        value['cpu_platform'] = vm.get('cpuPlatform', '')
+        value['accelerators'] = vm.get('accelerators', [])
         value['enable-stackdriver-monitoring'] = vm.get(
-            'enableStackdriverMonitoring')
+            'enableStackdriverMonitoring', False)
         value['service-account'] = vm.get('serviceAccount', {}).get('email')
         if 'disks' in vm:
           datadisk = next(

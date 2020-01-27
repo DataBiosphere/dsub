@@ -179,7 +179,7 @@ def get_event_of_type(op, event_type):
   return [e for e in events if e.get('details', {}).get('@type') == event_type]
 
 
-def get_worker_assigned_events(op):
+def _get_worker_assigned_events(op):
   """Return all "Worker Assigned" events."""
 
   events = get_events(op)
@@ -194,6 +194,23 @@ def get_worker_assigned_events(op):
 
   elif _API_VERSION == google_v2_versions.V2BETA:
     return [e for e in events if 'workerAssigned' in e]
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
+
+def get_worker_assigned_event_details(op):
+  """Return the detail portion of the most recent "worker assigned" event."""
+
+  events = _get_worker_assigned_events(op)
+  if not events:
+    return None
+
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    return events[0].get('details', {})
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+    return events[0].get('workerAssigned', {})
 
   else:
     assert False, 'Unexpected version: {}'.format(_API_VERSION)
@@ -217,6 +234,19 @@ def get_last_update(op):
 def get_resources(op):
   """Return the operation's resource."""
   return op.get('metadata', {}).get('pipeline').get('resources', {})
+
+
+def get_vm_network_name(vm):
+  """Return the name of the network from the virtualMachine."""
+
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    return vm.get('network', {}).get('name')
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+    return vm.get('network', {}).get('network')
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
 
 
 def is_pipeline(op):

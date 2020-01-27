@@ -38,6 +38,21 @@ class GoogleCLSV2JobProvider(google_v2_base.GoogleV2JobProviderBase):
 
     self._location = location
 
+  def _get_pipeline_regions(self, regions, zones):
+    """Returns the list of regions to use for a pipeline request.
+
+    If neither regions nor zones were specified for the pipeline, then use the
+    v2beta location as the default region.
+
+    Args:
+      regions (str): A space separated list of regions to use for the pipeline.
+      zones (str): A space separated list of zones to use for the pipeline.
+    """
+
+    if not regions and not zones:
+      return [self._location]
+    return regions or []
+
   def _pipelines_run_api(self, request):
     parent = 'projects/{}/locations/{}'.format(self._project, self._location)
     return self._service.projects().locations().pipelines().run(

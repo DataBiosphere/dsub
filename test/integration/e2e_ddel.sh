@@ -81,10 +81,11 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
       exit 1
     fi
 
-    # For the google-v2 provider, wait a sufficiently long time so that all the
+    # For the google v2 providers, wait a sufficiently long time so that all the
     # startup events occur prior to canceling so that the output event list is
     # consistent..
-    if [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+    if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
+       [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
       echo "Sleeping for 60s"
       sleep 60
     fi
