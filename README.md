@@ -122,7 +122,7 @@ charges using it.
 1.  Create a [Google Cloud Storage](https://cloud.google.com/storage) bucket.
 
     The dsub logs and output files will be written to a bucket. Create a
-    bucket using the [storage browser](https://cloud.google.com/storage/browser?project=)
+    bucket using the [storage browser](https://console.cloud.google.com/storage/browser?project=)
     or run the command-line utility [gsutil](https://cloud.google.com/storage/docs/gsutil),
     included in the Cloud SDK.
 

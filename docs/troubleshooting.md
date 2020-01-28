@@ -347,12 +347,9 @@ $ dstat \
 
 ## Viewing logs
 
-The location of `dsub` log files is determined by the `--logging` flag.
-The types of logs will vary depending on the `dsub` backend provider.
-The Google Pipelines API is currently the only backend provider.
-See the
-[Pipelines API Troubleshooting guide](https://cloud.google.com/genomics/v1alpha2/pipelines-api-troubleshooting)
-for more details on log files.
+Each `dsub` task produces log files whose destination is determined by the `--logging` flag.
+See [Logging](https://github.com/DataBiosphere/dsub/blob/master/docs/logging.md)
+for more information.
 
 ## SSH to the VM
 
