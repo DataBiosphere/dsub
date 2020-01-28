@@ -754,11 +754,15 @@ class GoogleV2JobProviderBase(base.JobProvider):
                                                     mounts)
     delocalization_env = self._get_delocalization_env(outputs, user_project)
 
+    # When --ssh is enabled, run all actions in the same process ID namespace
+    pid_namespace = 'shared' if job_resources.ssh else None
+
     # Build the list of actions
     actions = []
     actions.append(
         google_v2_pipelines.build_action(
             name='logging',
+            pid_namespace=pid_namespace,
             run_in_background=True,
             image_uri=_CLOUD_SDK_IMAGE,
             environment=logging_env,
@@ -769,6 +773,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
       actions.append(
           google_v2_pipelines.build_action(
               name='ssh',
+              pid_namespace=pid_namespace,
               image_uri=_SSH_IMAGE,
               mounts=[mnt_datadisk],
               entrypoint='ssh-server',
@@ -778,6 +783,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     actions.append(
         google_v2_pipelines.build_action(
             name='prepare',
+            pid_namespace=pid_namespace,
             image_uri=_CLOUD_SDK_IMAGE,
             mounts=[mnt_datadisk],
             environment=prepare_env,
@@ -789,6 +795,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     actions.extend([
         google_v2_pipelines.build_action(
             name='localization',
+            pid_namespace=pid_namespace,
             image_uri=_CLOUD_SDK_IMAGE,
             mounts=[mnt_datadisk],
             environment=localization_env,
@@ -803,6 +810,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
             ]),
         google_v2_pipelines.build_action(
             name='user-command',
+            pid_namespace=pid_namespace,
             image_uri=job_resources.image,
             mounts=[mnt_datadisk] + persistent_disk_mounts,
             environment=user_environment,
@@ -816,6 +824,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
             ]),
         google_v2_pipelines.build_action(
             name='delocalization',
+            pid_namespace=pid_namespace,
             image_uri=_CLOUD_SDK_IMAGE,
             mounts=[mnt_datadisk],
             environment=delocalization_env,
@@ -830,6 +839,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
             ]),
         google_v2_pipelines.build_action(
             name='final_logging',
+            pid_namespace=pid_namespace,
             always_run=True,
             image_uri=_CLOUD_SDK_IMAGE,
             environment=logging_env,

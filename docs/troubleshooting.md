@@ -359,6 +359,11 @@ Compute Engine Virtual Machine by default. To start an SSH server, use the
 background and will mount your data disk. This will allow you to inspect the
 runtime environment of your job's container in real time.
 
+Note that enabling the `--ssh` flag changes the behavior of how the containers
+run. Normally, each container uses a separate isolated process ID (PID)
+namespace. With `--ssh` enabled, the containers will all use the same PID
+namespace (named "shared").
+
 The SSH container will pick up authentication information from the VM, so to
 connect you can use the `gcloud compute ssh` command to establish an SSH
 session.
