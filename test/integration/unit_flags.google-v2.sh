@@ -47,6 +47,59 @@ fi
 
 # Define tests
 
+function test_preemptible_zero() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --preemptible 0; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.preemptible" "False"
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_preemptible_zero
+
+function test_preemptible_off() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.preemptible" "False"
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_preemptible_off
+
+function test_preemptible_on() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --preemptible; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.preemptible" "True"
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_preemptible_on
+
 # A google-cls-v2 test that the location value is settable and used
 # for the region.
 function test_location() {
@@ -687,6 +740,13 @@ echo
 if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
   test_location
 fi
+
+echo
+test_preemptible_zero
+test_preemptible_off
+test_preemptible_on
+
+echo
 test_neither_region_nor_zone
 test_region_and_zone
 test_regions
