@@ -299,10 +299,8 @@ every 5 minutes to the `--logging` location specified to `dsub`:
 - `[prefix]-stdout.log`: stdout from your Docker container
 - `[prefix]-stderr.log`: stderr from your Docker container
 
-The `[prefix]` will be either the Google Genomics operation name or a string
-that you can specify as described here:
-
-https://cloud.google.com/genomics/v1alpha2/pipelines-api-troubleshooting#pipeline_operation_log_files
+See [Logging](https://github.com/DataBiosphere/dsub/blob/master/docs/logging.md)
+for more details on log files.
 
 #### Resource requirements
 

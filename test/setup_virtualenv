@@ -17,7 +17,7 @@ declare PY_VERSION=""
 declare LIBS_FOLDER=""
 if [[ -z "${VERSION_ARG}" ]]; then
   PY_VERSION="python2"
-elif grep -Pq "^[23]\.?[567]?$" <<< "${VERSION_ARG}" ; then
+elif grep -Pq "^[23]\.?[567]?.?[1-9]$" <<< "${VERSION_ARG}" ; then
   PY_VERSION="python${VERSION_ARG}"
 else
   echo "ERROR: Python version must be a value from 2.7 to 3.7"
@@ -32,7 +32,12 @@ else
 fi
 readonly LIBS_FOLDER
 
-readonly PY_PATH="$(which "$PY_VERSION")"
+if ! PY_PATH="$(which "$PY_VERSION")"; then
+  echo "${PY_VERSION} executable not found. Instead, attempt to change pyenv to ${VERSION_ARG}"
+  eval "$(pyenv init -)"
+  pyenv versions
+  pyenv shell "${VERSION_ARG}"
+fi
 
 if [[ $(basename "${VIRTUAL_ENV:-}") == "${LIBS_FOLDER}" && -d "${VIRTUAL_ENV:-}" ]]; then
   echo "We are already running in a virtual environment:"
@@ -73,6 +78,9 @@ if [[ $(basename "${VIRTUAL_ENV:-}") != "${LIBS_FOLDER}" ]]; then
   echo "We are in: ${VIRTUAL_ENV:-}"
   return
 fi
+
+echo "python version is..."
+python --version
 
 echo "Running setup.py."
 python setup.py install

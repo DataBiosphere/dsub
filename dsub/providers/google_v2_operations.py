@@ -19,12 +19,23 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from . import google_v2_versions
+
 STATUS_FILTER_MAP = {
     'RUNNING': 'done = false',
     'CANCELED': 'error = 1',
     'FAILURE': 'error > 1',
     'SUCCESS': 'error = 0',
 }
+
+_API_VERSION = None
+
+
+def set_api_version(api_version):
+  assert api_version in (google_v2_versions.V2ALPHA1, google_v2_versions.V2BETA)
+
+  global _API_VERSION
+  _API_VERSION = api_version
 
 
 def label_filter(label_key, label_value):
@@ -110,8 +121,16 @@ def _get_action_by_name(op, name):
   """Return the value for the specified action."""
   actions = get_actions(op)
   for action in actions:
-    if action.get('name') == name:
-      return action
+    if _API_VERSION == google_v2_versions.V2ALPHA1:
+      if action.get('name') == name:
+        return action
+
+    elif _API_VERSION == google_v2_versions.V2BETA:
+      if action.get('containerName') == name:
+        return action
+
+    else:
+      assert False, 'Unexpected version: {}'.format(_API_VERSION)
 
 
 def get_action_environment(op, name):
@@ -160,9 +179,41 @@ def get_event_of_type(op, event_type):
   return [e for e in events if e.get('details', {}).get('@type') == event_type]
 
 
-def get_worker_assigned_events(op):
-  return get_event_of_type(
-      op, 'type.googleapis.com/google.genomics.v2alpha1.WorkerAssignedEvent')
+def _get_worker_assigned_events(op):
+  """Return all "Worker Assigned" events."""
+
+  events = get_events(op)
+  if not events:
+    return None
+
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    return [
+        e for e in events if e.get('details', {}).get('@type') ==
+        'type.googleapis.com/google.genomics.v2alpha1.WorkerAssignedEvent'
+    ]
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+    return [e for e in events if 'workerAssigned' in e]
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
+
+def get_worker_assigned_event_details(op):
+  """Return the detail portion of the most recent "worker assigned" event."""
+
+  events = _get_worker_assigned_events(op)
+  if not events:
+    return None
+
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    return events[0].get('details', {})
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+    return events[0].get('workerAssigned', {})
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
 
 
 def get_last_update(op):
@@ -185,6 +236,19 @@ def get_resources(op):
   return op.get('metadata', {}).get('pipeline').get('resources', {})
 
 
+def get_vm_network_name(vm):
+  """Return the name of the network from the virtualMachine."""
+
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    return vm.get('network', {}).get('name')
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+    return vm.get('network', {}).get('network')
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
+
 def is_pipeline(op):
   """Check that an operation is a genomics pipeline run.
 
@@ -198,8 +262,16 @@ def is_pipeline(op):
     Boolean, true if the operation is a RunPipelineRequest.
   """
 
-  return get_metadata_type(
-      op) == 'type.googleapis.com/google.genomics.v2alpha1.Metadata'
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    return get_metadata_type(
+        op) == 'type.googleapis.com/google.genomics.v2alpha1.Metadata'
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+    return get_metadata_type(
+        op) == 'type.googleapis.com/google.cloud.lifesciences.v2beta.Metadata'
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
 
 
 def is_dsub_operation(op):

@@ -6,13 +6,43 @@ File is based on this template: https://github.com/pypa/sampleproject
 import os
 import sys
 import unittest
-import warnings
 # Always prefer setuptools over distutils
 from setuptools import find_packages
 from setuptools import setup
 
-if sys.version_info[0] != 2:
-  warnings.warn('Python 3.x support is experimental.')
+
+_DEPENDENCIES = [
+    # dependencies for dsub, ddel, dstat
+    # Pin to known working versions to prevent episodic breakage from library
+    # version mismatches.
+    # This version list generated: 01/10/2020
+
+    # direct dependencies
+    'google-api-python-client<=1.7.11',
+    'google-auth<=1.10.0',
+    'python-dateutil<=2.8.1',
+    'pytz<=2019.3',
+    'pyyaml<=5.2',
+    'retrying<=1.3.3',
+    'six<=1.13.0',
+    'tabulate<=0.8.6',
+
+    # downstream dependencies
+    'funcsigs<=1.0.2',
+    'google-auth-httplib2<=0.0.3',
+    'httplib2<=0.15.0',
+    'pyasn1<=0.4.8',
+    'pyasn1-modules<=0.2.8',
+    'rsa<=4.0',
+    'uritemplate<=3.0.1',
+
+    # dependencies for test code
+    'parameterized<=0.7.1',
+    'mock<=3.0.5',
+]
+
+if sys.version_info[0] == 2:
+  _DEPENDENCIES.append('cachetools==3.1.1')
 
 
 def unittest_suite():
@@ -75,8 +105,7 @@ setup(
         #   3 - Alpha
         #   4 - Beta
         #   5 - Production/Stable
-        'Development Status :: 1 - Planning',
-        # 'Development Status :: 3 - Alpha',
+        'Development Status :: 3 - Alpha',
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
@@ -91,6 +120,9 @@ setup(
         # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
 
     # What does your project relate to?
@@ -102,21 +134,7 @@ setup(
 
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed.
-    install_requires=[
-        # dependencies for dsub, ddel, dstat
-        'google-api-python-client',
-        'google-auth',
-        'python-dateutil',
-        'pytz',
-        'pyyaml',
-        'retrying',
-        'six',
-        'tabulate',
-
-        # dependencies for test code
-        'parameterized',
-        'mock',
-    ],
+    install_requires=_DEPENDENCIES,
 
     # Define a test suite for Python unittests only.
     test_suite='setup.unittest_suite',

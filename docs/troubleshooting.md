@@ -347,12 +347,9 @@ $ dstat \
 
 ## Viewing logs
 
-The location of `dsub` log files is determined by the `--logging` flag.
-The types of logs will vary depending on the `dsub` backend provider.
-The Google Pipelines API is currently the only backend provider.
-See the
-[Pipelines API Troubleshooting guide](https://cloud.google.com/genomics/v1alpha2/pipelines-api-troubleshooting)
-for more details on log files.
+Each `dsub` task produces log files whose destination is determined by the `--logging` flag.
+See [Logging](https://github.com/DataBiosphere/dsub/blob/master/docs/logging.md)
+for more information.
 
 ## SSH to the VM
 
@@ -361,6 +358,11 @@ Compute Engine Virtual Machine by default. To start an SSH server, use the
 `dsub` command-line flag `--ssh` , which will start an SSH container in the
 background and will mount your data disk. This will allow you to inspect the
 runtime environment of your job's container in real time.
+
+Note that enabling the `--ssh` flag changes the behavior of how the containers
+run. Normally, each container uses a separate isolated process ID (PID)
+namespace. With `--ssh` enabled, the containers will all use the same PID
+namespace (named "shared").
 
 The SSH container will pick up authentication information from the VM, so to
 connect you can use the `gcloud compute ssh` command to establish an SSH

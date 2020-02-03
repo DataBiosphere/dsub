@@ -202,14 +202,20 @@ readonly -f end_test
 function get_test_providers() {
   local test_file="$(basename "${1}")"
 
-  # We use a naming convention on files that are provider-specific
+  # Provider-specific tests are of the form <test>.<provider>.sh
   if [[ ${test_file} == *.*.sh ]]; then
-    # Get the last token before the ".sh"
-    echo -n "${test_file}" | awk -F . '{ print $(NF-1) }'
+    local providers="$(echo -n "${test_file}" | awk -F . '{ print $(NF-1) }')"
+
+    # Special case the google-v2 tests - run them against google-cls-v2 as well
+    if [[ "${providers}" == "google-v2" ]]; then
+      echo -n "google-v2 google-cls-v2"
+    else
+      echo -n "${providers}"
+    fi
     return
   fi
 
-  echo -n "local google-v2"
+  echo -n "local google-v2 google-cls-v2"
 }
 readonly -f get_test_providers
 

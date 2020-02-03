@@ -29,7 +29,7 @@ source "${SCRIPT_DIR}/test_setup_unit.sh"
 
 function call_dsub() {
   dsub \
-    --provider google-v2 \
+    --provider "${DSUB_PROVIDER}" \
     --project "${PROJECT_ID}" \
     --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
     "${@}" \
@@ -39,9 +39,113 @@ function call_dsub() {
 }
 readonly -f call_dsub
 
+if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
+  readonly NETWORK_NAME_KEY="network"
+elif [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+  readonly NETWORK_NAME_KEY="name"
+fi
+
 # Define tests
 
-function test_neither_region_nor_zone() {
+function test_preemptible_zero() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --preemptible 0; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.preemptible" "False"
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_preemptible_zero
+
+function test_preemptible_off() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.preemptible" "False"
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_preemptible_off
+
+function test_preemptible_on() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --preemptible; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.preemptible" "True"
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_preemptible_on
+
+# A google-cls-v2 test that the location value is settable and used
+# for the region.
+function test_location() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --location us-west2 \
+    --command 'echo "${TEST_NAME}"'; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.regions.[0]" "us-west2"
+    assert_err_value_equals \
+     "[0].pipeline.resources.zones" "[]"
+
+    test_passed "${subtest}"
+  else
+    1>&2 echo "Using the location flag generated an error"
+
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_location
+
+function test_neither_region_nor_zone_google-cls-v2() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"'; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.regions.[0]" "us-central1"
+    assert_err_value_equals \
+     "[0].pipeline.resources.zones" "[]"
+
+    test_passed "${subtest}"
+  else
+    1>&2 echo "Location not used as default region"
+
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_neither_region_nor_zone_google-cls-v2
+
+function test_neither_region_nor_zone_google-v2() {
   local subtest="${FUNCNAME[0]}"
 
   if call_dsub \
@@ -60,6 +164,11 @@ function test_neither_region_nor_zone() {
     test_passed "${subtest}"
   fi
 }
+readonly -f test_neither_region_nor_zone_google-v2
+
+function test_neither_region_nor_zone() {
+  test_neither_region_nor_zone_"${DSUB_PROVIDER}"
+}
 readonly -f test_neither_region_nor_zone
 
 function test_region_and_zone() {
@@ -77,13 +186,58 @@ function test_region_and_zone() {
 
     assert_output_empty
 
-    assert_err_contains \
-      "ValueError: Exactly one of --regions and --zones must be specified"
+    if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
+      assert_err_contains \
+        "ValueError: At most one of --regions and --zones may be specified"
+    elif [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+      assert_err_contains \
+        "ValueError: Exactly one of --regions and --zones must be specified"
+    fi
 
     test_passed "${subtest}"
   fi
 }
 readonly -f test_region_and_zone
+
+function test_regions() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.regions.[0]" "us-central1"
+    assert_err_value_equals \
+     "[0].pipeline.resources.zones" "[]"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_regions
+
+function test_zones() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --zones us-central1-a; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.resources.regions" "[]"
+    assert_err_value_equals \
+     "[0].pipeline.resources.zones.[0]" "us-central1-a"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_zones
 
 function test_min_cores() {
   local subtest="${FUNCNAME[0]}"
@@ -239,7 +393,7 @@ function test_network() {
 
     # Check that the output contains expected values
     assert_err_value_equals \
-     "[0].pipeline.resources.virtualMachine.network.name" "network-name-foo"
+     "[0].pipeline.resources.virtualMachine.network.${NETWORK_NAME_KEY}" "network-name-foo"
     assert_err_value_equals \
      "[0].pipeline.resources.virtualMachine.network.subnetwork" "subnetwork-name-foo"
     assert_err_value_equals \
@@ -261,7 +415,7 @@ function test_no_network() {
 
     # Check that the output contains expected values
     assert_err_value_equals \
-     "[0].pipeline.resources.virtualMachine.network.name" "None"
+     "[0].pipeline.resources.virtualMachine.network.${NETWORK_NAME_KEY}" "None"
     assert_err_value_equals \
      "[0].pipeline.resources.virtualMachine.network.subnetwork" "None"
     assert_err_value_equals \
@@ -583,8 +737,20 @@ trap "exit_handler" EXIT
 mkdir -p "${TEST_TMP}"
 
 echo
+if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
+  test_location
+fi
+
+echo
+test_preemptible_zero
+test_preemptible_off
+test_preemptible_on
+
+echo
 test_neither_region_nor_zone
 test_region_and_zone
+test_regions
+test_zones
 
 echo
 test_min_cores

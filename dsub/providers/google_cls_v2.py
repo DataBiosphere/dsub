@@ -15,7 +15,7 @@
 """Provider for running jobs on Google Cloud Platform.
 
 This module implements job creation, listing, and canceling using the
-Google Genomics Pipelines and Operations APIs v2alpha1.
+Google Cloud Life Sciences Pipelines and Operations APIs v2beta.
 """
 
 from __future__ import absolute_import
@@ -25,39 +25,46 @@ from __future__ import print_function
 from . import google_v2_base
 from . import google_v2_versions
 
-_PROVIDER_NAME = 'google-v2'
+_PROVIDER_NAME = 'google-cls-v2'
 
 
-class GoogleV2JobProvider(google_v2_base.GoogleV2JobProviderBase):
+class GoogleCLSV2JobProvider(google_v2_base.GoogleV2JobProviderBase):
   """dsub provider implementation managing Jobs on Google Cloud."""
 
-  def __init__(self, dry_run, project, credentials=None):
-    super(GoogleV2JobProvider,
-          self).__init__(_PROVIDER_NAME, google_v2_versions.V2ALPHA1,
-                         credentials, project, dry_run)
+  def __init__(self, dry_run, project, location, credentials=None):
+    super(GoogleCLSV2JobProvider,
+          self).__init__(_PROVIDER_NAME, google_v2_versions.V2BETA, credentials,
+                         project, dry_run)
+
+    self._location = location
 
   def _get_pipeline_regions(self, regions, zones):
     """Returns the list of regions to use for a pipeline request.
 
-    For v2alpha1, just return the regions value that was set, even if it is
-    empty.
+    If neither regions nor zones were specified for the pipeline, then use the
+    v2beta location as the default region.
 
     Args:
       regions (str): A space separated list of regions to use for the pipeline.
       zones (str): A space separated list of zones to use for the pipeline.
     """
+
+    if not regions and not zones:
+      return [self._location]
     return regions or []
 
   def _pipelines_run_api(self, request):
-    return self._service.pipelines().run(body=request)
+    parent = 'projects/{}/locations/{}'.format(self._project, self._location)
+    return self._service.projects().locations().pipelines().run(
+        parent=parent, body=request)
 
   def _operations_list_api(self, ops_filter, page_token, page_size):
-    name = 'projects/{}/operations'.format(self._project)
-    return self._service.projects().operations().list(
+    name = 'projects/{}/locations/{}'.format(self._project, self._location)
+    return self._service.projects().locations().operations().list(
         name=name, filter=ops_filter, pageToken=page_token, pageSize=page_size)
 
   def _operations_cancel_api_def(self):
-    return self._service.projects().operations().cancel
+    return self._service.projects().locations().operations().cancel
 
 
 if __name__ == '__main__':

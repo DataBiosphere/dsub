@@ -18,10 +18,28 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from . import google_v2_versions
+
+_API_VERSION = None
+
+
+def set_api_version(api_version):
+  assert api_version in (google_v2_versions.V2ALPHA1, google_v2_versions.V2BETA)
+
+  global _API_VERSION
+  _API_VERSION = api_version
+
 
 def build_network(name, subnetwork, use_private_address):
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    network_key = 'name'
+  elif _API_VERSION == google_v2_versions.V2BETA:
+    network_key = 'network'
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
   return {
-      'name': name,
+      network_key: name,
       'subnetwork': subnetwork,
       'usePrivateAddress': use_private_address,
   }
@@ -109,12 +127,16 @@ def build_resources(project=None,
     An object representing a Resource.
   """
 
-  return {
-      'projectId': project,
+  resources = {
       'regions': regions,
       'zones': zones,
       'virtualMachine': virtual_machine,
   }
+
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    resources['projectId'] = project
+
+  return resources
 
 
 def build_mount(disk, path, read_only):
@@ -142,10 +164,12 @@ def build_action(name=None,
                  entrypoint=None,
                  environment=None,
                  pid_namespace=None,
-                 flags=None,
                  port_mappings=None,
                  mounts=None,
-                 labels=None):
+                 labels=None,
+                 always_run=None,
+                 enable_fuse=None,
+                 run_in_background=None):
   """Build an Action object for a Pipeline request.
 
   Args:
@@ -155,28 +179,56 @@ def build_action(name=None,
     entrypoint (str): overrides the ENTRYPOINT specified in the container.
     environment (dict[str,str]): The environment to pass into the container.
     pid_namespace (str): The PID namespace to run the action inside.
-    flags (str): Flags that control the execution of this action.
     port_mappings (dict[int, int]): A map of container to host port mappings for
       this container.
     mounts (List): A list of mounts to make available to the action.
     labels (dict[str]): Labels to associate with the action.
+    always_run (bool): Action must run even if pipeline has already failed.
+    enable_fuse (bool): Enable access to the FUSE device for this action.
+    run_in_background (bool): Allow the action to run in the background.
 
   Returns:
     An object representing an Action resource.
   """
 
-  return {
-      'name': name,
+  action = {
       'imageUri': image_uri,
       'commands': commands,
       'entrypoint': entrypoint,
       'environment': environment,
       'pidNamespace': pid_namespace,
-      'flags': flags,
       'portMappings': port_mappings,
       'mounts': mounts,
       'labels': labels,
   }
+
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    action['name'] = name
+
+    # In v2alpha1, the flags are passed as a list of strings
+    flags = []
+    if always_run:
+      flags.append('ALWAYS_RUN')
+    if enable_fuse:
+      flags.append('ENABLE_FUSE')
+    if run_in_background:
+      flags.append('RUN_IN_BACKGROUND')
+
+    if flags:
+      action['flags'] = flags
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+    action['containerName'] = name
+
+    # In v2beta, the flags are direct members of the action
+    action['alwaysRun'] = always_run
+    action['enableFuse'] = enable_fuse
+    action['runInBackground'] = run_in_background
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
+  return action
 
 
 def build_pipeline(actions, resources, environment, timeout):

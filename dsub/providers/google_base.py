@@ -12,8 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Base class for the google and google_v2 providers.
-"""
+"""Base module for the google, google_v2, and google_cls_v2 providers."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -66,16 +65,17 @@ DEFAULT_SCOPES = [
 # There are a set of HTTP and socket errors which we automatically retry.
 #  429: too frequent polling
 #  50x: backend error
-TRANSIENT_HTTP_ERROR_CODES = set([429, 500, 503, 504])
+TRANSIENT_HTTP_ERROR_CODES = frozenset([429, 500, 503, 504])
 
 # Auth errors should be permanent errors that a user needs to go fix
 # (enable a service, grant access on a resource).
 # However we have seen them occur transiently, so let's retry them when we
 # see them, but not as patiently.
-HTTP_AUTH_ERROR_CODES = set([401, 403])
+HTTP_AUTH_ERROR_CODES = frozenset([401, 403])
 
-# Socket error 104 (connection reset) should also be retried
-TRANSIENT_SOCKET_ERROR_CODES = set([104])
+# Socket error 32 (broken pipe) and 104 (connection reset) should
+# also be retried
+TRANSIENT_SOCKET_ERROR_CODES = frozenset([32, 104])
 
 # When attempting to cancel an operation that is already completed
 # (succeeded, failed, or canceled), the response will include:

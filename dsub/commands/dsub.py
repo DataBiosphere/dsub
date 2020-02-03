@@ -184,6 +184,21 @@ def _google_parse_arguments(args):
     raise ValueError('Not supported with the google provider: --mount.')
 
 
+def _google_cls_v2_parse_arguments(args):
+  """Validated google-cls-v2 arguments."""
+
+  # For the google-cls-v2 provider, the addition of the "--location" parameter,
+  # along with a default (us-central1), we can just default everything.
+
+  # So we only need to validate that there is not both a region and zone.
+  if (args.zones and args.regions):
+    raise ValueError('At most one of --regions and --zones may be specified')
+
+  if args.machine_type and (args.min_cores or args.min_ram):
+    raise ValueError(
+        '--machine-type not supported together with --min-cores or --min-ram.')
+
+
 def _google_v2_parse_arguments(args):
   """Validated google-v2 arguments."""
   if (args.zones and args.regions) or (not args.zones and not args.regions):
@@ -384,7 +399,8 @@ def _parse_arguments(prog, argv):
       '--disk-size',
       default=job_model.DEFAULT_DISK_SIZE,
       type=int,
-      help='Size (in GB) of data disk to attach for each job (default: 200)')
+      help='Size (in GB) of data disk to attach for each job (default: {})'
+      .format(job_model.DEFAULT_DISK_SIZE))
 
   parser.add_argument(
       '--logging',
@@ -393,10 +409,11 @@ def _parse_arguments(prog, argv):
 
   # Add provider-specific arguments
 
-  # Shared arguments between the "google" and "google-v2" providers
+  # Shared between the "google", "google-cls-v2", and "google-v2" providers
   google_common = parser.add_argument_group(
       title='google-common',
-      description='Options common to the "google" and "google-v2" providers')
+      description="""Options common to the "google", "google-cls-v2", and
+        "google-v2" providers""")
   google_common.add_argument(
       '--project', help='Cloud project ID in which to run the job')
   google_common.add_argument(
@@ -531,9 +548,22 @@ def _parse_arguments(prog, argv):
       help="""If set to true, enables Stackdriver monitoring on the VM.
               (default: False)""")
 
+  google_cls_v2 = parser.add_argument_group(
+      title='"google-cls-v2" provider options',
+      description='See also the "google-common" options listed above')
+  google_cls_v2.add_argument(
+      '--location',
+      default=job_model.DEFAULT_LOCATION,
+      help="""Specifies the Google Cloud region to which the pipeline request
+        will be sent and where operation metadata will be stored. The associated
+        dsub task may be executed in another region if the --regions or --zones
+        arguments are specified. (default: {})""".format(
+            job_model.DEFAULT_LOCATION))
+
   args = provider_base.parse_args(
       parser, {
           'google': ['project', 'zones', 'logging'],
+          'google-cls-v2': ['project', 'logging'],
           'google-v2': ['project', 'logging'],
           'test-fails': [],
           'local': ['logging'],
@@ -541,6 +571,8 @@ def _parse_arguments(prog, argv):
 
   if args.provider == 'google':
     _google_parse_arguments(args)
+  if args.provider == 'google-cls-v2':
+    _google_cls_v2_parse_arguments(args)
   if args.provider == 'google-v2':
     _google_v2_parse_arguments(args)
 
@@ -761,7 +793,8 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure, summary):
   return error_messages
 
 
-def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
+def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor,
+                    summary):
   """Wait for job and retry any tasks that fail.
 
   Stops retrying an individual task when: it succeeds, is canceled, or has been
@@ -776,6 +809,7 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
     poll_interval: integer seconds to wait between iterations
     retries: number of retries
     job_descriptor: job descriptor used to originally submit job
+    summary: whether to output summary messages
 
   Returns:
     Empty list if there was no error,
@@ -783,6 +817,7 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
   """
 
   while True:
+    formatted_tasks = []
     tasks = provider.lookup_job_tasks({'*'}, job_ids=[job_id], verbose=False)
 
     running_tasks = set()
@@ -815,6 +850,14 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor):
         completed_tasks.add(task_id)
       elif status == 'RUNNING':
         running_tasks.add(task_id)
+
+      if summary:
+        formatted_tasks.append(
+            output_formatter.prepare_row(t, full=False, summary=True))
+
+    if summary:
+      formatter = output_formatter.TextOutput(full=False)
+      formatter.prepare_and_print_table(formatted_tasks, summary)
 
     retry_tasks = (
         set(task_fail_count).difference(fully_failed_tasks)
@@ -1102,6 +1145,7 @@ def run_main(args):
       after=args.after,
       skip=args.skip,
       project=args.project,
+      location=args.location,
       disable_warning=True,
       unique_job_id=args.unique_job_id,
       summary=args.summary)
@@ -1124,6 +1168,7 @@ def run(provider,
         after=None,
         skip=False,
         project=None,
+        location=None,
         disable_warning=False,
         unique_job_id=False,
         summary=False):
@@ -1213,11 +1258,11 @@ def run(provider,
       print('%s task(s)' % len(launched_job['task-id']))
     print('To check the status, run:')
     print("  dstat %s --jobs '%s' --users '%s' --status '*'" %
-          (provider_base.get_dstat_provider_args(provider, project),
+          (provider_base.get_dstat_provider_args(provider, project, location),
            launched_job['job-id'], launched_job['user-id']))
     print('To cancel the job, run:')
     print("  ddel %s --jobs '%s' --users '%s'" %
-          (provider_base.get_ddel_provider_args(provider, project),
+          (provider_base.get_ddel_provider_args(provider, project, location),
            launched_job['job-id'], launched_job['user-id']))
 
   # Poll for job completion
@@ -1229,7 +1274,8 @@ def run(provider,
       print(
           '*** This dsub process must continue running to retry failed tasks.')
       error_messages = _wait_and_retry(provider, job_metadata['job-id'],
-                                       poll_interval, retries, job_descriptor)
+                                       poll_interval, retries, job_descriptor,
+                                       summary)
     else:
       error_messages = _wait_after(provider, [job_metadata['job-id']],
                                    poll_interval, False, summary)

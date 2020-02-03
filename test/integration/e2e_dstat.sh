@@ -91,6 +91,7 @@ function verify_dstat_google_provider_fields() {
        exit 1
      fi
    done
+
    echo "  - ${DSUB_PROVIDER} provider fields verified"
 }
 readonly -f verify_dstat_google_provider_fields
@@ -149,7 +150,9 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   fi
 
   verify_dstat_output "${DSTAT_OUTPUT}"
-  if [[ "${DSUB_PROVIDER}" == "google" ]] || [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+  if [[ "${DSUB_PROVIDER}" == "google" ]] || \
+     [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
+     [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
     echo "Checking dstat ${DSUB_PROVIDER} provider fields"
     verify_dstat_google_provider_fields "${DSTAT_OUTPUT}"
   fi
@@ -191,7 +194,9 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   fi
 
   verify_dstat_output "${DSTAT_OUTPUT}"
-  if [[ "${DSUB_PROVIDER}" == "google" ]] || [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+  if [[ "${DSUB_PROVIDER}" == "google" ]] || \
+     [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
+     [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
     echo "Checking dstat ${DSUB_PROVIDER} provider fields"
     verify_dstat_google_provider_fields "${DSTAT_OUTPUT}"
   fi

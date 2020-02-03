@@ -954,8 +954,11 @@ class PreemptibleParam(object):
   def validate(self, retries):
     """Validates that preemptible arguments make sense with retries."""
     if int is type(self._max_preemptible_attempts):
-      if not retries:
-        # This means user specified a preemptible number
+      if retries < 0 or self._max_preemptible_attempts < 0:
+        raise ValueError('--retries and --preemptible may not be negative')
+
+      if self._max_preemptible_attempts >= 1 and not retries:
+        # This means user specified a positive preemptible number
         # but didn't specify a retries number
         raise ValueError(
             'Requesting 1 or more preemptible attempts requires setting retries'
@@ -964,9 +967,6 @@ class PreemptibleParam(object):
       if self._max_preemptible_attempts > retries:
         raise ValueError(
             'Value passed for --preemptible cannot be larger than --retries.')
-
-      if retries < 0 or self._max_preemptible_attempts < 0:
-        raise ValueError('--retries and --preemptible must be 0 or greater')
 
 
 def preemptile_param_type(preemptible):
