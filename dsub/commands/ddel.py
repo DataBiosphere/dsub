@@ -88,8 +88,9 @@ def _parse_arguments():
       description='See also the "google-common" options listed')
   google_cls_v2.add_argument(
       '--location',
+      default=job_model.DEFAULT_LOCATION,
       help="""Specifies the Google Cloud region to which the dsub job was
-        submitted. (default: us-central1)""")
+        submitted. (default: {})""".format(job_model.DEFAULT_LOCATION))
 
   return provider_base.parse_args(
       parser, {
