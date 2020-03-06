@@ -459,6 +459,10 @@ def _parse_arguments(prog, argv):
           following third-party software onto your job's Compute Engine
           instances: NVIDIA(R) Tesla(R) drivers and NVIDIA(R) CUDA toolkit.
           (default: 0)""")
+  google_common.add_argument(
+      '--credentials-file',
+      type=str,
+      help='Path to a local file with JSON credentials for a service account.')
 
   google = parser.add_argument_group(
       title='"google" provider options',

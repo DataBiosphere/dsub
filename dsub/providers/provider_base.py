@@ -21,6 +21,7 @@ import argparse
 import os
 
 from . import google
+from . import google_base
 from . import google_cls_v2
 from . import google_v2
 from . import local
@@ -36,6 +37,15 @@ PROVIDER_NAME_MAP = {
 }
 
 
+def credentials_from_args(args):
+  credentials = getattr(args, 'credentials', None)
+  credentials_file = getattr(args, 'credentials_file', None)
+  if credentials_file and not credentials:
+    credentials = google_base.credentials_from_service_account_info(
+        credentials_file)
+  return credentials
+
+
 def get_provider(args, resources):
   """Returns a provider for job submission requests."""
 
@@ -44,13 +54,20 @@ def get_provider(args, resources):
   if provider == 'google':
     return google.GoogleJobProvider(
         getattr(args, 'verbose', False),
-        getattr(args, 'dry_run', False), args.project)
+        getattr(args, 'dry_run', False),
+        args.project,
+        credentials=getattr(args, 'credentials', None))
   elif provider == 'google-cls-v2':
     return google_cls_v2.GoogleCLSV2JobProvider(
-        getattr(args, 'dry_run', False), args.project, args.location)
+        getattr(args, 'dry_run', False),
+        args.project,
+        args.location,
+        credentials=credentials_from_args(args))
   elif provider == 'google-v2':
     return google_v2.GoogleV2JobProvider(
-        getattr(args, 'dry_run', False), args.project)
+        getattr(args, 'dry_run', False),
+        args.project,
+        credentials=credentials_from_args(args))
   elif provider == 'local':
     return local.LocalJobProvider(resources)
   elif provider == 'test-fails':

@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # pylint: disable=g-tzinfo-datetime
 from datetime import datetime
+import io
 import json
 import os
 import re
@@ -39,6 +40,7 @@ from six.moves import range
 import six.moves.http_client
 
 import google.auth
+from google.oauth2 import service_account
 
 
 # The google v1 provider directly added the bigquery scope, but the v1alpha2
@@ -610,6 +612,12 @@ def setup_service(api_name, api_version, credentials=None):
     credentials, _ = google.auth.default()
   return googleapiclient.discovery.build(
       api_name, api_version, credentials=credentials)
+
+
+def credentials_from_service_account_info(credentials_file):
+  with io.open(credentials_file, 'r', encoding='utf-8') as json_fi:
+    credentials_info = json.load(json_fi)
+  return service_account.Credentials.from_service_account_info(credentials_info)
 
 
 class Api(object):

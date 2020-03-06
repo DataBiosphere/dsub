@@ -215,7 +215,16 @@ function get_test_providers() {
     return
   fi
 
-  echo -n "local google-v2 google-cls-v2"
+ case "${test_file}" in
+    e2e_error.sh)
+      local all_provider_list="${DSUB_PROVIDER:-local}"
+      ;;
+    *)
+      local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2}"
+      ;;
+  esac
+
+  echo -n "${all_provider_list}"
 }
 readonly -f get_test_providers
 
