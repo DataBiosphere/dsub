@@ -254,23 +254,6 @@ specified in any order. Since it will be used as an environment variable,
 the name of the input parameter must comply with the
 [Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_235).
 
-## Notice
-
-As a getting started convenience, if `--input-recursive` or `--output-recursive`
-are used with the `google` provider, `dsub` will automatically check for and,
-if needed, install the
-[Google Cloud SDK](https://cloud.google.com/sdk/docs/) in the Docker container
-at runtime (before your script executes).
-
-If you use the recursive copy features, install the Cloud SDK in your Docker
-image when you build it to avoid the installation at runtime.
-
-If you use a Debian or Ubuntu Docker image, you are encouraged to use the
-[package installation instructions](https://cloud.google.com/sdk/downloads#apt-get).
-
-If you use a Red Hat or CentOS Docker image, you are encouraged to use the
-[package installation instructions](https://cloud.google.com/sdk/downloads#yum).
-
 ## Requester Pays
 
 To access a Google Cloud Storage
@@ -281,9 +264,6 @@ command-line option `--user-project`:
 ```
 --user-project my-cloud-project
 ```
-
-Access to Requester Pays buckets is supported by the `local` and `google-v2`
-providers. It is not supported by the `google` provider.
 
 ## Unsupported path formats:
 

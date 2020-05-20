@@ -213,75 +213,11 @@ To this end, `dsub` provides multiple "backend providers", each of which
 implements a consistent runtime environment. The current providers are:
 
 - local
-- google (deprecated: use `google-v2`)
 - google-v2 (the default)
 - google-cls-v2 (*new*)
 
 More details on the runtime environment implemented by the backend providers
 can be found in [dsub backend providers](https://github.com/DataBiosphere/dsub/blob/master/docs/providers/README.md).
-
-### Deprecation of the `google` provider
-
-The original `dsub` provider was the `google` provider, built on top of the
-Google Genomics Pipelines API `v1alpha2`. The Pipelines API `v1alpha2` has
-been deprecated and was scheduled for turn down at the end of 2018.
-For more details, see
-[Cloud Genomics v1alpha2 Migration Guide](https://cloud.google.com/genomics/docs/how-tos/migration)
-
-Replacing `v1alpha2` is [v2alpha1](https://cloud.google.com/genomics/reference/rest/v2alpha1/pipelines/run).
-`dsub` has added the `google-v2` provider which use `v2alpha1` as the backend
-for running `dsub` jobs on Google Cloud.
-
-**`dsub` users are encouraged today to use the `google-v2` provider. The
-`google-v2` provider is now the default. The `google` provider for `dsub` will
-be removed in a future release.**
-
-### Migrating existing code from `google` to `google-v2` or `google-cls-v2`
-
-To migrate existing `dsub` calls from the `google` provider to the `google-v2`
-or `google-cls-v2` provider:
-
-- Add `--provider google-v2` or `--provider google-cls-v2` to your command-line
-- Set the `--machine-type` or `--min-ram` and `--min-cores` if your tasks need
-other than 1 core and 3.75 GB of memory
-
-**NOTE: The conversion of `--min-ram` and `--min-cores` is different with the
-`google-v2` and `google-cls-v2` providers than the `google` provider.
-Please read the section below to set your parameters appropriately.**
-
-#### `--machine-type` vs. `--min-ram` and `--min-cores` with `google-v2` and `google-cls-v2`
-
-The `google` provider was backed by the Pipelines API `v1alpha2`, which accepted
-minimum ram and minimum cores as parameters and made a "best fit" attempt to
-translate those parameters into one of the
-[Compute Engine Predefined Machine Types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types).
-
-The APIs that back the `google-v2` and `google-cls-v2` providers do
-not perform this "best fit" computation, but require an explicit machine type
-to be specified.
-
-However, the new APIs support
-[Compute Engine Custom Machine Types](https://cloud.google.com/compute/docs/machine-types#custom_machine_types),
-which allow for greater control over machine resources than the predefined
-machine types do. This allows users to reduce costs by limiting
-over-provisioning of Compute Engine VMs.
-
-The `google-v2` and `google-cls-v2` providers takes advantage of this by translating
-`--min-ram` and `--min-cores` into a custom machine type specification.
-When migrating existing `dsub` jobs from `google` you may find
-that tasks are allocated smaller VMs
-because the `--min-ram` and `--min-cores` specified for the job are more
-precisely translated with `google-v2` and `google-cls-v2`.
-You will need to adjust your resource parameters accordingly.
-
-Notes for `google-v2` and `google-cls-v2` resource specifications:
-- `n1-standard-1` is the default machine type as it was with the `google`
-provider.
-- *Either* `--machine-type` or `--min-ram` and `--min-cores` may be specified,
-but not both.
-- To use one of the
-[Shared-core machine types](https://cloud.google.com/compute/docs/machine-types#sharedcore),
-use the `--machine-type` flag.
 
 ### Differences between `google-v2` and `google-cls-v2`
 
@@ -506,26 +442,6 @@ The local directory will be mounted into the Docker container running your
 variable `${LOCAL_MOUNT}`. Inside your script, you can reference the mounted
 path using the environment variable.
 
-##### Notice
-
-For the `google` provider, as a getting started convenience, if
-`--input-recursive` or `--output-recursive`
-are used, `dsub` will automatically check for and, if needed, install the
-[Google Cloud SDK](https://cloud.google.com/sdk/docs/) in the Docker container
-at runtime (before your script executes).
-
-If you use the recursive copy features, install the Cloud SDK in your Docker
-image when you build it to avoid the installation at runtime.
-
-If you use a Debian or Ubuntu Docker image, you are encouraged to use the
-[package installation instructions](https://cloud.google.com/sdk/downloads#apt-get).
-
-If you use a Red Hat or CentOS Docker image, you are encouraged to use the
-[package installation instructions](https://cloud.google.com/sdk/downloads#yum).
-
-**The installation of the CloudSDK into your Docker image is not needed for the
-`local`, `google-v2`, nor `google-cls-v2` providers.**
-
 ### Setting resource requirements
 
 `dsub` tasks run using the `local` provider will use the resources available on
@@ -614,8 +530,8 @@ For details, see [retries with dsub](https://github.com/DataBiosphere/dsub/blob/
 ### Labeling jobs and tasks
 
 You can add custom labels to jobs and tasks, which allows you to monitor and
-cancel tasks using your own identifiers. In addition, with the `google`
-provider, labeling a task will label associated compute resources such as
+cancel tasks using your own identifiers. In addition, with the Google
+providers, labeling a task will label associated compute resources such as
 virtual machines and disks.
 
 For more details, see [Checking Status and Troubleshooting Jobs](https://github.com/DataBiosphere/dsub/blob/master/docs/troubleshooting.md)
