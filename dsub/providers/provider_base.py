@@ -91,8 +91,8 @@ def create_parser(prog):
       default='google-v2',
       choices=['local', 'google', 'google-v2', 'google-cls-v2', 'test-fails'],
       help="""Job service provider. Valid values are "google-v2" (Google's
-        Pipeline API v2) and "local" (local Docker execution). "google-cls-v2"
-        (Google Cloud Life Science's Pipelines API v2beta is in development).
+        Pipeline API v2alpha1), "google-cls-v2" (Google's Pipelines API v2beta)
+        and "local" (local Docker execution).
         "google" provider is deprecated.
         "test-*" providers are for testing purposes only.
         (default: google-v2)""",
