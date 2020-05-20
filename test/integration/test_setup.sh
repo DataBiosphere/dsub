@@ -99,15 +99,14 @@ function dsub_google() {
 }
 
 function dsub_google-cls-v2() {
+  local location="${LOCATION:-}"
   local zones="${ZONES:-}"
   local regions="${REGIONS:-}"
-  if [[ -z "${regions}" ]] && [[ -z "${zones}" ]]; then
-    regions="us-central1"
-  fi
 
   dsub \
     --provider google-cls-v2 \
     --project "${PROJECT_ID}" \
+    ${location:+--location "${location}"} \
     --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
     ${regions:+--regions "${regions}"} \
     ${zones:+--zones "${zones}"} \
@@ -169,9 +168,12 @@ function dstat_google() {
 }
 
 function dstat_google-cls-v2() {
+  local location="${LOCATION:-}"
+
   dstat \
     --provider google-cls-v2 \
     --project "${PROJECT_ID}" \
+    ${location:+--location "${location}"} \
     "${@}"
 }
 
@@ -214,9 +216,12 @@ function ddel_google() {
 }
 
 function ddel_google-cls-v2() {
+  local location="${LOCATION:-}"
+
   ddel \
     --provider google-cls-v2 \
     --project "${PROJECT_ID}" \
+    ${location:+--location "${location}"} \
     "${@}"
 }
 

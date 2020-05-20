@@ -231,7 +231,7 @@ function util::dstat_yaml_assert_field_equal() {
   local field="${2}"
   local expected="${3}"
 
-  actual=$(util::dstat_yaml_output_value "${dstat_out}" "${field}")
+  actual="$(util::dstat_yaml_output_value "${dstat_out}" "${field}")"
   if [[ "${actual}" != "${expected}" ]]; then
     1>&2 echo "Assert: actual value for ${field}, ${actual}, does not match expected: ${expected}"
     1>&2 echo "${dstat_out}"
@@ -239,6 +239,28 @@ function util::dstat_yaml_assert_field_equal() {
   fi
 }
 readonly -f util::dstat_yaml_assert_field_equal
+
+function util::dstat_yaml_assert_boolean_field_equal() {
+  local dstat_out="${1}"
+  local field="${2}"
+  local expected="${3}"
+
+  if ! [[ "${expected}" =~ ^(true|false)$ ]]; then
+    1>&2 echo "Test error: ${expected} must be 'true' or 'false'"
+    exit 1
+  fi
+
+  actual="$(util::dstat_yaml_output_value "${dstat_out}" "${field}")"
+
+  # Normalize actual (change "False" to "false")
+  check_actual="$(echo "${actual}" | tr 'A-Z' 'a-z')"
+  if [[ "${check_actual}" != "${expected}" ]]; then
+    1>&2 echo "Assert: boolean value for ${field}, ${check_actual} (${actual}), does not match expected: ${expected}"
+    1>&2 echo "${dstat_out}"
+    exit 1
+  fi
+}
+readonly -f util::dstat_yaml_assert_boolean_field_equal
 
 function util::dstat_out_assert_equal_events() {
   local dstat_out="${1}"
