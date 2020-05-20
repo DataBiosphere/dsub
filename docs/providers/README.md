@@ -12,6 +12,7 @@ are:
 - local
 - google (deprecated: use `google-v2`)
 - google-v2 (the default)
+- google-cls-v2 (*new*)
 
 ## Runtime environment
 
@@ -70,17 +71,16 @@ of `.py` files, your script will be able to run.
 
 ### TMPDIR will be set to reference a directory on your "data disk"
 
-The `google` and `google-v2` providers depend on the
-[Google Genomics Pipelines API](https://cloud.google.com/genomics/reference/rest/v1alpha2/pipelines)
-and
-[Google Genomics Pipelines API](https://cloud.google.com/genomics/reference/rest/v2alpha1/pipelines)
-respectively, which put the Docker container's `/tmp` directory on the Compute
+The `google`, `google-v2`, and `google-cls-v2` providers depend on different
+versions of the Google Pipelines API
+which put the Docker container's `/tmp` directory on the Compute
 Engine VM's boot disk, rather than the data disk that is created for `dsub`.
 To avoid your needing to separately size both the boot disk and the data disk,
-the `google` and `google-v2` providers create a `tmp` directory and set the
+the `google`, `google-v2`, and `google-cls-v2` providers create a `tmp`
+directory and set the
 `TMPDIR` environment variable (supported by many tools) to point to it.
 
-The separation of boot vs. data disk does not hold for the `local` provider,
+This separation of boot vs. data disk does not hold for the `local` provider,
 but the `local` provider still sets `TMPDIR`. `dsub` scripts that need
 large temporary space should write to `${TMPDIR}` rather than `/tmp`
 
@@ -160,10 +160,10 @@ The data folder contains:
     `--input-recursive` parameter values.
 -   `output`: location for script to write automatically delocalized `--output`
     and `--output-recursive` parameter values.
--   `script`: location of the your dsub `--script` or `--command` script.
--   `tmp`: temporary directory for the your script. `TMPDIR` is set to this
+-   `script`: location of your dsub `--script` or `--command` script.
+-   `tmp`: temporary directory for your script. `TMPDIR` is set to this
     directory.
--   `workingdir`: the working directory set before the your script runs.
+-   `workingdir`: the working directory set before your script runs.
 
 #### Task state and logging
 
@@ -216,7 +216,7 @@ as a "data disk".
 When the pipelines.run() API is called, it creates an
 [operation](https://cloud.google.com/genomics/reference/rest/v1alpha2/operations).
 The Pipelines API service will then create the VM and disk when
-the your Cloud Project has sufficient
+your Cloud Project has sufficient
 [Compute Engine quota](https://cloud.google.com/compute/quotas).
 
 When the VM starts, it runs a Compute Engine
@@ -322,10 +322,13 @@ disk for system paths. All other directories set up by `dsub` will be on the
 data disk, including the `TMPDIR` (as discussed above). Thus you should only
 ever need to change the `--disk-size`.
 
-### `google-v2` provider
+### `google-v2` and `google-cls-v2` providers
 
-The `google-v2` provider utilizes the Google Genomics Pipelines API
-[pipelines.run()](https://cloud.google.com/genomics/reference/rest/v2alpha1/pipelines/run)
+The `google-v2` and `google-cls-v2` providers share a significant amount of
+their implementation. The `google-v2` provider utilizes the Google Genomics
+Pipelines API `v2alpha1`
+while the `google-cls-v2` provider utilizes the Google Cloud Life Sciences
+Piplines API [v2beta](https://cloud.google.com/life-sciences/docs/apis)
 to queue a request for the following sequence of events:
 
 1. Create a Google Compute Engine
@@ -341,8 +344,10 @@ as a "data disk".
 
 #### Orchestration
 
-When the pipelines.run() API is called, it creates an
-[operation](https://cloud.google.com/genomics/reference/rest/v2alpha1/operations).
+When the Pipelines
+[run()](https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.pipelines/run)
+API is called, it creates an
+[operation](https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.operations).
 The Pipelines API service will then create the VM and disk when
 the your Cloud Project has sufficient
 [Compute Engine quota](https://cloud.google.com/compute/quotas).
@@ -387,18 +392,18 @@ The `/mnt/data` folder contains:
 
 #### Task status
 
-The Genomics `v2alpha1` API supports operation status of:
+The Pipelines API supports operation status of:
 
 - done: false
-- done: true with no error
-- done: true with error
+- done: true (with no error)
+- done: true (with error)
 
 `dsub` interprets the above to provide task statuses of:
 
-- RUNNING
-- SUCCESS
-- FAILURE
-- CANCELED
+- RUNNING (`done: false`)
+- SUCCESS (`done: true` with no `error`)
+- FAILURE (`done: true` with `error` code != 1)
+- CANCELED (`done: true` with `error` code 1)
 
 Note that for historical reasons, while an operation is queued for execution
 its status is `RUNNING`.
@@ -416,8 +421,8 @@ Logging paths and the `[prefix]` are discussed further in [Logging](../logging.m
 
 #### Resource requirements
 
-The `google-v2` provider supports resource-related flags such as
-`--machine-type`, `--boot-disk-size`, `--disk-size`, and several other
+The `google-v2` and `google-cls-v2` providers support resource-related flags
+such as `--machine-type`, `--boot-disk-size`, `--disk-size`, and several other
 Compute Engine VM parameters.
 
 ##### Disk allocation
