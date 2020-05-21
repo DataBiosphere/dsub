@@ -31,7 +31,10 @@ function retries_setup::run_dsub () {
   local -r retries="${2}"
   local -r command="${3}"
 
+  # Set --unique-job-id to ensure the e2e_retries_*.sh tests don't interfere
+  # with each other.
   if run_dsub \
+      --unique-job-id \
       --name "${job_name}" \
       --label test-token="${TEST_TOKEN}" \
       --command "${command}" \
