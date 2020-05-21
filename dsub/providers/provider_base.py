@@ -20,7 +20,6 @@ from __future__ import print_function
 import argparse
 import os
 
-from . import google
 from . import google_base
 from . import google_cls_v2
 from . import google_v2
@@ -29,7 +28,6 @@ from . import test_fails
 
 
 PROVIDER_NAME_MAP = {
-    google.GoogleJobProvider: 'google',
     google_v2.GoogleV2JobProvider: 'google-v2',
     google_cls_v2.GoogleCLSV2JobProvider: 'google-cls-v2',
     local.LocalJobProvider: 'local',
@@ -49,15 +47,9 @@ def credentials_from_args(args):
 def get_provider(args, resources):
   """Returns a provider for job submission requests."""
 
-  provider = getattr(args, 'provider', 'google')
+  provider = getattr(args, 'provider', 'google-v2')
 
-  if provider == 'google':
-    return google.GoogleJobProvider(
-        getattr(args, 'verbose', False),
-        getattr(args, 'dry_run', False),
-        args.project,
-        credentials=getattr(args, 'credentials', None))
-  elif provider == 'google-cls-v2':
+  if provider == 'google-cls-v2':
     return google_cls_v2.GoogleCLSV2JobProvider(
         getattr(args, 'dry_run', False),
         args.project,
@@ -89,11 +81,10 @@ def create_parser(prog):
   parser.add_argument(
       '--provider',
       default='google-v2',
-      choices=['local', 'google', 'google-v2', 'google-cls-v2', 'test-fails'],
+      choices=['local', 'google-v2', 'google-cls-v2', 'test-fails'],
       help="""Job service provider. Valid values are "google-v2" (Google's
         Pipeline API v2alpha1), "google-cls-v2" (Google's Pipelines API v2beta)
         and "local" (local Docker execution).
-        "google" provider is deprecated.
         "test-*" providers are for testing purposes only.
         (default: google-v2)""",
       metavar='PROVIDER')
@@ -126,9 +117,7 @@ def get_dstat_provider_args(provider, project, location):
   provider_name = get_provider_name(provider)
 
   args = []
-  if provider_name == 'google':
-    args.append('--project %s' % project)
-  elif provider_name == 'google-cls-v2':
+  if provider_name == 'google-cls-v2':
     args.append('--project %s --location %s' % (project, location))
   elif provider_name == 'google-v2':
     args.append('--project %s' % project)
@@ -158,7 +147,7 @@ def emit_provider_message(provider):
 def check_for_unsupported_flag(args):
   """Raise an error if the provider doesn't support a provided flag."""
   if args.label and args.provider not in [
-      'test-fails', 'local', 'google', 'google-v2', 'google-cls-v2'
+      'test-fails', 'local', 'google-v2', 'google-cls-v2'
   ]:
     raise ValueError(
         '--label is not supported by the "%s" provider.' % args.provider)
