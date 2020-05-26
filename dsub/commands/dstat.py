@@ -132,7 +132,7 @@ def _parse_arguments():
       action='store_true',
       help='Display a summary of the results, grouped by (job, status).')
 
-  # Shared between the "google", "google-cls-v2", and "google-v2" providers
+  # Shared between the "google-cls-v2" and "google-v2" providers
   google_common = parser.add_argument_group(
       title='google-common',
       description="""Options common to the "google", "google-cls-v2", and
@@ -151,7 +151,6 @@ def _parse_arguments():
 
   return provider_base.parse_args(
       parser, {
-          'google': ['project'],
           'google-cls-v2': ['project'],
           'google-v2': ['project'],
           'test-fails': [],

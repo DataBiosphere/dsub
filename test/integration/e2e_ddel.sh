@@ -61,34 +61,28 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   echo "Pipeline started."
   echo "job id: ${JOB_ID}"
 
-  if [[ "${DSUB_PROVIDER}" != "google" ]]; then
-    # v1alpha2 of the Google Pipelines API can take a long time to fully cancel
-    # a pipeline if it has already started running.
-    # So skip the "fake cancel and wait" for the google provider for now.
+  # Test ddel with an age that is too soon
+  echo
+  echo "Sleeping 10 seconds before exercising 'ddel --age 5s'"
+  sleep 10s
+  run_ddel_age "5s" --jobs "${JOB_ID}"
 
-    # Test ddel with an age that is too soon
-    echo
-    echo "Sleeping 10 seconds before exercising 'ddel --age 5s'"
-    sleep 10s
-    run_ddel_age "5s" --jobs "${JOB_ID}"
+  # Make sure dstat still shows the job as not canceled.
+  echo
+  echo "Check that the job is not canceled."
+  if util::wait_for_canceled_status "${JOB_ID}"; then
+    echo "ERROR: Operation is canceled, but ddel should not have canceled it."
+    util::get_job_status "${JOB_ID}"
+    exit 1
+  fi
 
-    # Make sure dstat still shows the job as not canceled.
-    echo
-    echo "Check that the job is not canceled."
-    if util::wait_for_canceled_status "${JOB_ID}"; then
-      echo "ERROR: Operation is canceled, but ddel should not have canceled it."
-      util::get_job_status "${JOB_ID}"
-      exit 1
-    fi
-
-    # For the google v2 providers, wait a sufficiently long time so that all the
-    # startup events occur prior to canceling so that the output event list is
-    # consistent..
-    if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
-       [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
-      echo "Sleeping for 60s"
-      sleep 60
-    fi
+  # For the google v2 providers, wait a sufficiently long time so that all the
+  # startup events occur prior to canceling so that the output event list is
+  # consistent..
+  if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
+     [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+    echo "Sleeping for 60s"
+    sleep 60
   fi
 
   echo
@@ -113,11 +107,8 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     exit 1
   fi
 
-  # The 'google' provider job is canceled immediately after start so no events
-  # are registered.
-  if [[ "${DSUB_PROVIDER}" != "google" ]]; then
-    util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].events.[-1].name" "canceled"
-  fi
+  # Verify that there is a canceled event
+  util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].events.[-1].name" "canceled"
 
   provider_verify_stopped_job "${JOB_ID}"
 

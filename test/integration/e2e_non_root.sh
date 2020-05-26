@@ -72,11 +72,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
   mkdir -p "${BUILD_DIR}"
   ENTRYPOINT='ENTRYPOINT [ "sh", "-c", "exit 1" ]'
-  if [[ "${DSUB_PROVIDER}" == "google" ]]; then
-    # The original google provider could not support Docker images with
-    # entrypoints because the Pipelines API v1alpha2 did not.
-    ENTRYPOINT=""
-  fi
+
   sed -e 's#^ *##' > "${DOCKERFILE}" <<-EOF
     FROM alpine:latest
 

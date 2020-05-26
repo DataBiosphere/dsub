@@ -163,7 +163,7 @@ echo
 echo "GCS output file list matches expected"
 
 # Verify dstat
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 && "${DSUB_PROVIDER}" != "google" ]]; then
+if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${JOB_ID}")"; then
     echo "dstat exited with a non-zero exit code!"
     echo "Output:"

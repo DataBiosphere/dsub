@@ -300,7 +300,7 @@ $ dstat \
 ```
 
 Note the `Internal ID` in this example provides the
-[Google Pipelines API operation name](https://cloud.google.com/genomics/reference/rest/v1alpha2/operations#name).
+[Google Pipelines API operation name](https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.operations#Operation.FIELDS.name).
 
 ### Full output as tabular text
 

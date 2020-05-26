@@ -59,8 +59,7 @@ including:
   directory before the user script runs.
 
 Unless you have a compelling reason not to, follow naming conventions
-for the Docker container paths used by other providers, such as the
-`local` and `google` providers:
+for the Docker container paths used by other providers, such as:
 
   - input: /mnt/data/input
   - output: /mnt/data/output

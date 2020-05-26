@@ -174,16 +174,6 @@ class TaskParamAction(argparse.Action):
     setattr(namespace, self.dest, tasks)
 
 
-def _google_parse_arguments(args):
-  """Validated google arguments."""
-  if args.machine_type:
-    raise ValueError('Not supported with the google provider: --machine-type. '
-                     'Use --min-cores and --min-ram instead.'
-                     '')
-  if args.mount:
-    raise ValueError('Not supported with the google provider: --mount.')
-
-
 def _google_cls_v2_parse_arguments(args):
   """Validated google-cls-v2 arguments."""
 
@@ -409,7 +399,7 @@ def _parse_arguments(prog, argv):
 
   # Add provider-specific arguments
 
-  # Shared between the "google", "google-cls-v2", and "google-v2" providers
+  # Shared between the "google-cls-v2" and "google-v2" providers
   google_common = parser.add_argument_group(
       title='google-common',
       description="""Options common to the "google", "google-cls-v2", and
@@ -448,7 +438,7 @@ def _parse_arguments(prog, argv):
           NVIDIA(R) CUDA toolkit. Please see
           https://cloud.google.com/compute/docs/gpus/ for supported GPU types
           and
-          https://cloud.google.com/genomics/reference/rest/v1alpha2/pipelines#pipelineresources
+          https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.pipelines/run#accelerator
           for more details. (default: None)""")
   google_common.add_argument(
       '--accelerator-count',
@@ -463,17 +453,6 @@ def _parse_arguments(prog, argv):
       '--credentials-file',
       type=str,
       help='Path to a local file with JSON credentials for a service account.')
-
-  google = parser.add_argument_group(
-      title='"google" provider options',
-      description='See also the "google-common" options listed above')
-  google.add_argument(
-      '--keep-alive',
-      type=int,
-      help="""Time (in seconds) to keep a tasks's virtual machine (VM) running
-          after a localization, docker command, or delocalization failure.
-          Allows for connecting to the VM for debugging.
-          Default is 0; maximum allowed value is 86400 (1 day).""")
 
   google_v2 = parser.add_argument_group(
       title='"google-v2" provider options',
@@ -566,15 +545,12 @@ def _parse_arguments(prog, argv):
 
   args = provider_base.parse_args(
       parser, {
-          'google': ['project', 'zones', 'logging'],
           'google-cls-v2': ['project', 'logging'],
           'google-v2': ['project', 'logging'],
           'test-fails': [],
           'local': ['logging'],
       }, argv)
 
-  if args.provider == 'google':
-    _google_parse_arguments(args)
   if args.provider == 'google-cls-v2':
     _google_cls_v2_parse_arguments(args)
   if args.provider == 'google-v2':
@@ -611,7 +587,6 @@ def _get_job_resources(args):
       logging_path=None,
       service_account=args.service_account,
       scopes=args.scopes,
-      keep_alive=args.keep_alive,
       cpu_platform=args.cpu_platform,
       network=args.network,
       subnetwork=args.subnetwork,
@@ -836,7 +811,10 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor,
 
     task_dict = dict()
     for t in tasks:
-      task_id = job_model.numeric_task_id(t.get_field('task-id'))
+      task_id = t.get_field('task-id')
+      if task_id is not None:
+        task_id = int(task_id)
+
       task_dict[task_id] = t
 
       status = t.get_field('task-status')

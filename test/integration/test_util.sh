@@ -168,9 +168,6 @@ function util::wait_for_canceled_status() {
   # marked for deletion and there can be a short delay before it is externally
   # marked as CANCELED.
   local max_wait_sec=10
-  if [[ "${DSUB_PROVIDER}" == "google" ]]; then
-    max_wait_sec=90
-  fi
 
   local status
   echo "Waiting up to ${max_wait_sec} sec for CANCELED status of ${job_id}"
