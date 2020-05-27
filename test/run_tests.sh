@@ -215,14 +215,7 @@ function get_test_providers() {
     return
   fi
 
- case "${test_file}" in
-    e2e_error.sh)
-      local all_provider_list="${DSUB_PROVIDER:-local}"
-      ;;
-    *)
-      local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2}"
-      ;;
-  esac
+  local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2}"
 
   echo -n "${all_provider_list}"
 }
