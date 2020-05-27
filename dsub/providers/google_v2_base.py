@@ -51,7 +51,7 @@ _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 
 # Action steps that interact with GCS need gsutil and Python.
 # Use the 'slim' variant of the cloud-sdk image as it is much smaller.
-_CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:264.0.0-slim'
+_CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:294.0.0-slim'
 
 # This image is for an optional ssh container.
 _SSH_IMAGE = 'gcr.io/cloud-genomics-pipelines/tools'
@@ -110,9 +110,6 @@ _GSUTIL_CP_FN = textwrap.dedent("""\
       if (( attempt < 3 )); then
         log_warning "Sleeping 10s before the next attempt of failed gsutil command"
         log_warning "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
-        # Workaround for gsutil/gcloud issue that prevents re-authentication
-        # See https://github.com/googlegenomics/pipelines-tools/commit/464fd9c4a894b9144944459e47b64871aebd033a
-        rm -f "${HOME}/.config/gcloud/gce"
         sleep 10s
       fi
     done
@@ -164,9 +161,6 @@ _GSUTIL_RSYNC_FN = textwrap.dedent("""\
       if (( attempt < 3 )); then
         log_warning "Sleeping 10s before the next attempt of failed gsutil command"
         log_warning "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
-        # Workaround for gsutil issue that prevents re-authentication
-        # See https://github.com/googlegenomics/pipelines-tools/commit/464fd9c4a894b9144944459e47b64871aebd033a
-        rm -f "${HOME}/.config/gcloud/gce"
         sleep 10s
       fi
     done
