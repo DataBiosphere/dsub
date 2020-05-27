@@ -74,7 +74,7 @@ def _parse_arguments():
       help='User labels to match. Tasks returned must match all labels.',
       metavar='KEY=VALUE')
 
-  # Shared between the "google", "google-cls-v2", and "google-v2" providers
+  # Shared between the "google-cls-v2" and "google-v2" providers
   google_common = parser.add_argument_group(
       title='google-common',
       description="""Options common to the "google", "google-cls-v2", and
@@ -88,12 +88,12 @@ def _parse_arguments():
       description='See also the "google-common" options listed')
   google_cls_v2.add_argument(
       '--location',
+      default=job_model.DEFAULT_LOCATION,
       help="""Specifies the Google Cloud region to which the dsub job was
-        submitted. (default: us-central1)""")
+        submitted. (default: {})""".format(job_model.DEFAULT_LOCATION))
 
   return provider_base.parse_args(
       parser, {
-          'google': ['project'],
           'google-cls-v2': ['project'],
           'google-v2': ['project'],
           'test-fails': [],

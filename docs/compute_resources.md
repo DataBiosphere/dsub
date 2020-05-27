@@ -3,7 +3,7 @@
 For the `local` provider, `dsub` launches tasks on your local machine and runs
 as-is. No attempt is made to constrain resources used or ensure capacity.
 
-For the `google` and `google-v2` providers, you can specify the compute
+For the Google providers, you can specify the compute
 resources that your job tasks will need.
 
 ## Cores and RAM
@@ -19,32 +19,28 @@ Google Compute Engine treats `GB` as a base-2 value, where:
 - 1GB = 2^30 bytes
 - 1GB = 1024 MB
 
-Unit handling by the `dsub` `google` and `google-v2` providers is consistent
+Unit handling by the `dsub` Google providers is consistent
 with Google Compute Engine.
 
-### With the `google` provider (the default):
+### `--min-ram` and `--min-cores` flags
 
 To change the virtual machine minimum RAM, use the `--min-ram` flag.
 To change the virtual machine minimum number of CPU cores, use the `--min-cores` flag.
 
-The machine type selected will be the smallest matching VM from the
-[predefined machine types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types).
+If specified, `dsub` will choose the smallest matching
+[custom machine type](https://cloud.google.com/compute/docs/machine-types#custom_machine_types)
+that fits these
+[specifications](https://cloud.google.com/compute/docs/instances/creating-instance-with-custom-machine-type#specifications).
 
-### With the `google-v2` provider:
+### With the `--machine-type` flags
 
-To change the virtual machine RAM and number of CPU cores, use the
+To explicitly set the virtual machine RAM and number of CPU cores, use the
 `--machine-type` flag.
 
 The `--machine-type` value can be one of the
 [predefined machine types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types)
 or a
 [custom machine type](https://cloud.google.com/compute/docs/machine-types#custom_machine_types).
-
-You may also use the `--min-ram` and/or `--min-cores` flag similarly to the `google` provider above.
-If specified, `dsub` will choose the smallest matching
-[custom machine type](https://cloud.google.com/compute/docs/machine-types#custom_machine_types)
-that fits these
-[specifications](https://cloud.google.com/compute/docs/instances/creating-instance-with-custom-machine-type#specifications).
 
 ## Disks
 
@@ -56,7 +52,7 @@ To change the boot disk size, use the `--boot-disk-size` flag.<sup>(\*)</sup>
 To change the disk size, use the `--disk-size` flag.
 
 (\*) While the boot disk size *can* be changed, there should be no need to do
-so. The google provider runtime environment is structured such that you should
+so. The provider runtime environment is structured such that you should
 only ever need to size the data disk. See the
 [provider documentation](providers/README.md) for details.
 

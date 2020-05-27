@@ -1302,6 +1302,11 @@ class GoogleOperation(base.Task):
 
     return msg, action
 
+  def _is_ssh_enabled(self, op):
+    """Return whether the operation had --ssh enabled or not."""
+    action = google_v2_operations.get_action_by_name(op, 'ssh')
+    return action is not None
+
   def error_message(self):
     """Returns an error message if the operation failed for any reason.
 
@@ -1414,6 +1419,9 @@ class GoogleOperation(base.Task):
       return self._provider_name
     elif field == 'provider-attributes':
       value = {}
+
+      # The ssh flag is determined by if an action named 'ssh' exists.
+      value['ssh'] = self._is_ssh_enabled(self._op)
 
       # The VM instance name and zone can be found in the WorkerAssignedEvent.
       # For a given operation, this may have occurred multiple times, so be

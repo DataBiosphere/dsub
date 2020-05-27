@@ -36,7 +36,7 @@ _LOCALIZE_COMMAND_MAP = {
 #
 # Backends like the Google Pipelines API, allow for the user to set both
 # a boot-disk-size and a disk-size. But the boot-disk-size is not something
-# that users should care about, so the google provider puts everything
+# that users should care about, so the Google providers put everything
 # meaningful on the data disk:
 #
 #   input: files localized from object storage

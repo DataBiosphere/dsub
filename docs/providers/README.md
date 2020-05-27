@@ -10,8 +10,8 @@ implements a consistent runtime environment. The current supported providers
 are:
 
 - local
-- google (deprecated: use `google-v2`)
 - google-v2 (the default)
+- google-cls-v2 (*new*)
 
 ## Runtime environment
 
@@ -70,17 +70,14 @@ of `.py` files, your script will be able to run.
 
 ### TMPDIR will be set to reference a directory on your "data disk"
 
-The `google` and `google-v2` providers depend on the
-[Google Genomics Pipelines API](https://cloud.google.com/genomics/reference/rest/v1alpha2/pipelines)
-and
-[Google Genomics Pipelines API](https://cloud.google.com/genomics/reference/rest/v2alpha1/pipelines)
-respectively, which put the Docker container's `/tmp` directory on the Compute
+Historically, the Google Pipelines API (which the Google providers depend on)
+put the Docker container's `/tmp` directory on the Compute
 Engine VM's boot disk, rather than the data disk that is created for `dsub`.
 To avoid your needing to separately size both the boot disk and the data disk,
-the `google` and `google-v2` providers create a `tmp` directory and set the
+the Google providers create a `tmp` directory and set the
 `TMPDIR` environment variable (supported by many tools) to point to it.
 
-The separation of boot vs. data disk does not hold for the `local` provider,
+This separation of boot vs. data disk does not hold for the `local` provider,
 but the `local` provider still sets `TMPDIR`. `dsub` scripts that need
 large temporary space should write to `${TMPDIR}` rather than `/tmp`
 
@@ -160,10 +157,10 @@ The data folder contains:
     `--input-recursive` parameter values.
 -   `output`: location for script to write automatically delocalized `--output`
     and `--output-recursive` parameter values.
--   `script`: location of the your dsub `--script` or `--command` script.
--   `tmp`: temporary directory for the your script. `TMPDIR` is set to this
+-   `script`: location of your dsub `--script` or `--command` script.
+-   `tmp`: temporary directory for your script. `TMPDIR` is set to this
     directory.
--   `workingdir`: the working directory set before the your script runs.
+-   `workingdir`: the working directory set before your script runs.
 
 #### Task state and logging
 
@@ -194,138 +191,13 @@ During execution, `runner.sh` writes the following files to record task state:
 The `local` provider does not support resource-related flags such as
 `--min-cpu`, `--min-ram`, `--boot-disk-size`, or `--disk-size`.
 
-### `google` provider
+### `google-v2` and `google-cls-v2` providers
 
-The `google` provider utilizes the Google Genomics Pipelines API
-[pipelines.run()](https://cloud.google.com/genomics/reference/rest/v1alpha2/pipelines/run)
-to queue a request for the following sequence of events:
-
-1. Create a Google Compute Engine
-[Virtual Machine (VM) instance](https://cloud.google.com/compute/docs/instances/).
-2. Create a Google Compute Engine
-[Persistent Disk](https://cloud.google.com/compute/docs/disks/) and mount it
-as a "data disk".
-3. Localize files from
-[Google Cloud Storage](https://cloud.google.com/storage/docs/) to the data disk.
-4. Run a Docker container and execute your `--script` or `--command`.
-5. Delocalize files from the data disk to Google Cloud Storage.
-6. Destroy the VM
-
-#### Orchestration
-
-When the pipelines.run() API is called, it creates an
-[operation](https://cloud.google.com/genomics/reference/rest/v1alpha2/operations).
-The Pipelines API service will then create the VM and disk when
-the your Cloud Project has sufficient
-[Compute Engine quota](https://cloud.google.com/compute/quotas).
-
-When the VM starts, it runs a Compute Engine
-[startup script](https://cloud.google.com/compute/docs/startupscript)
-to launch the Pipelines API "controller" which orchestrates input localization,
-Docker execution, and output delocalization.
-
-When the controller exits, the startup script destroys the VM and disk.
-
-While the Pipelines API provides the core infrastructure for job queuing,
-VM creation, and Docker command execution, several features of `dsub` are
-not directly supported by the Pipelines API. These features are implemented
-by wrapping the user `--script` or `--command` with code that runs inside the
-Docker container.
-
-The Docker command submitted to the Pipelines API for a `dsub` does the
-following:
-
-1. Create runtime directories (`script`, `tmp`, `workingdir`) described above.
-2. Write the user `--script` or `--command` to a file and make it executable.
-3. Install `gsutil` if there are recursive copies to do.
-4. Set environment variables for `--input` parameters with wildcards.
-5. Set environment variables for `--input-recursive` parameters.
-6. Perform copy for `--input-recursive` parameters.
-7. Create the directories for `--output` parameters.
-8. Set environment variables for `--output-recursive` parameters.
-9. Set `TMPDIR`.
-10. Set the working directory.
-11. **Run the user `--script` or `--command`**.
-12. Perform copy for `--output-recursive` parameters.
-
-#### File copying
-
-Note that for the `--input-recursive` and `--output-recursive` features,
-`dsub` does not get direct support from the Pipelines API. Instead, it injects
-the necessary code into the Docker command to set the environment variables and
-perform the recursive copies.
-
-As a getting started convenience, if `--input-recursive` or `--output-recursive`
-are used with the `google` provider, `dsub` will automatically check for and
-install the
-[Google Cloud SDK](https://cloud.google.com/sdk/docs/) in the Docker container
-at runtime (before your script executes).
-
-If you use the recursive copy features, install the Cloud SDK in your Docker
-image when you build it to avoid the installation at runtime.
-
-#### Container runtime environment
-
-The data disk path is the same on the host VM as it is in the Docker container:
-
-- `/mnt/data`
-
-The `/mnt/data` folder contains:
-
--   `input`: location of automatically localized `--input` and
-    `--input-recursive` parameter values.
--   `output`: location for script to write automatically delocalized `--output`
-    and `--output-recursive` parameter values.
--   `script`: location of the your dsub `--script` or `--command` script.
--   `tmp`: temporary directory for the your script. `TMPDIR` is set to this
-    directory.
--   `workingdir`: the working directory set before the your script runs.
-
-#### Task state and logging
-
-The Genomics API supports the following "operation status" values:
-
-- RUNNING
-- SUCCESS
-- FAILURE
-- CANCELED
-
-Note that while an operation is queued for execution its status is `RUNNING`.
-
-The Pipelines API controller maintains 3 log files, which are uploaded
-every 5 minutes to the `--logging` location specified to `dsub`:
-
-- `[prefix].log`: log generated by the controller as it executes
-- `[prefix]-stdout.log`: stdout from your Docker container
-- `[prefix]-stderr.log`: stderr from your Docker container
-
-See [Logging](https://github.com/DataBiosphere/dsub/blob/master/docs/logging.md)
-for more details on log files.
-
-#### Resource requirements
-
-The `google` provider supports resource-related flags such as
-`--min-cpu`, `--min-ram`, `--boot-disk-size`, or `--disk-size`.
-
-##### Machine type
-
-By default, the Compute Engine VM that runs will be an `n1-standard-1`.
-If you specify `--min-cpu` and/or `--min-ram`, the Pipelines API will
-choose the smallest
-[predefined machine type](https://cloud.google.com/compute/docs/machine-types)
-that satisfies your requested minimums.
-
-##### Disk allocation
-
-The Docker container launched by the Pipelines API will use the host VM boot
-disk for system paths. All other directories set up by `dsub` will be on the
-data disk, including the `TMPDIR` (as discussed above). Thus you should only
-ever need to change the `--disk-size`.
-
-### `google-v2` provider
-
-The `google-v2` provider utilizes the Google Genomics Pipelines API
-[pipelines.run()](https://cloud.google.com/genomics/reference/rest/v2alpha1/pipelines/run)
+The `google-v2` and `google-cls-v2` providers share a significant amount of
+their implementation. The `google-v2` provider utilizes the Google Genomics
+Pipelines API `v2alpha1`
+while the `google-cls-v2` provider utilizes the Google Cloud Life Sciences
+Piplines API [v2beta](https://cloud.google.com/life-sciences/docs/apis)
 to queue a request for the following sequence of events:
 
 1. Create a Google Compute Engine
@@ -341,8 +213,10 @@ as a "data disk".
 
 #### Orchestration
 
-When the pipelines.run() API is called, it creates an
-[operation](https://cloud.google.com/genomics/reference/rest/v2alpha1/operations).
+When the Pipelines
+[run()](https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.pipelines/run)
+API is called, it creates an
+[operation](https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.operations).
 The Pipelines API service will then create the VM and disk when
 the your Cloud Project has sufficient
 [Compute Engine quota](https://cloud.google.com/compute/quotas).
@@ -387,18 +261,18 @@ The `/mnt/data` folder contains:
 
 #### Task status
 
-The Genomics `v2alpha1` API supports operation status of:
+The Pipelines API supports operation status of:
 
 - done: false
-- done: true with no error
-- done: true with error
+- done: true (with no error)
+- done: true (with error)
 
 `dsub` interprets the above to provide task statuses of:
 
-- RUNNING
-- SUCCESS
-- FAILURE
-- CANCELED
+- RUNNING (`done: false`)
+- SUCCESS (`done: true` with no `error`)
+- FAILURE (`done: true` with `error` code != 1)
+- CANCELED (`done: true` with `error` code 1)
 
 Note that for historical reasons, while an operation is queued for execution
 its status is `RUNNING`.
@@ -416,8 +290,8 @@ Logging paths and the `[prefix]` are discussed further in [Logging](../logging.m
 
 #### Resource requirements
 
-The `google-v2` provider supports resource-related flags such as
-`--machine-type`, `--boot-disk-size`, `--disk-size`, and several other
+The `google-v2` and `google-cls-v2` providers support resource-related flags
+such as `--machine-type`, `--boot-disk-size`, `--disk-size`, and several other
 Compute Engine VM parameters.
 
 ##### Disk allocation

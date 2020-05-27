@@ -28,28 +28,6 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 readonly TESTDATA_DIR="$(cd "${SCRIPT_DIR}/../testdata" && pwd)"
 readonly JOB_NAME="test-job"
 
-# Utility routine for getting a list of task statuses
-function check_correct_task() {
-  local dstat_output="${1}"
-  local task_id="${2}"
-
-  if [[ "${DSUB_PROVIDER}" == "google" ]]; then
-    # For historical reasons, the dstat provider for google formats task ids as "task-n".
-    task_id="task-${task_id}"
-  else
-    # For the local provider, task IDs are stored as integers and single-quoted
-    # when formatted to yaml
-    task_id="'${task_id}'"
-  fi
-
-  if ! echo "${dstat_output}" | grep -qi "task-id: ${task_id}"; then
-    echo "Task \"task-id: ${task_id}\" not found in the dstat output!"
-    echo "${dstat_output}"
-    exit 1
-  fi
-}
-readonly -f check_correct_task
-
 # This test is not sensitive to the output of the dsub job.
 # Set the ALLOW_DIRTY_TESTS environment variable to 1 in your shell to
 # run this test without first emptying the output and logging directories.
@@ -101,7 +79,7 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     exit 1
   fi
 
-  echo "Checking dstat (by tasks)..."
+  echo "Checking dstat (by --tasks)..."
 
   TASK_NUM=2
 
@@ -112,7 +90,8 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     exit 1
   fi
 
-  check_correct_task "${DSTAT_OUTPUT}" "${TASK_NUM}"
+  # Check that the task id is set
+  util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].task-id" "${TASK_NUM}"
 
   echo "Checking dstat (by job-name)..."
 

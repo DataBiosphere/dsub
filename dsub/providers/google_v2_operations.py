@@ -117,7 +117,7 @@ def get_action_by_id(op, action_id):
     return actions[action_id - 1]
 
 
-def _get_action_by_name(op, name):
+def get_action_by_name(op, name):
   """Return the value for the specified action."""
   actions = get_actions(op)
   for action in actions:
@@ -135,14 +135,14 @@ def _get_action_by_name(op, name):
 
 def get_action_environment(op, name):
   """Return the environment for the operation."""
-  action = _get_action_by_name(op, name)
+  action = get_action_by_name(op, name)
   if action:
     return action.get('environment')
 
 
 def get_action_image(op, name):
   """Return the image for the operation."""
-  action = _get_action_by_name(op, name)
+  action = get_action_by_name(op, name)
   if action:
     return action.get('imageUri')
 

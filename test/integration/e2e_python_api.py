@@ -24,7 +24,6 @@ from dsub.commands import dsub
 from dsub.lib import job_model
 from dsub.lib import param_util
 from dsub.lib import resources
-from dsub.providers import google
 from dsub.providers import google_cls_v2
 from dsub.providers import google_v2
 from dsub.providers import local
@@ -45,8 +44,6 @@ def get_dsub_provider():
   """Return the appropriate google_base.JobProvider instance."""
   if test.DSUB_PROVIDER == 'local':
     return local.LocalJobProvider(resources)
-  elif test.DSUB_PROVIDER == 'google':
-    return google.GoogleJobProvider(False, False, test.PROJECT_ID)
   elif test.DSUB_PROVIDER == 'google-cls-v2':
     return google_cls_v2.GoogleCLSV2JobProvider(False, test.PROJECT_ID,
                                                 'us-central1')

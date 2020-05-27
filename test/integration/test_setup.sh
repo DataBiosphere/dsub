@@ -87,27 +87,15 @@ function run_dsub() {
   dsub_"${DSUB_PROVIDER}" "${@}"
 }
 
-function dsub_google() {
-  dsub \
-    --provider google \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
-    --zones "${ZONES:-us-central1-*}" \
-    ${DISK_SIZE:+--disk-size "${DISK_SIZE}"} \
-    ${BOOT_DISK_SIZE:+--boot-disk-size "${BOOT_DISK_SIZE}"} \
-    "${@}"
-}
-
 function dsub_google-cls-v2() {
+  local location="${LOCATION:-}"
   local zones="${ZONES:-}"
   local regions="${REGIONS:-}"
-  if [[ -z "${regions}" ]] && [[ -z "${zones}" ]]; then
-    regions="us-central1"
-  fi
 
   dsub \
     --provider google-cls-v2 \
     --project "${PROJECT_ID}" \
+    ${location:+--location "${location}"} \
     --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
     ${regions:+--regions "${regions}"} \
     ${zones:+--zones "${zones}"} \
@@ -161,17 +149,13 @@ function run_dstat() {
   run_dstat_age "45m" "${@}"
 }
 
-function dstat_google() {
-  dstat \
-    --provider google \
-    --project "${PROJECT_ID}" \
-    "${@}"
-}
-
 function dstat_google-cls-v2() {
+  local location="${LOCATION:-}"
+
   dstat \
     --provider google-cls-v2 \
     --project "${PROJECT_ID}" \
+    ${location:+--location "${location}"} \
     "${@}"
 }
 
@@ -206,17 +190,13 @@ function run_ddel() {
   run_ddel_age "45m" "${@}"
 }
 
-function ddel_google() {
-  ddel \
-    --provider google \
-    --project "${PROJECT_ID}" \
-    "${@}"
-}
-
 function ddel_google-cls-v2() {
+  local location="${LOCATION:-}"
+
   ddel \
     --provider google-cls-v2 \
     --project "${PROJECT_ID}" \
+    ${location:+--location "${location}"} \
     "${@}"
 }
 

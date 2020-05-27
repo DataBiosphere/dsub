@@ -22,21 +22,30 @@ install from [github](https://github.com/DataBiosphere/dsub).
 
 ### Sunsetting Python 2 support
 
-Python 2 support will end in January 2020. We will turn off our tests running on Python 2.
+Python 2 support ended in January 2020. Automated `dsub` tests running on
+Python 2 will soon be disabled.
 See [Python's official article](https://www.python.org/doc/sunset-python-2/) for details.
+
+Use Python 3.
 
 ### Pre-installation steps
 
-1. This is optional, but whether installing from PyPI or from github,
-you are encouraged to use a [Python virtualenv](https://virtualenv.pypa.io).
+This is optional, but whether installing from PyPI or from github,
+you are encouraged to use a
+[Python virtual environment](https://docs.python.org/3/library/venv.html).
 
-    If necessary, [install virtualenv](https://virtualenv.pypa.io/en/stable/installation/).
+You can do this in a directory of your choosing.
 
-1.  Create and activate a Python virtualenv.
-
-        # (You can do this in a directory of your choosing.)
-        virtualenv dsub_libs
+        python3 -m venv dsub_libs
         source dsub_libs/bin/activate
+
+Using a Python virtual environment isolates `dsub` library dependencies from
+other Python applications on your system.
+
+Activate this virtual environment in any shell session before running `dsub`.
+To deactivate the virtual environment in your shell, run the command:
+
+        deactivate
 
 ### Install `dsub`
 
@@ -84,8 +93,12 @@ Choose one of the following:
 ### Getting started with the local provider
 
 We think you'll find the `local` provider to be very helpful when building
-your pipelines. You'll get quicker turnaround times and won't incur cloud
-charges using it.
+your `dsub` tasks. Instead of submitting a request to run your command on a
+cloud VM, the `local` provider runs your `dsub` tasks on your local machine.
+
+The `local` provider is not designed for running at scale. It is designed
+to emulate running on a cloud VM such that you can rapidly iterate.
+You'll get quicker turnaround times and won't incur cloud charges using it.
 
 1. Run a `dsub` job and wait for completion.
 
@@ -104,10 +117,29 @@ charges using it.
 
 ### Getting started on Google Cloud
 
-1.  Sign up for a Google Cloud Platform account and
+`dsub` supports the use of two different APIs from Google Cloud for running
+tasks. Google Cloud is transitioning from `Genomics v2alpha1`
+to [Cloud Life Sciences v2beta](https://cloud.google.com/life-sciences/docs/reference/rest).
+
+`dsub` supports both APIs with the (old) `google-v2` and (new) `google-cls-v2`
+providers respectively. `google-v2` is the current default provider. `dsub`
+will be transitioning to make `google-cls-v2` the default in coming releases.
+
+The steps for getting started differ slightly as indicated in the steps below:
+
+1.  Sign up for a Google account and
     [create a project](https://console.cloud.google.com/project?).
 
-1.  [Enable the APIs](https://console.cloud.google.com/flows/enableapi?apiid=genomics,storage_component,compute_component&redirect=https://console.cloud.google.com).
+1.  Enable the APIs:
+
+    - For the `v2alpha1` API (provider: `google-v2`):
+
+     [Enable the Genomics, Storage, and Compute APIs](https://console.cloud.google.com/flows/enableapi?apiid=genomics,storage_component,compute_component&redirect=https://console.cloud.google.com).
+
+    - For the `v2beta` API (provider: `google-cls-v2`):
+
+     [Enable the Cloud Life Sciences, Storage, and Compute APIs](https://console.cloud.google.com/flows/enableapi?apiid=lifesciences.googleapis.com,storage_component,compute_component&redirect=https://console.cloud.google.com)
+
 
 1.  [Install the Google Cloud SDK](https://cloud.google.com/sdk/) and run
 
@@ -115,7 +147,7 @@ charges using it.
 
     This will set up your default project and grant credentials to the Google
     Cloud SDK. Now provide [credentials](https://developers.google.com/identity/protocols/application-default-credentials)
-    so dsub can call Google APIs:
+    so `dsub` can call Google APIs:
 
         gcloud auth application-default login
 
@@ -135,12 +167,26 @@ charges using it.
     refine the [location](https://cloud.google.com/storage/docs/bucket-locations)
     setting with the `-l` option.)
 
-1.  Run a dsub job and wait for completion.
+1.  Run a very simple "Hello World" `dsub` job and wait for completion.
 
-    Here is a very simple "Hello World" test:
+    - For the `v2alpha1` API (provider: `google-v2`):
 
         dsub \
           --provider google-v2 \
+          --project my-cloud-project \
+          --regions us-central1 \
+          --logging gs://my-bucket/logging/ \
+          --output OUT=gs://my-bucket/output/out.txt \
+          --command 'echo "Hello World" > "${OUT}"' \
+          --wait
+
+    Change `my-cloud-project` to your Google Cloud project, and `my-bucket` to
+    the bucket you created above.
+
+    - For the `v2beta` API (provider: `google-cls-v2`):
+
+        dsub \
+          --provider google-cls-v2 \
           --project my-cloud-project \
           --regions us-central1 \
           --logging gs://my-bucket/logging/ \
@@ -167,74 +213,43 @@ To this end, `dsub` provides multiple "backend providers", each of which
 implements a consistent runtime environment. The current providers are:
 
 - local
-- google (deprecated: use `google-v2`)
 - google-v2 (the default)
+- google-cls-v2 (*new*)
 
 More details on the runtime environment implemented by the backend providers
 can be found in [dsub backend providers](https://github.com/DataBiosphere/dsub/blob/master/docs/providers/README.md).
 
-### Deprecation of the `google` provider
+### Differences between `google-v2` and `google-cls-v2`
 
-The original `dsub` provider was the `google` provider, built on top of the
-Google Genomics Pipelines API `v1alpha2`. The Pipelines API `v1alpha2` has
-been deprecated and was scheduled for turn down at the end of 2018.
-For more details, see
-[Cloud Genomics v1alpha2 Migration Guide](https://cloud.google.com/genomics/docs/how-tos/migration)
+The `google-cls-v2` provider is built on the Cloud Life Sciences `v2beta` API.
+This API is very similar to its predecessor, the Genomics `v2alpha1` API.
+Details of the differences can be found in the
+[Migration Guide](https://cloud.google.com/life-sciences/docs/how-tos/migration).
 
-Replacing `v1alpha2` is [v2alpha1](https://cloud.google.com/genomics/reference/rest/v2alpha1/pipelines/run).
-`dsub` has added the `google-v2` provider which use `v2alpha1` as the backend
-for running `dsub` jobs on Google Cloud.
+`dsub` largely hides the differences between the two APIs, but there are a
+few difference to note:
 
-**`dsub` users are encouraged today to use the `google-v2` provider. The
-`google-v2` provider is now the default. The `google` provider for `dsub` will
-be removed in a future release.**
+- `v2beta` is a regional service, `v2alpha1` is a global service
 
-### Migrating existing code from `google` to `google-v2`
+What this means is that with `v2alpha1`, the metadata about your tasks
+(called "operations"), is stored in a global database, while with `v2beta`, the
+metadata about your tasks are stored in a regional database. If your operation
+information needs to stay in a particular region, use the `v2beta` API
+(the `google-cls-v2` provider), and specify the `--location` where your
+operation information should be stored.
 
-To migrate existing `dsub` calls from the `google` provider to the `google-v2`
-provider:
+- The `--regions` and `--zones` flags can be omitted when using `google-cls-v2`
 
-- Add `--provider google-v2` to your command-line
-- Set the `--machine-type` or `--min-ram` and `--min-cores` if your tasks need
-other than 1 core and 3.75 GB of memory
+The `--regions` and `--zones` flags for `dsub` specify where the tasks should
+run. More specifically, this specifies what Compute Engine Zones to use for
+the VMs that run your tasks.
 
-**NOTE: The conversion of `--min-ram` and `--min-cores` is different with the
-`google-v2` provider than the `google` provider. Please read the section below
-to set your parameters appropriately.**
+With the `google-v2` provider, there is no default region or zone, and thus
+one of the `--regions` or `--zones` flags is required.
 
-#### `--machine-type` vs. `--min-ram` and `--min-cores` with `google-v2`
-
-The `google` provider was backed by the Pipelines API `v1alpha2`, which accepted
-minimum ram and minimum cores as parameters and made a "best fit" attempt to
-translate those parameters into one of the
-[Compute Engine Predefined Machine Types](https://cloud.google.com/compute/docs/machine-types#predefined_machine_types).
-
-The `google-v2` provider is backed by the Pipelines API `v2alpha1`, which does
-not perform this "best fit" computation, but requires an explicit machine type
-to be specified.
-
-However, the `v2alpha1` API also supports
-[Compute Engine Custom Machine Types](https://cloud.google.com/compute/docs/machine-types#custom_machine_types),
-which allow for greater control over machine resources than the predefined
-machine types do. This allows users to reduce costs by limiting any
-over-provisioning of Compute Engine VMs.
-
-The `google-v2` provider takes advantage of this by translating
-`--min-ram` and `--min-cores` into a custom machine type specification.
-When migrating existing `dsub` jobs from `google` to `google-v2` you may find
-that tasks are allocated smaller VMs with `google-v2` than with `google`
-because the `--min-ram` and `--min-cores` specified for the job are more
-precisely translated with `google-v2`. You will need to adjust your resource
-parameters accordingly.
-
-Notes for `google-v2` resource specifications:
-- `n1-standard-1` is the default machine type as it was with the `google`
-provider.
-- *Either* `--machine-type` or `--min-ram` and `--min-cores` may be specified,
-but not both.
-- To use one of the
-[Shared-core machine types](https://cloud.google.com/compute/docs/machine-types#sharedcore),
-use the `--machine-type` flag.
+With `google-cls-v2`, the `--location` flag defaults to `us-central1`, and
+if the `--regions` and `--zones` flags are omitted, the `location` will be
+used as the default `regions` list.
 
 ## `dsub` features
 
@@ -386,11 +401,11 @@ mounting a Google Cloud Storage bucket read-only or mounting a persistent disk
 created from a
 [Compute Engine Image](https://cloud.google.com/compute/docs/images) read-only.
 
-The `google-v2` provider supports these two methods of providing access to
+The `google-v2` and `google-cls-v2` providers support these two methods of providing access to
 resource data. The `local` provider supports mounting a local directory in a
 similar fashion to support your local development.
 
-To have the `google-v2` provider mount a Cloud Storage bucket using
+To have the `google-v2` or `google-cls-v2` provider mount a Cloud Storage bucket using
 Cloud Storage FUSE, use the `--mount` command line flag:
 
     --mount MYBUCKET=gs://mybucket
@@ -403,7 +418,7 @@ environment variable. Please read
 and [Semantics](https://github.com/GoogleCloudPlatform/gcsfuse/blob/master/docs/semantics.md)
 before using Cloud Storage FUSE.
 
-To have the `google-v2` provider mount a persistent disk created from an image,
+To have the `google-v2` or `google-cls-v2` provider mount a persistent disk created from an image,
 use the `--mount` command line flag and the url of the source image and the size
 (in GB) of the disk:
 
@@ -427,32 +442,12 @@ The local directory will be mounted into the Docker container running your
 variable `${LOCAL_MOUNT}`. Inside your script, you can reference the mounted
 path using the environment variable.
 
-##### Notice
-
-For the `google` provider, as a getting started convenience, if
-`--input-recursive` or `--output-recursive`
-are used, `dsub` will automatically check for and, if needed, install the
-[Google Cloud SDK](https://cloud.google.com/sdk/docs/) in the Docker container
-at runtime (before your script executes).
-
-If you use the recursive copy features, install the Cloud SDK in your Docker
-image when you build it to avoid the installation at runtime.
-
-If you use a Debian or Ubuntu Docker image, you are encouraged to use the
-[package installation instructions](https://cloud.google.com/sdk/downloads#apt-get).
-
-If you use a Red Hat or CentOS Docker image, you are encouraged to use the
-[package installation instructions](https://cloud.google.com/sdk/downloads#yum).
-
-**The installation of the CloudSDK into your Docker image is not needed for the
-`local` or the `google-v2` providers.**
-
 ### Setting resource requirements
 
 `dsub` tasks run using the `local` provider will use the resources available on
 your local machine.
 
-`dsub` tasks run using the `google` or `google-v2` providers can take advantage
+`dsub` tasks run using the `google`, `google-v2`, or `google-cls-v2` providers can take advantage
 of a wide range of CPU, RAM, disk, and hardware accelerator (eg. GPU) options.
 
 See the [Compute Resources](https://github.com/DataBiosphere/dsub/blob/master/docs/compute_resources.md)
@@ -535,8 +530,8 @@ For details, see [retries with dsub](https://github.com/DataBiosphere/dsub/blob/
 ### Labeling jobs and tasks
 
 You can add custom labels to jobs and tasks, which allows you to monitor and
-cancel tasks using your own identifiers. In addition, with the `google`
-provider, labeling a task will label associated compute resources such as
+cancel tasks using your own identifiers. In addition, with the Google
+providers, labeling a task will label associated compute resources such as
 virtual machines and disks.
 
 For more details, see [Checking Status and Troubleshooting Jobs](https://github.com/DataBiosphere/dsub/blob/master/docs/troubleshooting.md)

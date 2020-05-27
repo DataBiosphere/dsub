@@ -74,7 +74,7 @@ DEFAULT_DISK_TYPE = 'pd-standard'
 DEFAULT_LOCATION = 'us-central1'
 
 # Users may specify their own labels, however dsub also uses an implicit set of
-# labels (in the google provider). Reserve these labels such that users do
+# labels (in the Google providers). Reserve these labels such that users do
 # not attempt to set them.
 RESERVED_LABELS = frozenset([
     'job-name', 'job-id', 'user-id', 'task-id', 'dsub-version', 'task-attempt'
@@ -420,7 +420,6 @@ class Resources(
         'zones',
         'service_account',
         'scopes',
-        'keep_alive',
         'cpu_platform',
         'network',
         'subnetwork',
@@ -453,7 +452,6 @@ class Resources(
     service_account (string): Email address of the service account to be
       authorized on the Compute Engine VM for each job task.
     scopes (List[str]): OAuth2 scopes for the job
-    keep_alive (int): Seconds to keep VM alive on failure
     cpu_platform (string): The CPU platform to request (e.g. 'Intel Skylake')
     network (string): The network name to attach the VM's network interface to.
     subnetwork (string): The name of the subnetwork to attach the instance to.
@@ -490,7 +488,6 @@ class Resources(
               zones=None,
               service_account=None,
               scopes=None,
-              keep_alive=None,
               cpu_platform=None,
               network=None,
               subnetwork=None,
@@ -504,13 +501,15 @@ class Resources(
               enable_stackdriver_monitoring=None,
               max_retries=None,
               max_preemptible_attempts=None):
-    return super(Resources, cls).__new__(
-        cls, min_cores, min_ram, machine_type, disk_size, disk_type,
-        boot_disk_size, preemptible, image, logging, logging_path, regions,
-        zones, service_account, scopes, keep_alive, cpu_platform, network,
-        subnetwork, use_private_address, accelerator_type, accelerator_count,
-        nvidia_driver_version, timeout, log_interval, ssh,
-        enable_stackdriver_monitoring, max_retries, max_preemptible_attempts)
+    return super(Resources,
+                 cls).__new__(cls, min_cores, min_ram, machine_type, disk_size,
+                              disk_type, boot_disk_size, preemptible, image,
+                              logging, logging_path, regions, zones,
+                              service_account, scopes, cpu_platform, network,
+                              subnetwork, use_private_address, accelerator_type,
+                              accelerator_count, nvidia_driver_version, timeout,
+                              log_interval, ssh, enable_stackdriver_monitoring,
+                              max_retries, max_preemptible_attempts)
 
 
 def ensure_job_params_are_complete(job_params):
@@ -972,25 +971,3 @@ def task_view_generator(job_descriptor):
     jd = JobDescriptor(job_descriptor.job_metadata, job_descriptor.job_params,
                        job_descriptor.job_resources, [task_descriptor])
     yield jd
-
-
-def numeric_task_id(task_id):
-  """Converts a task-id to the numeric task-id.
-
-  Args:
-    task_id: task-id in either task-n or n format
-
-  Returns:
-    n
-  """
-
-  # This function exists to support the legacy "task-id" format in the "google"
-  # provider. Google labels originally could not be numeric. When the google
-  # provider is completely replaced by the google-v2 provider, this function can
-  # go away.
-
-  if task_id is not None:
-    if task_id.startswith('task-'):
-      return int(task_id[len('task-'):])
-    else:
-      return int(task_id)

@@ -1,14 +1,16 @@
 # Logging
 
-Both the `local` and `google` providers emit logging in a similar fashion:
+`dsub` providers emit logging in a similar fashion:
 
 -   Three log files are written to disk in the local execution environment.
     -   Task log
     -   Docker command stdout
     -   Docker command stderr
 -   The log files are copied from the execution environment to a designated
-    logging path on completion of the task. Some providers will update the log
-    files periodically during task execution.
+    logging path, based on the `--logging` command-line flag.
+-   All providers copy the logs on completion of the task.
+-   The Google providers also copy the log files periodically during task
+    execution, based on the `--log-interval` command-line flag.
 
 ## Logging paths
 
@@ -24,7 +26,7 @@ as the `job-id`) into the path.
 
 The `local` provider supports both `file://` as well as `gs://` logging paths.
 
-The `google` provider supports `gs://` logging paths.
+The Google providers support `gs://` logging paths.
 
 ### Directory path
 

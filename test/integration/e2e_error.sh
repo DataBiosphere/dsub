@@ -43,13 +43,11 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   DSTAT_OUTPUT=$(run_dstat --status '*' --jobs "${JOB_ID}" --full)
 
   declare -a EXPECTED_EVENTS
-  if [[ "${DSUB_PROVIDER}" == "google" ]] || \
-     [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
-     [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
-    EXPECTED_EVENTS=(start pulling-image localizing-files running-docker fail)
-  else
+  if [[ "${DSUB_PROVIDER}" == "local" ]]; then
     # The local provider has slightly different events in this error case
     EXPECTED_EVENTS=(start pulling-image localizing-files running-docker delocalizing-files fail)
+  else
+    EXPECTED_EVENTS=(start pulling-image localizing-files running-docker fail)
   fi
   util::dstat_out_assert_equal_events "${DSTAT_OUTPUT}" "[0].events" "${EXPECTED_EVENTS[@]}"
 fi

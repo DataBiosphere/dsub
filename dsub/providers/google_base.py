@@ -12,19 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Base module for the google, google_v2, and google_cls_v2 providers."""
+"""Base module for the google_v2 and google_cls_v2 providers."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 # pylint: disable=g-tzinfo-datetime
-from datetime import datetime
+import datetime
+import io
 import json
 import os
 import re
 import socket
-from ssl import SSLError
+import ssl
 import sys
 import warnings
 
@@ -39,6 +40,7 @@ from six.moves import range
 import six.moves.http_client
 
 import google.auth
+from google.oauth2 import service_account
 
 
 # The google v1 provider directly added the bigquery scope, but the v1alpha2
@@ -254,7 +256,7 @@ def build_pipeline_labels(job_metadata, task_metadata, task_id_pattern=None):
 def prepare_job_metadata(script, job_name, user_id, create_time):
   """Returns a dictionary of metadata fields for the job."""
 
-  # The name of the pipeline gets set into the ephemeralPipeline.name as-is.
+  # The name of the pipeline gets set into the operation as-is.
   # The default name of the pipeline is the script name
   # The name of the job is derived from the job_name and gets set as a
   # 'job-name' label (and so the value must be normalized).
@@ -363,7 +365,8 @@ def parse_rfc3339_utc_string(rfc3339_utc_string):
     assert False, 'Fraction length not 0, 6, or 9: {}'.len(fraction)
 
   try:
-    return datetime(g[0], g[1], g[2], g[3], g[4], g[5], micros, tzinfo=pytz.utc)
+    return datetime.datetime(
+        g[0], g[1], g[2], g[3], g[4], g[5], micros, tzinfo=pytz.utc)
   except ValueError as e:
     assert False, 'Could not parse RFC3339 datestring: {} exception: {}'.format(
         rfc3339_utc_string, e)
@@ -483,7 +486,7 @@ def _print_retry_error(exception, verbose):
   if not verbose:
     return
 
-  now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+  now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
   try:
     status_code = exception.resp.status
   except AttributeError:
@@ -521,7 +524,7 @@ def retry_api_check(exception, verbose):
 
   # For a given installation, this could be a permanent error, but has only
   # been observed as transient.
-  if isinstance(exception, SSLError):
+  if isinstance(exception, ssl.SSLError):
     _print_retry_error(exception, verbose)
     return True
 
@@ -610,6 +613,12 @@ def setup_service(api_name, api_version, credentials=None):
     credentials, _ = google.auth.default()
   return googleapiclient.discovery.build(
       api_name, api_version, credentials=credentials)
+
+
+def credentials_from_service_account_info(credentials_file):
+  with io.open(credentials_file, 'r', encoding='utf-8') as json_fi:
+    credentials_info = json.load(json_fi)
+  return service_account.Credentials.from_service_account_info(credentials_info)
 
 
 class Api(object):
