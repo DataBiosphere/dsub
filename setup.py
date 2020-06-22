@@ -15,11 +15,11 @@ _DEPENDENCIES = [
     # dependencies for dsub, ddel, dstat
     # Pin to known working versions to prevent episodic breakage from library
     # version mismatches.
-    # This version list generated: 05/19/2020
+    # This version list generated: 06/22/2020
 
     # direct dependencies
     'google-api-python-client<=1.8.3',
-    'google-auth<=1.15.0',
+    'google-auth<=1.18.0',
     'python-dateutil<=2.8.1',
     'pytz<=2019.3',
     'pyyaml<=5.2',
@@ -29,6 +29,7 @@ _DEPENDENCIES = [
 
     # downstream dependencies
     'funcsigs<=1.0.2',
+    'google-api-core<=1.21.0',
     'google-auth-httplib2<=0.0.3',
     'httplib2<=0.17.3',
     'pyasn1<=0.4.8',
