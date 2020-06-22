@@ -13,6 +13,9 @@
 # limitations under the License.
 """Unit tests for exponential backoff retrying."""
 
+import errno
+import socket
+import sys
 import unittest
 
 import apiclient.errors
@@ -118,6 +121,36 @@ class TestRetrying(unittest.TestCase):
         apiclient.errors.HttpError(ResponseMock(500, None), b'test_exception'),
         apiclient.errors.HttpError(ResponseMock(503, None), b'test_exception'),
     ]
+    ft = fake_time.FakeTime(chronology())
+    with patch('time.sleep', new=ft.sleep):
+      api_wrapper_to_test = google_base.Api(verbose)
+      mock_api_object = GoogleApiMock(exception_list)
+      api_wrapper_to_test.execute(mock_api_object)
+      # Expected to retry twice, for a total of 1 + 2 = 3 seconds
+      self.assertEqual(mock_api_object.retry_counter, 2)
+      self.assertGreaterEqual(elapsed_time_in_seconds(ft), 3)
+      self.assertLess(elapsed_time_in_seconds(ft), 3.5)
+
+  @parameterized.parameterized.expand([(True,), (False,)])
+  def test_broken_pipe_retries(self, verbose):
+    if sys.version_info.major == 3:
+      # To construct a BrokenPipeError, we pass errno.EPIPE (32) to OSError
+      # See https://docs.python.org/3/library/exceptions.html#BaseException.args
+      exception_list = [
+          OSError(errno.EPIPE, 'broken pipe exception test'),
+          OSError(errno.EPIPE, 'broken pipe exception test'),
+      ]
+    elif sys.version_info.major == 2:
+      # In Python2, BrokenPipeErrors are socket errors
+      broken_pipe_socket_error = socket.error()
+      broken_pipe_socket_error.errno = errno.EPIPE
+      exception_list = [
+          broken_pipe_socket_error,
+          broken_pipe_socket_error,
+      ]
+    else:
+      raise RuntimeError('Python version {} is not supported'.format(
+          sys.version_info.major))
     ft = fake_time.FakeTime(chronology())
     with patch('time.sleep', new=ft.sleep):
       api_wrapper_to_test = google_base.Api(verbose)
