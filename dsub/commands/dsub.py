@@ -1292,6 +1292,12 @@ def _name_for_command(command):
   'command'
   >>> _name_for_command('\\\n\\\n# Bad continuations, but ignore.\necho hello.')
   'echo'
+  >>> _name_for_command('(uname -a && pwd) # Command begins with non-letter.')
+  'uname'
+  >>> _name_for_command('my-program.sh # Command with hyphens.')
+  'my-program.sh'
+  >>> _name_for_command('/home/user/bin/-my-sort # Path with hyphen.')
+  'my-sort'
 
   Arguments:
     command: the user-provided command
@@ -1303,7 +1309,14 @@ def _name_for_command(command):
   for line in lines:
     line = line.strip()
     if line and not line.startswith('#') and line != '\\':
-      return os.path.basename(re.split(r'\s', line)[0])
+      # Tokenize on whitespace [ \t\n\r\f\v]
+      names = re.split(r'\s', line)
+      for name in names:
+        # Make sure the first character is a letter, number, or underscore
+        # Get basename so something like "/usr/bin/sort" becomes just "sort"
+        name = re.sub(r'^[^a-zA-Z0-9_]*', '', os.path.basename(name))
+        if name:
+          return name
 
   return 'command'
 
