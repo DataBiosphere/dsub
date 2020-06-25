@@ -16,29 +16,14 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import copy
 import datetime
 import doctest
 import textwrap
 import unittest
-from dateutil.tz import tzlocal
 from dsub.lib import dsub_util
 from dsub.lib import job_model
 import parameterized
 import pytz
-
-# Fixed values for age_to_create_time
-FIXED_TIME = datetime.datetime(2017, 1, 1)
-FIXED_TIME_UTC = int(
-    (FIXED_TIME - datetime.datetime.utcfromtimestamp(0)).total_seconds())
-
-# Fixed timestamp values for from_yaml and from_yaml_local tests.
-# The v0 version of the meta.yaml did not include a timezone offset for the
-# create-time. It was (of course) implicitly local.
-CREATE_TIME_LOCAL_STR = '2017-11-22 14:28:37.321788'
-CREATE_TIME_LOCAL = dsub_util.replace_timezone(
-    datetime.datetime.strptime(CREATE_TIME_LOCAL_STR, '%Y-%m-%d %H:%M:%S.%f'),
-    tzlocal())
 
 CREATE_TIME_STR = '2017-11-22 14:28:37.321788-08:00'
 CREATE_TIME = dsub_util.replace_timezone(
@@ -126,19 +111,6 @@ class JobModelTest(unittest.TestCase):
 #   --env VAR4="VAL4" \
 #   --env VAR5="VAL5"
 
-_ENV_LIST_LOCAL_META = textwrap.dedent("""
-  create-time: '{}'
-""".format(CREATE_TIME_LOCAL_STR) + """
-  envs: {VAR1: VAL1, VAR2: VAL2, VAR3: VAL3, VAR4: VAL4, VAR5: VAL5}
-  inputs: {}
-  job-id: script_env--dsubuser--171122-142837-321721
-  job-name: script_env_test.sh
-  labels: {dsub-version: 0.1.4}
-  logging: gs://b/dsub/sh/local/env_list/env_list/logging/env_list.log
-  outputs: {}
-  task-id: null
-""")
-
 _ENV_LIST_META = textwrap.dedent("""
   create-time: {}
 """.format(CREATE_TIME_STR) + """
@@ -218,21 +190,6 @@ _ENV_LIST_JOB_DESCRIPTOR = job_model.JobDescriptor(
 
 # pylint: disable=common_typos_disable
 # pilot3_exon_targetted_GRCh37_bams raises a "common typos" warning: "targetted"
-
-_IO_TASKS_LOCAL_META = textwrap.dedent("""
-  create-time: '{}'
-""".format(CREATE_TIME_LOCAL_STR) + """
-  envs: {TASK_ID: TASK_3, TEST_NAME: io_tasks}
-  inputs: {INPUT_PATH: 'gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/pilot3_exon_targetted_GRCh37_bams/data/NA06986/alignment/NA06986.chrom18.ILLUMINA.bwa.CEU.exon_targetted.20100311.bam',
-    POPULATION_FILE: 'gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/20131219.superpopulations.tsv'}
-  job-id: script_io_--dsubuser--171201-083727-449848
-  job-name: script_io_test.sh
-  labels: {dsub-version: 0.1.4}
-  logging: gs://b/dsub/sh/local/io_tasks/logging/script_io_--dsubuser--171201-083727-449848.3.log
-  outputs: {OUTPUT_PATH: 'gs://b/dsub/sh/local/io_tasks/output/3/*.md5',
-    OUTPUT_POPULATION_FILE: 'gs://b/dsub/sh/local/io_tasks/output/*'}
-  task-id: !!python/long '3'
-""")
 
 _IO_TASKS_META = textwrap.dedent("""
   create-time: {}
@@ -328,21 +285,6 @@ _IO_TASKS_JOB_DESCRIPTOR = job_model.JobDescriptor(
 #   --output OUTPUT_PATH_SHALLOW="${OUTPUTS}/shallow/*" \
 #   --output-recursive OUTPUT_PATH_DEEP="${OUTPUTS}/deep/"
 
-_IO_RECURSIVE_LOCAL_META = textwrap.dedent("""
-  create-time: '{}'
-""".format(CREATE_TIME_LOCAL_STR) + """
-  envs: {FILE_CONTENTS: Test file contents}
-  inputs: {INPUT_PATH_DEEP: 'gs://b/dsub/sh/local/io_recursive/input/deep/',
-    INPUT_PATH_SHALLOW: 'gs://b/dsub/sh/local/io_recursive/input/shallow/*'}
-  job-id: script_io_--dsubuser--171201-135702-356673
-  job-name: script_io_recursive.sh
-  labels: {dsub-version: 0.1.4}
-  logging: gs://b/dsub/sh/local/io_recursive/logging/io_recursive.log
-  outputs: {OUTPUT_PATH_DEEP: 'gs://b/dsub/sh/local/io_recursive/output/deep/',
-    OUTPUT_PATH_SHALLOW: 'gs://b/dsub/sh/local/io_recursive/output/shallow/*'}
-  task-id: null
-""")
-
 _IO_RECURSIVE_META = textwrap.dedent("""
   create-time: {}
 """.format(CREATE_TIME_STR) + """
@@ -434,19 +376,6 @@ _IO_RECURSIVE_JOB_DESCRIPTOR = job_model.JobDescriptor(
 # 1
 # 2
 
-_LABELS_LOCAL_META = textwrap.dedent("""
-  create-time: '{}'
-""".format(CREATE_TIME_LOCAL_STR) + """
-  envs: {}
-  inputs: {}
-  job-id: echo--dsubuser--171201-142229-050417
-  job-name: echo
-  labels: {batch: hello-world, dsub-version: 0.1.4, item-number: '2'}
-  logging: gs://b/dsub/sh/local/labels/logging/labels.2.log
-  outputs: {}
-  task-id: !!python/long '2'
-""")
-
 _LABELS_META = textwrap.dedent("""
   create-time: {}
 """.format(CREATE_TIME_STR) + """
@@ -523,58 +452,6 @@ class JobDescriptorTest(unittest.TestCase):
       self.assert_job_metadata_equal(a.task_metadata, e.task_metadata)
       self.assert_job_resources_equal(a.task_resources, e.task_resources)
       self.assert_job_params_equal(a.task_params, e.task_params)
-
-  @parameterized.parameterized.expand([
-      ('env_list', _ENV_LIST_LOCAL_META, _ENV_LIST_JOB_DESCRIPTOR),
-      ('io_tasks', _IO_TASKS_LOCAL_META, _IO_TASKS_JOB_DESCRIPTOR),
-      ('io_recursive', _IO_RECURSIVE_LOCAL_META, _IO_RECURSIVE_JOB_DESCRIPTOR),
-      ('labels', _LABELS_LOCAL_META, _LABELS_JOB_DESCRIPTOR),
-  ])
-  def test_from_yaml_local(self, unused_name, yaml_string, expected_descriptor):
-    actual = job_model.JobDescriptor.from_yaml(yaml_string)
-    expected = copy.deepcopy(expected_descriptor)
-
-    # The v0 meta.yaml did not include a timezone or offset, so we can't
-    # use the default expected create-time (which includes the offset)
-    # All tests use the same create-time.
-    expected.job_metadata['create-time'] = CREATE_TIME_LOCAL
-
-    # local meta.yaml did not include 'task-ids', so it should not be expected
-    is_tasks_job = expected.job_metadata.get('task-ids')
-    if is_tasks_job:
-      del expected.job_metadata['task-ids']
-
-    # local meta.yaml did not include 'user-id', so it should not be expected
-    del expected.job_metadata['user-id']
-
-    # local meta.yaml "logging" was the resolved task logging path, so it should
-    # be expected in the task logging_path and the job logging should be empty.
-    expected.job_resources = expected.job_resources._replace(logging=None)
-
-    # local meta.yaml did not distinguish between job and task parameters
-    # For --tasks jobs, they should all be in the task.
-    # For non-task jobs, they should all be in the job.
-
-    if is_tasks_job:
-      src_params = expected.job_params
-      dst_params = expected.task_descriptors[0].task_params
-    else:
-      src_params = expected.task_descriptors[0].task_params
-      dst_params = expected.job_params
-
-    for param_type in 'labels', 'envs', 'inputs', 'outputs':
-      dst_params[param_type] |= src_params[param_type]
-      src_params[param_type] = set()
-
-    # local meta.yaml did not mark recursive inputs/outputs as recursive
-    for param_type, recursive_param_type in zip(
-        ['inputs', 'outputs'], ['input-recursives', 'output-recursives']):
-      for param in dst_params[recursive_param_type]:
-        dst_params[param_type].add(param._replace(recursive=False))
-    dst_params['input-recursives'] = set()
-    dst_params['output-recursives'] = set()
-
-    self.assert_job_descriptors_equal(actual, expected)
 
   @parameterized.parameterized.expand([
       ('env_list', _ENV_LIST_META, _ENV_LIST_JOB_DESCRIPTOR),
