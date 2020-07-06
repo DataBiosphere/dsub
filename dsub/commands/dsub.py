@@ -1170,8 +1170,8 @@ def run(provider,
     script = job_model.Script(command_name, '#!/usr/bin/env bash\n' + command)
   elif script:
     # Read the script file
-    script_file = dsub_util.load_file(script)
-    script = job_model.Script(os.path.basename(script), script_file.read())
+    script_file_contents = dsub_util.load_file(script)
+    script = job_model.Script(os.path.basename(script), script_file_contents)
   else:
     raise ValueError('One of --command or a script name must be supplied')
 

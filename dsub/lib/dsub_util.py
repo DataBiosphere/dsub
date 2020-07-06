@@ -16,8 +16,8 @@
 
 from __future__ import print_function
 
-from contextlib import contextmanager
-from datetime import datetime
+import contextlib
+import datetime
 import fnmatch
 import io
 import os
@@ -54,7 +54,7 @@ class _Printer(object):
     self._fileobj.write(buf)
 
 
-@contextmanager
+@contextlib.contextmanager
 def replace_print(fileobj=sys.stderr):
   """Sys.out replacer, by default with stderr.
 
@@ -142,7 +142,7 @@ def _get_storage_service(credentials):
 
 def _retry_storage_check(exception):
   """Return True if we should retry, False otherwise."""
-  now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+  now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
   print_error(
       '%s: Exception %s: %s' % (now, type(exception).__name__, str(exception)))
   return isinstance(exception, google.auth.exceptions.RefreshError)
@@ -184,7 +184,7 @@ def _load_file_from_gcs(gcs_file_path, credentials=None):
   filevalue = file_handle.getvalue()
   if not isinstance(filevalue, six.string_types):
     filevalue = filevalue.decode()
-  return six.StringIO(filevalue)
+  return filevalue
 
 
 def load_file(file_path, credentials=None):
@@ -196,13 +196,13 @@ def load_file(file_path, credentials=None):
     credentials: Optional credential to be used to load the file from gcs.
 
   Returns:
-    A python File object if loading file from local or a StringIO object if
-    loading from gcs.
+    The contents of the file as a string.
   """
   if file_path.startswith('gs://'):
     return _load_file_from_gcs(file_path, credentials)
   else:
-    return open(file_path, 'r')
+    with open(file_path, 'r') as f:
+      return f.read()
 
 
 # Exponential backoff retrying downloads of GCS object chunks.
