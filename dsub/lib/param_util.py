@@ -519,13 +519,12 @@ def tasks_file_to_task_descriptors(tasks, retries, input_file_param_util,
 
   # First check for any empty lines
   param_file = dsub_util.load_file(path)
-  if any([not line for line in param_file]):
+  param_file_lines = param_file.splitlines()
+  if any([not line for line in param_file_lines]):
     raise ValueError('Blank line(s) found in {}'.format(path))
-  param_file.close()
 
-  # Load the file and set up a Reader that tokenizes the fields
-  param_file = dsub_util.load_file(path)
-  reader = csv.reader(param_file, delimiter='\t')
+  # Set up a Reader that tokenizes the fields
+  reader = csv.reader(param_file_lines, delimiter='\t')
 
   # Read the first line and extract the parameters
   header = six.advance_iterator(reader)

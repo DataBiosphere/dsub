@@ -290,13 +290,135 @@ Logging paths and the `[prefix]` are discussed further in [Logging](../logging.m
 
 #### Resource requirements
 
-The `google-v2` and `google-cls-v2` providers support resource-related flags
-such as `--machine-type`, `--boot-disk-size`, `--disk-size`, and several other
-Compute Engine VM parameters.
+The `google-v2` and `google-cls-v2` providers support many resource-related
+flags to configure the Compute Engine VMs that tasks run on, such as
+`--machine-type` or `--min-cores` and `--min-ram`, as well as `--boot-disk-size`
+and `--disk-size`. Additional provider-specific parameters are available
+and documented below.
 
 ##### Disk allocation
 
 The Docker container launched by the Pipelines API will use the host VM boot
-disk for system paths. All other directories set up by `dsub` will be on the
-data disk, including the `TMPDIR` (as discussed above). Thus you should only
-ever need to change the `--disk-size`.
+disk for the system services needed to orchestrate the set of docker actions
+defined by `dsub`.  All other directories set up by `dsub` will be on the
+data disk, including the `TMPDIR` (as discussed above). In general it should
+be unnecessary for end-users to ever change the `--boot-disk-size` and they
+should only need to set the `--disk-size`. One known exception is when very
+large Docker images are used, as such images need to be pulled to the boot disk.
+
+#### Provider specific parameters
+
+The following `dsub` parameters are specific to the `google-v2` and
+`google-cls-v2` providers:
+
+* [Location resources](https://cloud.google.com/about/locations)
+
+    - `--location` (`google-cls-v2` only):
+      - Specifies the Google Cloud region to which the pipeline request will be
+        sent and where operation metadata will be stored. The associated dsub task
+        may be executed in another region if the `--regions` or `--zones`
+        arguments are specified. (default: us-central1)
+
+    - `--project`:
+      - Cloud project ID in which to run the job.
+    - `--regions`:
+      - List of Google Compute Engine regions. Only one of `--zones` and
+        `--regions` may be specified.
+    - `--zones`:
+      - List of Google Compute Engine zones.
+
+- [Network resources](https://cloud.google.com/vpc/docs/overview)
+    - `--network`:
+      - The Compute Engine VPC network name to attach the VM's network interface
+        to. The value will be prefixed with `global/networks/` unless it contains
+        a `/`, in which case it is assumed to be a fully specified network
+        resource URL.
+    - `--subnetwork`:
+      - The name of the Compute Engine subnetwork to attach the instance to.
+    - `--use-private-address`:
+      - If set to true, do not attach a public IP address to the VM.
+        (default: False)
+
+- Per-task compute resources
+    - `--boot-disk-size`:
+      - Size (in GB) of the boot disk. (default: 10)
+    - `--cpu-platform`:
+      - The CPU platform to request. Supported values can be found at
+        [Specifying a minimum CPU](https://cloud.google.com/compute/docs/instances/specify-min-cpu-platform)
+    - `--disk-type`:
+      - The disk type to use for the data disk. Valid values are `pd-standard`,
+        `pd-ssd` and `local-ssd`. (default: `pd-standard`)
+    - `--docker-cache-images`:
+      - The Compute Engine Disk Images to use as a Docker cache. At the moment,
+        only a single image is supported. Image passed must be of the form
+        "projects/{PROJECT_ID}/global/images/{IMAGE_NAME}".
+        Instructions for creating a disk image can be found at
+        [Create private images](https://cloud.google.com/compute/docs/images/create-delete-deprecate-private-images)
+    - `--machine-type`:
+      - Provider-specific machine type.
+    - `--preemptible`:
+      - If `--preemptible` is given without a number, enables preemptible VMs
+        for all attempts for all tasks. If a number value N is used, enables
+        preemptible VMs for up to N attempts for each task. Defaults to not
+        using preemptible VMs.
+    - `--timeout`:
+      - The maximum amount of time to give the task to complete. This includes
+        the time spent waiting for a worker to be allocated. Time can be listed
+        using a number followed by a unit. Supported units are s (seconds),
+        m (minutes), h (hours), d (days), w (weeks). Example: '7d' (7 days).
+        (default: '7d')
+
+- [Task credentials](https://cloud.google.com/docs/authentication)
+    - `--credentials-file`:
+      - Path to a local file with JSON credentials for a service account.
+    - `--scopes`:
+        - Space-separated scopes for Google Compute Engine instances. If
+          unspecified, provider will use
+
+          - https://www.googleapis.com/auth/bigquery,
+          - https://www.googleapis.com/auth/compute,
+          - https://www.googleapis.com/auth/devstorage.full_control,
+          - https://www.googleapis.com/auth/genomics,
+          - https://www.googleapis.com/auth/logging.write,
+          - https://www.googleapis.com/auth/monitoring.write
+    - `--service-account`:
+      - Email address of the service account to be authorized on the Compute
+        Engine VM for each job task. If not specified, the default Compute
+        Engine service account for the project will be used.
+
+- Monitoring, logging, and debugging
+    - `--enable-stackdriver-monitoring`:
+      - If set to true, enables Stackdriver monitoring on the VM.
+        (default: False)
+    - `--log-interval`:
+      - The amount of time to sleep between copies of log files from the task to
+        the logging path. Time can be listed using a number followed by a unit.
+        Supported units are s (seconds), m (minutes), h (hours).
+        Example: '5m' (5 minutes). (default: '1m')
+    - `--ssh`:
+      - If set to true, start an ssh container in the background to allow you to
+        log in using SSH and debug in real time. (default: False)
+
+- GPU resources
+    - `--accelerator-type`:
+        - The Compute Engine accelerator type. By specifying this parameter, you
+          will download and install the following third-party software onto your
+          job's Compute Engine instances:
+
+          - NVIDIA(R) Tesla(R) drivers and NVIDIA(R) CUDA toolkit.
+
+          Please see [GPUs](https://cloud.google.com/compute/docs/gpus/) for
+          supported GPU types and
+          [pipelines.accelerator] (https://cloud.google.com/lifesciences/docs/reference/rest/v2beta/projects.locations.pipelines/run#accelerator)
+          for more details.
+    - `--accelerator-count`:
+      - The number of accelerators of the specified type to attach. By
+        specifying this parameter, you will download and install the following
+        third-party software onto your job's Compute Engine instances: NVIDIA(R)
+        Tesla(R) drivers and NVIDIA(R) CUDA toolkit. (default: 0)
+    - `--nvidia-driver-version`:
+      - The NVIDIA driver version to use when attaching an NVIDIA GPU
+        accelerator. The version specified here must be compatible with the GPU
+        libraries contained in the container being executed, and must be one of
+        the drivers hosted in the nvidia-drivers-us-public bucket on Google
+        Cloud Storage.

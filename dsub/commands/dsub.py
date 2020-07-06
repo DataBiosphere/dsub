@@ -402,8 +402,8 @@ def _parse_arguments(prog, argv):
   # Shared between the "google-cls-v2" and "google-v2" providers
   google_common = parser.add_argument_group(
       title='google-common',
-      description="""Options common to the "google", "google-cls-v2", and
-        "google-v2" providers""")
+      description="""Options common to the "google-cls-v2" and "google-v2"
+        providers""")
   google_common.add_argument(
       '--project', help='Cloud project ID in which to run the job')
   google_common.add_argument(
@@ -453,78 +453,74 @@ def _parse_arguments(prog, argv):
       '--credentials-file',
       type=str,
       help='Path to a local file with JSON credentials for a service account.')
-
-  google_v2 = parser.add_argument_group(
-      title='"google-v2" provider options',
-      description='See also the "google-common" options listed above')
-  google_v2.add_argument(
+  google_common.add_argument(
       '--regions',
       nargs='+',
       help="""List of Google Compute Engine regions.
           Only one of --zones and --regions may be specified.""")
-  google_v2.add_argument(
+  google_common.add_argument(
       '--machine-type', help='Provider-specific machine type (default: None)')
-  google_v2.add_argument(
+  google_common.add_argument(
       '--cpu-platform',
       help="""The CPU platform to request. Supported values can be found at
       https://cloud.google.com/compute/docs/instances/specify-min-cpu-platform
       (default: None)""")
-  google_v2.add_argument(
+  google_common.add_argument(
       '--network',
       help="""The Compute Engine VPC network name to attach the VM's network
           interface to. The value will be prefixed with global/networks/ unless
           it contains a /, in which case it is assumed to be a fully specified
           network resource URL. (default: None)""")
-  google_v2.add_argument(
+  google_common.add_argument(
       '--subnetwork',
       help="""The name of the Compute Engine subnetwork to attach the instance
           to. (default: None)""")
-  google_v2.add_argument(
+  google_common.add_argument(
       '--use-private-address',
       default=False,
       action='store_true',
       help="""If set to true, do not attach a public IP address to the VM.
       (default: False)""")
-  google_v2.add_argument(
+  google_common.add_argument(
       '--timeout',
       help="""The maximum amount of time to give the task to complete.
           This includes the time spent waiting for a worker to be allocated.
           Time can be listed using a number followed by a unit. Supported units
           are s (seconds), m (minutes), h (hours), d (days), w (weeks). The
           provider-specific default is 7 days. Example: '7d' (7 days).""")
-  google_v2.add_argument(
+  google_common.add_argument(
       '--log-interval',
       help="""The amount of time to sleep between copies of log files from
           the task to the logging path.
           Time can be listed using a number followed by a unit. Supported units
           are s (seconds), m (minutes), h (hours).
           Example: '5m' (5 minutes). Default is '1m'.""")
-  google_v2.add_argument(
+  google_common.add_argument(
       '--ssh',
       default=False,
       action='store_true',
       help="""If set to true, start an ssh container in the background
           to allow you to log in using SSH and debug in real time.
           (default: False)""")
-  google_v2.add_argument(
+  google_common.add_argument(
       '--nvidia-driver-version',
       help="""The NVIDIA driver version to use when attaching an NVIDIA GPU
           accelerator. The version specified here must be compatible with the
           GPU libraries contained in the container being executed, and must be
           one of the drivers hosted in the nvidia-drivers-us-public bucket on
           Google Cloud Storage. (default: None)""")
-  google_v2.add_argument(
+  google_common.add_argument(
       '--service-account',
       type=str,
       help="""Email address of the service account to be authorized on the
           Compute Engine VM for each job task. If not specified, the default
           Compute Engine service account for the project will be used.""")
-  google_v2.add_argument(
+  google_common.add_argument(
       '--disk-type',
       help="""
           The disk type to use for the data disk. Valid values are pd-standard
           pd-ssd and local-ssd. The default value is pd-standard.""")
-  google_v2.add_argument(
+  google_common.add_argument(
       '--enable-stackdriver-monitoring',
       default=False,
       action='store_true',
@@ -1174,8 +1170,8 @@ def run(provider,
     script = job_model.Script(command_name, '#!/usr/bin/env bash\n' + command)
   elif script:
     # Read the script file
-    script_file = dsub_util.load_file(script)
-    script = job_model.Script(os.path.basename(script), script_file.read())
+    script_file_contents = dsub_util.load_file(script)
+    script = job_model.Script(os.path.basename(script), script_file_contents)
   else:
     raise ValueError('One of --command or a script name must be supplied')
 
@@ -1296,6 +1292,12 @@ def _name_for_command(command):
   'command'
   >>> _name_for_command('\\\n\\\n# Bad continuations, but ignore.\necho hello.')
   'echo'
+  >>> _name_for_command('(uname -a && pwd) # Command begins with non-letter.')
+  'uname'
+  >>> _name_for_command('my-program.sh # Command with hyphens.')
+  'my-program.sh'
+  >>> _name_for_command('/home/user/bin/-my-sort # Path with hyphen.')
+  'my-sort'
 
   Arguments:
     command: the user-provided command
@@ -1307,7 +1309,14 @@ def _name_for_command(command):
   for line in lines:
     line = line.strip()
     if line and not line.startswith('#') and line != '\\':
-      return os.path.basename(re.split(r'\s', line)[0])
+      # Tokenize on whitespace [ \t\n\r\f\v]
+      names = re.split(r'\s', line)
+      for name in names:
+        # Make sure the first character is a letter, number, or underscore
+        # Get basename so something like "/usr/bin/sort" becomes just "sort"
+        name = re.sub(r'^[^a-zA-Z0-9_]*', '', os.path.basename(name))
+        if name:
+          return name
 
   return 'command'
 
