@@ -43,6 +43,12 @@ def replace_timezone(dt, tz):
   return dt.replace(tzinfo=tz)
 
 
+def datetime_is_timezone_aware(dt):
+  # From datetime docs:
+  # https://docs.python.org/3/library/datetime.html#determining-if-an-object-is-aware-or-naive
+  return dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None
+
+
 class _Printer(object):
   """File-like stream object that redirects stdout to a file object."""
 
