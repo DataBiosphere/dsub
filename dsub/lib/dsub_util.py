@@ -24,10 +24,11 @@ import os
 import pwd
 import sys
 import warnings
+from . import retry_util
 
-from googleapiclient import discovery
-from googleapiclient import errors
-from googleapiclient.http import MediaIoBaseDownload
+import googleapiclient.discovery
+import googleapiclient.errors
+import googleapiclient.http
 import retrying
 import six
 
@@ -143,7 +144,8 @@ def _get_storage_service(credentials):
       'ignore', 'Your application has authenticated using end user credentials')
   if credentials is None:
     credentials, _ = google.auth.default()
-  return discovery.build('storage', 'v1', credentials=credentials)
+  return googleapiclient.discovery.build(
+      'storage', 'v1', credentials=credentials)
 
 
 def _retry_storage_check(exception):
@@ -155,14 +157,21 @@ def _retry_storage_check(exception):
 
 
 # Exponential backoff retrying downloads of GCS object chunks.
-# Maximum 23 retries.
-# Wait 1, 2, 4 ... 64, 64, 64... seconds.
+# Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
 @retrying.retry(
     stop_max_attempt_number=24,
-    retry_on_exception=_retry_storage_check,
+    retry_on_exception=retry_util.retry_api_check_verbose,
     wait_exponential_multiplier=500,
     wait_exponential_max=64000)
+# For API errors dealing with auth, we want to retry, but not as often
+# Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
+@retrying.retry(
+    stop_max_attempt_number=5,
+    retry_on_exception=retry_util.retry_auth_check_verbose,
+    wait_exponential_multiplier=500,
+    wait_exponential_max=8000)
 def _downloader_next_chunk(downloader):
+  """Downloads the next chunk."""
   return downloader.next_chunk()
 
 
@@ -183,7 +192,8 @@ def _load_file_from_gcs(gcs_file_path, credentials=None):
       bucket=bucket_name, object=object_name)
 
   file_handle = io.BytesIO()
-  downloader = MediaIoBaseDownload(file_handle, request, chunksize=1024 * 1024)
+  downloader = googleapiclient.http.MediaIoBaseDownload(
+      file_handle, request, chunksize=1024 * 1024)
   done = False
   while not done:
     _, done = _downloader_next_chunk(downloader)
@@ -212,13 +222,19 @@ def load_file(file_path, credentials=None):
 
 
 # Exponential backoff retrying downloads of GCS object chunks.
-# Maximum 23 retries.
-# Wait 1, 2, 4 ... 64, 64, 64... seconds.
+# Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
 @retrying.retry(
-    stop_max_attempt_number=23,
-    retry_on_exception=_retry_storage_check,
-    wait_exponential_multiplier=1000,
+    stop_max_attempt_number=24,
+    retry_on_exception=retry_util.retry_api_check_verbose,
+    wait_exponential_multiplier=500,
     wait_exponential_max=64000)
+# For API errors dealing with auth, we want to retry, but not as often
+# Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
+@retrying.retry(
+    stop_max_attempt_number=5,
+    retry_on_exception=retry_util.retry_auth_check_verbose,
+    wait_exponential_multiplier=500,
+    wait_exponential_max=8000)
 def _file_exists_in_gcs(gcs_file_path, credentials=None):
   """Check whether the file exists, in GCS.
 
@@ -237,7 +253,7 @@ def _file_exists_in_gcs(gcs_file_path, credentials=None):
   try:
     request.execute()
     return True
-  except errors.HttpError:
+  except googleapiclient.errors.HttpError:
     return False
 
 
@@ -258,13 +274,19 @@ def file_exists(file_path, credentials=None):
 
 
 # Exponential backoff retrying downloads of GCS object chunks.
-# Maximum 23 retries.
-# Wait 1, 2, 4 ... 64, 64, 64... seconds.
+# Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
 @retrying.retry(
     stop_max_attempt_number=24,
-    retry_on_exception=_retry_storage_check,
+    retry_on_exception=retry_util.retry_api_check_verbose,
     wait_exponential_multiplier=500,
     wait_exponential_max=64000)
+# For API errors dealing with auth, we want to retry, but not as often
+# Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
+@retrying.retry(
+    stop_max_attempt_number=5,
+    retry_on_exception=retry_util.retry_auth_check_verbose,
+    wait_exponential_multiplier=500,
+    wait_exponential_max=8000)
 def _prefix_exists_in_gcs(gcs_prefix, credentials=None):
   """Check whether there is a GCS object whose name starts with the prefix.
 
@@ -278,7 +300,7 @@ def _prefix_exists_in_gcs(gcs_prefix, credentials=None):
     True if the prefix matches at least one object in GCS.
 
   Raises:
-    errors.HttpError: if it can't talk to the server
+    googleapiclient.errors.HttpError: if it can't talk to the server
   """
   gcs_service = _get_storage_service(credentials)
 
@@ -299,13 +321,19 @@ def folder_exists(folder_path, credentials=None):
 
 
 # Exponential backoff retrying downloads of GCS object chunks.
-# Maximum 23 retries.
-# Wait 1, 2, 4 ... 64, 64, 64... seconds.
+# Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
 @retrying.retry(
-    stop_max_attempt_number=23,
-    retry_on_exception=_retry_storage_check,
-    wait_exponential_multiplier=1000,
+    stop_max_attempt_number=24,
+    retry_on_exception=retry_util.retry_api_check_verbose,
+    wait_exponential_multiplier=500,
     wait_exponential_max=64000)
+# For API errors dealing with auth, we want to retry, but not as often
+# Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
+@retrying.retry(
+    stop_max_attempt_number=5,
+    retry_on_exception=retry_util.retry_auth_check_verbose,
+    wait_exponential_multiplier=500,
+    wait_exponential_max=8000)
 def simple_pattern_exists_in_gcs(file_pattern, credentials=None):
   """True iff an object exists matching the input GCS pattern.
 

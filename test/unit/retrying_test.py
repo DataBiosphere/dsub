@@ -19,6 +19,7 @@ import sys
 import unittest
 
 import apiclient.errors
+from dsub.lib import retry_util
 from dsub.providers import google_base
 import fake_time
 from mock import patch
@@ -74,11 +75,11 @@ class TestRetrying(unittest.TestCase):
 
   @parameterized.parameterized.expand(
       [(True, error_code)
-       for error_code in list(google_base.TRANSIENT_HTTP_ERROR_CODES) +
-       list(google_base.HTTP_AUTH_ERROR_CODES)] +
+       for error_code in list(retry_util.TRANSIENT_HTTP_ERROR_CODES) +
+       list(retry_util.HTTP_AUTH_ERROR_CODES)] +
       [(False, error_code)
-       for error_code in list(google_base.TRANSIENT_HTTP_ERROR_CODES) +
-       list(google_base.HTTP_AUTH_ERROR_CODES)])
+       for error_code in list(retry_util.TRANSIENT_HTTP_ERROR_CODES) +
+       list(retry_util.HTTP_AUTH_ERROR_CODES)])
   def test_retry_once(self, verbose, error_code):
     ft = fake_time.FakeTime(chronology())
     with patch('time.sleep', new=ft.sleep):
