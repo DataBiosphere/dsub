@@ -15,7 +15,7 @@ _DEPENDENCIES = [
     # dependencies for dsub, ddel, dstat
     # Pin to known working versions to prevent episodic breakage from library
     # version mismatches.
-    # This version list generated: 06/22/2020
+    # This version list generated: 07/14/2020
 
     # direct dependencies
     'google-api-python-client<=1.8.3',
@@ -31,7 +31,7 @@ _DEPENDENCIES = [
     'funcsigs<=1.0.2',
     'google-api-core<=1.21.0',
     'google-auth-httplib2<=0.0.3',
-    'httplib2<=0.17.3',
+    'httplib2<=0.18.1',
     'pyasn1<=0.4.8',
     'pyasn1-modules<=0.2.8',
     'rsa<=4.0',
