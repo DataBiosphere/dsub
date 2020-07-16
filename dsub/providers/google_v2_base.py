@@ -979,6 +979,12 @@ class GoogleV2JobProviderBase(base.JobProvider):
 
     return [google_v2_operations.STATUS_FILTER_MAP[s] for s in statuses]
 
+  def _get_user_id_filter_value(self, user_ids):
+    if not user_ids or user_ids == {'*'}:
+      return None
+
+    return google_base.prepare_query_label_value(user_ids)
+
   def _get_label_filters(self, label_key, values):
     if not values or values == {'*'}:
       return None
@@ -1028,7 +1034,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     # 'OR' filtering arguments.
     status_filters = self._get_status_filters(statuses)
     user_id_filters = self._get_label_filters(
-        'user-id', google_base.prepare_query_label_value(user_ids))
+        'user-id', self._get_user_id_filter_value(user_ids))
     job_id_filters = self._get_label_filters('job-id', job_ids)
     job_name_filters = self._get_label_filters(
         'job-name', google_base.prepare_query_label_value(job_names))
@@ -1121,10 +1127,10 @@ class GoogleV2JobProviderBase(base.JobProvider):
     Args:
       statuses: {'*'}, or a list of job status strings to return. Valid
         status strings are 'RUNNING', 'SUCCESS', 'FAILURE', or 'CANCELED'.
-      user_ids: a list of ids for the user(s) who launched the job.
-      job_ids: a list of job ids to return.
-      job_names: a list of job names to return.
-      task_ids: a list of specific tasks within the specified job(s) to return.
+      user_ids: a set of ids for the user(s) who launched the job.
+      job_ids: a set of job ids to return.
+      job_names: a set of job names to return.
+      task_ids: a set of specific tasks within the specified job(s) to return.
       task_attempts: a list of specific attempts within the specified tasks(s)
         to return.
       labels: a list of LabelParam with user-added labels. All labels must

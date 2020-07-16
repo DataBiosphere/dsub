@@ -277,7 +277,7 @@ def prepare_query_label_value(labels):
   """Converts the label strings to contain label-appropriate characters.
 
   Args:
-    labels: A list of strings to be converted.
+    labels: A set of strings to be converted.
 
   Returns:
     A list of converted strings.
