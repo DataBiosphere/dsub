@@ -73,9 +73,12 @@ class FailsJobProvider(base.JobProvider):
     del tasks  # doesn't matter either
     return ["Fail provider never completes a job"]
 
-  def prepare_job_metadata(self, script, job_name, user_id, create_time):
-    del script, job_name, user_id, create_time  # all the same
-    return {"job-id": "DOOMED_JOB"}
+  def prepare_job_metadata(self, script, job_name, user_id):
+    del script, job_name, user_id  # all the same
+    return {
+        "job-name": "DOOMED_JOB_NAME",
+        "user-id": "DOOMED_JOB_USER",
+    }
 
 
 class FailTask(base.Task):

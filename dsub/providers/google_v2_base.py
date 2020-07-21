@@ -482,10 +482,9 @@ class GoogleV2JobProviderBase(base.JobProvider):
     self._project = project
     self._dry_run = dry_run
 
-  def prepare_job_metadata(self, script, job_name, user_id, create_time):
+  def prepare_job_metadata(self, script, job_name, user_id):
     """Returns a dictionary of metadata fields for the job."""
-    return google_base.prepare_job_metadata(script, job_name, user_id,
-                                            create_time)
+    return providers_util.prepare_job_metadata(script, job_name, user_id)
 
   def _get_logging_env(self, logging_uri, user_project):
     """Returns the environment for actions that copy logging files."""

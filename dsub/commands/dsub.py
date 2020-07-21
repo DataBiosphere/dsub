@@ -199,6 +199,13 @@ def _google_v2_parse_arguments(args):
         '--machine-type not supported together with --min-cores or --min-ram.')
 
 
+def _local_parse_arguments(args):
+  """Validated local arguments."""
+  if args.user and args.user != dsub_util.get_os_user():
+    raise ValueError('If specified, the local provider\'s "--user" flag must '
+                     'match the current logged-in user.')
+
+
 def _parse_arguments(prog, argv):
   """Parses command line arguments.
 
@@ -616,10 +623,25 @@ def _get_job_metadata(provider, user_id, job_name, script, task_ids,
   """
   create_time = dsub_util.replace_timezone(datetime.datetime.now(), tzlocal())
   user_id = user_id or dsub_util.get_os_user()
-  job_metadata = provider.prepare_job_metadata(script.name, job_name, user_id,
-                                               create_time)
+  job_metadata = provider.prepare_job_metadata(script.name, job_name, user_id)
   if unique_job_id:
     job_metadata['job-id'] = uuid.uuid4().hex
+  else:
+    # Build the job-id. We want the job-id to be expressive while also
+    # having a low-likelihood of collisions.
+    #
+    # For expressiveness, we:
+    # * use the job name (truncated at 10 characters).
+    # * insert the user-id
+    # * add a datetime value
+    # To have a high likelihood of uniqueness, the datetime value is out to
+    # hundredths of a second.
+    #
+    # The full job-id is:
+    #   <job-name>--<user-id>--<timestamp>
+    job_metadata['job-id'] = '%s--%s--%s' % (
+        job_metadata['job-name'][:10], job_metadata['user-id'],
+        create_time.strftime('%y%m%d-%H%M%S-%f')[:16])
 
   job_metadata['create-time'] = create_time
   job_metadata['script'] = script
@@ -1205,7 +1227,10 @@ def run(provider,
 
   # Job and task properties are now all resolved. Begin execution!
   if not dry_run:
-    print('Job: %s' % job_metadata['job-id'])
+    print('Job properties:')
+    print('  job-id: %s' % job_metadata['job-id'])
+    print('  job-name: %s' % job_metadata['job-name'])
+    print('  user-id: %s' % job_metadata['user-id'])
 
   # Wait for predecessor jobs (if any)
   if after:

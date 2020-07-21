@@ -44,7 +44,7 @@ class JobProvider(object):
   status_message = None
 
   @abc.abstractmethod
-  def prepare_job_metadata(self, script, job_name, user_id, create_time):
+  def prepare_job_metadata(self, script, job_name, user_id):
     """Returns a dictionary of metadata fields for the job.
 
     Call this before calling submit_job.
@@ -77,7 +77,6 @@ class JobProvider(object):
       script: path to the job script
       job_name: user-supplied job name, if any
       user_id: user whose jobs to look for
-      create_time: create time for the job
     """
     raise NotImplementedError()
 

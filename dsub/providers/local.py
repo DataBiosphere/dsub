@@ -63,7 +63,6 @@ import subprocess
 import tempfile
 import textwrap
 from . import base
-from .._dsub_version import DSUB_VERSION
 from dateutil.tz import tzlocal
 from ..lib import dsub_util
 from ..lib import job_model
@@ -189,17 +188,8 @@ class LocalJobProvider(base.JobProvider):
     self._operations = []
     self._resources = resources
 
-  def prepare_job_metadata(self, script, job_name, user_id, create_time):
-    job_name_value = job_name or os.path.basename(script)
-    if user_id != dsub_util.get_os_user():
-      raise ValueError('If specified, the local provider\'s "--user" flag must '
-                       'match the current logged-in user.')
-    return {
-        'job-id': self._make_job_id(job_name_value, user_id, create_time),
-        'job-name': job_name_value,
-        'user-id': user_id,
-        'dsub-version': DSUB_VERSION,
-    }
+  def prepare_job_metadata(self, script, job_name, user_id):
+    return providers_util.prepare_job_metadata(script, job_name, user_id)
 
   def submit_job(self, job_descriptor, skip_if_output_present):
     # Validate inputs.
@@ -745,24 +735,6 @@ class LocalJobProvider(base.JobProvider):
         mkdir_cmd=mkdir_cmd, copy_logs_cmd=copy_logs_cmd)
 
     return body
-
-  def _make_job_id(self, job_name_value, user_id, create_time):
-    """Return a job-id string."""
-
-    # We want the job-id to be expressive while also
-    # having a low-likelihood of collisions.
-    #
-    # For expressiveness, we:
-    # * use the job name (truncated at 10 characters).
-    # * insert the user-id
-    # * add a datetime value
-    # To have a high likelihood of uniqueness, the datetime value is out to
-    # hundredths of a second.
-    #
-    # The full job-id is:
-    #   <job-name>--<user-id>--<timestamp>
-    return '%s--%s--%s' % (job_name_value[:10], user_id,
-                           create_time.strftime('%y%m%d-%H%M%S-%f'))
 
   def _task_directory(self, job_id, task_id, task_attempt):
     """The local dir for staging files for that particular task."""

@@ -17,6 +17,7 @@ import os
 import textwrap
 
 from . import job_model
+from .._dsub_version import DSUB_VERSION
 
 _LOCALIZE_COMMAND_MAP = {
     job_model.P_GCS: 'gsutil -m rsync -r',
@@ -224,3 +225,25 @@ def build_mount_env(source, mounts):
 def get_job_and_task_param(job_params, task_params, field):
   """Returns a dict combining the field for job and task params."""
   return job_params.get(field, set()) | task_params.get(field, set())
+
+
+def prepare_job_metadata(script, job_name, user_id):
+  """Returns a dictionary of metadata fields for the job."""
+
+  # The name of the job is derived from the job_name and gets set as a
+  # 'job-name' label (and so the value must be normalized).
+  if not job_name:
+    job_name = os.path.basename(script).split('.', 1)[0]
+  job_name_value = job_model.convert_to_label_chars(job_name)
+
+  # The user-id will get set as a label
+  user_id = job_model.convert_to_label_chars(user_id)
+
+  # Standard version is MAJOR.MINOR(.PATCH). This will convert the version
+  # string to "vMAJOR-MINOR(-PATCH)". Example; "0.1.0" -> "v0-1-0".
+  version = job_model.convert_to_label_chars('v%s' % DSUB_VERSION)
+  return {
+      'job-name': job_name_value,
+      'user-id': user_id,
+      'dsub-version': version,
+  }
