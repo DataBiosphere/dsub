@@ -174,6 +174,15 @@ class TaskParamAction(argparse.Action):
     setattr(namespace, self.dest, tasks)
 
 
+def _check_private_address(args):
+  """If --use-private-address is enabled, ensure the Docker path is for GCR."""
+  if args.use_private_address:
+    split = args.image.split('/', 1)
+    if len(split) == 1 or not split[0].endswith('gcr.io'):
+      raise ValueError(
+          '--use-private-address must specify a --image with a gcr.io host')
+
+
 def _google_cls_v2_parse_arguments(args):
   """Validated google-cls-v2 arguments."""
 
@@ -188,6 +197,8 @@ def _google_cls_v2_parse_arguments(args):
     raise ValueError(
         '--machine-type not supported together with --min-cores or --min-ram.')
 
+  _check_private_address(args)
+
 
 def _google_v2_parse_arguments(args):
   """Validated google-v2 arguments."""
@@ -197,6 +208,8 @@ def _google_v2_parse_arguments(args):
   if args.machine_type and (args.min_cores or args.min_ram):
     raise ValueError(
         '--machine-type not supported together with --min-cores or --min-ram.')
+
+  _check_private_address(args)
 
 
 def _local_parse_arguments(args):

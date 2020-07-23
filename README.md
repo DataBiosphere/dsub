@@ -630,6 +630,7 @@ To delete all running jobs for the current user:
     *   [Input and Output File Handling](https://github.com/DataBiosphere/dsub/blob/master/docs/input_output.md)
     *   [Logging](https://github.com/DataBiosphere/dsub/blob/master/docs/logging.md)
     *   [Compute Resources](https://github.com/DataBiosphere/dsub/blob/master/docs/compute_resources.md)
+    *   [Compute Quotas](https://github.com/DataBiosphere/dsub/blob/master/docs/compute_quotas.md)
     *   [Job Control](https://github.com/DataBiosphere/dsub/blob/master/docs/job_control.md)
     *   [Retries](https://github.com/DataBiosphere/dsub/blob/master/docs/retries.md)
     *   [Checking Status and Troubleshooting Jobs](https://github.com/DataBiosphere/dsub/blob/master/docs/troubleshooting.md)

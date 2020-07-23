@@ -353,7 +353,8 @@ for more information.
 
 ## SSH to the VM
 
-With the `google-v2` provider, there is no SSH server running on the
+With the `google-v2` and `google-cls-v2` providers, there is no SSH server
+running on the
 Compute Engine Virtual Machine by default. To start an SSH server, use the
 `dsub` command-line flag `--ssh` , which will start an SSH container in the
 background and will mount your data disk. This will allow you to inspect the
