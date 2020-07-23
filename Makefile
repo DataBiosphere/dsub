@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+SHELL := /bin/bash
+
 VIRTUALENV := dsub_env
 
-PYTHON_VERSION := $(shell python --version 2>&1)
+PYTHON_VERSION := $(shell python3 --version 2>&1)
 PYTHON_LIST := $(wordlist 2,4,$(subst ., ,$(PYTHON_VERSION)))
 PYTHON_MAJOR_VERSION := $(word 1,${PYTHON_LIST})
 PYTHON_MINOR_VERSION := $(word 2,${PYTHON_LIST})
@@ -29,10 +31,10 @@ install: checkversions virtualenv
 
 checkversions:
 ifndef PYTHON_VERSION
-	$(error python executable not found; either update the path or install Python)
+	$(error python3 executable not found; either update the path or install Python 3)
 endif
-ifneq "$(PYTHON_MAJOR_VERSION).$(PYTHON_MINOR_VERSION)" "2.7"
-	$(error Bad python version $(PYTHON_LIST); install 2.7.x)
+ifneq "$(PYTHON_MAJOR_VERSION)" "3"
+	$(error Bad python version $(PYTHON_LIST); install Python 3)
 endif
 ifndef PIP_VERSION
 	$(error pip executable not found; either update the path or install pip)
@@ -43,12 +45,10 @@ endif
 	@echo All prechecks pass. Ready to 'make install'.
 
 virtualenv:
-	mkdir -p install
-	pip install --upgrade virtualenv
-	virtualenv install/$(VIRTUALENV)
-	source install/$(VIRTUALENV)/bin/activate && \
+	python3 -m venv dsub_libs
+	source dsub_libs/bin/activate && \
 		python setup.py install
 	@echo Installed. You can now run the programs in bin/.
 
 clean:
-	rm -rf install
+	rm -rf dsub_libs
