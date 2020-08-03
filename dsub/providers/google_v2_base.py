@@ -477,10 +477,16 @@ class GoogleV2JobProviderBase(base.JobProvider):
     service = google_base.setup_service(
         google_v2_versions.get_api_name(api_version), api_version, credentials)
 
+    # TODO: Looks like we've always used application default credentials
+    # to make GCS calls... lets keep it that way by passing credentials = None
+    # See b/162779549
+    storage_service = dsub_util.get_storage_service(credentials=None)
+
     self._provider_name = provider_name
     self._service = service
     self._project = project
     self._dry_run = dry_run
+    self._storage_service = storage_service
 
   def prepare_job_metadata(self, script, job_name, user_id):
     """Returns a dictionary of metadata fields for the job."""
@@ -931,6 +937,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     # Prepare and submit jobs.
     launched_tasks = []
     requests = []
+
     for task_view in job_model.task_view_generator(job_descriptor):
 
       job_params = task_view.job_params
@@ -939,7 +946,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
       outputs = job_params['outputs'] | task_params['outputs']
       if skip_if_output_present:
         # check whether the output's already there
-        if dsub_util.outputs_are_present(outputs):
+        if dsub_util.outputs_are_present(outputs, self._storage_service):
           print('Skipping task because its outputs are present')
           continue
 
