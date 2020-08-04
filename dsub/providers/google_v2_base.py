@@ -477,10 +477,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     service = google_base.setup_service(
         google_v2_versions.get_api_name(api_version), api_version, credentials)
 
-    # TODO: Looks like we've always used application default credentials
-    # to make GCS calls... lets keep it that way by passing credentials = None
-    # See b/162779549
-    storage_service = dsub_util.get_storage_service(credentials=None)
+    storage_service = dsub_util.get_storage_service(credentials=credentials)
 
     self._provider_name = provider_name
     self._service = service
