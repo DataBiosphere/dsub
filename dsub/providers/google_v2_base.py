@@ -477,15 +477,17 @@ class GoogleV2JobProviderBase(base.JobProvider):
     service = google_base.setup_service(
         google_v2_versions.get_api_name(api_version), api_version, credentials)
 
+    storage_service = dsub_util.get_storage_service(credentials=credentials)
+
     self._provider_name = provider_name
     self._service = service
     self._project = project
     self._dry_run = dry_run
+    self._storage_service = storage_service
 
-  def prepare_job_metadata(self, script, job_name, user_id, create_time):
+  def prepare_job_metadata(self, script, job_name, user_id):
     """Returns a dictionary of metadata fields for the job."""
-    return google_base.prepare_job_metadata(script, job_name, user_id,
-                                            create_time)
+    return providers_util.prepare_job_metadata(script, job_name, user_id)
 
   def _get_logging_env(self, logging_uri, user_project):
     """Returns the environment for actions that copy logging files."""
@@ -932,6 +934,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     # Prepare and submit jobs.
     launched_tasks = []
     requests = []
+
     for task_view in job_model.task_view_generator(job_descriptor):
 
       job_params = task_view.job_params
@@ -940,7 +943,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
       outputs = job_params['outputs'] | task_params['outputs']
       if skip_if_output_present:
         # check whether the output's already there
-        if dsub_util.outputs_are_present(outputs):
+        if dsub_util.outputs_are_present(outputs, self._storage_service):
           print('Skipping task because its outputs are present')
           continue
 
@@ -978,6 +981,12 @@ class GoogleV2JobProviderBase(base.JobProvider):
       return None
 
     return [google_v2_operations.STATUS_FILTER_MAP[s] for s in statuses]
+
+  def _get_user_id_filter_value(self, user_ids):
+    if not user_ids or user_ids == {'*'}:
+      return None
+
+    return google_base.prepare_query_label_value(user_ids)
 
   def _get_label_filters(self, label_key, values):
     if not values or values == {'*'}:
@@ -1028,7 +1037,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     # 'OR' filtering arguments.
     status_filters = self._get_status_filters(statuses)
     user_id_filters = self._get_label_filters(
-        'user-id', google_base.prepare_query_label_value(user_ids))
+        'user-id', self._get_user_id_filter_value(user_ids))
     job_id_filters = self._get_label_filters('job-id', job_ids)
     job_name_filters = self._get_label_filters(
         'job-name', google_base.prepare_query_label_value(job_names))
@@ -1121,10 +1130,10 @@ class GoogleV2JobProviderBase(base.JobProvider):
     Args:
       statuses: {'*'}, or a list of job status strings to return. Valid
         status strings are 'RUNNING', 'SUCCESS', 'FAILURE', or 'CANCELED'.
-      user_ids: a list of ids for the user(s) who launched the job.
-      job_ids: a list of job ids to return.
-      job_names: a list of job names to return.
-      task_ids: a list of specific tasks within the specified job(s) to return.
+      user_ids: a set of ids for the user(s) who launched the job.
+      job_ids: a set of job ids to return.
+      job_names: a set of job names to return.
+      task_ids: a set of specific tasks within the specified job(s) to return.
       task_attempts: a list of specific attempts within the specified tasks(s)
         to return.
       labels: a list of LabelParam with user-added labels. All labels must

@@ -27,14 +27,21 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
   readonly RANDOM_STRING="$(cat /dev/urandom | env LC_CTYPE=C tr -cd 'a-z0-9' \
     | head -c 8)"
   readonly USER_NAME="UNDERSCORE_USER"
+  readonly USER_NAME_2="UNDERSCORE_USER_2"
   readonly JOB_NAME="UNDERSCORE_JOB_${RANDOM_STRING}"
 
-  # (1) Launch a simple job with a user_id and name containing
+  # (1) Launch 2 simple jobs with a user_id and name containing
   # an underscore and caps
-  echo "Launch a job (and don't --wait)..."
+  echo "Launching two jobs, one with user ${USER_NAME},"
+  echo "And one with user ${USER_NAME_2} (and don't --wait)..."
   JOB_ID="$(run_dsub \
     --command 'sleep 5s' \
     --user "${USER_NAME}" \
+    --name "${JOB_NAME}")"
+
+  JOB_ID_2="$(run_dsub \
+    --command 'sleep 5s' \
+    --user "${USER_NAME_2}" \
     --name "${JOB_NAME}")"
 
   sleep 5s
@@ -58,6 +65,32 @@ if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
     --users "${USER_NAME}")"
   if [[ -z "${DSTAT_OUTPUT}" ]]; then
     echo "ERROR: dstat output for ${JOB_ID} not found."
+    exit 1
+  fi
+
+  # (4) Validate that dstat can find the job with --users '*'
+  echo "Check that the job can be found with --users '*'"
+  DSTAT_OUTPUT="$(run_dstat \
+    --status '*' \
+    --names "${JOB_NAME}" \
+    --users "*")"
+  if [[ -z "${DSTAT_OUTPUT}" ]]; then
+    echo "ERROR: dstat output for ${JOB_ID} not found."
+    exit 1
+  fi
+
+  # (5) Validate that dstat can find jobs for multiple specified users
+  DSTAT_OUTPUT="$(run_dstat \
+    --status '*' \
+    --names "${JOB_NAME}" \
+    --users "${USER_NAME}" "${USER_NAME_2}" \
+    --format yaml)"
+
+  TASK_COUNT=$(echo "${DSTAT_OUTPUT}" | grep -w "job-name" | wc -l)
+
+  if [[ "${TASK_COUNT}" -ne 2 ]]; then
+    echo "Number of tasks returned by dstat --users not 2!"
+    echo "${DSTAT_OUTPUT}"
     exit 1
   fi
 

@@ -22,22 +22,16 @@ from __future__ import print_function
 import datetime
 import io
 import json
-import os
 import re
-import socket
-import ssl
-import sys
 import warnings
 
-from .._dsub_version import DSUB_VERSION
 import googleapiclient.discovery
 import googleapiclient.errors
-from httplib2 import ServerNotFoundError
 from ..lib import job_model
+from ..lib import retry_util
 import pytz
 import retrying
 from six.moves import range
-import six.moves.http_client
 
 import google.auth
 from google.oauth2 import service_account
@@ -62,22 +56,6 @@ DEFAULT_SCOPES = [
     'https://www.googleapis.com/auth/monitoring.write',
 ]
 
-
-# Transient errors for the Google APIs should not cause them to fail.
-# There are a set of HTTP and socket errors which we automatically retry.
-#  429: too frequent polling
-#  50x: backend error
-TRANSIENT_HTTP_ERROR_CODES = frozenset([429, 500, 503, 504])
-
-# Auth errors should be permanent errors that a user needs to go fix
-# (enable a service, grant access on a resource).
-# However we have seen them occur transiently, so let's retry them when we
-# see them, but not as patiently.
-HTTP_AUTH_ERROR_CODES = frozenset([401, 403])
-
-# Socket error 32 (broken pipe) and 104 (connection reset) should
-# also be retried
-TRANSIENT_SOCKET_ERROR_CODES = frozenset([32, 104])
 
 # When attempting to cancel an operation that is already completed
 # (succeeded, failed, or canceled), the response will include:
@@ -159,11 +137,6 @@ _ZONES = [
     'us-west2-b',
     'us-west2-c',
 ]
-
-
-def _print_error(msg):
-  """Utility routine to emit messages to stderr."""
-  print(msg, file=sys.stderr)
 
 
 def get_zones(input_list):
@@ -253,56 +226,11 @@ def build_pipeline_labels(job_metadata, task_metadata, task_id_pattern=None):
   return labels
 
 
-def prepare_job_metadata(script, job_name, user_id, create_time):
-  """Returns a dictionary of metadata fields for the job."""
-
-  # The name of the pipeline gets set into the operation as-is.
-  # The default name of the pipeline is the script name
-  # The name of the job is derived from the job_name and gets set as a
-  # 'job-name' label (and so the value must be normalized).
-  if job_name:
-    pipeline_name = job_name
-    job_name_value = job_model.convert_to_label_chars(job_name)
-  else:
-    pipeline_name = os.path.basename(script)
-    job_name_value = job_model.convert_to_label_chars(
-        pipeline_name.split('.', 1)[0])
-
-  # The user-id will get set as a label
-  user_id = job_model.convert_to_label_chars(user_id)
-
-  # Now build the job-id. We want the job-id to be expressive while also
-  # having a low-likelihood of collisions.
-  #
-  # For expressiveness, we:
-  # * use the job name (truncated at 10 characters).
-  # * insert the user-id
-  # * add a datetime value
-  # To have a high likelihood of uniqueness, the datetime value is out to
-  # hundredths of a second.
-  #
-  # The full job-id is:
-  #   <job-name>--<user-id>--<timestamp>
-  job_id = '%s--%s--%s' % (job_name_value[:10], user_id,
-                           create_time.strftime('%y%m%d-%H%M%S-%f')[:16])
-
-  # Standard version is MAJOR.MINOR(.PATCH). This will convert the version
-  # string to "vMAJOR-MINOR(-PATCH)". Example; "0.1.0" -> "v0-1-0".
-  version = job_model.convert_to_label_chars('v%s' % DSUB_VERSION)
-  return {
-      'pipeline-name': pipeline_name,
-      'job-name': job_name_value,
-      'job-id': job_id,
-      'user-id': user_id,
-      'dsub-version': version,
-  }
-
-
 def prepare_query_label_value(labels):
   """Converts the label strings to contain label-appropriate characters.
 
   Args:
-    labels: A list of strings to be converted.
+    labels: A set of strings to be converted.
 
   Returns:
     A list of converted strings.
@@ -481,118 +409,18 @@ def cancel(batch_fn, cancel_fn, ops):
   return canceled_ops, error_messages
 
 
-def _print_retry_error(exception, verbose):
-  """Prints an error message if appropriate."""
-  if not verbose:
-    return
-
-  now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-  try:
-    status_code = exception.resp.status
-  except AttributeError:
-    status_code = ''
-
-  _print_error('{}: Caught exception {} {}'.format(now,
-                                                   type(exception).__name__,
-                                                   status_code))
-  _print_error('{}: This request is being retried'.format(now))
-
-
-def retry_api_check(exception, verbose):
-  """Return True if we should retry. False otherwise.
-
-  Args:
-    exception: An exception to test for transience.
-    verbose: If true, output retry messages
-
-  Returns:
-    True if we should retry. False otherwise.
-  """
-  if isinstance(exception, googleapiclient.errors.HttpError):
-    if exception.resp.status in TRANSIENT_HTTP_ERROR_CODES:
-      _print_retry_error(exception, verbose)
-      return True
-
-  if isinstance(exception, socket.error):
-    if exception.errno in TRANSIENT_SOCKET_ERROR_CODES:
-      _print_retry_error(exception, verbose)
-      return True
-
-  if isinstance(exception, google.auth.exceptions.RefreshError):
-    _print_retry_error(exception, verbose)
-    return True
-
-  # For a given installation, this could be a permanent error, but has only
-  # been observed as transient.
-  if isinstance(exception, ssl.SSLError):
-    _print_retry_error(exception, verbose)
-    return True
-
-  # This has been observed as a transient error:
-  #   ServerNotFoundError: Unable to find the server at genomics.googleapis.com
-  if isinstance(exception, ServerNotFoundError):
-    _print_retry_error(exception, verbose)
-    return True
-
-  # Observed to be thrown transiently from auth libraries which use httplib2
-  # Use the one from six because httlib no longer exists in Python3
-  # https://docs.python.org/2/library/httplib.html
-  if isinstance(exception, six.moves.http_client.ResponseNotReady):
-    _print_retry_error(exception, verbose)
-    return True
-
-  return False
-
-
-def retry_api_check_quiet(exception):
-  return retry_api_check(exception, False)
-
-
-def retry_api_check_verbose(exception):
-  return retry_api_check(exception, True)
-
-
-def retry_auth_check(exception, verbose):
-  """Specific check for auth error codes.
-
-  Return True if we should retry.
-
-  False otherwise.
-  Args:
-    exception: An exception to test for transience.
-    verbose: If true, output retry messages
-
-  Returns:
-    True if we should retry. False otherwise.
-  """
-  if isinstance(exception, googleapiclient.errors.HttpError):
-    if exception.resp.status in HTTP_AUTH_ERROR_CODES:
-      _print_retry_error(exception, verbose)
-      return True
-
-  return False
-
-
-def retry_auth_check_quiet(exception):
-  return retry_auth_check(exception, False)
-
-
-def retry_auth_check_verbose(exception):
-  return retry_auth_check(exception, True)
-
-
 # Exponential backoff retrying API discovery.
 # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
 @retrying.retry(
     stop_max_attempt_number=24,
-    retry_on_exception=retry_api_check_verbose,
+    retry_on_exception=retry_util.retry_api_check_verbose,
     wait_exponential_multiplier=500,
     wait_exponential_max=64000)
 # For API errors dealing with auth, we want to retry, but not as often
 # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
 @retrying.retry(
     stop_max_attempt_number=5,
-    retry_on_exception=retry_auth_check_verbose,
+    retry_on_exception=retry_util.retry_auth_check_verbose,
     wait_exponential_multiplier=500,
     wait_exponential_max=8000)
 def setup_service(api_name, api_version, credentials=None):
@@ -645,14 +473,14 @@ class Api(object):
   # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
   @retrying.retry(
       stop_max_attempt_number=24,
-      retry_on_exception=retry_api_check_verbose,
+      retry_on_exception=retry_util.retry_api_check_verbose,
       wait_exponential_multiplier=500,
       wait_exponential_max=64000)
   # For API errors dealing with auth, we want to retry, but not as often
   # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
   @retrying.retry(
       stop_max_attempt_number=5,
-      retry_on_exception=retry_auth_check_verbose,
+      retry_on_exception=retry_util.retry_auth_check_verbose,
       wait_exponential_multiplier=500,
       wait_exponential_max=8000)
   def execute_verbose(self, api):
@@ -670,14 +498,14 @@ class Api(object):
   # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
   @retrying.retry(
       stop_max_attempt_number=24,
-      retry_on_exception=retry_api_check_quiet,
+      retry_on_exception=retry_util.retry_api_check_quiet,
       wait_exponential_multiplier=500,
       wait_exponential_max=64000)
   # For API errors dealing with auth, we want to retry, but not as often
   # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
   @retrying.retry(
       stop_max_attempt_number=5,
-      retry_on_exception=retry_auth_check_quiet,
+      retry_on_exception=retry_util.retry_auth_check_quiet,
       wait_exponential_multiplier=500,
       wait_exponential_max=8000)
   def execute_quiet(self, api):

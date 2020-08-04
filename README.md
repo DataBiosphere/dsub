@@ -47,6 +47,12 @@ To deactivate the virtual environment in your shell, run the command:
 
         deactivate
 
+Alternatively, a set of convenience scripts are provided that activate the
+virutalenv before calling `dsub`, `dstat`, and `ddel`. They are in the
+[bin](https://github.com/DataBiosphere/dsub/tree/master/bin) directory. You can
+use these scripts if you don't want to activate the virtualenv explicitly in
+your shell.
+
 ### Install `dsub`
 
 Choose one of the following:
@@ -89,6 +95,17 @@ Choose one of the following:
 
     This is necessary only if you're going to create your own Docker images or
     use the `local` provider.
+
+### Makefile
+
+After cloning the dsub repo, you can also use the
+[Makefile](https://github.com/DataBiosphere/dsub/blob/master/Makefile)
+by running:
+
+        make
+
+This will create a Python virtual environment and install `dsub` into a
+directory named `dsub_libs`.
 
 ### Getting started with the local provider
 
@@ -630,6 +647,7 @@ To delete all running jobs for the current user:
     *   [Input and Output File Handling](https://github.com/DataBiosphere/dsub/blob/master/docs/input_output.md)
     *   [Logging](https://github.com/DataBiosphere/dsub/blob/master/docs/logging.md)
     *   [Compute Resources](https://github.com/DataBiosphere/dsub/blob/master/docs/compute_resources.md)
+    *   [Compute Quotas](https://github.com/DataBiosphere/dsub/blob/master/docs/compute_quotas.md)
     *   [Job Control](https://github.com/DataBiosphere/dsub/blob/master/docs/job_control.md)
     *   [Retries](https://github.com/DataBiosphere/dsub/blob/master/docs/retries.md)
     *   [Checking Status and Troubleshooting Jobs](https://github.com/DataBiosphere/dsub/blob/master/docs/troubleshooting.md)

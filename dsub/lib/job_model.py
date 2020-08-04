@@ -786,6 +786,16 @@ class JobDescriptor(object):
     return mounts
 
   @classmethod
+  def _set_metadata_create_time(cls, metadata, create_time):
+    if dsub_util.datetime_is_timezone_aware(create_time):
+      # In yaml version starting at 5.3,
+      # timestamps are already loaded as timezone aware
+      metadata['create-time'] = create_time
+    else:
+      metadata['create-time'] = dsub_util.replace_timezone(
+          create_time, pytz.utc)
+
+  @classmethod
   def from_yaml(cls, yaml_string):
     """Populate and return a JobDescriptor from a YAML string."""
     try:
@@ -803,8 +813,8 @@ class JobDescriptor(object):
         job_metadata[key] = job.get(key)
 
     # Make sure that create-time string is turned into a datetime
-    job_metadata['create-time'] = dsub_util.replace_timezone(
-        job.get('create-time'), pytz.utc)
+    job_create_time = job.get('create-time')
+    cls._set_metadata_create_time(job_metadata, job_create_time)
 
     job_resources = Resources(logging=job.get('logging'))
 
@@ -828,8 +838,7 @@ class JobDescriptor(object):
       # Old instances of the meta.yaml do not have a task create time.
       create_time = task.get('create-time')
       if create_time:
-        task_metadata['create-time'] = dsub_util.replace_timezone(
-            create_time, pytz.utc)
+        cls._set_metadata_create_time(task_metadata, create_time)
 
       if task.get('task-attempt') is not None:
         task_metadata['task-attempt'] = task.get('task-attempt')

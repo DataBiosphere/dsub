@@ -385,6 +385,7 @@ function test_network() {
   local subtest="${FUNCNAME[0]}"
 
   if call_dsub \
+    --image 'marketplace.gcr.io/google/debian9' \
     --command 'echo "${TEST_NAME}"' \
     --regions us-central1 \
     --network 'network-name-foo' \
@@ -427,6 +428,29 @@ function test_no_network() {
   fi
 }
 readonly -f test_no_network
+
+function test_use_private_address_with_public_image() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --use-private-address; then
+
+    1>&2 echo "Public image used with no public address was not detected"
+
+    test_failed "${subtest}"
+  else
+
+    assert_output_empty
+
+    assert_err_contains \
+      "ValueError: --use-private-address must specify a --image with a gcr.io host"
+
+    test_passed "${subtest}"
+  fi
+}
+readonly -f test_use_private_address_with_public_image
 
 function test_cpu_platform() {
   local subtest="${FUNCNAME[0]}"
@@ -766,6 +790,7 @@ test_no_accelerator_type_and_count
 echo
 test_network
 test_no_network
+test_use_private_address_with_public_image
 
 echo
 test_cpu_platform

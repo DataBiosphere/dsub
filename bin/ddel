@@ -17,9 +17,9 @@
 set -o errexit
 set -o nounset
 
-readonly VIRTUALENV="dsub_env"
-readonly INSTALL_DIR="$(dirname "${0}")/../install"
-readonly COMMAND="${INSTALL_DIR}/${VIRTUALENV}/bin/$(basename "${0}")"
+readonly VIRTUALENV="dsub_libs"
+readonly INSTALL_DIR="$(dirname "${0}")/../${VIRTUALENV}"
+readonly COMMAND="${INSTALL_DIR}/bin/$(basename "${0}")"
 
 if [[ ! -f "${COMMAND}" ]]; then
   echo 'Command not installed! Run "make install" and try again.'
@@ -27,7 +27,7 @@ if [[ ! -f "${COMMAND}" ]]; then
 fi
 
 set +o nounset  # https://github.com/pypa/virtualenv/pull/922
-source "${INSTALL_DIR}/${VIRTUALENV}/bin/activate"
+source "${INSTALL_DIR}/bin/activate"
 set -o nounset
 
 exec "${COMMAND}" "${@}"

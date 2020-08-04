@@ -174,6 +174,15 @@ class TaskParamAction(argparse.Action):
     setattr(namespace, self.dest, tasks)
 
 
+def _check_private_address(args):
+  """If --use-private-address is enabled, ensure the Docker path is for GCR."""
+  if args.use_private_address:
+    split = args.image.split('/', 1)
+    if len(split) == 1 or not split[0].endswith('gcr.io'):
+      raise ValueError(
+          '--use-private-address must specify a --image with a gcr.io host')
+
+
 def _google_cls_v2_parse_arguments(args):
   """Validated google-cls-v2 arguments."""
 
@@ -188,6 +197,8 @@ def _google_cls_v2_parse_arguments(args):
     raise ValueError(
         '--machine-type not supported together with --min-cores or --min-ram.')
 
+  _check_private_address(args)
+
 
 def _google_v2_parse_arguments(args):
   """Validated google-v2 arguments."""
@@ -197,6 +208,15 @@ def _google_v2_parse_arguments(args):
   if args.machine_type and (args.min_cores or args.min_ram):
     raise ValueError(
         '--machine-type not supported together with --min-cores or --min-ram.')
+
+  _check_private_address(args)
+
+
+def _local_parse_arguments(args):
+  """Validated local arguments."""
+  if args.user and args.user != dsub_util.get_os_user():
+    raise ValueError('If specified, the local provider\'s "--user" flag must '
+                     'match the current logged-in user.')
 
 
 def _parse_arguments(prog, argv):
@@ -616,10 +636,25 @@ def _get_job_metadata(provider, user_id, job_name, script, task_ids,
   """
   create_time = dsub_util.replace_timezone(datetime.datetime.now(), tzlocal())
   user_id = user_id or dsub_util.get_os_user()
-  job_metadata = provider.prepare_job_metadata(script.name, job_name, user_id,
-                                               create_time)
+  job_metadata = provider.prepare_job_metadata(script.name, job_name, user_id)
   if unique_job_id:
     job_metadata['job-id'] = uuid.uuid4().hex
+  else:
+    # Build the job-id. We want the job-id to be expressive while also
+    # having a low-likelihood of collisions.
+    #
+    # For expressiveness, we:
+    # * use the job name (truncated at 10 characters).
+    # * insert the user-id
+    # * add a datetime value
+    # To have a high likelihood of uniqueness, the datetime value is out to
+    # hundredths of a second.
+    #
+    # The full job-id is:
+    #   <job-name>--<user-id>--<timestamp>
+    job_metadata['job-id'] = '%s--%s--%s' % (
+        job_metadata['job-name'][:10], job_metadata['user-id'],
+        create_time.strftime('%y%m%d-%H%M%S-%f')[:16])
 
   job_metadata['create-time'] = create_time
   job_metadata['script'] = script
@@ -1205,7 +1240,10 @@ def run(provider,
 
   # Job and task properties are now all resolved. Begin execution!
   if not dry_run:
-    print('Job: %s' % job_metadata['job-id'])
+    print('Job properties:')
+    print('  job-id: %s' % job_metadata['job-id'])
+    print('  job-name: %s' % job_metadata['job-name'])
+    print('  user-id: %s' % job_metadata['user-id'])
 
   # Wait for predecessor jobs (if any)
   if after:

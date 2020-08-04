@@ -68,8 +68,8 @@ class StubJobProvider(base.JobProvider):
   #    Meant to be called by the code under test, they rely on the fake
   #    state set via group (2) above.
 
-  def prepare_job_metadata(self, script, job_name, user_id, create_time):
-    del script, job_name, user_id, create_time  # pacify linter
+  def prepare_job_metadata(self, script, job_name, user_id):
+    del script, job_name, user_id  # pacify linter
     raise BaseException('Not implemented')
 
   def lookup_job_tasks(self,
