@@ -162,6 +162,22 @@ class TestRetrying(unittest.TestCase):
       self.assertGreaterEqual(elapsed_time_in_seconds(ft), 3)
       self.assertLess(elapsed_time_in_seconds(ft), 3.5)
 
+  @parameterized.parameterized.expand([(True,), (False,)])
+  def test_socket_timeout(self, verbose):
+    exception_list = [
+        socket.timeout(),
+        socket.timeout(),
+    ]
+    ft = fake_time.FakeTime(chronology())
+    with patch('time.sleep', new=ft.sleep):
+      api_wrapper_to_test = google_base.Api(verbose)
+      mock_api_object = GoogleApiMock(exception_list)
+      api_wrapper_to_test.execute(mock_api_object)
+      # Expected to retry twice, for a total of 1 + 2 = 3 seconds
+      self.assertEqual(mock_api_object.retry_counter, 2)
+      self.assertGreaterEqual(elapsed_time_in_seconds(ft), 3)
+      self.assertLess(elapsed_time_in_seconds(ft), 3.5)
+
 
 if __name__ == '__main__':
   unittest.main()

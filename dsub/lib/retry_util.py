@@ -88,6 +88,9 @@ def retry_api_check(exception, verbose):
       _print_retry_error(exception, verbose)
       return True
 
+  if isinstance(exception, socket.timeout):
+    return True
+
   if isinstance(exception, google.auth.exceptions.RefreshError):
     _print_retry_error(exception, verbose)
     return True
