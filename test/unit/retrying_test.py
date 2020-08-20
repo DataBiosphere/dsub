@@ -25,6 +25,8 @@ import fake_time
 from mock import patch
 import parameterized
 
+import google.auth
+
 
 def chronology():
   # Simulates the passing of time for fake_time.
@@ -177,6 +179,17 @@ class TestRetrying(unittest.TestCase):
       self.assertEqual(mock_api_object.retry_counter, 2)
       self.assertGreaterEqual(elapsed_time_in_seconds(ft), 3)
       self.assertLess(elapsed_time_in_seconds(ft), 3.5)
+
+  @parameterized.parameterized.expand([
+      (apiclient.errors.HttpError(ResponseMock(500, None), b'test_exception'),
+       'googleapiclient.errors.HttpError'),
+      (google.auth.exceptions.RefreshError(),
+       'google.auth.exceptions.RefreshError'),
+      (socket.timeout(), 'socket.timeout'),
+  ])
+  def test_get_exception_type_string(self, exception, expected_type_string):
+    actual_exception_string = retry_util.get_exception_type_string(exception)
+    self.assertEqual(actual_exception_string, expected_type_string)
 
 
 if __name__ == '__main__':

@@ -60,10 +60,25 @@ def _print_retry_error(exception, verbose):
   except AttributeError:
     status_code = ''
 
-  _print_error('{}: Caught exception {} {}'.format(now,
-                                                   type(exception).__name__,
-                                                   status_code))
+  _print_error('{}: Caught exception {} {}'.format(
+      now, get_exception_type_string(exception), status_code))
   _print_error('{}: This request is being retried'.format(now))
+
+
+def get_exception_type_string(exception):
+  """Returns the full path of the exception."""
+  exception_type_string = str(type(exception))
+
+  # This is expected to look something like
+  # "<class 'google.auth.exceptions.RefreshError'>"
+  if exception_type_string.startswith(
+      "<class '") and exception_type_string.endswith("'>"):
+    # Slice off the <class ''> parts
+    return exception_type_string[len("<class '"):-len("'>")]
+  else:
+    # If the exception type looks different than expected,
+    # just print out the whole type.
+    return exception_type_string
 
 
 def retry_api_check(exception, verbose):
