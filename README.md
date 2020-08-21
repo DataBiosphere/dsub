@@ -22,9 +22,12 @@ install from [github](https://github.com/DataBiosphere/dsub).
 
 ### Sunsetting Python 2 support
 
-Python 2 support ended in January 2020. Automated `dsub` tests running on
-Python 2 will soon be disabled.
-See [Python's official article](https://www.python.org/doc/sunset-python-2/) for details.
+Python 2 support ended in January 2020.
+See Python's official [Sunsetting Python 2 announcement](https://www.python.org/doc/sunset-python-2/) for details.
+
+Automated `dsub` tests running on Python 2 have been disabled.
+[Release 0.3.10](https://github.com/DataBiosphere/dsub/releases/tag/v0.3.10) is
+the last version of `dsub` that supports Python 2.
 
 Use Python 3.
 
