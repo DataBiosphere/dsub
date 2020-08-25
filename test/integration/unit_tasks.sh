@@ -32,6 +32,7 @@ function call_dsub() {
   run_dsub \
     "$@" \
     --command 'echo hello' \
+    --image dummy-image \
     --dry-run \
     1> "${TEST_STDOUT}" \
     2> "${TEST_STDERR}"

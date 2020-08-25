@@ -291,8 +291,12 @@ working with input and output files and folders.
 
 ### Selecting a Docker image
 
-By default, dsub uses a stock Ubuntu image. You can change the image
-by passing the `--image` flag.
+To get started more easily, `dsub` uses a stock Ubuntu Docker image.
+This default image may change at any time in future releases, so for
+reproducible production workflows, you should always specify the image
+explicitly.
+
+You can change the image by passing the `--image` flag.
 
     dsub \
         ... \
@@ -301,6 +305,10 @@ by passing the `--image` flag.
 
 Note: your `--image` must include the
 [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) shell interpreter.
+
+For more information on using the
+`--image` flag, see the
+[image section in Scripts, Commands, and Docker](https://github.com/DataBiosphere/dsub/blob/master/docs/code.md#--image-docker-image)
 
 ### Passing parameters to your script
 

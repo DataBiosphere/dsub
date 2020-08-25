@@ -42,6 +42,7 @@ function call_dsub() {
   run_dsub \
     --script "${SCRIPT}" \
     --env TEST_NAME="${TEST_NAME}" \
+    --image dummy-image \
     ${input:+--input "${input}"} \
     ${output:+--output "${output}"} \
     --dry-run \
