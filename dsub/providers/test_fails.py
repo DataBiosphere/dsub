@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +24,7 @@ from ..lib import dsub_util
 from ..lib import job_model
 
 
-class FailsException(Exception):
+class FailsError(Exception):
   pass
 
 
@@ -37,7 +37,7 @@ class FailsJobProvider(base.JobProvider):
   def submit_job(self, job_descriptor, skip_if_output_present):
     """Fails if there's anything to submit (so, not skipped)."""
     if not skip_if_output_present:
-      raise FailsException("fails provider made submit_job fail")
+      raise FailsError("fails provider made submit_job fail")
 
     for task_view in job_model.task_view_generator(job_descriptor):
       job_params = task_view.job_params
@@ -49,13 +49,13 @@ class FailsJobProvider(base.JobProvider):
         continue
 
       # if any task is allowed to run, then we fail.
-      raise FailsException("fails provider made submit_job fail")
+      raise FailsError("fails provider made submit_job fail")
 
     return {"job-id": dsub_util.NO_JOB}
 
   def delete_jobs(self, user_ids, job_ids, task_ids, labels, create_time=None):
     del user_ids, job_ids, task_ids, labels, create_time
-    raise FailsException("fails provider made delete_jobs fail")
+    raise FailsError("fails provider made delete_jobs fail")
 
   def lookup_job_tasks(self,
                        statuses,
@@ -67,7 +67,7 @@ class FailsJobProvider(base.JobProvider):
                        create_time=None,
                        max_tasks=0):
     del statuses, user_ids, job_ids, job_names, task_ids, labels, max_tasks
-    raise FailsException("fails provider made lookup_job_tasks fail")
+    raise FailsError("fails provider made lookup_job_tasks fail")
 
   def get_tasks_completion_messages(self, tasks):
     del tasks  # doesn't matter either

@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -1064,6 +1064,7 @@ def _validate_job_and_task_arguments(job_params, task_descriptors):
 
 
 def dsub_main(prog, argv):
+  """Main entry point for dsub."""
   # Parse args and validate
   args = _parse_arguments(prog, argv)
   # intent:

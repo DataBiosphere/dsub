@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2018 Verily Life Sciences Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -670,6 +670,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
 
     persistent_disk_mount_params = param_util.get_persistent_disk_mounts(mounts)
 
+    # pylint: disable=g-complex-comprehension
     persistent_disks = [
         google_v2_pipelines.build_disk(
             name=disk.name.replace('_', '-'),  # Underscores not allowed
@@ -687,6 +688,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
         for persistent_disk, persistent_disk_mount_param in zip(
             persistent_disks, persistent_disk_mount_params)
     ]
+    # pylint: enable=g-complex-comprehension
 
     # The list of "actions" (1-based) will be:
     #   1- continuous copy of log files off to Cloud Storage
