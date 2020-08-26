@@ -52,5 +52,5 @@ run_dsub \
 # Fancier testing of the label syntax is done in test_param_util.py
 
 assert_err_contains \
-    'FailsException'
+    'FailsError'
 

@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -260,6 +260,7 @@ class LabelParam(collections.namedtuple('LabelParam', ['name', 'value'])):
 
   @staticmethod
   def _check_label_value(value):
+    """Raise ValueError if the label value is invalid."""
     if not value:
       return
 
@@ -334,9 +335,12 @@ class InputFileParam(FileParam):
               disk_size=None,
               disk_type=None):
     validate_param_name(name, 'Input parameter')
-    return super(InputFileParam,
-                 cls).__new__(cls, name, value, docker_path, uri, recursive,
-                              file_provider, disk_size, disk_type)
+    # There is an open bug in the linter for too-many-function-args:
+    # https://github.com/PyCQA/pylint/issues/1789
+    return super(  # pylint: disable=too-many-function-args
+        InputFileParam,
+        cls).__new__(cls, name, value, docker_path, uri, recursive,
+                     file_provider, disk_size, disk_type)
 
 
 class OutputFileParam(FileParam):
@@ -352,9 +356,12 @@ class OutputFileParam(FileParam):
               disk_size=None,
               disk_type=None):
     validate_param_name(name, 'Output parameter')
-    return super(OutputFileParam,
-                 cls).__new__(cls, name, value, docker_path, uri, recursive,
-                              file_provider, disk_size, disk_type)
+    # There is an open bug in the linter for too-many-function-args:
+    # https://github.com/PyCQA/pylint/issues/1789
+    return super(  # pylint: disable=too-many-function-args
+        OutputFileParam,
+        cls).__new__(cls, name, value, docker_path, uri, recursive,
+                     file_provider, disk_size, disk_type)
 
 
 class MountParam(FileParam):
@@ -567,7 +574,7 @@ class TaskDescriptor(object):
   A TaskDescriptor on its own is incomplete and should always be handled in
   the context of a JobDescriptor (described below).
 
-  Args:
+  Attributes:
     task_metadata: Task metadata such as task-id.
     task_params: Task parameters such as labels, envs, inputs, and outputs.
     task_resources: Resources specified such as ram, cpu, and logging path.
@@ -641,7 +648,7 @@ class TaskDescriptor(object):
 class JobDescriptor(object):
   """Metadata, resources, and parameters for a dsub job.
 
-  Args:
+  Attributes:
     job_metadata: Job metadata such as job-id, job-name, and user-id.
     job_params: Job parameters such as labels, envs, inputs, and outputs.
     job_resources: Resources specified such as ram, cpu, and logging path.

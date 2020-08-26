@@ -22,9 +22,12 @@ install from [github](https://github.com/DataBiosphere/dsub).
 
 ### Sunsetting Python 2 support
 
-Python 2 support ended in January 2020. Automated `dsub` tests running on
-Python 2 will soon be disabled.
-See [Python's official article](https://www.python.org/doc/sunset-python-2/) for details.
+Python 2 support ended in January 2020.
+See Python's official [Sunsetting Python 2 announcement](https://www.python.org/doc/sunset-python-2/) for details.
+
+Automated `dsub` tests running on Python 2 have been disabled.
+[Release 0.3.10](https://github.com/DataBiosphere/dsub/releases/tag/v0.3.10) is
+the last version of `dsub` that supports Python 2.
 
 Use Python 3.
 
@@ -157,7 +160,6 @@ The steps for getting started differ slightly as indicated in the steps below:
 
      [Enable the Cloud Life Sciences, Storage, and Compute APIs](https://console.cloud.google.com/flows/enableapi?apiid=lifesciences.googleapis.com,storage_component,compute_component&redirect=https://console.cloud.google.com)
 
-
 1.  [Install the Google Cloud SDK](https://cloud.google.com/sdk/) and run
 
         gcloud init
@@ -188,28 +190,28 @@ The steps for getting started differ slightly as indicated in the steps below:
 
     - For the `v2alpha1` API (provider: `google-v2`):
 
-        dsub \
-          --provider google-v2 \
-          --project my-cloud-project \
-          --regions us-central1 \
-          --logging gs://my-bucket/logging/ \
-          --output OUT=gs://my-bucket/output/out.txt \
-          --command 'echo "Hello World" > "${OUT}"' \
-          --wait
+            dsub \
+              --provider google-v2 \
+              --project my-cloud-project \
+              --regions us-central1 \
+              --logging gs://my-bucket/logging/ \
+              --output OUT=gs://my-bucket/output/out.txt \
+              --command 'echo "Hello World" > "${OUT}"' \
+              --wait
 
     Change `my-cloud-project` to your Google Cloud project, and `my-bucket` to
     the bucket you created above.
 
     - For the `v2beta` API (provider: `google-cls-v2`):
 
-        dsub \
-          --provider google-cls-v2 \
-          --project my-cloud-project \
-          --regions us-central1 \
-          --logging gs://my-bucket/logging/ \
-          --output OUT=gs://my-bucket/output/out.txt \
-          --command 'echo "Hello World" > "${OUT}"' \
-          --wait
+            dsub \
+              --provider google-cls-v2 \
+              --project my-cloud-project \
+              --regions us-central1 \
+              --logging gs://my-bucket/logging/ \
+              --output OUT=gs://my-bucket/output/out.txt \
+              --command 'echo "Hello World" > "${OUT}"' \
+              --wait
 
     Change `my-cloud-project` to your Google Cloud project, and `my-bucket` to
     the bucket you created above.
@@ -289,8 +291,12 @@ working with input and output files and folders.
 
 ### Selecting a Docker image
 
-By default, dsub uses a stock Ubuntu image. You can change the image
-by passing the `--image` flag.
+To get started more easily, `dsub` uses a stock Ubuntu Docker image.
+This default image may change at any time in future releases, so for
+reproducible production workflows, you should always specify the image
+explicitly.
+
+You can change the image by passing the `--image` flag.
 
     dsub \
         ... \
@@ -299,6 +305,10 @@ by passing the `--image` flag.
 
 Note: your `--image` must include the
 [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) shell interpreter.
+
+For more information on using the
+`--image` flag, see the
+[image section in Scripts, Commands, and Docker](https://github.com/DataBiosphere/dsub/blob/master/docs/code.md#--image-docker-image)
 
 ### Passing parameters to your script
 

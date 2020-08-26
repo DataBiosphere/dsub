@@ -29,13 +29,10 @@ source "${SCRIPT_DIR}/test_setup_unit.sh"
 # Define a utility routine for running a test of the "--command" flag
 
 function call_dsub() {
-  local command="${1:-}"
-  local script="${2:-}"
 
   run_dsub \
-    --command "${command}" \
-    --script "${script}" \
     --dry-run \
+    "${@}" \
     1> "${TEST_STDOUT}" \
     2> "${TEST_STDERR}"
 }
@@ -46,7 +43,10 @@ readonly -f call_dsub
 function test_missing_command_and_script() {
   local subtest="${FUNCNAME[0]}"
 
-  if call_dsub; then
+  if call_dsub \
+    --command "" \
+    --script "" \
+    --image "dummy-image"; then
 
     1>&2 echo "Neither command nor script specified - not detected"
 
@@ -67,8 +67,9 @@ function test_having_command_and_script() {
   local subtest="${FUNCNAME[0]}"
 
   if call_dsub \
-    'echo "Hello World"' \
-    "dummy.sh"; then
+    --command 'echo "Hello World"' \
+    --script "dummy.sh" \
+    --image "dummy-image"; then
 
     1>&2 echo "Command and script specified - not detected"
 
@@ -85,6 +86,24 @@ function test_having_command_and_script() {
 }
 readonly -f test_having_command_and_script
 
+function test_missing_image() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "Hello World"'; then
+
+    assert_err_contains "WARNING: No Docker image specified."
+
+    test_passed "${subtest}"
+  else
+
+    1>&2 echo "dsub command failed unexpectedly"
+
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_missing_image
+
 # Run the tests
 trap "exit_handler" EXIT
 
@@ -93,3 +112,4 @@ mkdir -p "${TEST_TMP}"
 echo
 test_missing_command_and_script
 test_having_command_and_script
+test_missing_image

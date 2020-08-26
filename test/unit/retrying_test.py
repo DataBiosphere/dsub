@@ -25,6 +25,8 @@ import fake_time
 from mock import patch
 import parameterized
 
+import google.auth
+
 
 def chronology():
   # Simulates the passing of time for fake_time.
@@ -161,6 +163,33 @@ class TestRetrying(unittest.TestCase):
       self.assertEqual(mock_api_object.retry_counter, 2)
       self.assertGreaterEqual(elapsed_time_in_seconds(ft), 3)
       self.assertLess(elapsed_time_in_seconds(ft), 3.5)
+
+  @parameterized.parameterized.expand([(True,), (False,)])
+  def test_socket_timeout(self, verbose):
+    exception_list = [
+        socket.timeout(),
+        socket.timeout(),
+    ]
+    ft = fake_time.FakeTime(chronology())
+    with patch('time.sleep', new=ft.sleep):
+      api_wrapper_to_test = google_base.Api(verbose)
+      mock_api_object = GoogleApiMock(exception_list)
+      api_wrapper_to_test.execute(mock_api_object)
+      # Expected to retry twice, for a total of 1 + 2 = 3 seconds
+      self.assertEqual(mock_api_object.retry_counter, 2)
+      self.assertGreaterEqual(elapsed_time_in_seconds(ft), 3)
+      self.assertLess(elapsed_time_in_seconds(ft), 3.5)
+
+  @parameterized.parameterized.expand([
+      (apiclient.errors.HttpError(ResponseMock(500, None), b'test_exception'),
+       'googleapiclient.errors.HttpError'),
+      (google.auth.exceptions.RefreshError(),
+       'google.auth.exceptions.RefreshError'),
+      (socket.timeout(), 'socket.timeout'),
+  ])
+  def test_get_exception_type_string(self, exception, expected_type_string):
+    actual_exception_string = retry_util.get_exception_type_string(exception)
+    self.assertEqual(actual_exception_string, expected_type_string)
 
 
 if __name__ == '__main__':

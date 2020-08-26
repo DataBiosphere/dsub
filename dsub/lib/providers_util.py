@@ -1,3 +1,4 @@
+# Lint as: python3
 # Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -83,12 +84,14 @@ def build_recursive_localize_env(destination, inputs):
     a multi-line string with a shell script that sets environment variables
     corresponding to the inputs.
   """
+  # pylint: disable=g-complex-comprehension
   export_input_dirs = '\n'.join([
       'export {0}={1}/{2}'.format(var.name, destination.rstrip('/'),
                                   var.docker_path.rstrip('/'))
       for var in inputs
       if var.recursive and var.docker_path
   ])
+  # pylint: enable=g-complex-comprehension
   return export_input_dirs
 
 
@@ -112,7 +115,7 @@ def build_recursive_localize_command(destination, inputs, file_provider):
       var for var in inputs
       if var.recursive and var.file_provider == file_provider
   ]
-
+  # pylint: disable=g-complex-comprehension
   copy_input_dirs = '\n'.join([
       textwrap.dedent("""
       mkdir -p {data_mount}/{docker_path}
@@ -131,6 +134,7 @@ def build_recursive_localize_command(destination, inputs, file_provider):
           data_mount=destination.rstrip('/'),
           docker_path=var.docker_path) for var in filtered_inputs
   ])
+  # pylint: enable=g-complex-comprehension
   return copy_input_dirs
 
 
@@ -150,12 +154,14 @@ def build_recursive_gcs_delocalize_env(source, outputs):
       var for var in outputs
       if var.recursive and var.file_provider == job_model.P_GCS
   ]
+  # pylint: disable=g-complex-comprehension
   return '\n'.join([
       'export {0}={1}/{2}'.format(var.name,
                                   source.rstrip('/'),
                                   var.docker_path.rstrip('/'))
       for var in filtered_outs
   ])
+  # pylint: enable=g-complex-comprehension
 
 
 def build_recursive_delocalize_command(source, outputs, file_provider):
@@ -178,7 +184,7 @@ def build_recursive_delocalize_command(source, outputs, file_provider):
       var for var in outputs
       if var.recursive and var.file_provider == file_provider
   ]
-
+  # pylint: disable=g-complex-comprehension
   return '\n'.join([
       textwrap.dedent("""
       for ((i = 0; i < 3; i++)); do
@@ -195,6 +201,7 @@ def build_recursive_delocalize_command(source, outputs, file_provider):
           docker_path=var.docker_path,
           destination_uri=var.uri) for var in filtered_outputs
   ])
+  # pylint: enable=g-complex-comprehension
 
 
 def get_task_metadata(job_metadata, task_id):

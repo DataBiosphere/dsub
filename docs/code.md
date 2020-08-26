@@ -87,7 +87,26 @@ script, see the [Custom Scripts example](../examples/custom_scripts).
 ## --image "Docker image"
 
 The `--image` flag allows you to specify the Docker image to be used for running
-a job. Many software packages are already available in public Docker images at
+your `--command` or `--script`. By default, `dsub` uses a stock Ubuntu image.
+This default image is provided to simplify the getting started experience,
+but may be changed at any time in future releases to ensure newer and more
+secure images.
+
+For reproducible production workflows, be sure to specify an image using
+`--image` flag:
+
+    dsub \
+        ... \
+        --image ubuntu:16.04 \
+        --script hello.sh
+
+You may want to select one of Google's
+[Managed Base Images](https://cloud.google.com/container-registry/docs/managed-base-images).
+
+Note: your `--image` must include the
+[Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) shell interpreter.
+
+Many software packages are already available in public Docker images at
 sites such as [Docker Hub](https://hub.docker.com/). Images can be pulled
 from Docker Hub or any container registry:
 

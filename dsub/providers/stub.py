@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -96,6 +96,7 @@ class StubJobProvider(base.JobProvider):
       raise NotImplementedError(
           'Lookup by labels and create_time not yet supported by stub.')
 
+    # pylint: disable=g-complex-comprehension
     operations = [
         x for x in self._operations
         if ((not statuses or x.get_field('status', (None, None))[0] in statuses
@@ -106,6 +107,8 @@ class StubJobProvider(base.JobProvider):
             (not task_attempts or
              x.get_field('task-attempt', None) in task_attempts))
     ]
+    # pylint: enable=g-complex-comprehension
+
     if max_tasks > 0:
       operations = operations[:max_tasks]
     return operations
@@ -119,6 +122,7 @@ class StubJobProvider(base.JobProvider):
 
 
 class StubTask(base.Task):
+  """Stub task, for unit testing. Does not actually run anything."""
 
   def __init__(self, op):
     self.op = op

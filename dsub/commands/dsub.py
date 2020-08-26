@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -117,6 +117,8 @@ DEFAULT_INPUT_LOCAL_PATH = 'input'
 DEFAULT_OUTPUT_LOCAL_PATH = 'output'
 DEFAULT_MOUNT_LOCAL_PATH = 'mount'
 
+DEFAULT_IMAGE = 'ubuntu:14.04'
+
 
 class TaskParamAction(argparse.Action):
   """Parse the task flag value into a dict."""
@@ -177,7 +179,8 @@ class TaskParamAction(argparse.Action):
 def _check_private_address(args):
   """If --use-private-address is enabled, ensure the Docker path is for GCR."""
   if args.use_private_address:
-    split = args.image.split('/', 1)
+    image = args.image or DEFAULT_IMAGE
+    split = image.split('/', 1)
     if len(split) == 1 or not split[0].endswith('gcr.io'):
       raise ValueError(
           '--use-private-address must specify a --image with a gcr.io host')
@@ -268,10 +271,12 @@ def _parse_arguments(prog, argv):
       metavar='FILE M-N')
   parser.add_argument(
       '--image',
-      default='ubuntu:14.04',
+      # Defaults to None so we can emit a warning if not specified
+      # Will later on be set to DEFAULT_IMAGE
+      default=None,
       help="""Image name from Docker Hub, Google Container Repository, or other
           Docker image service. The task must have READ access to the
-          image. (default: ubuntu:14.04)""")
+          image. (default: {})""".format(DEFAULT_IMAGE))
   parser.add_argument(
       '--dry-run',
       default=False,
@@ -1064,6 +1069,7 @@ def _validate_job_and_task_arguments(job_params, task_descriptors):
 
 
 def dsub_main(prog, argv):
+  """Main entry point for dsub."""
   # Parse args and validate
   args = _parse_arguments(prog, argv)
   # intent:
@@ -1139,6 +1145,14 @@ def run_main(args):
             'outputs': set()
         }, job_model.Resources())
     ]
+
+  # Emit a warning if default image is used
+  if args.image is None:
+    print('***WARNING: No Docker image specified. The default, '
+          f'`{DEFAULT_IMAGE}` will be used.')
+    print('***WARNING: For reproducible pipelines, specify an image with the '
+          '`--image` flag.')
+    args.image = DEFAULT_IMAGE
 
   return run(
       provider_base.get_provider(args, resources),

@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -54,7 +54,7 @@ submitted will run concurrently.
 """
 from __future__ import print_function
 
-from collections import namedtuple
+import collections
 import datetime
 import os
 import signal
@@ -897,7 +897,7 @@ class LocalJobProvider(base.JobProvider):
     return script
 
 # The task object for this provider.
-_RawTask = namedtuple('_RawTask', [
+_RawTask = collections.namedtuple('_RawTask', [
     'job_descriptor',
     'task_status',
     'events',

@@ -28,10 +28,13 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 source "${SCRIPT_DIR}/test_setup_unit.sh"
 
 function call_dsub() {
+  local image="${DOCKER_IMAGE_OVERRIDE:-dummy-image}"
+  
   dsub \
     --provider "${DSUB_PROVIDER}" \
     --project "${PROJECT_ID}" \
     --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
+    --image "${image}" \
     "${@}" \
     --dry-run \
     1> "${TEST_STDOUT}" \
@@ -384,8 +387,7 @@ readonly -f test_no_accelerator_type_and_count
 function test_network() {
   local subtest="${FUNCNAME[0]}"
 
-  if call_dsub \
-    --image 'marketplace.gcr.io/google/debian9' \
+  if DOCKER_IMAGE_OVERRIDE="marketplace.gcr.io/google/debian9" call_dsub \
     --command 'echo "${TEST_NAME}"' \
     --regions us-central1 \
     --network 'network-name-foo' \
