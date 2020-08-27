@@ -1149,7 +1149,7 @@ def run_main(args):
   # Emit a warning if default image is used
   if args.image is None:
     print('***WARNING: No Docker image specified. The default, '
-          f'`{DEFAULT_IMAGE}` will be used.')
+          '`{}` will be used.'.format(DEFAULT_IMAGE))
     print('***WARNING: For reproducible pipelines, specify an image with the '
           '`--image` flag.')
     args.image = DEFAULT_IMAGE
