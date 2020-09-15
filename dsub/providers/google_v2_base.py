@@ -485,6 +485,26 @@ class GoogleV2JobProviderBase(base.JobProvider):
     self._dry_run = dry_run
     self._storage_service = storage_service
 
+  def _get_pipeline_regions(self, regions, zones):
+    """Returns the list of regions to use for a pipeline request."""
+    raise NotImplementedError('Derived class must implement this function')
+
+  def _pipelines_run_api(self, request):
+    """Executes the provider-specific pipelines.run() API."""
+    raise NotImplementedError('Derived class must implement this function')
+
+  def _operations_list_api(self, ops_filter, page_token, page_size):
+    """Executes the provider-specific operaitons.list() API."""
+    raise NotImplementedError('Derived class must implement this function')
+
+  def _operations_cancel_api_def(self):
+    """Returns a function object for the provider-specific cancel API."""
+    raise NotImplementedError('Derived class must implement this function')
+
+  def _batch_handler_def(self):
+    """Returns a function object for the provider-specific batch handler."""
+    raise NotImplementedError('Derived class must implement this function')
+
   def prepare_job_metadata(self, script, job_name, user_id):
     """Returns a dictionary of metadata fields for the job."""
     return providers_util.prepare_job_metadata(script, job_name, user_id)
@@ -1215,7 +1235,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
 
     print('Found %d tasks to delete.' % len(tasks))
 
-    return google_base.cancel(GoogleV2BatchHandler,
+    return google_base.cancel(self._batch_handler_def(),
                               self._operations_cancel_api_def(), tasks)
 
 

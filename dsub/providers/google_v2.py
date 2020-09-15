@@ -59,6 +59,9 @@ class GoogleV2JobProvider(google_v2_base.GoogleV2JobProviderBase):
   def _operations_cancel_api_def(self):
     return self._service.projects().operations().cancel
 
+  def _batch_handler_def(self):
+    return google_v2_base.GoogleV2BatchHandler
+
 
 if __name__ == '__main__':
   pass
