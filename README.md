@@ -29,7 +29,7 @@ Automated `dsub` tests running on Python 2 have been disabled.
 [Release 0.3.10](https://github.com/DataBiosphere/dsub/releases/tag/v0.3.10) is
 the last version of `dsub` that supports Python 2.
 
-Use Python 3.
+Use Python 3.6 or greater. For earlier versions of Python 3, use `dsub` 0.4.1.
 
 ### Pre-installation steps
 
