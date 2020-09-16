@@ -23,7 +23,7 @@ _DEPENDENCIES = [
     'python-dateutil<=2.8.1',
     'pytz<=2019.3',
     'pyyaml<=5.3',
-    'retrying<=1.3.3',
+    'tenacity<=5.0.4',
     'six<=1.14.0',
     'tabulate<=0.8.7',
 

@@ -24,6 +24,7 @@ import sys
 import googleapiclient.errors
 from httplib2 import ServerNotFoundError
 import six.moves.http_client
+import tenacity
 
 import google.auth
 
@@ -43,26 +44,32 @@ HTTP_AUTH_ERROR_CODES = frozenset([401, 403])
 # also be retried
 TRANSIENT_SOCKET_ERROR_CODES = frozenset([32, 104])
 
+# The maximum number of attempts when retrying API errors (network, 500s, etc)
+MAX_API_ATTEMPTS = 24
+
+# The maximum number of attempts when retrying auth errors (refresh tokens,
+# 401s, etc)
+MAX_AUTH_ATTEMPTS = 5
+
 
 def _print_error(msg):
   """Utility routine to emit messages to stderr."""
   print(msg, file=sys.stderr)
 
 
-def _print_retry_error(exception, verbose):
+def _print_retry_error(attempt_number, max_attempts, exception):
   """Prints an error message if appropriate."""
-  if not verbose:
-    return
-
   now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
   try:
     status_code = exception.resp.status
   except AttributeError:
     status_code = ''
 
-  _print_error('{}: Caught exception {} {}'.format(
-      now, get_exception_type_string(exception), status_code))
-  _print_error('{}: This request is being retried'.format(now))
+  if attempt_number % 5 == 0:
+    _print_error('{}: Caught exception {} {}'.format(
+        now, get_exception_type_string(exception), status_code))
+    _print_error('{}: This request is being retried (attempt {} of {}).'.format(
+        now, attempt_number, max_attempts))
 
 
 def get_exception_type_string(exception):
@@ -81,90 +88,103 @@ def get_exception_type_string(exception):
     return exception_type_string
 
 
-def retry_api_check(exception, verbose):
+def retry_api_check(retry_state: tenacity.RetryCallState) -> bool:
   """Return True if we should retry.
 
   False otherwise.
 
   Args:
-    exception: An exception to test for transience.
-    verbose: If true, output retry messages
+    retry_state: A retry state including exception to test for transience.
 
   Returns:
     True if we should retry. False otherwise.
   """
+  exception = retry_state.outcome.exception()
+  attempt_number = retry_state.attempt_number
+  now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+
   if isinstance(exception, googleapiclient.errors.HttpError):
     if exception.resp.status in TRANSIENT_HTTP_ERROR_CODES:
-      _print_retry_error(exception, verbose)
+      _print_retry_error(attempt_number, MAX_API_ATTEMPTS, exception)
       return True
 
   if isinstance(exception, socket.error):
     if exception.errno in TRANSIENT_SOCKET_ERROR_CODES:
-      _print_retry_error(exception, verbose)
+      _print_retry_error(attempt_number, MAX_API_ATTEMPTS, exception)
       return True
 
   if isinstance(exception, socket.timeout):
-    _print_retry_error(exception, verbose)
+    _print_retry_error(attempt_number, MAX_API_ATTEMPTS, exception)
     return True
 
   if isinstance(exception, google.auth.exceptions.RefreshError):
-    _print_retry_error(exception, verbose)
+    _print_retry_error(attempt_number, MAX_API_ATTEMPTS, exception)
     return True
 
   # For a given installation, this could be a permanent error, but has only
   # been observed as transient.
   if isinstance(exception, ssl.SSLError):
-    _print_retry_error(exception, verbose)
+    _print_retry_error(attempt_number, MAX_API_ATTEMPTS, exception)
     return True
 
   # This has been observed as a transient error:
   #   ServerNotFoundError: Unable to find the server at genomics.googleapis.com
   if isinstance(exception, ServerNotFoundError):
-    _print_retry_error(exception, verbose)
+    _print_retry_error(attempt_number, MAX_API_ATTEMPTS, exception)
     return True
 
   # Observed to be thrown transiently from auth libraries which use httplib2
   # Use the one from six because httlib no longer exists in Python3
   # https://docs.python.org/2/library/httplib.html
   if isinstance(exception, six.moves.http_client.ResponseNotReady):
-    _print_retry_error(exception, verbose)
+    _print_retry_error(attempt_number, MAX_API_ATTEMPTS, exception)
     return True
+
+  if not exception and attempt_number > 5:
+    _print_error('{}: Retry SUCCEEDED'.format(now))
 
   return False
 
 
-def retry_api_check_quiet(exception):
-  return retry_api_check(exception, False)
-
-
-def retry_api_check_verbose(exception):
-  return retry_api_check(exception, True)
-
-
-def retry_auth_check(exception, verbose):
+def retry_auth_check(retry_state: tenacity.RetryCallState) -> bool:
   """Specific check for auth error codes.
 
   Return True if we should retry.
 
   False otherwise.
   Args:
-    exception: An exception to test for transience.
-    verbose: If true, output retry messages
+    retry_state: A retry state including exception to test for transience.
 
   Returns:
     True if we should retry. False otherwise.
   """
+  exception = retry_state.outcome.exception()
+  attempt_number = retry_state.attempt_number
+  now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+
   if isinstance(exception, googleapiclient.errors.HttpError):
     if exception.resp.status in HTTP_AUTH_ERROR_CODES:
-      _print_retry_error(exception, verbose)
+      _print_retry_error(attempt_number, MAX_AUTH_ATTEMPTS, exception)
       return True
+
+  if not exception and attempt_number > 4:
+    _print_error('{}: Retry SUCCEEDED'.format(now))
 
   return False
 
 
-def retry_auth_check_quiet(exception):
-  return retry_auth_check(exception, False)
+def on_give_up(retry_state: tenacity.RetryCallState) -> None:
+  """Called after all retries failed.
 
+  Simply outputs a message and re-raises.
 
-def retry_auth_check_verbose(exception):
-  return retry_auth_check(exception, True)
+  Args:
+    retry_state: info about current retry invocation.
+
+  Returns:
+    None.
+  """
+  exception = retry_state.outcome.exception()
+  attempt_number = retry_state.attempt_number
+  _print_error('Giving up after {} attempts'.format(attempt_number))
+  raise exception

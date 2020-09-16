@@ -17,7 +17,6 @@
 from __future__ import print_function
 
 import contextlib
-import datetime
 import fnmatch
 import io
 import os
@@ -29,8 +28,8 @@ from . import retry_util
 import googleapiclient.discovery
 import googleapiclient.errors
 import googleapiclient.http
-import retrying
 import six
+import tenacity
 
 import google.auth
 
@@ -148,28 +147,20 @@ def get_storage_service(credentials):
       'storage', 'v1', credentials=credentials)
 
 
-def _retry_storage_check(exception):
-  """Return True if we should retry, False otherwise."""
-  now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-  print_error(
-      '%s: Exception %s: %s' % (now, type(exception).__name__, str(exception)))
-  return isinstance(exception, google.auth.exceptions.RefreshError)
-
-
 # Exponential backoff retrying downloads of GCS object chunks.
 # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
-@retrying.retry(
-    stop_max_attempt_number=24,
-    retry_on_exception=retry_util.retry_api_check_verbose,
-    wait_exponential_multiplier=500,
-    wait_exponential_max=64000)
+@tenacity.retry(
+    stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
+    retry=retry_util.retry_api_check,
+    wait=tenacity.wait_exponential(multiplier=0.5, max=64),
+    retry_error_callback=retry_util.on_give_up)
 # For API errors dealing with auth, we want to retry, but not as often
 # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
-@retrying.retry(
-    stop_max_attempt_number=5,
-    retry_on_exception=retry_util.retry_auth_check_verbose,
-    wait_exponential_multiplier=500,
-    wait_exponential_max=8000)
+@tenacity.retry(
+    stop=tenacity.stop_after_attempt(retry_util.MAX_AUTH_ATTEMPTS),
+    retry=retry_util.retry_auth_check,
+    wait=tenacity.wait_exponential(multiplier=0.5, max=8),
+    retry_error_callback=retry_util.on_give_up)
 def _downloader_next_chunk(downloader):
   """Downloads the next chunk."""
   return downloader.next_chunk()
@@ -223,18 +214,18 @@ def load_file(file_path, credentials=None):
 
 # Exponential backoff retrying downloads of GCS object chunks.
 # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
-@retrying.retry(
-    stop_max_attempt_number=24,
-    retry_on_exception=retry_util.retry_api_check_verbose,
-    wait_exponential_multiplier=500,
-    wait_exponential_max=64000)
+@tenacity.retry(
+    stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
+    retry=retry_util.retry_api_check,
+    wait=tenacity.wait_exponential(multiplier=0.5, max=64),
+    retry_error_callback=retry_util.on_give_up)
 # For API errors dealing with auth, we want to retry, but not as often
 # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
-@retrying.retry(
-    stop_max_attempt_number=5,
-    retry_on_exception=retry_util.retry_auth_check_verbose,
-    wait_exponential_multiplier=500,
-    wait_exponential_max=8000)
+@tenacity.retry(
+    stop=tenacity.stop_after_attempt(retry_util.MAX_AUTH_ATTEMPTS),
+    retry=retry_util.retry_auth_check,
+    wait=tenacity.wait_exponential(multiplier=0.5, max=8),
+    retry_error_callback=retry_util.on_give_up)
 def _file_exists_in_gcs(gcs_file_path, credentials=None, storage_service=None):
   """Check whether the file exists, in GCS.
 
@@ -261,18 +252,18 @@ def _file_exists_in_gcs(gcs_file_path, credentials=None, storage_service=None):
 
 # Exponential backoff retrying downloads of GCS object chunks.
 # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
-@retrying.retry(
-    stop_max_attempt_number=24,
-    retry_on_exception=retry_util.retry_api_check_verbose,
-    wait_exponential_multiplier=500,
-    wait_exponential_max=64000)
+@tenacity.retry(
+    stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
+    retry=retry_util.retry_api_check,
+    wait=tenacity.wait_exponential(multiplier=0.5, max=64),
+    retry_error_callback=retry_util.on_give_up)
 # For API errors dealing with auth, we want to retry, but not as often
 # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
-@retrying.retry(
-    stop_max_attempt_number=5,
-    retry_on_exception=retry_util.retry_auth_check_verbose,
-    wait_exponential_multiplier=500,
-    wait_exponential_max=8000)
+@tenacity.retry(
+    stop=tenacity.stop_after_attempt(retry_util.MAX_AUTH_ATTEMPTS),
+    retry=retry_util.retry_auth_check,
+    wait=tenacity.wait_exponential(multiplier=0.5, max=8),
+    retry_error_callback=retry_util.on_give_up)
 def _prefix_exists_in_gcs(gcs_prefix, credentials=None, storage_service=None):
   """Check whether there is a GCS object whose name starts with the prefix.
 
@@ -311,18 +302,18 @@ def folder_exists(folder_path, credentials=None, storage_service=None):
 
 # Exponential backoff retrying downloads of GCS object chunks.
 # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
-@retrying.retry(
-    stop_max_attempt_number=24,
-    retry_on_exception=retry_util.retry_api_check_verbose,
-    wait_exponential_multiplier=500,
-    wait_exponential_max=64000)
+@tenacity.retry(
+    stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
+    retry=retry_util.retry_api_check,
+    wait=tenacity.wait_exponential(multiplier=0.5, max=64),
+    retry_error_callback=retry_util.on_give_up)
 # For API errors dealing with auth, we want to retry, but not as often
 # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
-@retrying.retry(
-    stop_max_attempt_number=5,
-    retry_on_exception=retry_util.retry_auth_check_verbose,
-    wait_exponential_multiplier=500,
-    wait_exponential_max=8000)
+@tenacity.retry(
+    stop=tenacity.stop_after_attempt(retry_util.MAX_AUTH_ATTEMPTS),
+    retry=retry_util.retry_auth_check,
+    wait=tenacity.wait_exponential(multiplier=0.5, max=8),
+    retry_error_callback=retry_util.on_give_up)
 def simple_pattern_exists_in_gcs(file_pattern,
                                  credentials=None,
                                  storage_service=None):

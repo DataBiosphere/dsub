@@ -30,8 +30,8 @@ import googleapiclient.errors
 from ..lib import job_model
 from ..lib import retry_util
 import pytz
-import retrying
 from six.moves import range
+import tenacity
 
 import google.auth
 from google.oauth2 import service_account
@@ -411,18 +411,18 @@ def cancel(batch_fn, cancel_fn, ops):
 
 # Exponential backoff retrying API discovery.
 # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
-@retrying.retry(
-    stop_max_attempt_number=24,
-    retry_on_exception=retry_util.retry_api_check_verbose,
-    wait_exponential_multiplier=500,
-    wait_exponential_max=64000)
+@tenacity.retry(
+    stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
+    retry=retry_util.retry_api_check,
+    wait=tenacity.wait_exponential(multiplier=0.5, max=64),
+    retry_error_callback=retry_util.on_give_up)
 # For API errors dealing with auth, we want to retry, but not as often
 # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
-@retrying.retry(
-    stop_max_attempt_number=5,
-    retry_on_exception=retry_util.retry_auth_check_verbose,
-    wait_exponential_multiplier=500,
-    wait_exponential_max=8000)
+@tenacity.retry(
+    stop=tenacity.stop_after_attempt(retry_util.MAX_AUTH_ATTEMPTS),
+    retry=retry_util.retry_auth_check,
+    wait=tenacity.wait_exponential(multiplier=0.5, max=8),
+    retry_error_callback=retry_util.on_give_up)
 def setup_service(api_name, api_version, credentials=None):
   """Configures genomics API client.
 
@@ -452,9 +452,20 @@ def credentials_from_service_account_info(credentials_file):
 class Api(object):
   """Wrapper around API execution with exponential backoff retries."""
 
-  def __init__(self, verbose):
-    self._verbose = verbose
-
+  # Exponential backoff retrying API execution
+  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
+  @tenacity.retry(
+      stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
+      retry=retry_util.retry_api_check,
+      wait=tenacity.wait_exponential(multiplier=0.5, max=64),
+      retry_error_callback=retry_util.on_give_up)
+  # For API errors dealing with auth, we want to retry, but not as often
+  # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
+  @tenacity.retry(
+      stop=tenacity.stop_after_attempt(retry_util.MAX_AUTH_ATTEMPTS),
+      retry=retry_util.retry_auth_check,
+      wait=tenacity.wait_exponential(multiplier=0.5, max=8),
+      retry_error_callback=retry_util.on_give_up)
   def execute(self, api):
     """Executes operation.
 
@@ -464,60 +475,6 @@ class Api(object):
     Returns:
        A response body object
     """
-    if self._verbose:
-      return self.execute_verbose(api)
-    else:
-      return self.execute_quiet(api)
-
-  # Exponential backoff retrying API execution, verbose version
-  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
-  @retrying.retry(
-      stop_max_attempt_number=24,
-      retry_on_exception=retry_util.retry_api_check_verbose,
-      wait_exponential_multiplier=500,
-      wait_exponential_max=64000)
-  # For API errors dealing with auth, we want to retry, but not as often
-  # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
-  @retrying.retry(
-      stop_max_attempt_number=5,
-      retry_on_exception=retry_util.retry_auth_check_verbose,
-      wait_exponential_multiplier=500,
-      wait_exponential_max=8000)
-  def execute_verbose(self, api):
-    """Executes operation.
-
-    Args:
-      api: The base API object
-
-    Returns:
-       A response body object
-    """
-    return api.execute()
-
-  # Exponential backoff retrying API execution, quiet version
-  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
-  @retrying.retry(
-      stop_max_attempt_number=24,
-      retry_on_exception=retry_util.retry_api_check_quiet,
-      wait_exponential_multiplier=500,
-      wait_exponential_max=64000)
-  # For API errors dealing with auth, we want to retry, but not as often
-  # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
-  @retrying.retry(
-      stop_max_attempt_number=5,
-      retry_on_exception=retry_util.retry_auth_check_quiet,
-      wait_exponential_multiplier=500,
-      wait_exponential_max=8000)
-  def execute_quiet(self, api):
-    """Executes operation.
-
-    Args:
-      api: The base API object
-
-    Returns:
-       A response body object
-    """
-
     return api.execute()
 
 

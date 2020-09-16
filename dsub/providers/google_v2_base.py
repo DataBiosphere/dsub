@@ -924,7 +924,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     return {'pipeline': pipeline, 'labels': labels}
 
   def _submit_pipeline(self, request):
-    google_base_api = google_base.Api(verbose=True)
+    google_base_api = google_base.Api()
     operation = google_base_api.execute(self._pipelines_run_api(request))
     print('Provider internal-id (operation): {}'.format(operation['name']))
 
@@ -1094,8 +1094,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     # Now and all of these arguments together.
     return ' AND '.join(or_arguments + and_arguments)
 
-  def _operations_list(self, ops_filter, max_tasks, page_size, page_token,
-                       verbose):
+  def _operations_list(self, ops_filter, max_tasks, page_size, page_token):
     """Gets the list of operations for the specified filter.
 
     Args:
@@ -1104,7 +1103,6 @@ class GoogleV2JobProviderBase(base.JobProvider):
       page_size: the number of operations to requested on each list operation to
         the pipelines API (if 0 or None, the API default is used)
       page_token: page token returned by a previous _operations_list call.
-      verbose: if set to true, will output retrying error messages.
 
     Returns:
       Operations matching the filter criteria.
@@ -1121,7 +1119,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
 
     # Execute operations.list() and return all of the dsub operations
     api = self._operations_list_api(ops_filter, page_token, page_size)
-    google_base_api = google_base.Api(verbose)
+    google_base_api = google_base.Api()
     response = google_base_api.execute(api)
 
     return [
@@ -1141,8 +1139,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
                        create_time_min=None,
                        create_time_max=None,
                        max_tasks=0,
-                       page_size=0,
-                       verbose=True):
+                       page_size=0):
     """Yields operations based on the input criteria.
 
     If any of the filters are empty or {'*'}, then no filtering is performed on
@@ -1166,7 +1163,6 @@ class GoogleV2JobProviderBase(base.JobProvider):
                        create time of a task, inclusive.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
       page_size: the page size to use for each query to the pipelins API.
-      verbose: if set to true, will output retrying error messages.
 
     Raises:
       ValueError: if both a job id list and a job name list are provided
@@ -1190,7 +1186,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
       if max_tasks:
         max_to_fetch = max_tasks - tasks_yielded
       ops, page_token = self._operations_list(ops_filter, max_to_fetch,
-                                              page_size, page_token, verbose)
+                                              page_size, page_token)
 
       for op in ops:
         yield op
