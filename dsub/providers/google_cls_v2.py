@@ -69,6 +69,10 @@ class GoogleCLSV2JobProvider(google_v2_base.GoogleV2JobProviderBase):
   def _batch_handler_def(self):
     """Returns a function object for the provider-specific batch handler."""
 
+    # The batch endpoint currently only works for us-central1 requests.
+    if self._location != 'us-central1':
+      return google_v2_base.GoogleV2BatchHandler
+
     # The Lifesciences API provides a batch endpoint
     # (the Genomics v2alpha1 does not).
     #

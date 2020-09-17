@@ -51,6 +51,14 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
 if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
+  # For google-cls-v2, we will test that the "--location" parameter works by
+  # specifying something other than the default (us-central1).
+  # The batch endpoint used for the operation.cancel() calls cannot use the
+  # batch endpoint except for us-central1.
+  if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
+    export LOCATION=us-west2
+  fi
+
   echo "Launching pipeline..."
 
   JOB_ID=$(run_dsub \
