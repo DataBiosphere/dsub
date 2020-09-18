@@ -29,8 +29,6 @@ from . import job_model
 from .._dsub_version import DSUB_VERSION
 from dateutil.tz import tzlocal
 import pytz
-import six
-from six.moves import range
 
 AUTO_PREFIX_INPUT = 'INPUT_'  # Prefix for auto-generated input names
 AUTO_PREFIX_OUTPUT = 'OUTPUT_'  # Prefix for auto-generated output names
@@ -527,7 +525,7 @@ def tasks_file_to_task_descriptors(tasks, retries, input_file_param_util,
   reader = csv.reader(param_file_lines, delimiter='\t')
 
   # Read the first line and extract the parameters
-  header = six.advance_iterator(reader)
+  header = next(reader)
   job_params = parse_tasks_file_header(header, input_file_param_util,
                                        output_file_param_util)
 

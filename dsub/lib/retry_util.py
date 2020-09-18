@@ -17,13 +17,13 @@
 from __future__ import print_function
 
 import datetime
+import http.client
 import socket
 import ssl
 import sys
 
 import googleapiclient.errors
 from httplib2 import ServerNotFoundError
-import six.moves.http_client
 import tenacity
 
 import google.auth
@@ -134,9 +134,7 @@ def retry_api_check(retry_state: tenacity.RetryCallState) -> bool:
     return True
 
   # Observed to be thrown transiently from auth libraries which use httplib2
-  # Use the one from six because httlib no longer exists in Python3
-  # https://docs.python.org/2/library/httplib.html
-  if isinstance(exception, six.moves.http_client.ResponseNotReady):
+  if isinstance(exception, http.client.ResponseNotReady):
     _print_retry_error(attempt_number, MAX_API_ATTEMPTS, exception)
     return True
 

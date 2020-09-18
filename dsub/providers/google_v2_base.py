@@ -41,7 +41,6 @@ from ..lib import dsub_util
 from ..lib import job_model
 from ..lib import param_util
 from ..lib import providers_util
-from six.moves import zip
 
 # Create file provider whitelist.
 _SUPPORTED_FILE_PROVIDERS = frozenset([job_model.P_GCS])

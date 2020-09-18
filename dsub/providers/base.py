@@ -32,11 +32,9 @@ explicit tasks.
 """
 
 import abc
-import six
 
 
-@six.add_metaclass(abc.ABCMeta)
-class JobProvider(object):
+class JobProvider(object, metaclass=abc.ABCMeta):
   """Interface all job providers should inherit from."""
 
   # A member field that a provider can use to expose a status message

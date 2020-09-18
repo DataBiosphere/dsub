@@ -27,7 +27,6 @@ from dsub.lib import resources
 from dsub.providers import google_cls_v2
 from dsub.providers import google_v2
 from dsub.providers import local
-import six
 
 # Because this may be invoked from another directory (treated as a library) or
 # invoked localy (treated as a binary) both import styles need to be supported.
@@ -140,7 +139,7 @@ def dstat_get_jobs(statuses=None,
   labels['test-name'] = test_setup.TEST_NAME
   labels_set = {job_model.LabelParam(k, v) for (k, v) in labels.items()}
 
-  return six.advance_iterator(
+  return next(
       dstat.dstat_job_producer(
           provider=get_dsub_provider(),
           statuses=statuses,
@@ -235,20 +234,20 @@ if not os.environ.get('CHECK_RESULTS_ONLY'):
       create_time_max=third_ct)
 
   dstat_check_job_names(
-      'Get jobs by range: create_time_min = {}, create_time_max = {}.'.format(
-          first_ct, first_ct), ['job1'],
+      f'Get jobs by range: create_time_min = {first_ct}, create_time_max = {first_ct}.',
+      ['job1'],
       create_time_min=first_ct,
       create_time_max=first_ct)
 
   dstat_check_job_names(
-      'Get jobs by range: create_time_min = {}, create_time_max = {}.'.format(
-          second_ct, second_ct), ['job2'],
+      f'Get jobs by range: create_time_min = {second_ct}, create_time_max = {second_ct}.',
+      ['job2'],
       create_time_min=second_ct,
       create_time_max=second_ct)
 
   dstat_check_job_names(
-      'Get jobs by range: create_time_min = {}, create_time_max = {}.'.format(
-          third_ct, third_ct), ['job3'],
+      f'Get jobs by range: create_time_min = {third_ct}, create_time_max = {third_ct}.',
+      ['job3'],
       create_time_min=third_ct,
       create_time_max=third_ct)
 

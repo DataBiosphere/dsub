@@ -30,7 +30,6 @@ import googleapiclient.errors
 from ..lib import job_model
 from ..lib import retry_util
 import pytz
-from six.moves import range
 import tenacity
 
 import google.auth

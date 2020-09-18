@@ -23,7 +23,6 @@ import datetime
 import json
 from dateutil.tz import tzlocal
 
-import six
 import tabulate
 import yaml
 
@@ -175,7 +174,6 @@ class YamlOutput(OutputFormatter):
   def __init__(self, full):
     super(YamlOutput, self).__init__(full)
 
-    yaml.add_representer(six.text_type, self.string_presenter)
     yaml.add_representer(str, self.string_presenter)
     yaml.add_representer(collections.OrderedDict, self.dict_representer)
 

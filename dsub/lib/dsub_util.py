@@ -28,7 +28,6 @@ from . import retry_util
 import googleapiclient.discovery
 import googleapiclient.errors
 import googleapiclient.http
-import six
 import tenacity
 
 import google.auth
@@ -189,7 +188,7 @@ def _load_file_from_gcs(gcs_file_path, credentials=None):
   while not done:
     _, done = _downloader_next_chunk(downloader)
   filevalue = file_handle.getvalue()
-  if not isinstance(filevalue, six.string_types):
+  if not isinstance(filevalue, str):
     filevalue = filevalue.decode()
   return filevalue
 
