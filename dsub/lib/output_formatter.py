@@ -43,14 +43,16 @@ class OutputFormatter(object):
     else:
       return dt.strftime(fmt)
 
-  def format_date_micro(self, dt):
+  def _format_date_micro(self, dt):
     return self._format_date(dt, '%Y-%m-%d %H:%M:%S.%f')
 
-  def format_date_seconds(self, dt):
-    return self._format_date(dt, '%Y-%m-%d %H:%M:%S')
+  def _format_datetime_compact(self, dt):
+    # Drop the year
+    # Drop milliseconds
+    return self._format_date(dt, '%m-%d %H:%M:%S')
 
   def default_format_date(self, dt):
-    return self.format_date_micro(dt)
+    return self._format_date_micro(dt)
 
   def prepare_output(self, row):
     """Convert types of task fields."""
@@ -86,9 +88,30 @@ class OutputFormatter(object):
 class TextOutput(OutputFormatter):
   """Format output for text display."""
 
-  _MAX_ERROR_MESSAGE_LENGTH = 30
+  # With text output, we need to pay attention to total line length.
+  #
+  # The default columns are: job-name, task-id, last-update, status-message.
+  #   The Job Name is typically short, but there's nothing to enforce that.
+  #   The task-id is typically going to be less than 5 characters (99999)
+  #     (and the column heading is "Task").
+  #   The last-update date is 14 characters (09-21 23:15:00).
 
-  def trim_display_field(self, value, max_length):
+  # By default, we'd like to fit nicely on an 80 character terminal.
+  # Let's set the following maximums:
+  #  Job Name: 15 characters
+  #  Task: 5 characters
+  #  Status: 42 characters
+  #  Last Update: 14 characters
+  #
+  # With 1 character between columns, that's:
+  #  15 + 1 + 5 + 1 + 42 + 1 + 14 = 79
+
+  _MAX_JOB_NAME_LENGTH = 15
+  _MAX_TASK_ID_LENGTH = 5
+  _MAX_STATUS_MESSAGE_LENGTH = 42
+  _MAX_LAST_UPDATE_LENGTH = 14  # not used
+
+  def _trim_display_field(self, value, max_length):
     """Return a value for display; if longer than max length, use ellipsis."""
     if not value:
       return ''
@@ -96,20 +119,30 @@ class TextOutput(OutputFormatter):
       return value[:max_length - 3] + '...'
     return value
 
-  def format_status(self, status):
+  def _format_job_name(self, job_name):
+    if self._full:
+      return job_name
+    return self._trim_display_field(job_name, self._MAX_JOB_NAME_LENGTH)
+
+  def _format_task_id(self, task_id):
+    if self._full:
+      return task_id
+    return self._trim_display_field(task_id, self._MAX_TASK_ID_LENGTH)
+
+  def _format_status(self, status):
     if self._full:
       return status
-    return self.trim_display_field(status, self._MAX_ERROR_MESSAGE_LENGTH)
+    return self._trim_display_field(status, self._MAX_STATUS_MESSAGE_LENGTH)
 
-  def format_pairs(self, values):
+  def _format_pairs(self, values):
     """Returns a string of comma-delimited key=value pairs."""
     return ', '.join(
         '%s=%s' % (key, value) for key, value in sorted(values.items()))
 
-  def text_format_date(self, dt):
+  def _text_format_date(self, dt):
     if self._full:
-      return self.format_date_micro(dt)
-    return self.format_date_seconds(dt)
+      return self._format_date_micro(dt)
+    return self._format_datetime_compact(dt)
 
   def prepare_output(self, row):
 
@@ -117,25 +150,25 @@ class TextOutput(OutputFormatter):
     # transformations.
     column_map = [
         ('job-id', 'Job ID'),
-        ('job-name', 'Job Name'),
-        ('task-id', 'Task'),
+        ('job-name', 'Job Name', self._format_job_name),
+        ('task-id', 'Task', self._format_task_id),
         ('task-attempt', 'Attempt'),
-        ('status-message', 'Status', self.format_status),
+        ('status-message', 'Status', self._format_status),
         ('status-detail', 'Status Details'),
-        ('last-update', 'Last Update', self.text_format_date),
-        ('create-time', 'Created', self.text_format_date),
-        ('start-time', 'Started', self.text_format_date),
-        ('end-time', 'Ended', self.text_format_date),
+        ('last-update', 'Last Update', self._text_format_date),
+        ('create-time', 'Created', self._text_format_date),
+        ('start-time', 'Started', self._text_format_date),
+        ('end-time', 'Ended', self._text_format_date),
         ('user-id', 'User'),
         ('internal-id', 'Internal ID'),
         ('logging', 'Logging'),
-        ('labels', 'Labels', self.format_pairs),
-        ('envs', 'Environment Variables', self.format_pairs),
-        ('inputs', 'Inputs', self.format_pairs),
-        ('input-recursives', 'Input Recursives', self.format_pairs),
-        ('outputs', 'Outputs', self.format_pairs),
-        ('output-recursives', 'Output Recursives', self.format_pairs),
-        ('mounts', 'Mounts', self.format_pairs),
+        ('labels', 'Labels', self._format_pairs),
+        ('envs', 'Environment Variables', self._format_pairs),
+        ('inputs', 'Inputs', self._format_pairs),
+        ('input-recursives', 'Input Recursives', self._format_pairs),
+        ('outputs', 'Outputs', self._format_pairs),
+        ('output-recursives', 'Output Recursives', self._format_pairs),
+        ('mounts', 'Mounts', self._format_pairs),
         ('user-project', 'User Project'),
         ('dsub-version', 'Version'),
         # These fields only shows up when summarizing

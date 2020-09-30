@@ -12,8 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Utility routines for constructing a Google Genomics Pipelines v2 API request.
-"""
+"""Utility routines for constructing a Google Genomics Pipelines v2 API request."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -121,16 +120,19 @@ def get_action_by_name(op, name):
   """Return the value for the specified action."""
   actions = get_actions(op)
   for action in actions:
-    if _API_VERSION == google_v2_versions.V2ALPHA1:
-      if action.get('name') == name:
-        return action
+    if get_action_name(action) == name:
+      return action
 
-    elif _API_VERSION == google_v2_versions.V2BETA:
-      if action.get('containerName') == name:
-        return action
 
-    else:
-      assert False, 'Unexpected version: {}'.format(_API_VERSION)
+def get_action_name(action):
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    return action.get('name')
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+    return action.get('containerName')
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
 
 
 def get_action_environment(op, name):
@@ -160,40 +162,165 @@ def get_last_event(op):
   return None
 
 
+def is_unexpected_exit_status_event(e):
+  """Retun True if the event is for an unexpected exit status."""
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+
+    return e.get('details', {}).get(
+        '@type'
+    ) == 'type.googleapis.com/google.genomics.v2alpha1.UnexpectedExitStatusEvent'
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+
+    return 'unexpectedExitStatus' in e
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
+
+def is_failed_event(e):
+  """Retun True if the event is an operation failed event."""
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+
+    return e.get('details', {}).get(
+        '@type') == 'type.googleapis.com/google.genomics.v2alpha1.FailedEvent'
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+
+    return 'failed' in e
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
+
+def is_container_stopped_event(e):
+  """Retun True if the event is a container stopped event."""
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+
+    return e.get('details', {}).get(
+        '@type'
+    ) == 'type.googleapis.com/google.genomics.v2alpha1.ContainerStoppedEvent'
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+
+    return 'containerStopped' in e
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
+
+def is_worker_assigned_event(event):
+  """Return True if the event is a "Worker assigned..." event."""
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    return event.get('details', {}).get(
+        '@type'
+    ) == 'type.googleapis.com/google.genomics.v2alpha1.WorkerAssignedEvent'
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+    return 'workerAssigned' in event
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
+
+def is_pull_started_event(event):
+  """Return True if the event is a "Started Pulling..." event."""
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+    return event.get('details', {}).get(
+        '@type'
+    ) == 'type.googleapis.com/google.genomics.v2alpha1.PullStartedEvent'
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+    return 'pullStarted' in event
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
+
 def get_failed_events(op):
-  """Return the events (if any) with a non-zero exitStatus."""
-  events = get_events(op)
-  if events:
-    return [
-        e for e in events if int(e.get('details', {}).get('exitStatus', 0)) != 0
-    ]
-  return None
-
-
-def get_event_of_type(op, event_type):
-  """Return all events of a particular type."""
+  """Return all "failed" events."""
   events = get_events(op)
   if not events:
     return None
 
-  return [e for e in events if e.get('details', {}).get('@type') == event_type]
+  return [e for e in events if is_failed_event(e)]
 
 
-def _get_worker_assigned_events(op):
+def get_container_stopped_error_events(op):
+  """Return all container stopped events with a non-zero exit status."""
+  events = get_events(op)
+  if not events:
+    return None
+
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+
+    return [
+        e for e in events if is_container_stopped_event(e) and
+        e.get('details', {}).get('exitStatus', 0) != 0
+    ]
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+
+    return [
+        e for e in events if is_container_stopped_event(e) and
+        e['containerStopped'].get('exitStatus', 0) != 0
+    ]
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
+
+def get_unexpected_exit_events(op):
+  """Return all unexpected exit status events."""
+  events = get_events(op)
+  if not events:
+    return None
+
+  return [e for e in events if is_unexpected_exit_status_event(e)]
+
+
+def get_worker_assigned_events(op):
   """Return all "Worker Assigned" events."""
 
   events = get_events(op)
   if not events:
     return None
 
+  return [e for e in events if is_worker_assigned_event(e)]
+
+
+def get_event_action_id(e):
+  """Return the actionId associated with the specified event."""
   if _API_VERSION == google_v2_versions.V2ALPHA1:
-    return [
-        e for e in events if e.get('details', {}).get('@type') ==
-        'type.googleapis.com/google.genomics.v2alpha1.WorkerAssignedEvent'
-    ]
+
+    return e.get('details', {}).get('actionId')
 
   elif _API_VERSION == google_v2_versions.V2BETA:
-    return [e for e in events if 'workerAssigned' in e]
+
+    for event_type in ['containerStopped', 'unexpectedExitStatus']:
+      if event_type in e:
+        return e[event_type].get('actionId')
+
+  else:
+    assert False, 'Unexpected version: {}'.format(_API_VERSION)
+
+
+def get_event_description(e):
+  """Return the description field for the event."""
+  return e.get('description')
+
+
+def get_event_stderr(e):
+  """Return the stderr field (if any) associated with the event."""
+  if _API_VERSION == google_v2_versions.V2ALPHA1:
+
+    return e.get('details', {}).get('stderr')
+
+  elif _API_VERSION == google_v2_versions.V2BETA:
+
+    for event_type in ['containerStopped']:
+      if event_type in e:
+        return e[event_type].get('stderr')
 
   else:
     assert False, 'Unexpected version: {}'.format(_API_VERSION)
@@ -202,7 +329,7 @@ def _get_worker_assigned_events(op):
 def get_worker_assigned_event_details(op):
   """Return the detail portion of the most recent "worker assigned" event."""
 
-  events = _get_worker_assigned_events(op)
+  events = get_worker_assigned_events(op)
   if not events:
     return None
 
