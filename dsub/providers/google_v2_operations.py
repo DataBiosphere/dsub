@@ -14,10 +14,6 @@
 # limitations under the License.
 """Utility routines for constructing a Google Genomics Pipelines v2 API request."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from . import google_v2_versions
 
 STATUS_FILTER_MAP = {

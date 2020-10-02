@@ -14,8 +14,6 @@
 # limitations under the License.
 """Utility functions used by dsub, dstat, ddel."""
 
-from __future__ import print_function
-
 import contextlib
 import fnmatch
 import io

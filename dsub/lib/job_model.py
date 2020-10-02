@@ -51,8 +51,6 @@ in the --tasks file, but the object model allows for callers using the Python
 API to set each of the resource fields at the task level.
 """
 
-from __future__ import print_function
-
 import collections
 import re
 import string

@@ -27,8 +27,6 @@ Follows the model of bjobs, sinfo, qstat, etc.
 # qstat and hence dstat.py defaults to listing jobs for the current user, so
 # there is no need to include user information in the default output.
 
-from __future__ import print_function
-
 import sys
 import time
 

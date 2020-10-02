@@ -18,10 +18,6 @@ This module serves as the base class for the google-v2 and google-cls-v2
 providers. The APIs they are based on are very similar and can benefit from
 sharing code.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import ast
 import json
 import math

@@ -14,10 +14,6 @@
 # limitations under the License.
 """Base module for the google_v2 and google_cls_v2 providers."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # pylint: disable=g-tzinfo-datetime
 import datetime
 import io

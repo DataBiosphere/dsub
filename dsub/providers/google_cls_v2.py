@@ -18,10 +18,6 @@ This module implements job creation, listing, and canceling using the
 Google Cloud Life Sciences Pipelines and Operations APIs v2beta.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from . import google_v2_base
 from . import google_v2_versions
 

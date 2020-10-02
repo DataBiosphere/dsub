@@ -14,8 +14,6 @@
 # limitations under the License.
 """Utility functions used for retry logic in dsub, dstat, ddel."""
 
-from __future__ import print_function
-
 import datetime
 import http.client
 import socket

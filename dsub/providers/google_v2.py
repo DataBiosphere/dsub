@@ -18,10 +18,6 @@ This module implements job creation, listing, and canceling using the
 Google Genomics Pipelines and Operations APIs v2alpha1.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from . import google_v2_base
 from . import google_v2_versions
 

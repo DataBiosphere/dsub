@@ -14,10 +14,6 @@
 # limitations under the License.
 """Constants and methods for Google's Pipelines API v2."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 V2ALPHA1 = 'v2alpha1'
 V2BETA = 'v2beta'
 

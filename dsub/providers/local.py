@@ -52,8 +52,6 @@ Thus using the local runner requires:
 Note that the local runner supports the `--tasks` parameter. All tasks
 submitted will run concurrently.
 """
-from __future__ import print_function
-
 import collections
 import datetime
 import os

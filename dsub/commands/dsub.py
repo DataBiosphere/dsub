@@ -17,8 +17,6 @@
 Follows the model of bsub, qsub, srun, etc.
 """
 
-from __future__ import print_function
-
 import argparse
 import collections
 import datetime

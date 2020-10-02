@@ -17,8 +17,6 @@
 
 Follows the model of qdel.
 """
-from __future__ import print_function
-
 import sys
 
 from ..lib import dsub_util

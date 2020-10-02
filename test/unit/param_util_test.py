@@ -13,9 +13,6 @@
 # limitations under the License.
 """Tests for dsub.lib.param_util."""
 
-from __future__ import absolute_import
-from __future__ import print_function
-
 import datetime
 import doctest
 import os
