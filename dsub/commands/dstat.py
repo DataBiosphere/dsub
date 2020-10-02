@@ -40,6 +40,13 @@ from ..lib import resources
 from ..providers import provider_base
 
 
+def get_credentials(args):
+  """Returns credentials for API requests."""
+
+  # Across dsub, dstat, ddel, defer to the provider for credentials handling
+  return provider_base.credentials_from_args(args)
+
+
 def _parse_arguments():
   """Parses command line arguments.
 
@@ -183,7 +190,8 @@ def main():
       formatter = output_formatter.TextOutput(args.full)
 
   # Set up the Genomics Pipelines service interface
-  provider = provider_base.get_provider(args, resources)
+  provider = provider_base.get_provider(
+      args, resources, credentials_fn=get_credentials)
   with dsub_util.replace_print():
     provider_base.emit_provider_message(provider)
 

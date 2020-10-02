@@ -44,8 +44,14 @@ def credentials_from_args(args):
   return credentials
 
 
-def get_provider(args, resources):
+def get_provider(args, resources, credentials_fn=None):
   """Returns a provider for job submission requests."""
+
+  # provider_base has a standard way for dsub, dstat, and ddel to
+  # get credentials for each provider, but we allow for overriding
+  # that by supplying a custom credentials function.
+  if not credentials_fn:
+    credentials_fn = credentials_from_args
 
   provider = getattr(args, 'provider', 'google-v2')
 
@@ -54,12 +60,12 @@ def get_provider(args, resources):
         getattr(args, 'dry_run', False),
         args.project,
         args.location,
-        credentials=credentials_from_args(args))
+        credentials=credentials_fn(args))
   elif provider == 'google-v2':
     return google_v2.GoogleV2JobProvider(
         getattr(args, 'dry_run', False),
         args.project,
-        credentials=credentials_from_args(args))
+        credentials=credentials_fn(args))
   elif provider == 'local':
     return local.LocalJobProvider(resources)
   elif provider == 'test-fails':

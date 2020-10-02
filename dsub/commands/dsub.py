@@ -176,6 +176,13 @@ class TaskParamAction(argparse.Action):
     setattr(namespace, self.dest, tasks)
 
 
+def get_credentials(args):
+  """Returns credentials for API requests."""
+
+  # Across dsub, dstat, ddel, defer to the provider for credentials handling
+  return provider_base.credentials_from_args(args)
+
+
 def _check_private_address(args):
   """If --use-private-address is enabled, ensure the Docker path is for GCR."""
   if args.use_private_address:
@@ -1153,7 +1160,8 @@ def run_main(args):
     args.image = DEFAULT_IMAGE
 
   return run(
-      provider_base.get_provider(args, resources),
+      provider_base.get_provider(
+          args, resources, credentials_fn=get_credentials),
       _get_job_resources(args),
       job_params,
       task_descriptors,
