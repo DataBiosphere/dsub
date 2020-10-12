@@ -42,6 +42,10 @@ from google.oauth2 import service_account
 #
 # With the addition of the google v2 provider, we explicitly set all of these
 # scopes such that existing user code continues to work.
+# Note that with the API (for both v2 and cls_v2 provider), the
+# `https://www.googleapis.com/auth/cloud-platform` scope is automatically added.
+# See
+# https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.pipelines/run#serviceaccount
 DEFAULT_SCOPES = [
     'https://www.googleapis.com/auth/bigquery',
     'https://www.googleapis.com/auth/compute',
