@@ -18,10 +18,6 @@ This module implements job creation, listing, and canceling using the
 Google Cloud Life Sciences Pipelines and Operations APIs v2beta.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from . import google_v2_base
 from . import google_v2_versions
 
@@ -65,6 +61,28 @@ class GoogleCLSV2JobProvider(google_v2_base.GoogleV2JobProviderBase):
 
   def _operations_cancel_api_def(self):
     return self._service.projects().locations().operations().cancel
+
+  def _batch_handler_def(self):
+    """Returns a function object for the provider-specific batch handler."""
+
+    # The batch endpoint currently only works for us-central1 requests.
+    if self._location != 'us-central1':
+      return google_v2_base.GoogleV2BatchHandler
+
+    # The Lifesciences API provides a batch endpoint
+    # (the Genomics v2alpha1 does not).
+    #
+    # This function returns the new_batch_http_request function, which the
+    # caller can then use to create a BatchHttpRequest object.
+    # The new_batch_http_request function is provided by the Google APIs
+    # Python Client for batching requests destined for the batch endpoint.
+    #
+    # For documentation, see
+    # https://googleapis.github.io/google-api-python-client/docs/dyn/lifesciences_v2beta.html#new_batch_http_request
+    #
+    # For example usage, see google_base.py (_cancel() and __cancel_batch()).
+
+    return self._service.new_batch_http_request
 
 
 if __name__ == '__main__':

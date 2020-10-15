@@ -18,10 +18,6 @@ This module implements job creation, listing, and canceling using the
 Google Genomics Pipelines and Operations APIs v2alpha1.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from . import google_v2_base
 from . import google_v2_versions
 
@@ -58,6 +54,9 @@ class GoogleV2JobProvider(google_v2_base.GoogleV2JobProviderBase):
 
   def _operations_cancel_api_def(self):
     return self._service.projects().operations().cancel
+
+  def _batch_handler_def(self):
+    return google_v2_base.GoogleV2BatchHandler
 
 
 if __name__ == '__main__':

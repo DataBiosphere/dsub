@@ -23,8 +23,7 @@ _DEPENDENCIES = [
     'python-dateutil<=2.8.1',
     'pytz<=2019.3',
     'pyyaml<=5.3',
-    'retrying<=1.3.3',
-    'six<=1.14.0',
+    'tenacity<=5.0.4',
     'tabulate<=0.8.7',
 
     # downstream dependencies
@@ -87,7 +86,7 @@ setup(
     name='dsub',
 
     # Python 2 is no longer supported. Use Python 3.
-    python_requires='>=3',
+    python_requires='>=3.6',
 
     # Versions should comply with PEP440.
     version=get_dsub_version(),
@@ -122,9 +121,9 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
 
     # What does your project relate to?

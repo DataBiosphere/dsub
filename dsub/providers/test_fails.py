@@ -17,8 +17,6 @@
 * Raises an exception for job submission, listing, or deletion.
 * Returns uninteresting values for other public provider methods.
 """
-from __future__ import print_function
-
 from . import base
 from ..lib import dsub_util
 from ..lib import job_model

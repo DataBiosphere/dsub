@@ -17,8 +17,6 @@
 
 Follows the model of qdel.
 """
-from __future__ import print_function
-
 import sys
 
 from ..lib import dsub_util
@@ -26,6 +24,13 @@ from ..lib import job_model
 from ..lib import param_util
 from ..lib import resources
 from ..providers import provider_base
+
+
+def get_credentials(args):
+  """Returns credentials for API requests."""
+
+  # Across dsub, dstat, ddel, defer to the provider for credentials handling
+  return provider_base.credentials_from_args(args)
 
 
 def _parse_arguments():
@@ -125,7 +130,8 @@ def main():
   create_time = param_util.age_to_create_time(args.age)
 
   # Set up the Genomics Pipelines service interface
-  provider = provider_base.get_provider(args, resources)
+  provider = provider_base.get_provider(
+      args, resources, credentials_fn=get_credentials)
 
   # Make sure users were provided, or try to fill from OS user. This cannot
   # be made into a default argument since some environments lack the ability

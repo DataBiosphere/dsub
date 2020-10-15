@@ -17,8 +17,6 @@
 Follows the model of bsub, qsub, srun, etc.
 """
 
-from __future__ import print_function
-
 import argparse
 import collections
 import datetime
@@ -174,6 +172,13 @@ class TaskParamAction(argparse.Action):
         tasks['max'] = int(task_range)
 
     setattr(namespace, self.dest, tasks)
+
+
+def get_credentials(args):
+  """Returns credentials for API requests."""
+
+  # Across dsub, dstat, ddel, defer to the provider for credentials handling
+  return provider_base.credentials_from_args(args)
 
 
 def _check_private_address(args):
@@ -777,9 +782,7 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure, summary):
     jobs_completed = job_ids_to_check.difference(jobs_left)
 
     # Get all tasks for the newly completed jobs
-    tasks_completed = provider.lookup_job_tasks({'*'},
-                                                job_ids=jobs_completed,
-                                                verbose=False)
+    tasks_completed = provider.lookup_job_tasks({'*'}, job_ids=jobs_completed)
 
     # We don't want to overwhelm the user with output when there are many
     # tasks per job. So we get a single "dominant" task for each of the
@@ -833,7 +836,7 @@ def _wait_and_retry(provider, job_id, poll_interval, retries, job_descriptor,
 
   while True:
     formatted_tasks = []
-    tasks = provider.lookup_job_tasks({'*'}, job_ids=[job_id], verbose=False)
+    tasks = provider.lookup_job_tasks({'*'}, job_ids=[job_id])
 
     running_tasks = set()
     completed_tasks = set()
@@ -1001,7 +1004,7 @@ def _wait_for_any_job(provider, job_ids, poll_interval, summary):
     return
   while True:
     formatted_tasks = []
-    tasks = provider.lookup_job_tasks({'*'}, job_ids=job_ids, verbose=False)
+    tasks = provider.lookup_job_tasks({'*'}, job_ids=job_ids)
     running_jobs = set()
     failed_jobs = set()
     for t in tasks:
@@ -1155,7 +1158,8 @@ def run_main(args):
     args.image = DEFAULT_IMAGE
 
   return run(
-      provider_base.get_provider(args, resources),
+      provider_base.get_provider(
+          args, resources, credentials_fn=get_credentials),
       _get_job_resources(args),
       job_params,
       task_descriptors,

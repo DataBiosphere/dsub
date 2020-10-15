@@ -13,10 +13,6 @@
 # limitations under the License.
 """Unit tests for parse_rfc3339_utc_string function."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import unittest
 from dsub.providers import google_base
 import parameterized

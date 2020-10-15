@@ -27,8 +27,6 @@ Follows the model of bjobs, sinfo, qstat, etc.
 # qstat and hence dstat.py defaults to listing jobs for the current user, so
 # there is no need to include user information in the default output.
 
-from __future__ import print_function
-
 import sys
 import time
 
@@ -38,6 +36,13 @@ from ..lib import output_formatter
 from ..lib import param_util
 from ..lib import resources
 from ..providers import provider_base
+
+
+def get_credentials(args):
+  """Returns credentials for API requests."""
+
+  # Across dsub, dstat, ddel, defer to the provider for credentials handling
+  return provider_base.credentials_from_args(args)
 
 
 def _parse_arguments():
@@ -183,7 +188,8 @@ def main():
       formatter = output_formatter.TextOutput(args.full)
 
   # Set up the Genomics Pipelines service interface
-  provider = provider_base.get_provider(args, resources)
+  provider = provider_base.get_provider(
+      args, resources, credentials_fn=get_credentials)
   with dsub_util.replace_print():
     provider_base.emit_provider_message(provider)
 
@@ -277,8 +283,7 @@ def dstat_job_producer(provider,
         create_time_min=create_time_min,
         create_time_max=create_time_max,
         max_tasks=max_tasks,
-        page_size=max_tasks,
-        verbose=(poll_interval == 0))
+        page_size=max_tasks)
 
     some_job_running = False
 

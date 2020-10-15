@@ -29,7 +29,7 @@ Automated `dsub` tests running on Python 2 have been disabled.
 [Release 0.3.10](https://github.com/DataBiosphere/dsub/releases/tag/v0.3.10) is
 the last version of `dsub` that supports Python 2.
 
-Use Python 3.
+Use Python 3.6 or greater. For earlier versions of Python 3, use `dsub` 0.4.1.
 
 ### Pre-installation steps
 
@@ -641,6 +641,69 @@ To delete specific tasks:
 To delete all running jobs for the current user:
 
     ddel --provider google-v2 --project my-cloud-project --jobs '*'
+
+## Service Accounts and Scope (Google providers only)
+
+When you run the `dsub` command with the `google-v2` or `google-cls-v2`
+provider, there are two different sets of credentials to consider:
+
+- Account submitting the `pipelines.run()` request to run your command/script on a VM
+- Account accessing Cloud resources (such as files in GCS) when executing your command/script
+
+The account used to submit the `pipelines.run()` request is typically your
+end user credentials. You would have set this up by running:
+
+    gcloud auth application-default login
+
+The account used on the VM is a [service account](https://cloud.google.com/iam/docs/service-accounts).
+The image below illustrates this:
+
+![Pipelines Runner Architecture](./docs/images/pipelines_runner_architecture.png)
+
+By default, `dsub` will use the [default Compute Engine service account]
+(https://cloud.google.com/compute/docs/access/service-accounts#default_service_account)
+as the authorized service account on the VM instance. You can choose to specify
+the email address of another service acount using `--service-account`.
+
+By default, `dsub` will grant the following access scopes to the service account:
+
+- https://www.googleapis.com/auth/bigquery
+- https://www.googleapis.com/auth/compute
+- https://www.googleapis.com/auth/devstorage.full_control
+- https://www.googleapis.com/auth/genomics
+- https://www.googleapis.com/auth/logging.write
+- https://www.googleapis.com/auth/monitoring.write
+
+In addition, [the API](https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.pipelines/run#serviceaccount) will always add this scope:
+
+- https://www.googleapis.com/auth/cloud-platform
+
+You can choose to specify scopes using `--scopes`.
+
+### Recommendations for service accounts
+
+While it is straightforward to use the default service account, this account also
+has broad privileges granted to it by default. Following the
+[Principle of Least Privilege](https://en.wikipedia.org/wiki/Principle_of_least_privilege)
+you may want to create and use a service account that has only sufficient privileges
+granted in order to run your `dsub` command/script.
+
+To create a new service account, follow the steps below:
+
+1. Execute the `gcloud iam service-accounts create` command. The email address
+of the service account will be `sa-name@project-id.iam.gserviceaccount.com`.
+
+        gcloud iam service-accounts create "sa-name"
+
+2. Grant IAM access on buckets, etc. to the service account.
+
+        gsutil iam ch serviceAccount:sa-name@project-id.iam.gserviceaccount.com:roles/storage.objectAdmin gs://bucket-name
+
+3. Update your `dsub` command to include `--service-account`
+
+        dsub \
+          --service-account sa-name@project-id.iam.gserviceaccount.com
+          ...
 
 ## What next?
 

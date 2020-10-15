@@ -18,10 +18,6 @@ This module serves as the base class for the google-v2 and google-cls-v2
 providers. The APIs they are based on are very similar and can benefit from
 sharing code.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import ast
 import json
 import math
@@ -41,7 +37,6 @@ from ..lib import dsub_util
 from ..lib import job_model
 from ..lib import param_util
 from ..lib import providers_util
-from six.moves import zip
 
 # Create file provider whitelist.
 _SUPPORTED_FILE_PROVIDERS = frozenset([job_model.P_GCS])
@@ -324,8 +319,8 @@ _PREPARE_CMD = textwrap.dedent("""\
 
   echo "${{{script_var}}}" \
     | python -c '{python_decode_script}' \
-    > {script_path}
-  chmod a+x {script_path}
+    > "{script_path}"
+  chmod a+x "{script_path}"
 
   {mk_io_dirs}
 """)
@@ -334,7 +329,7 @@ _USER_CMD = textwrap.dedent("""\
   export TMPDIR="{tmp_dir}"
   cd {working_dir}
 
-  {user_script}
+  "{user_script}"
 """)
 
 _ACTION_LOGGING = 'logging'
@@ -484,6 +479,26 @@ class GoogleV2JobProviderBase(base.JobProvider):
     self._project = project
     self._dry_run = dry_run
     self._storage_service = storage_service
+
+  def _get_pipeline_regions(self, regions, zones):
+    """Returns the list of regions to use for a pipeline request."""
+    raise NotImplementedError('Derived class must implement this function')
+
+  def _pipelines_run_api(self, request):
+    """Executes the provider-specific pipelines.run() API."""
+    raise NotImplementedError('Derived class must implement this function')
+
+  def _operations_list_api(self, ops_filter, page_token, page_size):
+    """Executes the provider-specific operaitons.list() API."""
+    raise NotImplementedError('Derived class must implement this function')
+
+  def _operations_cancel_api_def(self):
+    """Returns a function object for the provider-specific cancel API."""
+    raise NotImplementedError('Derived class must implement this function')
+
+  def _batch_handler_def(self):
+    """Returns a function object for the provider-specific batch handler."""
+    raise NotImplementedError('Derived class must implement this function')
 
   def prepare_job_metadata(self, script, job_name, user_id):
     """Returns a dictionary of metadata fields for the job."""
@@ -904,7 +919,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     return {'pipeline': pipeline, 'labels': labels}
 
   def _submit_pipeline(self, request):
-    google_base_api = google_base.Api(verbose=True)
+    google_base_api = google_base.Api()
     operation = google_base_api.execute(self._pipelines_run_api(request))
     print('Provider internal-id (operation): {}'.format(operation['name']))
 
@@ -1074,8 +1089,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     # Now and all of these arguments together.
     return ' AND '.join(or_arguments + and_arguments)
 
-  def _operations_list(self, ops_filter, max_tasks, page_size, page_token,
-                       verbose):
+  def _operations_list(self, ops_filter, max_tasks, page_size, page_token):
     """Gets the list of operations for the specified filter.
 
     Args:
@@ -1084,7 +1098,6 @@ class GoogleV2JobProviderBase(base.JobProvider):
       page_size: the number of operations to requested on each list operation to
         the pipelines API (if 0 or None, the API default is used)
       page_token: page token returned by a previous _operations_list call.
-      verbose: if set to true, will output retrying error messages.
 
     Returns:
       Operations matching the filter criteria.
@@ -1101,7 +1114,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
 
     # Execute operations.list() and return all of the dsub operations
     api = self._operations_list_api(ops_filter, page_token, page_size)
-    google_base_api = google_base.Api(verbose)
+    google_base_api = google_base.Api()
     response = google_base_api.execute(api)
 
     return [
@@ -1121,8 +1134,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
                        create_time_min=None,
                        create_time_max=None,
                        max_tasks=0,
-                       page_size=0,
-                       verbose=True):
+                       page_size=0):
     """Yields operations based on the input criteria.
 
     If any of the filters are empty or {'*'}, then no filtering is performed on
@@ -1146,7 +1158,6 @@ class GoogleV2JobProviderBase(base.JobProvider):
                        create time of a task, inclusive.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
       page_size: the page size to use for each query to the pipelins API.
-      verbose: if set to true, will output retrying error messages.
 
     Raises:
       ValueError: if both a job id list and a job name list are provided
@@ -1170,7 +1181,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
       if max_tasks:
         max_to_fetch = max_tasks - tasks_yielded
       ops, page_token = self._operations_list(ops_filter, max_to_fetch,
-                                              page_size, page_token, verbose)
+                                              page_size, page_token)
 
       for op in ops:
         yield op
@@ -1215,7 +1226,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
 
     print('Found %d tasks to delete.' % len(tasks))
 
-    return google_base.cancel(GoogleV2BatchHandler,
+    return google_base.cancel(self._batch_handler_def(),
                               self._operations_cancel_api_def(), tasks)
 
 
@@ -1277,35 +1288,95 @@ class GoogleOperation(base.Task):
     This string is meant for display only.
 
     Returns:
-      A printable status string and name of failed action (if any).
+      A triple of:
+      - printable status message
+      - the action that failed (if any)
+      - a detail message (if available)
     """
     msg = None
     action = None
+    detail = None
+
     if not google_v2_operations.is_done(self._op):
       last_event = google_v2_operations.get_last_event(self._op)
       if last_event:
-        msg = last_event['description']
-        action_id = last_event.get('details', {}).get('actionId')
-        if action_id:
-          action = google_v2_operations.get_action_by_id(self._op, action_id)
+        if google_v2_operations.is_worker_assigned_event(last_event):
+          msg = 'VM starting (awaiting worker checkin)'
+          detail = last_event['description']
+        elif google_v2_operations.is_pull_started_event(last_event):
+          detail = last_event['description']
+          msg = detail.replace('Started pulling', 'Pulling')
+        else:
+          msg = last_event['description']
+          action_id = last_event.get('details', {}).get('actionId')
+          if action_id:
+            action = google_v2_operations.get_action_by_id(self._op, action_id)
       else:
         msg = 'Pending'
+
+    elif google_v2_operations.is_success(self._op):
+      msg = 'Success'
+
     else:
+      # We have a failure condition and want to get the best details of why.
+
+      # For a single failure, we may get multiple failure events.
+      # For the Life Sciences v2 provider, events may look like:
+
+      # - description: 'Execution failed: generic::failed_precondition: ...
+      #   failed:
+      #     cause: 'Execution failed: generic::failed_precondition: while ...
+      #     code: FAILED_PRECONDITION
+      #   timestamp: '2020-09-28T23:10:09.364365339Z'
+      # - description: Unexpected exit status 127 while running "user-command"
+      #   timestamp: '2020-09-28T23:10:04.671139036Z'
+      #   unexpectedExitStatus:
+      #     actionId: 4
+      #     exitStatus: 127
+      # - containerStopped:
+      #     actionId: 4
+      #     exitStatus: 127
+      #     stderr: |
+      #       bash: line 3: /mnt/data/script/foo: No such file or directory
+      #   description: 'Stopped running "user-command": exit status 127: ...
+      #   timestamp: '2020-09-28T23:10:04.671133099Z'
+
+      # If we can get a containerStopped event, it has the best information
+      # Otherwise fallback to unexpectedExitStatus.
+      # Otherwise fallback to failed.
+
+      container_failed_events = google_v2_operations.get_container_stopped_error_events(
+          self._op)
+      unexpected_exit_events = google_v2_operations.get_unexpected_exit_events(
+          self._op)
       failed_events = google_v2_operations.get_failed_events(self._op)
-      if failed_events:
+
+      if container_failed_events:
+        container_failed_event = container_failed_events[-1]
+        action_id = google_v2_operations.get_event_action_id(
+            container_failed_event)
+        msg = google_v2_operations.get_event_description(container_failed_event)
+        detail = google_v2_operations.get_event_stderr(container_failed_event)
+
+      elif unexpected_exit_events:
+        unexpected_exit_event = unexpected_exit_events[-1]
+        action_id = google_v2_operations.get_event_action_id(
+            unexpected_exit_event)
+        msg = google_v2_operations.get_event_description(unexpected_exit_event)
+
+      elif failed_events:
         failed_event = failed_events[-1]
-        msg = failed_event.get('details', {}).get('stderr')
-        action_id = failed_event.get('details', {}).get('actionId')
-        if action_id:
-          action = google_v2_operations.get_action_by_id(self._op, action_id)
+        msg = google_v2_operations.get_event_description(failed_event)
+        action_id = None
+
       if not msg:
         error = google_v2_operations.get_error(self._op)
         if error:
           msg = error['message']
-        else:
-          msg = 'Success'
 
-    return msg, action
+        action = google_v2_operations.get_action_by_id(self._op, action_id)
+
+    return msg, action, detail
 
   def _is_ssh_enabled(self, op):
     """Return whether the operation had --ssh enabled or not."""
@@ -1400,22 +1471,33 @@ class GoogleOperation(base.Task):
       ds = google_v2_operations.get_end_time(self._op)
       if ds:
         value = google_base.parse_rfc3339_utc_string(ds)
+
     elif field == 'status':
+      # Short message like:
+      #   "Pending", "VM starting", "<error message>", "Success", "Cancelled"
       value = self._operation_status()
+
     elif field == 'status-message':
-      msg, action = self._operation_status_message()
+      # Longer message
+      msg, action, detail = self._operation_status_message()
       if msg.startswith('Execution failed:'):
         # msg may look something like
         # "Execution failed: action 2: pulling image..."
         # Emit the actual message ("pulling image...")
         msg = msg.split(': ', 2)[-1]
       value = msg
+
     elif field == 'status-detail':
-      msg, action = self._operation_status_message()
+      # As much detail as we can reasonably get from the operation
+      msg, action, detail = self._operation_status_message()
+      if detail:
+        msg = detail
+
       if action:
-        value = action.get('name') + ':\n' + msg
+        value = google_v2_operations.get_action_name(action) + ':\n' + msg
       else:
         value = msg
+
     elif field == 'last-update':
       last_update = google_v2_operations.get_last_update(self._op)
       if last_update:

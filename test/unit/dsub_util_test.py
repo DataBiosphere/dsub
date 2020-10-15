@@ -13,9 +13,6 @@
 # limitations under the License.
 """Tests for dsub.lib.dsub_util."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import os
 import unittest
 from dsub.lib import dsub_util

@@ -13,9 +13,6 @@
 # limitations under the License.
 """Tests for dsub.lib.job_model."""
 
-from __future__ import absolute_import
-from __future__ import print_function
-
 import datetime
 import doctest
 import textwrap
