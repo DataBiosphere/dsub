@@ -409,7 +409,7 @@ The following `dsub` parameters are specific to the `google-v2` and
 
           Please see [GPUs](https://cloud.google.com/compute/docs/gpus/) for
           supported GPU types and
-          [pipelines.accelerator] (https://cloud.google.com/lifesciences/docs/reference/rest/v2beta/projects.locations.pipelines/run#accelerator)
+          [pipelines.accelerator](https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.pipelines/run#accelerator)
           for more details.
     - `--accelerator-count`:
       - The number of accelerators of the specified type to attach. By
