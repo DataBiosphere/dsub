@@ -139,16 +139,19 @@ the host environment requires a copy of
 
 The `local` provider creates a workspace directory under:
 
-- `/tmp/dsub-local/<job-id>/task`
+- `${TMPDIR}/dsub-local/<job-id>/task`
 
 If `dsub` is called with `--task` then the word `task` at the end of the path
 is replaced by the task id, for example:
 
-- `/tmp/dsub-local/<job-id>/0`
-- `/tmp/dsub-local/<job-id>/1`
-- `/tmp/dsub-local/<job-id>/2`
+- `${TMPDIR}/dsub-local/<job-id>/0`
+- `${TMPDIR}/dsub-local/<job-id>/1`
+- `${TMPDIR}/dsub-local/<job-id>/2`
 
 for a job with 3 tasks.
+
+Note: `TMPDIR` is commonly set to `/tmp` by default on most Unix systems.
+`TMPDIR` is set to a path under `/var/folders` on some versions of MacOS.
 
 Each task folder contains a `data` folder that is mounted by Docker.
 The data folder contains:

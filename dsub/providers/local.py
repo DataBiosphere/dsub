@@ -36,7 +36,7 @@ Output files are copied on your local machine at
 ${TMPDIR}/dsub-local/job-id/task-id.task-attempt/output_mnt/.
 
 Task status files are staged to
-${TMPDIR}/tmp/dsub-local/job-id/task-id.task-attempt/.
+${TMPDIR}/dsub-local/job-id/task-id.task-attempt/.
 The task status files include logs and scripts to drive the task.
 
 task-id is the task index, or "task" for a job that didn't specify a list

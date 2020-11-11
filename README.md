@@ -126,14 +126,21 @@ You'll get quicker turnaround times and won't incur cloud charges using it.
 
         dsub \
           --provider local \
-          --logging /tmp/dsub-test/logging/ \
-          --output OUT=/tmp/dsub-test/output/out.txt \
+          --logging "${TMPDIR:-/tmp}/dsub-test/logging/" \
+          --output OUT="${TMPDIR:-/tmp}/dsub-test/output/out.txt" \
           --command 'echo "Hello World" > "${OUT}"' \
           --wait
 
+    Note: `TMPDIR` is commonly set to `/tmp` by default on most Unix systems,
+    although it is also often left unset.
+    On some versions of MacOS TMPDIR is set to a location under `/var/folders`.
+
+    Note: The above syntax `${TMPDIR:-/tmp}` is known to be supported by Bash, zsh, ksh.
+    The shell will expand `TMPDIR`, but if it is unset, `/tmp` will be used.
+
 1. View the output file.
 
-        cat /tmp/dsub-test/output/out.txt
+        cat "${TMPDIR:-/tmp}/dsub-test/output/out.txt"
 
 ### Getting started on Google Cloud
 
