@@ -31,42 +31,38 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 readonly LOGGING_OVERRIDE="${LOGGING}.log"
 readonly NUM_TASKS=3
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+# Set up for running the tests
+mkdir -p "${TEST_TMP}"
 
-  # Set up for running the tests
-  mkdir -p "${TEST_TMP}"
+# Create a simple TSV which tests blank values in the first, last, and
+# a middle column.
+# Also include 0 to make sure it is passed through correctly as
+# a string ("0") and not dropped as int (0).
+util::write_tsv_file "${TASKS_FILE}" '
+--env TASK_VAR1\t--env TASK_VAR2\t--env TASK_VAR_ZERO\t--input TASK_VAR_IO1\t--input-recursive TASK_VAR_IO2\t--output TASK_VAR_IO3\t--output-recursive TASK_VAR_IO4\t--env TASK_VAR3
+\tVAL2_TASK1\t0\t\t\t\t\tVAL3_TASK1
+VAL1_TASK2\t\t0\t\t\t\t\tVAL3_TASK2
+VAL1_TASK3\tVAL2_TASK3\t0\t\t\t\t\t
+'
 
-  # Create a simple TSV which tests blank values in the first, last, and
-  # a middle column.
-  # Also include 0 to make sure it is passed through correctly as
-  # a string ("0") and not dropped as int (0).
-  util::write_tsv_file "${TASKS_FILE}" '
-  --env TASK_VAR1\t--env TASK_VAR2\t--env TASK_VAR_ZERO\t--input TASK_VAR_IO1\t--input-recursive TASK_VAR_IO2\t--output TASK_VAR_IO3\t--output-recursive TASK_VAR_IO4\t--env TASK_VAR3
-  \tVAL2_TASK1\t0\t\t\t\t\tVAL3_TASK1
-  VAL1_TASK2\t\t0\t\t\t\t\tVAL3_TASK2
-  VAL1_TASK3\tVAL2_TASK3\t0\t\t\t\t\t
-  '
+echo "Launching pipeline..."
 
-  echo "Launching pipeline..."
-
-  # VAL4 tests spaces in variable values
-  # VAR6 tests empty variable value
-  run_dsub \
-    --image "ubuntu" \
-    --script "${SCRIPT_DIR}/script_env_test.sh" \
-    --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
-    --env VAR4="VAL4 (four)" \
-    --env VAR5="VAL5" \
-    --env VAR6= \
-    --input VAR_IO1= \
-    --input-recursive VAR_IO2= \
-    --output VAR_IO3= \
-    --output-recursive VAR_IO4= \
-    --env VAR_ZERO=0 \
-    --tasks "${TASKS_FILE}" \
-    --wait
-
-fi
+# VAL4 tests spaces in variable values
+# VAR6 tests empty variable value
+run_dsub \
+  --image "ubuntu" \
+  --script "${SCRIPT_DIR}/script_env_test.sh" \
+  --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
+  --env VAR4="VAL4 (four)" \
+  --env VAR5="VAL5" \
+  --env VAR6= \
+  --input VAR_IO1= \
+  --input-recursive VAR_IO2= \
+  --output VAR_IO3= \
+  --output-recursive VAR_IO4= \
+  --env VAR_ZERO=0 \
+  --tasks "${TASKS_FILE}" \
+  --wait
 
 echo
 echo "Checking output..."

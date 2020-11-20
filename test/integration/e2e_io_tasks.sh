@@ -38,18 +38,14 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 # Do io_task setup
 source "${SCRIPT_DIR}/io_tasks_setup.sh"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+io_tasks_setup::write_tasks_file
 
-  io_tasks_setup::write_tasks_file
+echo "Launching pipelines..."
 
-  echo "Launching pipelines..."
-
-  JOB_ID="$(
-    io_tasks_setup::run_dsub \
-      "${SCRIPT_DIR}/script_io_test.sh" \
-      "${TASKS_FILE}")"
-
-fi
+JOB_ID="$(
+  io_tasks_setup::run_dsub \
+    "${SCRIPT_DIR}/script_io_test.sh" \
+    "${TASKS_FILE}")"
 
 # Do validation
 io_tasks_setup::check_output

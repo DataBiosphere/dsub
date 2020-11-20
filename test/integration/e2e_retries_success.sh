@@ -31,10 +31,8 @@ readonly JOB_NAME="$(retries_setup::get_job_name "$(basename "${0}")")"
 
 echo "${JOB_NAME}"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
-  echo "Launch a job that should succeed with --retries 2"
-  retries_setup::run_dsub "${JOB_NAME}" 2 true
-fi
+echo "Launch a job that should succeed with --retries 2"
+retries_setup::run_dsub "${JOB_NAME}" 2 true
 
 echo
 

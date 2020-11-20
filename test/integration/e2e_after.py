@@ -19,7 +19,6 @@ on the objects returned by dsub.call().
 """
 from __future__ import print_function
 
-import os
 import sys
 
 # Because this may be invoked from another directory (treated as a library) or
@@ -35,27 +34,25 @@ except SystemError:
 TEST_FILE_PATH_1 = test.OUTPUTS + '/testfile1.txt'
 TEST_FILE_PATH_2 = test.OUTPUTS + '/testfile2.txt'
 
-if not os.environ.get('CHECK_RESULTS_ONLY'):
+# (1) Launch a simple job that should succeed after a short wait
+print('Launch a job (and don\'t --wait)...')
+# pyformat: disable
+launched_job = test.run_dsub([
+    '--command', 'sleep 5s && echo "hello world" > "${OUT}"',
+    '--output', 'OUT=%s' % TEST_FILE_PATH_1])
+# pyformat: enable
 
-  # (1) Launch a simple job that should succeed after a short wait
-  print('Launch a job (and don\'t --wait)...')
-  # pyformat: disable
-  launched_job = test.run_dsub([
-      '--command', 'sleep 5s && echo "hello world" > "${OUT}"',
-      '--output', 'OUT=%s' % TEST_FILE_PATH_1])
-  # pyformat: enable
-
-  # (2) Wait for the previous job and then launch a new one that blocks
-  # until exit
-  print('Launch a job (--after the previous, and then --wait)...')
-  # pyformat: disable
-  next_job = test.run_dsub([
-      '--after', launched_job['job-id'],
-      '--input', 'IN=%s' % TEST_FILE_PATH_1,
-      '--output', 'OUT=%s' % TEST_FILE_PATH_2,
-      '--wait',
-      '--command', 'cat "${IN}" > "${OUT}"'])
-  # pyformat: enable
+# (2) Wait for the previous job and then launch a new one that blocks
+# until exit
+print('Launch a job (--after the previous, and then --wait)...')
+# pyformat: disable
+next_job = test.run_dsub([
+    '--after', launched_job['job-id'],
+    '--input', 'IN=%s' % TEST_FILE_PATH_1,
+    '--output', 'OUT=%s' % TEST_FILE_PATH_2,
+    '--wait',
+    '--command', 'cat "${IN}" > "${OUT}"'])
+# pyformat: enable
 
 print('\nChecking output...')
 

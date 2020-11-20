@@ -28,26 +28,22 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+echo "Launching pipeline..."
 
-  echo "Launching pipeline..."
-
-  BOOT_DISK_SIZE=20 \
-  run_dsub \
-    --image "debian:stable-slim" \
-    --min-cores "1" \
-    --min-ram "3.75" \
-    --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
-    --env VAR4="VAL4" \
-    --env VAR5="VAL5" \
-    --command '\
-      # This comment is here to verify that dsub will properly handle
-      # a command that starts with a comment, specifically with regards to
-      # deriving a usable job name.
-      env | grep ^VAR | sort' \
-    --wait
-
-fi
+BOOT_DISK_SIZE=20 \
+run_dsub \
+  --image "debian:stable-slim" \
+  --min-cores "1" \
+  --min-ram "3.75" \
+  --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
+  --env VAR4="VAL4" \
+  --env VAR5="VAL5" \
+  --command '\
+    # This comment is here to verify that dsub will properly handle
+    # a command that starts with a comment, specifically with regards to
+    # deriving a usable job name.
+    env | grep ^VAR | sort' \
+  --wait
 
 echo
 echo "Checking output..."

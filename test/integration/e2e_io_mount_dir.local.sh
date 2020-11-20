@@ -32,11 +32,9 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 # Do io setup
 source "${SCRIPT_DIR}/io_setup.sh"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
-  io_setup::mount_local_path_setup
-  echo "Launching pipeline..."
-  JOB_ID="$(io_setup::run_dsub_with_mount "${TEST_LOCAL_MOUNT_PARAMETER}")"
-fi
+io_setup::mount_local_path_setup
+echo "Launching pipeline..."
+JOB_ID="$(io_setup::run_dsub_with_mount "${TEST_LOCAL_MOUNT_PARAMETER}")"
 
 # Do validation
 io_setup::check_output

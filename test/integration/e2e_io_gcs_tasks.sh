@@ -40,26 +40,22 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 # Do io_task setup
 source "${SCRIPT_DIR}/io_tasks_setup.sh"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+io_tasks_setup::write_tasks_file
 
-  io_tasks_setup::write_tasks_file
+# Copy the script to GCS to test loading the script remotely
+echo "Copying script to ${DSUB_PARAMS}"
+gsutil cp "${SCRIPT_DIR}/script_io_test.sh" "${DSUB_PARAMS}/"
 
-  # Copy the script to GCS to test loading the script remotely
-  echo "Copying script to ${DSUB_PARAMS}"
-  gsutil cp "${SCRIPT_DIR}/script_io_test.sh" "${DSUB_PARAMS}/"
+# Copy the TASKS_FILE to GCS to test loading the tasks file remotely
+echo "Copying tasks file to ${DSUB_PARAMS}"
+gsutil cp "${TASKS_FILE}" "${DSUB_PARAMS}/"
 
-  # Copy the TASKS_FILE to GCS to test loading the tasks file remotely
-  echo "Copying tasks file to ${DSUB_PARAMS}"
-  gsutil cp "${TASKS_FILE}" "${DSUB_PARAMS}/"
+echo "Launching pipelines..."
 
-  echo "Launching pipelines..."
-
-  JOB_ID="$(
-    io_tasks_setup::run_dsub \
-      "${DSUB_PARAMS}/script_io_test.sh" \
-      "${DSUB_PARAMS}/$(basename "${TASKS_FILE}")")"
-
-fi
+JOB_ID="$(
+  io_tasks_setup::run_dsub \
+    "${DSUB_PARAMS}/script_io_test.sh" \
+    "${DSUB_PARAMS}/$(basename "${TASKS_FILE}")")"
 
 # Do validation
 io_tasks_setup::check_output

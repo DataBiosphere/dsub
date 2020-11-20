@@ -55,25 +55,21 @@ declare LOGGING_OVERRIDE
 
 echo "Setting up test inputs"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+echo "Setting up pipeline input..."
+build_recursive_files "${INPUT_DEEP}" "${INPUT_SHALLOW}"
 
-  echo "Setting up pipeline input..."
-  build_recursive_files "${INPUT_DEEP}" "${INPUT_SHALLOW}"
+echo "Launching pipeline..."
 
-  echo "Launching pipeline..."
-
-  LOGGING_OVERRIDE="${LOCAL_LOGGING}"
-  run_dsub \
-    --image "google/cloud-sdk:latest" \
-    --script "${SCRIPT_DIR}/script_io_recursive.sh" \
-    --env FILE_CONTENTS="${FILE_CONTENTS}" \
-    --input INPUT_PATH_SHALLOW="${INPUT_SHALLOW}/*" \
-    --input-recursive INPUT_PATH_DEEP="${INPUT_DEEP}/" \
-    --output OUTPUT_PATH_SHALLOW="${OUTPUT_SHALLOW}/*" \
-    --output-recursive OUTPUT_PATH_DEEP="${OUTPUT_DEEP}/" \
-    --wait
-
-fi
+LOGGING_OVERRIDE="${LOCAL_LOGGING}"
+run_dsub \
+  --image "google/cloud-sdk:latest" \
+  --script "${SCRIPT_DIR}/script_io_recursive.sh" \
+  --env FILE_CONTENTS="${FILE_CONTENTS}" \
+  --input INPUT_PATH_SHALLOW="${INPUT_SHALLOW}/*" \
+  --input-recursive INPUT_PATH_DEEP="${INPUT_DEEP}/" \
+  --output OUTPUT_PATH_SHALLOW="${OUTPUT_SHALLOW}/*" \
+  --output-recursive OUTPUT_PATH_DEEP="${OUTPUT_DEEP}/" \
+  --wait
 
 echo
 echo "Checking logs were copied out..."

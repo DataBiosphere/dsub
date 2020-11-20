@@ -52,32 +52,27 @@ readonly -f exit_handler
 
 trap "exit_handler" EXIT
 
+mkdir -p "${INPUT_ROOT}"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+echo "Setting up pipeline input..."
 
-  mkdir -p "${INPUT_ROOT}"
+for INPUT_DIR in "${INPUT_BASIC}" "${INPUT_WITH_SPACE}"; do
+  mkdir -p "${INPUT_DIR}"
 
-  echo "Setting up pipeline input..."
-
-  for INPUT_DIR in "${INPUT_BASIC}" "${INPUT_WITH_SPACE}"; do
-    mkdir -p "${INPUT_DIR}"
-
-    for INDEX in {1..3}; do
-      echo "${FILE_CONTENTS}" > "${INPUT_DIR}/file.${INDEX}.txt"
-    done
+  for INDEX in {1..3}; do
+    echo "${FILE_CONTENTS}" > "${INPUT_DIR}/file.${INDEX}.txt"
   done
+done
 
-  gsutil -m rsync -r "${INPUT_ROOT}" "${INPUTS}/"
+gsutil -m rsync -r "${INPUT_ROOT}" "${INPUTS}/"
 
-  echo "Launching pipeline..."
+echo "Launching pipeline..."
 
-  run_dsub \
-    --script "${SCRIPT_DIR}/script_input_wildcards.sh" \
-    --input INPUT_BASIC="${GS_INPUT_BASIC}" \
-    --input INPUT_WITH_SPACE="${GS_INPUT_WITH_SPACE}" \
-    --wait
-
-fi
+run_dsub \
+  --script "${SCRIPT_DIR}/script_input_wildcards.sh" \
+  --input INPUT_BASIC="${GS_INPUT_BASIC}" \
+  --input INPUT_WITH_SPACE="${GS_INPUT_WITH_SPACE}" \
+  --wait
 
 echo
 echo "Checking output..."

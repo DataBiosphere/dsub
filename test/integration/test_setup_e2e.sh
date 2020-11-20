@@ -114,17 +114,12 @@ echo "Output path: ${OUTPUTS}"
 # For tests that exercise remote dsub parameters (like TSV file)
 readonly DSUB_PARAMS="${TEST_GCS_ROOT}/params"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]] && \
-   [[ "${ALLOW_DIRTY_TESTS:-0}" -eq 0 ]]; then
-
-  echo "  Checking if remote test files already exists"
-  if gsutil ls "${TEST_GCS_ROOT}/**" 2>/dev/null; then
-    1>&2 echo "Test files exist: ${TEST_GCS_ROOT}"
-    1>&2 echo "Remove contents:"
-    1>&2 echo "  gsutil -m rm ${TEST_GCS_ROOT}/**"
-    exit 1
-  fi
-
+echo "  Checking if remote test files already exists"
+if gsutil ls "${TEST_GCS_ROOT}/**" 2>/dev/null; then
+  1>&2 echo "Test files exist: ${TEST_GCS_ROOT}"
+  1>&2 echo "Remove contents:"
+  1>&2 echo "  gsutil -m rm ${TEST_GCS_ROOT}/**"
+  exit 1
 fi
 
 if [[ -n "${TASKS_FILE:-}" ]]; then

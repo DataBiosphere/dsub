@@ -33,18 +33,14 @@ readonly OUTPUT_FILE="${OUTPUTS}/output_file/file.txt"
 
 readonly OUTPUT_DIR="${OUTPUTS}/output_files/*"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+echo "Launching pipeline..."
 
-  echo "Launching pipeline..."
-
-  run_dsub \
-    --script "${SCRIPT_DIR}/script_io_auto.sh" \
-    --env TEST_NAME="${TEST_NAME}" \
-    --input "${INPUT_BAM}" "${INPUT_BAMS}" \
-    --output "${OUTPUT_FILE}" "${OUTPUT_DIR}" \
-    --wait
-
-fi
+run_dsub \
+  --script "${SCRIPT_DIR}/script_io_auto.sh" \
+  --env TEST_NAME="${TEST_NAME}" \
+  --input "${INPUT_BAM}" "${INPUT_BAMS}" \
+  --output "${OUTPUT_FILE}" "${OUTPUT_DIR}" \
+  --wait
 
 echo
 echo "Checking output..."

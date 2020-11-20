@@ -26,17 +26,13 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
 readonly LOGGING_OVERRIDE="gs://__this__/path/cannot/exist"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+echo "Launching pipeline..."
 
-  echo "Launching pipeline..."
-
-  if run_dsub \
-    --command 'sleep 1m' \
-    --wait; then
-    echo "dsub did not report the failure as it should have."
-    exit 1
-  fi
-
+if run_dsub \
+  --command 'sleep 1m' \
+  --wait; then
+  echo "dsub did not report the failure as it should have."
+  exit 1
 fi
 
 echo "SUCCESS"

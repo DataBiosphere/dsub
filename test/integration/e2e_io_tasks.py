@@ -50,48 +50,46 @@ INPUT_BAMS_MD5 = ('4afb9b8908959dbd4e2d5c54bf254c93',
                   '0dc006ed39ddad2790034ca497631234',
                   '36e37a0dab5926dbf5a1b8afc0cdac8b')
 
-if not os.environ.get('CHECK_RESULTS_ONLY'):
+# Build up an array of lines for the TSV.
+with open(test.TASKS_FILE, 'w') as f:
+  f.write('--env TASK_ID\t--input INPUT_PATH\t--output OUTPUT_PATH\n')
+  for i in range(len(INPUT_BAMS)):
+    f.write('TASK_{task}\t{input}\t{output_path}/{task}/*.md5\n'.format(
+        task=i + 1, input=INPUT_BAMS[i], output_path=test.OUTPUTS))
 
-  # Build up an array of lines for the TSV.
-  with open(test.TASKS_FILE, 'w') as f:
-    f.write('--env TASK_ID\t--input INPUT_PATH\t--output OUTPUT_PATH\n')
-    for i in range(len(INPUT_BAMS)):
-      f.write('TASK_{task}\t{input}\t{output_path}/{task}/*.md5\n'.format(
-          task=i + 1, input=INPUT_BAMS[i], output_path=test.OUTPUTS))
+print('Launching pipeline...')
 
-  print('Launching pipeline...')
+# pyformat: disable
+launched_job = test.run_dsub([
+    '--script', '%s/script_io_test.sh' % test.TEST_DIR,
+    '--tasks', test.TASKS_FILE,
+    '--env', 'TEST_NAME=%s' % test.TEST_NAME,
+    '--input', 'POPULATION_FILE_PATH=%s' % POPULATION_FILE,
+    '--output', 'OUTPUT_POPULATION_FILE=%s/*' % test.OUTPUTS,
+    '--wait'])
+# pyformat: enable
 
-  # pyformat: disable
-  launched_job = test.run_dsub([
-      '--script', '%s/script_io_test.sh' % test.TEST_DIR,
-      '--tasks', test.TASKS_FILE,
-      '--env', 'TEST_NAME=%s' % test.TEST_NAME,
-      '--input', 'POPULATION_FILE_PATH=%s' % POPULATION_FILE,
-      '--output', 'OUTPUT_POPULATION_FILE=%s/*' % test.OUTPUTS,
-      '--wait'])
-  # pyformat: enable
+# Sanity check launched_jobs - should have a single record with 3 tasks
+if not launched_job:
+  print('No launched jobs returned', file=sys.stderr)
+  sys.exit(1)
 
-  # Sanity check launched_jobs - should have a single record with 3 tasks
-  if not launched_job:
-    print('No launched jobs returned', file=sys.stderr)
-    sys.exit(1)
+if not launched_job.get('job-id'):
+  print('Launched job contains no job id', file=sys.stderr)
+  sys.exit(1)
 
-  if not launched_job.get('job-id'):
-    print('Launched job contains no job id', file=sys.stderr)
-    sys.exit(1)
+if not launched_job.get('user-id'):
+  print('Launched job contains no user-id.', file=sys.stderr)
+  sys.exit(1)
 
-  if not launched_job.get('user-id'):
-    print('Launched job contains no user-id.', file=sys.stderr)
-    sys.exit(1)
+if len(launched_job.get('task-id', [])) != 3:
+  print('Launched job does not contain 3 tasks.', file=sys.stderr)
+  print(launched_job.get('task-id'), file=sys.stderr)
+  sys.exit(1)
 
-  if len(launched_job.get('task-id', [])) != 3:
-    print('Launched job does not contain 3 tasks.', file=sys.stderr)
-    print(launched_job.get('task-id'), file=sys.stderr)
-    sys.exit(1)
-
-  print('Launched job: %s' % launched_job['job-id'])
-  for task in launched_job['task-id']:
-    print('  task: %s' % task)
+print('Launched job: %s' % launched_job['job-id'])
+for task in launched_job['task-id']:
+  print('  task: %s' % task)
 
 print('\nChecking output...')
 
