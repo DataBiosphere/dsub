@@ -39,89 +39,83 @@ function check_label() {
 # reflects the labels that were specified in dsub.
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
-# This test is not sensitive to the output of the dsub job.
-# Set the ALLOW_DIRTY_TESTS environment variable to 1 in your shell to
-# run this test without first emptying the output and logging directories.
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
 readonly TASKS_FILE="${TEST_TMP}/${TEST_NAME}.tsv"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+# Set up for running the tests
+mkdir -p "${TEST_TMP}"
 
-  # Set up for running the tests
-  mkdir -p "${TEST_TMP}"
+# Create a simple TSV file
+util::write_tsv_file "${TASKS_FILE}" '
+  --label item-number
+  1
+  2
+'
 
-  # Create a simple TSV file
-  util::write_tsv_file "${TASKS_FILE}" '
-    --label item-number
-    1
-    2
-  '
+echo "Launching pipeline..."
 
-  echo "Launching pipeline..."
+JOBID="$(run_dsub \
+  --label batch=hello-world \
+  --label item-number=1 \
+  --command "echo 'hello world'; sleep 4m;")"
 
-  JOBID="$(run_dsub \
-    --label batch=hello-world \
-    --label item-number=1 \
-    --command "echo 'hello world'; sleep 4m;")"
+echo "Checking dstat (full)..."
 
-  echo "Checking dstat (full)..."
-
-  if ! DSTAT_OUTPUT=$(run_dstat --status '*' --full --jobs "${JOBID}" 2>&1); then
-    echo "dstat exited with a non-zero exit code!"
-    echo "Output:"
-    echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  check_label "batch: hello-world"
-  check_label "item-number: '1'"
-
-  echo
-  echo "Running ddel against a non-matching label - should not kill pipeline."
-  run_ddel --jobs "${JOBID}" --label "batch=hello-world" --label "item-number=2"
-
-  echo
-  echo "Check that the job is not canceled."
-  if util::wait_for_canceled_status "${JOBID}"; then
-    echo "ERROR: Operation is canceled, but ddel should not have canceled it."
-    util::get_job_status "${JOBID}"
-    exit 1
-  fi
-
-  echo
-  echo "Killing the pipeline"
-  run_ddel --jobs "${JOBID}" --label "batch=hello-world" --label "item-number=1"
-
-  if ! util::wait_for_canceled_status "${JOBID}"; then
-    echo "dstat does not show the operation as canceled after wait."
-    util::get_job_status "${JOBID}"
-    exit 1
-  fi
-
-  # As of this writing we cannot combine --labels from the command line
-  # and task file, that's why we run two tests.
-
-  echo "Launching pipeline..."
-
-  JOBID="$(run_dsub \
-    --tasks "${TASKS_FILE}" \
-    --label batch=hello-world \
-    --command "echo 'hello world'")"
-
-  echo "Checking dstat (full)..."
-
-  if ! DSTAT_OUTPUT=$(run_dstat --status '*' --full --jobs "${JOBID}" 2>&1); then
-    echo "dstat exited with a non-zero exit code!"
-    echo "Output:"
-    echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  check_label "batch: hello-world"
-  check_label "item-number: '1'"
-  check_label "item-number: '2'"
-
-  echo "SUCCESS"
-
+if ! DSTAT_OUTPUT=$(run_dstat --status '*' --full --jobs "${JOBID}" 2>&1); then
+  echo "dstat exited with a non-zero exit code!"
+  echo "Output:"
+  echo "${DSTAT_OUTPUT}"
+  exit 1
 fi
+
+check_label "batch: hello-world"
+check_label "item-number: '1'"
+
+echo
+echo "Running ddel against a non-matching label - should not kill pipeline."
+run_ddel --jobs "${JOBID}" --label "batch=hello-world" --label "item-number=2"
+
+echo
+echo "Check that the job is not canceled."
+if util::wait_for_canceled_status "${JOBID}"; then
+  echo "ERROR: Operation is canceled, but ddel should not have canceled it."
+  util::get_job_status "${JOBID}"
+  exit 1
+fi
+
+echo
+echo "Killing the pipeline"
+run_ddel --jobs "${JOBID}" --label "batch=hello-world" --label "item-number=1"
+
+if ! util::wait_for_canceled_status "${JOBID}"; then
+  echo "dstat does not show the operation as canceled after wait."
+  util::get_job_status "${JOBID}"
+  exit 1
+fi
+
+# As of this writing we cannot combine --labels from the command line
+# and task file, that's why we run two tests.
+
+echo "Launching pipeline..."
+
+JOBID="$(run_dsub \
+  --tasks "${TASKS_FILE}" \
+  --label batch=hello-world \
+  --command "echo 'hello world'")"
+
+echo "Checking dstat (full)..."
+
+if ! DSTAT_OUTPUT=$(run_dstat --status '*' --full --jobs "${JOBID}" 2>&1); then
+  echo "dstat exited with a non-zero exit code!"
+  echo "Output:"
+  echo "${DSTAT_OUTPUT}"
+  exit 1
+fi
+
+check_label "batch: hello-world"
+check_label "item-number: '1'"
+check_label "item-number: '2'"
+
+echo "SUCCESS"
+

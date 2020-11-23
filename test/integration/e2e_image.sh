@@ -44,18 +44,15 @@ readonly IMAGE_ARRAY=("bash:4.4" "python:2-slim" "python:3-slim")
 readonly RESULT_EXPECTED="Success!"
 
 for image in ${IMAGE_ARRAY[@]}; do
-  if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
 
-    echo "Launching pipeline..."
+  echo "Launching pipeline..."
 
-    BOOT_DISK_SIZE=20 \
-    run_dsub \
-      --image "${image}" \
-      --command '\
-        echo "Success!"' \
-      --wait
-
-  fi
+  BOOT_DISK_SIZE=20 \
+  run_dsub \
+    --image "${image}" \
+    --command '\
+      echo "Success!"' \
+    --wait
 
   echo
   echo "Checking output..."

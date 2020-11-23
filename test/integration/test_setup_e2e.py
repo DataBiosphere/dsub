@@ -129,14 +129,12 @@ print("Logging path: %s" % LOGGING)
 print("Input path: %s" % INPUTS)
 print("Output path: %s" % OUTPUTS)
 
-if not os.environ.get("CHECK_RESULTS_ONLY"):
-
-  print("  Checking if remote test files already exists")
-  if test_util.gsutil_ls_check("%s/**" % TEST_GCS_ROOT):
-    print("Test files exist: %s" % TEST_GCS_ROOT, file=sys.stderr)
-    print("Remove contents:", file=sys.stderr)
-    print("  gsutil -m rm %s/**" % TEST_GCS_ROOT, file=sys.stderr)
-    sys.exit(1)
+print("  Checking if remote test files already exists")
+if test_util.gsutil_ls_check("%s/**" % TEST_GCS_ROOT):
+  print("Test files exist: %s" % TEST_GCS_ROOT, file=sys.stderr)
+  print("Remove contents:", file=sys.stderr)
+  print("  gsutil -m rm %s/**" % TEST_GCS_ROOT, file=sys.stderr)
+  sys.exit(1)
 
 if TASKS_FILE:
   # For a task file test, set up the task file from its template

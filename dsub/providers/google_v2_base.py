@@ -351,7 +351,7 @@ _ABORT_REGEX = re.compile('The operation was cancelled')
 _FAIL_REGEX = re.compile(
     '^Unexpected exit status [\\d]{1,4} while running "user-command"$')
 _EVENT_REGEX_MAP = {
-    'start': re.compile('^Worker ".*" assigned in ".*"$'),
+    'start': re.compile('^Worker ".*" assigned in ".*".*$'),
     'pulling-image': re.compile('^Started pulling "(.*)"$'),
     'localizing-files': re.compile('^Started running "localization"$'),
     'running-docker': re.compile('^Started running "user-command"$'),

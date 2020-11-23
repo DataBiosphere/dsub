@@ -46,17 +46,13 @@ readonly OUTPUT_TEST_FILE="${OUTPUT_PATH_RELATIVE}/test.txt"
 mkdir -p "$(dirname "${INPUT_TEST_FILE}")"
 echo "This is only a test" > "${INPUT_TEST_FILE}"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+echo "Launching pipeline..."
 
-  echo "Launching pipeline..."
-
-  run_dsub \
-    --input INPUT_FILE="${INPUT_TEST_FILE}" \
-    --output OUTPUT_FILE="${OUTPUT_TEST_FILE}" \
-    --command 'cp "${INPUT_FILE}" "${OUTPUT_FILE}"' \
-    --wait
-
-fi
+run_dsub \
+  --input INPUT_FILE="${INPUT_TEST_FILE}" \
+  --output OUTPUT_FILE="${OUTPUT_TEST_FILE}" \
+  --command 'cp "${INPUT_FILE}" "${OUTPUT_FILE}"' \
+  --wait
 
 if ! diff "${INPUT_TEST_FILE}" "${OUTPUT_TEST_FILE}"; then
   echo "Output file does not match expected"

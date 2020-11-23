@@ -45,7 +45,7 @@ dsub \
 
 # Step two: process each split.
 # We use --tasks for that, so we first create the tsv.
-readonly TASKS_FILE=/tmp/dsub_demo.tsv
+readonly TASKS_FILE="${TMPDIR:-/tmp}/dsub_demo.tsv"
 rm -f "${TASKS_FILE}"
 
 echo -e "--env SHARD\t--input IN\t--output OUT" >> "${TASKS_FILE}";

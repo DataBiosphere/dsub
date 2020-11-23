@@ -19,7 +19,6 @@ on the objects returned by dsub.call().
 """
 from __future__ import print_function
 
-import os
 import sys
 
 from dsub.lib import dsub_errors
@@ -32,44 +31,43 @@ try:
 except ImportError:
   import test_setup_e2e as test
 
-if not os.environ.get('CHECK_RESULTS_ONLY'):
-
-  # (1) Launch a job to test command execution failure
-  print('Launch a job that should fail (--wait for it)...')
-  try:
-    # pyformat: disable
-    bad_job_wait = test.run_dsub([
-        '--command', 'exit 1',
-        '--wait'])
-    # pyformat: enable
-
-    print('Expected to throw dsub_errors.JobExecutionError', file=sys.stderr)
-    sys.exit(1)
-  except dsub_errors.JobExecutionError as e:
-    if len(e.error_list) != 1:
-      print('Expected 1 error during wait, got: %s' % e.error_list,
-            file=sys.stderr)
-      sys.exit(1)
-
-  # (2) Launch a bad job to allow the next call to detect its failure
-  print('Launch a job that should fail (don\'t --wait)')
+# (1) Launch a job to test command execution failure
+print('Launch a job that should fail (--wait for it)...')
+try:
   # pyformat: disable
-  bad_job_previous = test.run_dsub(['--command', 'sleep 5s && exit 1'])
+  bad_job_wait = test.run_dsub([
+      '--command', 'exit 1',
+      '--wait'])
   # pyformat: enable
 
-  # (3) This call to dsub should fail before submit
-  print('Launch a job that should fail (--after the previous)')
-  try:
-    # pyformat: disable
-    job_after = test.run_dsub([
-        '--command', 'echo "does not matter"',
-        '--after', bad_job_previous['job-id']])
-    # pyformat: enable
-
-    print('Expected to throw a PredecessorJobFailureError', file=sys.stderr)
+  print('Expected to throw dsub_errors.JobExecutionError', file=sys.stderr)
+  sys.exit(1)
+except dsub_errors.JobExecutionError as e:
+  if len(e.error_list) != 1:
+    print(
+        'Expected 1 error during wait, got: %s' % e.error_list, file=sys.stderr)
     sys.exit(1)
-  except dsub_errors.PredecessorJobFailureError as e:
-    if len(e.error_list) != 1:
-      print('Expected 1 error from previous job, got: %s' % (e.error_list),
-            file=sys.stderr)
-      sys.exit(1)
+
+# (2) Launch a bad job to allow the next call to detect its failure
+print('Launch a job that should fail (don\'t --wait)')
+# pyformat: disable
+bad_job_previous = test.run_dsub(['--command', 'sleep 5s && exit 1'])
+# pyformat: enable
+
+# (3) This call to dsub should fail before submit
+print('Launch a job that should fail (--after the previous)')
+try:
+  # pyformat: disable
+  job_after = test.run_dsub([
+      '--command', 'echo "does not matter"',
+      '--after', bad_job_previous['job-id']])
+  # pyformat: enable
+
+  print('Expected to throw a PredecessorJobFailureError', file=sys.stderr)
+  sys.exit(1)
+except dsub_errors.PredecessorJobFailureError as e:
+  if len(e.error_list) != 1:
+    print(
+        'Expected 1 error from previous job, got: {}'.format(e.error_list),
+        file=sys.stderr)
+    sys.exit(1)

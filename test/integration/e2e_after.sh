@@ -27,33 +27,29 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 TEST_FILE_PATH_1="${OUTPUTS}/testfile_1.txt"
 TEST_FILE_PATH_2="${OUTPUTS}/testfile_2.txt"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+# (1) Launch a simple job that should succeed after a short wait
+echo "Launch a job (and don't --wait)..."
+JOB_ID=$(run_dsub \
+  --command 'sleep 5s && echo "hello world" > "${OUT}"' \
+  --output OUT="${TEST_FILE_PATH_1}")
 
-  # (1) Launch a simple job that should succeed after a short wait
-  echo "Launch a job (and don't --wait)..."
-  JOB_ID=$(run_dsub \
-    --command 'sleep 5s && echo "hello world" > "${OUT}"' \
-    --output OUT="${TEST_FILE_PATH_1}")
+# (2) Wait for the previous job and then launch a new one that blocks
+# until exit
+echo "Launch a job (--after the previous, and then --wait)..."
+run_dsub \
+  --after "${JOB_ID}" \
+  --command 'cat "${IN}" > "${OUT}"' \
+  --input IN="${TEST_FILE_PATH_1}" \
+  --output OUT="${TEST_FILE_PATH_2}" \
+  --wait
 
-  # (2) Wait for the previous job and then launch a new one that blocks
-  # until exit
-  echo "Launch a job (--after the previous, and then --wait)..."
-  run_dsub \
-    --after "${JOB_ID}" \
-    --command 'cat "${IN}" > "${OUT}"' \
-    --input IN="${TEST_FILE_PATH_1}" \
-    --output OUT="${TEST_FILE_PATH_2}" \
-    --wait
-
-  # (3) Validate the end time for the failed job
-  echo "Check that the success job has a proper end-time set"
-  DSTAT_OUTPUT=$(run_dstat --status '*' --jobs "${JOB_ID}" --full)
-  if ! util::dstat_yaml_job_has_valid_end_time "${DSTAT_OUTPUT}"; then
-    echo "dstat output for ${JOB_ID} does not include a valid end time."
-    echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
+# (3) Validate the end time for the failed job
+echo "Check that the success job has a proper end-time set"
+DSTAT_OUTPUT=$(run_dstat --status '*' --jobs "${JOB_ID}" --full)
+if ! util::dstat_yaml_job_has_valid_end_time "${DSTAT_OUTPUT}"; then
+  echo "dstat output for ${JOB_ID} does not include a valid end time."
+  echo "${DSTAT_OUTPUT}"
+  exit 1
 fi
 
 echo

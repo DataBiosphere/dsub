@@ -36,40 +36,36 @@ if gsutil ls "${TEST_FILE_PATH_2}" &> /dev/null; then
   exit 1
 fi
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+echo "1. non-task single job: skip (output present)"
+JOB_ID="$(
+  run_dsub \
+    --output OUTPUT_PATH="${TEST_FILE_PATH_1}" \
+    --command 'echo "hello from the job" > "${OUTPUT_PATH}"' \
+    --skip \
+    --wait)"
 
-  echo "1. non-task single job: skip (output present)"
-  JOB_ID="$(
-    run_dsub \
-      --output OUTPUT_PATH="${TEST_FILE_PATH_1}" \
-      --command 'echo "hello from the job" > "${OUTPUT_PATH}"' \
-      --skip \
-      --wait)"
-
-  RESULT="$(gsutil cat "${TEST_FILE_PATH_1}")"
-  if [[ "${RESULT}" != "hello world" ]]; then
-    echo "Output file does not match expected (from step 4)"
-    echo "Expected: hello world"
-    echo "Got: ${RESULT}"
-    exit 1
-  fi
-
-  echo "2. non-task single job: do not skip (output not present)"
-  JOB_ID="$(
-    run_dsub \
-      --output OUTPUT_PATH="${TEST_FILE_PATH_2}" \
-      --command 'echo "hello from the job" > "${OUTPUT_PATH}"' \
-      --skip \
-      --wait)"
-
-  RESULT="$(gsutil cat "${TEST_FILE_PATH_2}")"
-  if [[ "${RESULT}" != "hello from the job" ]]; then
-    echo "Output file does not match expected (from step 2)"
-    echo "Expected: hello world"
-    echo "Got: ${RESULT}"
-    exit 1
-  fi
-
-  echo "SUCCESS"
-
+RESULT="$(gsutil cat "${TEST_FILE_PATH_1}")"
+if [[ "${RESULT}" != "hello world" ]]; then
+  echo "Output file does not match expected (from step 4)"
+  echo "Expected: hello world"
+  echo "Got: ${RESULT}"
+  exit 1
 fi
+
+echo "2. non-task single job: do not skip (output not present)"
+JOB_ID="$(
+  run_dsub \
+    --output OUTPUT_PATH="${TEST_FILE_PATH_2}" \
+    --command 'echo "hello from the job" > "${OUTPUT_PATH}"' \
+    --skip \
+    --wait)"
+
+RESULT="$(gsutil cat "${TEST_FILE_PATH_2}")"
+if [[ "${RESULT}" != "hello from the job" ]]; then
+  echo "Output file does not match expected (from step 2)"
+  echo "Expected: hello world"
+  echo "Got: ${RESULT}"
+  exit 1
+fi
+
+echo "SUCCESS"

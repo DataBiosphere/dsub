@@ -19,7 +19,6 @@ on the objects returned by dsub.call().
 """
 from __future__ import print_function
 
-import os
 import sys
 
 # Because this may be invoked from another directory (treated as a library) or
@@ -32,37 +31,36 @@ except SystemError:
   import test_setup_e2e as test
   import test_util
 
-if not os.environ.get('CHECK_RESULTS_ONLY'):
-  print('Launching pipeline...')
+print('Launching pipeline...')
 
-  # pyformat: disable
-  launched_job = test.run_dsub([
-      '--script', '%s/script_env_test.sh' % test.TEST_DIR,
-      '--env', 'VAR1=VAL1', 'VAR2=VAL2', 'VAR3=VAL3',
-      '--env', 'VAR4=VAL4',
-      '--env', 'VAR5=VAL5',
-      '--wait'])
-  # pyformat: enable
+# pyformat: disable
+launched_job = test.run_dsub([
+    '--script', '%s/script_env_test.sh' % test.TEST_DIR,
+    '--env', 'VAR1=VAL1', 'VAR2=VAL2', 'VAR3=VAL3',
+    '--env', 'VAR4=VAL4',
+    '--env', 'VAR5=VAL5',
+    '--wait'])
+# pyformat: enable
 
-  # Sanity check launched_jobs - should have a single record with no tasks
-  if not launched_job:
-    print('No launched jobs returned.', file=sys.stderr)
-    sys.exit(1)
+# Sanity check launched_jobs - should have a single record with no tasks
+if not launched_job:
+  print('No launched jobs returned.', file=sys.stderr)
+  sys.exit(1)
 
-  if not launched_job.get('job-id'):
-    print('Launched job contains no job-id.', file=sys.stderr)
-    sys.exit(1)
+if not launched_job.get('job-id'):
+  print('Launched job contains no job-id.', file=sys.stderr)
+  sys.exit(1)
 
-  if not launched_job.get('user-id'):
-    print('Launched job contains no user-id.', file=sys.stderr)
-    sys.exit(1)
+if not launched_job.get('user-id'):
+  print('Launched job contains no user-id.', file=sys.stderr)
+  sys.exit(1)
 
-  if launched_job.get('task-id'):
-    print('Launched job contains tasks.', file=sys.stderr)
-    print(launched_job['task-id'], file=sys.stderr)
-    sys.exit(1)
+if launched_job.get('task-id'):
+  print('Launched job contains tasks.', file=sys.stderr)
+  print(launched_job['task-id'], file=sys.stderr)
+  sys.exit(1)
 
-  print('Launched job: %s' % launched_job['job-id'])
+print('Launched job: %s' % launched_job['job-id'])
 
 print('\nChecking output...')
 

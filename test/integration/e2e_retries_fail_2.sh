@@ -29,10 +29,8 @@ source "${SCRIPT_DIR}/retries_setup.sh"
 
 readonly JOB_NAME="$(retries_setup::get_job_name "$(basename "${0}")")"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
-  echo "Launch a job that should fail with --retries 2"
-  retries_setup::run_dsub "${JOB_NAME}" 2 false
-fi
+echo "Launch a job that should fail with --retries 2"
+retries_setup::run_dsub "${JOB_NAME}" 2 false
 
 echo
 

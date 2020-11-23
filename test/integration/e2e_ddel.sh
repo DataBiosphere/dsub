@@ -49,77 +49,74 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
-
-  # For google-cls-v2, we will test that the "--location" parameter works by
-  # specifying something other than the default (us-central1).
-  # The batch endpoint used for the operation.cancel() calls cannot use the
-  # batch endpoint except for us-central1.
-  if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
-    export LOCATION=us-west2
-  fi
-
-  echo "Launching pipeline..."
-
-  JOB_ID=$(run_dsub \
-    --name "ddel-test" \
-    --command "for ((i=0; i < 600; i++)); do echo 'test' ; sleep 1s ; done")
-
-  echo
-  echo "Pipeline started."
-  echo "job id: ${JOB_ID}"
-
-  # Test ddel with an age that is too soon
-  echo
-  echo "Sleeping 10 seconds before exercising 'ddel --age 5s'"
-  sleep 10s
-  run_ddel_age "5s" --jobs "${JOB_ID}"
-
-  # Make sure dstat still shows the job as not canceled.
-  echo
-  echo "Check that the job is not canceled."
-  if util::wait_for_canceled_status "${JOB_ID}"; then
-    echo "ERROR: Operation is canceled, but ddel should not have canceled it."
-    util::get_job_status "${JOB_ID}"
-    exit 1
-  fi
-
-  # For the google v2 providers, wait a sufficiently long time so that all the
-  # startup events occur prior to canceling so that the output event list is
-  # consistent..
-  if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
-     [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
-    echo "Sleeping for 60s"
-    sleep 60
-  fi
-
-  echo
-  echo "Killing the pipeline"
-  run_ddel --jobs "${JOB_ID}"
-
-  # Make sure dstat shows the job as canceled.
-  if ! util::wait_for_canceled_status "${JOB_ID}"; then
-    echo "dstat does not show the operation as canceled after wait."
-    util::get_job_status "${JOB_ID}"
-    exit 1
-  fi
-
-  echo
-  echo "dstat indicates that the job is canceled."
-
-  # Check that there is a valid end time
-  DSTAT_OUTPUT=$(run_dstat --status '*' --jobs "${JOB_ID}" --full)
-  if ! util::dstat_yaml_job_has_valid_end_time "${DSTAT_OUTPUT}"; then
-    echo "dstat output for ${JOB_ID} does not include a valid end time."
-    echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  # Verify that there is a canceled event
-  util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].events.[-1].name" "canceled"
-
-  provider_verify_stopped_job "${JOB_ID}"
-
-  echo "SUCCESS"
-
+# For google-cls-v2, we will test that the "--location" parameter works by
+# specifying something other than the default (us-central1).
+# The batch endpoint used for the operation.cancel() calls cannot use the
+# batch endpoint except for us-central1.
+if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
+  export LOCATION=us-west2
 fi
+
+echo "Launching pipeline..."
+
+JOB_ID=$(run_dsub \
+  --name "ddel-test" \
+  --command "for ((i=0; i < 600; i++)); do echo 'test' ; sleep 1s ; done")
+
+echo
+echo "Pipeline started."
+echo "job id: ${JOB_ID}"
+
+# Test ddel with an age that is too soon
+echo
+echo "Sleeping 10 seconds before exercising 'ddel --age 5s'"
+sleep 10s
+run_ddel_age "5s" --jobs "${JOB_ID}"
+
+# Make sure dstat still shows the job as not canceled.
+echo
+echo "Check that the job is not canceled."
+if util::wait_for_canceled_status "${JOB_ID}"; then
+  echo "ERROR: Operation is canceled, but ddel should not have canceled it."
+  util::get_job_status "${JOB_ID}"
+  exit 1
+fi
+
+# For the google v2 providers, wait a sufficiently long time so that all the
+# startup events occur prior to canceling so that the output event list is
+# consistent..
+if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
+   [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+  echo "Sleeping for 60s"
+  sleep 60
+fi
+
+echo
+echo "Killing the pipeline"
+run_ddel --jobs "${JOB_ID}"
+
+# Make sure dstat shows the job as canceled.
+if ! util::wait_for_canceled_status "${JOB_ID}"; then
+  echo "dstat does not show the operation as canceled after wait."
+  util::get_job_status "${JOB_ID}"
+  exit 1
+fi
+
+echo
+echo "dstat indicates that the job is canceled."
+
+# Check that there is a valid end time
+DSTAT_OUTPUT=$(run_dstat --status '*' --jobs "${JOB_ID}" --full)
+if ! util::dstat_yaml_job_has_valid_end_time "${DSTAT_OUTPUT}"; then
+  echo "dstat output for ${JOB_ID} does not include a valid end time."
+  echo "${DSTAT_OUTPUT}"
+  exit 1
+fi
+
+# Verify that there is a canceled event
+util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].events.[-1].name" "canceled"
+
+provider_verify_stopped_job "${JOB_ID}"
+
+echo "SUCCESS"
+

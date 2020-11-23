@@ -63,43 +63,39 @@ readonly -f check_jobid
 
 trap "exit_handler" EXIT
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+echo "Enabling Google Cloud Build"
+gcloud services enable cloudbuild.googleapis.com
 
-  echo "Enabling Google Cloud Build"
-  gcloud services enable cloudbuild.googleapis.com
+echo "Creating image using Google Cloud Build"
 
-  echo "Creating image using Google Cloud Build"
+mkdir -p "${BUILD_DIR}"
+ENTRYPOINT='ENTRYPOINT [ "sh", "-c", "exit 1" ]'
 
-  mkdir -p "${BUILD_DIR}"
-  ENTRYPOINT='ENTRYPOINT [ "sh", "-c", "exit 1" ]'
+sed -e 's#^ *##' > "${DOCKERFILE}" <<-EOF
+  FROM alpine:latest
 
-  sed -e 's#^ *##' > "${DOCKERFILE}" <<-EOF
-    FROM alpine:latest
+  RUN apk add --no-cache bash
 
-    RUN apk add --no-cache bash
+  RUN adduser test_user \
+    --disabled-password --gecos "First Last,RoomNumber,WorkPhone,HomePhone"
 
-    RUN adduser test_user \
-      --disabled-password --gecos "First Last,RoomNumber,WorkPhone,HomePhone"
+  USER test_user
 
-    USER test_user
-
-    ${ENTRYPOINT}
+  ${ENTRYPOINT}
 EOF
 
-  gcloud builds submit "${BUILD_DIR}" \
-    --tag "${IMAGE}" \
-    --project "${PROJECT_ID}"
+gcloud builds submit "${BUILD_DIR}" \
+  --tag "${IMAGE}" \
+  --project "${PROJECT_ID}"
 
-  echo "Launching pipeline..."
+echo "Launching pipeline..."
 
-  JOB_ID="$(io_setup::run_dsub)"
+JOB_ID="$(io_setup::run_dsub)"
 
-  if [[ "${DSUB_PROVIDER}" == "local" ]]; then
-    # Cleanup is more challenging when the Docker user isn't root,
-    # so let's make sure it worked right.
-    check_jobid "${JOB_ID}"
-  fi
-
+if [[ "${DSUB_PROVIDER}" == "local" ]]; then
+  # Cleanup is more challenging when the Docker user isn't root,
+  # so let's make sure it worked right.
+  check_jobid "${JOB_ID}"
 fi
 
 # Do validation

@@ -61,25 +61,22 @@ readonly INPUT_SHALLOW="${LOCAL_INPUTS}/shallow"
 
 echo "Setting up test inputs"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+echo "Setting up pipeline input..."
+build_recursive_files "${INPUT_DEEP}" "${INPUT_SHALLOW}"
 
-  echo "Setting up pipeline input..."
-  build_recursive_files "${INPUT_DEEP}" "${INPUT_SHALLOW}"
+gsutil -m rsync -r "${LOCAL_INPUTS}" "${INPUTS}/"
 
-  gsutil -m rsync -r "${LOCAL_INPUTS}" "${INPUTS}/"
+echo "Launching pipeline..."
 
-  echo "Launching pipeline..."
-
-  JOB_ID="$(run_dsub \
-    --image "google/cloud-sdk:latest" \
-    --script "${SCRIPT_DIR}/script_io_recursive.sh" \
-    --env FILE_CONTENTS="${FILE_CONTENTS}" \
-    --input INPUT_PATH_SHALLOW="${INPUTS}/shallow/*" \
-    --input-recursive INPUT_PATH_DEEP="${INPUTS}/deep/" \
-    --output OUTPUT_PATH_SHALLOW="${OUTPUTS}/shallow/*" \
-    --output-recursive OUTPUT_PATH_DEEP="${OUTPUTS}/deep/" \
-    --wait)"
-fi
+JOB_ID="$(run_dsub \
+  --image "google/cloud-sdk:latest" \
+  --script "${SCRIPT_DIR}/script_io_recursive.sh" \
+  --env FILE_CONTENTS="${FILE_CONTENTS}" \
+  --input INPUT_PATH_SHALLOW="${INPUTS}/shallow/*" \
+  --input-recursive INPUT_PATH_DEEP="${INPUTS}/deep/" \
+  --output OUTPUT_PATH_SHALLOW="${OUTPUTS}/shallow/*" \
+  --output-recursive OUTPUT_PATH_DEEP="${OUTPUTS}/deep/" \
+  --wait)"
 
 echo
 echo "Checking output..."
@@ -163,16 +160,14 @@ echo
 echo "GCS output file list matches expected"
 
 # Verify dstat
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
-  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${JOB_ID}")"; then
-    echo "dstat exited with a non-zero exit code!"
-    echo "Output:"
-    echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-  util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].inputs" "{'INPUT_PATH_SHALLOW': '${INPUTS}/shallow/*'}"
-  util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].outputs" "{'OUTPUT_PATH_SHALLOW': '${OUTPUTS}/shallow/*'}"
-  util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].input-recursives" "{'INPUT_PATH_DEEP': '${INPUTS}/deep/'}"
-  util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].output-recursives" "{'OUTPUT_PATH_DEEP': '${OUTPUTS}/deep/'}"
+if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${JOB_ID}")"; then
+  echo "dstat exited with a non-zero exit code!"
+  echo "Output:"
+  echo "${DSTAT_OUTPUT}"
+  exit 1
 fi
+util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].inputs" "{'INPUT_PATH_SHALLOW': '${INPUTS}/shallow/*'}"
+util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].outputs" "{'OUTPUT_PATH_SHALLOW': '${OUTPUTS}/shallow/*'}"
+util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].input-recursives" "{'INPUT_PATH_DEEP': '${INPUTS}/deep/'}"
+util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].output-recursives" "{'OUTPUT_PATH_DEEP': '${OUTPUTS}/deep/'}"
 echo "SUCCESS"

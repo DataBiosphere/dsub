@@ -24,15 +24,11 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+echo "Launching pipeline..."
 
-  echo "Launching pipeline..."
+run_dsub \
+  --image python \
+  --script "${SCRIPT_DIR}/script_python.py" \
+  --wait
 
-  run_dsub \
-    --image python \
-    --script "${SCRIPT_DIR}/script_python.py" \
-    --wait
-
-  echo "SUCCESS"
-
-fi
+echo "SUCCESS"

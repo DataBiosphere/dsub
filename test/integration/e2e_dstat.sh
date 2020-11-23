@@ -152,140 +152,130 @@ function verify_dstat_google_provider_fields() {
 readonly -f verify_dstat_google_provider_fields
 
 
-# This test is not sensitive to the output of the dsub job.
-# Set the ALLOW_DIRTY_TESTS environment variable to 1 in your shell to
-# run this test without first emptying the output and logging directories.
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
-
-  # For google-cls-v2, we will test that the "--location" parameter works by
-  # specifying something other than the default (us-central1) and then verify
-  # that the operation name (which is region-specific) includes the test region.
-  if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
-    export LOCATION=us-west2
-  fi
-
-  echo "Launching pipeline..."
-
-  COMPLETED_JOB_ID="$(run_dsub \
-    --name "${COMPLETED_JOB_NAME}" \
-    --label test-token="${TEST_TOKEN}" \
-    --command 'echo TEST')"
-
-  RUNNING_JOB_ID="$(run_dsub \
-    --name "${RUNNING_JOB_NAME}" \
-    --label test-token="${TEST_TOKEN}" \
-    --command 'sleep 10s')"
-
-  RUNNING_JOB_ID_2="$(run_dsub \
-    --name "${RUNNING_JOB_NAME_2}" \
-    --label test-token="${TEST_TOKEN}" \
-    --command 'sleep 20s')"
-
-  echo ""
-  echo "Waiting for ${COMPLETED_JOB_ID} to complete."
-  echo ""
-  run_dstat --jobs "${COMPLETED_JOB_ID}" --wait
-
-  echo ""
-  echo "Job completed: ${COMPLETED_JOB_ID}. Begin verifications."
-
-  echo "Checking dstat (by status)..."
-
-  if ! DSTAT_OUTPUT="$(run_dstat --status 'RUNNING' 'SUCCESS' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
-    1>&2 echo "dstat exited with a non-zero exit code!"
-    1>&2 echo "Output:"
-    1>&2 echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  verify_dstat_output "${DSTAT_OUTPUT}"
-
-  echo "Checking dstat (by job-name)..."
-
-  # For the google provider, sleep briefly to allow the Pipelines v1
-  # to set the compute properties, which occurs shortly after pipeline submit.
-  if [[ "${DSUB_PROVIDER}" == "google" ]]; then
-    sleep 2
-  fi
-
-  if ! DSTAT_OUTPUT="$(run_dstat --status 'RUNNING' 'SUCCESS' --full --names "${RUNNING_JOB_NAME_2}" "${RUNNING_JOB_NAME}" "${COMPLETED_JOB_NAME}" --label "test-token=${TEST_TOKEN}")"; then
-    1>&2 echo "dstat exited with a non-zero exit code!"
-    1>&2 echo "Output:"
-    1>&2 echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  verify_dstat_output "${DSTAT_OUTPUT}"
-
-  echo "Checking dstat (by job-id: default)..."
-
-  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
-    1>&2 echo "dstat exited with a non-zero exit code!"
-    1>&2 echo "Output:"
-    1>&2 echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${RUNNING_JOB_NAME}"; then
-    1>&2 echo "Job ${RUNNING_JOB_NAME} not found in the dstat output!"
-    1>&2 echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${RUNNING_JOB_NAME_2}"; then
-    1>&2 echo "Job ${RUNNING_JOB_NAME} not found in the dstat output!"
-    1>&2 echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  if ! echo "${DSTAT_OUTPUT}" | grep -qi "${COMPLETED_JOB_NAME}"; then
-    1>&2 echo "Job ${RUNNING_JOB_NAME} not found in the dstat output!"
-    1>&2 echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  echo "Checking dstat (by job-id: full)..."
-
-  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
-    1>&2 echo "dstat exited with a non-zero exit code!"
-    1>&2 echo "Output:"
-    1>&2 echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  verify_dstat_output "${DSTAT_OUTPUT}"
-
-  echo "Checking dstat (by repeated job-ids: full)..."
-
-  if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
-    1>&2 echo "dstat exited with a non-zero exit code!"
-    1>&2 echo "Output:"
-    1>&2 echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  verify_dstat_output "${DSTAT_OUTPUT}"
-
-  echo "Waiting 5 seconds and checking 'dstat --age 5s'..."
-  sleep 5s
-
-  DSTAT_OUTPUT="$(run_dstat_age "5s" --status '*' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"
-  if [[ "${DSTAT_OUTPUT}" != "[]" ]]; then
-    1>&2 echo "dstat output not empty as expected:"
-    1>&2 echo "${DSTAT_OUTPUT}"
-    exit 1
-  fi
-
-  echo "Waiting for all jobs to complete."
-
-  DSTAT_OUTPUT="$(run_dstat --status '*' --full --wait --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"
-  verify_dstat_output "${DSTAT_OUTPUT}" "true"
-
-  echo "SUCCESS"
-
+# For google-cls-v2, we will test that the "--location" parameter works by
+# specifying something other than the default (us-central1) and then verify
+# that the operation name (which is region-specific) includes the test region.
+if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
+  export LOCATION=us-west2
 fi
 
+echo "Launching pipeline..."
 
+COMPLETED_JOB_ID="$(run_dsub \
+  --name "${COMPLETED_JOB_NAME}" \
+  --label test-token="${TEST_TOKEN}" \
+  --command 'echo TEST')"
+
+RUNNING_JOB_ID="$(run_dsub \
+  --name "${RUNNING_JOB_NAME}" \
+  --label test-token="${TEST_TOKEN}" \
+  --command 'sleep 10s')"
+
+RUNNING_JOB_ID_2="$(run_dsub \
+  --name "${RUNNING_JOB_NAME_2}" \
+  --label test-token="${TEST_TOKEN}" \
+  --command 'sleep 20s')"
+
+echo ""
+echo "Waiting for ${COMPLETED_JOB_ID} to complete."
+echo ""
+run_dstat --jobs "${COMPLETED_JOB_ID}" --wait
+
+echo ""
+echo "Job completed: ${COMPLETED_JOB_ID}. Begin verifications."
+
+echo "Checking dstat (by status)..."
+
+if ! DSTAT_OUTPUT="$(run_dstat --status 'RUNNING' 'SUCCESS' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
+  1>&2 echo "dstat exited with a non-zero exit code!"
+  1>&2 echo "Output:"
+  1>&2 echo "${DSTAT_OUTPUT}"
+  exit 1
+fi
+
+verify_dstat_output "${DSTAT_OUTPUT}"
+
+echo "Checking dstat (by job-name)..."
+
+# For the google provider, sleep briefly to allow the Pipelines v1
+# to set the compute properties, which occurs shortly after pipeline submit.
+if [[ "${DSUB_PROVIDER}" == "google" ]]; then
+  sleep 2
+fi
+
+if ! DSTAT_OUTPUT="$(run_dstat --status 'RUNNING' 'SUCCESS' --full --names "${RUNNING_JOB_NAME_2}" "${RUNNING_JOB_NAME}" "${COMPLETED_JOB_NAME}" --label "test-token=${TEST_TOKEN}")"; then
+  1>&2 echo "dstat exited with a non-zero exit code!"
+  1>&2 echo "Output:"
+  1>&2 echo "${DSTAT_OUTPUT}"
+  exit 1
+fi
+
+verify_dstat_output "${DSTAT_OUTPUT}"
+
+echo "Checking dstat (by job-id: default)..."
+
+if ! DSTAT_OUTPUT="$(run_dstat --status '*' --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
+  1>&2 echo "dstat exited with a non-zero exit code!"
+  1>&2 echo "Output:"
+  1>&2 echo "${DSTAT_OUTPUT}"
+  exit 1
+fi
+
+if ! echo "${DSTAT_OUTPUT}" | grep -qi "${RUNNING_JOB_NAME}"; then
+  1>&2 echo "Job ${RUNNING_JOB_NAME} not found in the dstat output!"
+  1>&2 echo "${DSTAT_OUTPUT}"
+  exit 1
+fi
+
+if ! echo "${DSTAT_OUTPUT}" | grep -qi "${RUNNING_JOB_NAME_2}"; then
+  1>&2 echo "Job ${RUNNING_JOB_NAME} not found in the dstat output!"
+  1>&2 echo "${DSTAT_OUTPUT}"
+  exit 1
+fi
+
+if ! echo "${DSTAT_OUTPUT}" | grep -qi "${COMPLETED_JOB_NAME}"; then
+  1>&2 echo "Job ${RUNNING_JOB_NAME} not found in the dstat output!"
+  1>&2 echo "${DSTAT_OUTPUT}"
+  exit 1
+fi
+
+echo "Checking dstat (by job-id: full)..."
+
+if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
+  1>&2 echo "dstat exited with a non-zero exit code!"
+  1>&2 echo "Output:"
+  1>&2 echo "${DSTAT_OUTPUT}"
+  exit 1
+fi
+
+verify_dstat_output "${DSTAT_OUTPUT}"
+
+echo "Checking dstat (by repeated job-ids: full)..."
+
+if ! DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"; then
+  1>&2 echo "dstat exited with a non-zero exit code!"
+  1>&2 echo "Output:"
+  1>&2 echo "${DSTAT_OUTPUT}"
+  exit 1
+fi
+
+verify_dstat_output "${DSTAT_OUTPUT}"
+
+echo "Waiting 5 seconds and checking 'dstat --age 5s'..."
+sleep 5s
+
+DSTAT_OUTPUT="$(run_dstat_age "5s" --status '*' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"
+if [[ "${DSTAT_OUTPUT}" != "[]" ]]; then
+  1>&2 echo "dstat output not empty as expected:"
+  1>&2 echo "${DSTAT_OUTPUT}"
+  exit 1
+fi
+
+echo "Waiting for all jobs to complete."
+
+DSTAT_OUTPUT="$(run_dstat --status '*' --full --wait --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"
+verify_dstat_output "${DSTAT_OUTPUT}" "true"
+
+echo "SUCCESS"

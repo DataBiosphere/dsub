@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 Google Inc. All Rights Reserved.
+# Copyright 2020 Verily Life Sciences Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 set -o errexit
 set -o nounset
 
-# Basic test of the "--command" flag.
+# Basic test of using a small attached GPU.
 #
 # No input files.
 # No output files.
@@ -30,37 +30,25 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
 echo "Launching pipeline..."
 
-BOOT_DISK_SIZE=20 \
+# Use the python:slim image just to demonstrate that no special image is needed.
+# The necessary GPU libraries and files are mounted from the VM into the container.
 run_dsub \
-  --image "debian:stable-slim" \
-  --min-cores "1" \
-  --min-ram "3.75" \
-  --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
-  --env VAR4="VAL4" \
-  --env VAR5="VAL5" \
+  --image 'python:slim' \
+  --accelerator-type 'nvidia-tesla-p4' \
+  --accelerator-count 1 \
   --command '\
-    # This comment is here to verify that dsub will properly handle
-    # a command that starts with a comment, specifically with regards to
-    # deriving a usable job name.
-    env | grep ^VAR | sort' \
+    export LD_LIBRARY_PATH="/usr/local/nvidia/lib64" && \
+    /usr/local/nvidia/bin/nvidia-smi' \
   --wait
 
 echo
 echo "Checking output..."
 
 # Check the results
-readonly RESULT_EXPECTED=$(cat <<EOF
-VAR1=VAL1
-VAR2=VAL2
-VAR3=VAL3
-VAR4=VAL4
-VAR5=VAL5
-EOF
-)
-
-readonly RESULT="$(gsutil cat "${STDOUT_LOG}")"
-if ! diff <(echo "${RESULT_EXPECTED}") <(echo "${RESULT}"); then
-  echo "Output file does not match expected"
+RESULT="$(gsutil cat "${STDOUT_LOG}")"
+if ! echo "${RESULT}" | grep -qi "GPU Memory"; then
+  1>&2 echo "GPU Memory not found in the dsub output!"
+  1>&2 echo "${RESULT}"
   exit 1
 fi
 
@@ -68,7 +56,6 @@ echo
 echo "Output file matches expected:"
 echo "*****************************"
 echo "${RESULT}"
-echo "*****************************"
-
+  echo "*****************************"
 echo "SUCCESS"
 

@@ -24,33 +24,30 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 # Do standard test setup
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
-if [[ "${CHECK_RESULTS_ONLY:-0}" -eq 0 ]]; then
+echo "Launching pipeline..."
 
-  echo "Launching pipeline..."
-
-  set +o errexit
-  JOB_ID="$(run_dsub \
-    --image 'debian:stable-slim' \
-    --name 'e2e-error' \
-    --command 'idontknowhowtounix' \
-    --wait)"
-  if [[ $? -eq 0 ]]; then
-    echo "dsub did not report the failure as it should have."
-    exit 1
-  fi
-  set -o errexit
-
-  DSTAT_OUTPUT=$(run_dstat --status '*' --jobs "${JOB_ID}" --full)
-
-  declare -a EXPECTED_EVENTS
-  if [[ "${DSUB_PROVIDER}" == "local" ]]; then
-    # The local provider has slightly different events in this error case
-    EXPECTED_EVENTS=(start pulling-image localizing-files running-docker delocalizing-files fail)
-  else
-    EXPECTED_EVENTS=(start pulling-image localizing-files running-docker fail)
-  fi
-  util::dstat_out_assert_equal_events "${DSTAT_OUTPUT}" "[0].events" "${EXPECTED_EVENTS[@]}"
+set +o errexit
+JOB_ID="$(run_dsub \
+  --image 'debian:stable-slim' \
+  --name 'e2e-error' \
+  --command 'idontknowhowtounix' \
+  --wait)"
+if [[ $? -eq 0 ]]; then
+  echo "dsub did not report the failure as it should have."
+  exit 1
 fi
+set -o errexit
+
+DSTAT_OUTPUT=$(run_dstat --status '*' --jobs "${JOB_ID}" --full)
+
+declare -a EXPECTED_EVENTS
+if [[ "${DSUB_PROVIDER}" == "local" ]]; then
+  # The local provider has slightly different events in this error case
+  EXPECTED_EVENTS=(start pulling-image localizing-files running-docker delocalizing-files fail)
+else
+  EXPECTED_EVENTS=(start pulling-image localizing-files running-docker fail)
+fi
+util::dstat_out_assert_equal_events "${DSTAT_OUTPUT}" "[0].events" "${EXPECTED_EVENTS[@]}"
 
 echo "SUCCESS"
 
