@@ -367,7 +367,8 @@ namespace (named "shared").
 
 The SSH container will pick up authentication information from the VM, so to
 connect you can use the `gcloud compute ssh` command to establish an SSH
-session.
+session. Alternatively, you can use the cloud console UI to SSH from the
+browser. See [SSH from the browser](https://cloud.google.com/compute/docs/ssh-in-browser).
 
 The VM `instance-name` and `zone` can be found in the `provider-attributes`
 section of `dstat ... --full` output. For example:
@@ -394,3 +395,5 @@ Then issue the command:
       --zone <zone> \
      <instance-name>
 ```
+
+Or alternatively, [SSH from the browser](https://cloud.google.com/compute/docs/ssh-in-browser).
