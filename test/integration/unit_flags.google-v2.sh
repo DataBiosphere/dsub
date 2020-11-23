@@ -353,9 +353,11 @@ function test_accelerator_type_and_count() {
     assert_err_value_equals \
      "[0].pipeline.resources.virtualMachine.accelerators.[0].type" "nvidia-tesla-k80"
     assert_err_value_equals \
-     "[0].pipeline.resources.virtualMachine.nvidiaDriverVersion" "390.46"
-    assert_err_value_equals \
      "[0].pipeline.resources.virtualMachine.accelerators.[0].count" "2"
+
+    # The nvidia-driver-version should be ignored (deprecated Sept 2020)
+    assert_err_value_equals \
+     "[0].pipeline.resources.virtualMachine.nvidiaDriverVersion" "None"
 
     test_passed "${subtest}"
   else

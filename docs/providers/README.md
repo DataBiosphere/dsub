@@ -404,24 +404,21 @@ The following `dsub` parameters are specific to the `google-v2` and
 
 - GPU resources
     - `--accelerator-type`:
-        - The Compute Engine accelerator type. By specifying this parameter, you
-          will download and install the following third-party software onto your
-          job's Compute Engine instances:
+        - The Compute Engine accelerator type. See
+          https://cloud.google.com/compute/docs/gpus/ for supported GPU types.
 
-          - NVIDIA(R) Tesla(R) drivers and NVIDIA(R) CUDA toolkit.
+          Only NVIDIA GPU accelerators are currently supported. If an NVIDIA GPU
+          is attached, the required runtime libraries will be made available to
+          all containers under /usr/local/nvidia.
 
-          Please see [GPUs](https://cloud.google.com/compute/docs/gpus/) for
-          supported GPU types and
-          [pipelines.accelerator](https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.pipelines/run#accelerator)
-          for more details.
+          Each version of Container-Optimized OS image (used by the Pipelines
+          API) has a default supported NVIDIA GPU driver version. See
+          https://cloud.google.com/container-optimized-os/docs/how-to/run-gpus#install
+
+          Note that attaching a GPU increases the worker VM startup time by a
+          few minutes. (default: None)
     - `--accelerator-count`:
       - The number of accelerators of the specified type to attach. By
         specifying this parameter, you will download and install the following
         third-party software onto your job's Compute Engine instances: NVIDIA(R)
         Tesla(R) drivers and NVIDIA(R) CUDA toolkit. (default: 0)
-    - `--nvidia-driver-version`:
-      - The NVIDIA driver version to use when attaching an NVIDIA GPU
-        accelerator. The version specified here must be compatible with the GPU
-        libraries contained in the container being executed, and must be one of
-        the drivers hosted in the nvidia-drivers-us-public bucket on Google
-        Cloud Storage.

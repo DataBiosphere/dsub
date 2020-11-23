@@ -191,6 +191,13 @@ def _check_private_address(args):
           '--use-private-address must specify a --image with a gcr.io host')
 
 
+def _check_nvidia_driver_version(args):
+  """If --nvidia-driver-version is set, warn that it is ignored."""
+  if args.nvidia_driver_version:
+    print('***WARNING: The --nvidia-driver-version flag is deprecated and will '
+          'be ignored.')
+
+
 def _google_cls_v2_parse_arguments(args):
   """Validated google-cls-v2 arguments."""
 
@@ -206,6 +213,7 @@ def _google_cls_v2_parse_arguments(args):
         '--machine-type not supported together with --min-cores or --min-ram.')
 
   _check_private_address(args)
+  _check_nvidia_driver_version(args)
 
 
 def _google_v2_parse_arguments(args):
@@ -218,6 +226,7 @@ def _google_v2_parse_arguments(args):
         '--machine-type not supported together with --min-cores or --min-ram.')
 
   _check_private_address(args)
+  _check_nvidia_driver_version(args)
 
 
 def _local_parse_arguments(args):
@@ -462,14 +471,19 @@ def _parse_arguments(prog, argv):
               google_base.DEFAULT_SCOPES))
   google_common.add_argument(
       '--accelerator-type',
-      help="""The Compute Engine accelerator type. By specifying this parameter,
-          you will download and install the following third-party software onto
-          your job's Compute Engine instances: NVIDIA(R) Tesla(R) drivers and
-          NVIDIA(R) CUDA toolkit. Please see
-          https://cloud.google.com/compute/docs/gpus/ for supported GPU types
-          and
-          https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.pipelines/run#accelerator
-          for more details. (default: None)""")
+      help="""The Compute Engine accelerator type. See
+          https://cloud.google.com/compute/docs/gpus/ for supported GPU types.
+
+          Only NVIDIA GPU accelerators are currently supported. If an NVIDIA GPU
+          is attached, the required runtime libraries will be made available to
+          all containers under /usr/local/nvidia.
+
+          Each version of Container-Optimized OS image (used by the Pipelines
+          API) has a default supported NVIDIA GPU driver version. See
+          https://cloud.google.com/container-optimized-os/docs/how-to/run-gpus#install
+
+          Note that attaching a GPU increases the worker VM startup time by a
+          few minutes. (default: None)""")
   google_common.add_argument(
       '--accelerator-count',
       type=int,
@@ -532,13 +546,7 @@ def _parse_arguments(prog, argv):
       help="""If set to true, start an ssh container in the background
           to allow you to log in using SSH and debug in real time.
           (default: False)""")
-  google_common.add_argument(
-      '--nvidia-driver-version',
-      help="""The NVIDIA driver version to use when attaching an NVIDIA GPU
-          accelerator. The version specified here must be compatible with the
-          GPU libraries contained in the container being executed, and must be
-          one of the drivers hosted in the nvidia-drivers-us-public bucket on
-          Google Cloud Storage. (default: None)""")
+  google_common.add_argument('--nvidia-driver-version', help=argparse.SUPPRESS)
   google_common.add_argument(
       '--service-account',
       type=str,
@@ -619,7 +627,7 @@ def _get_job_resources(args):
       use_private_address=args.use_private_address,
       accelerator_type=args.accelerator_type,
       accelerator_count=args.accelerator_count,
-      nvidia_driver_version=args.nvidia_driver_version,
+      nvidia_driver_version=None,
       timeout=timeout,
       log_interval=log_interval,
       ssh=args.ssh,
