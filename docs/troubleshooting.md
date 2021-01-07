@@ -348,7 +348,7 @@ $ dstat \
 ## Viewing logs
 
 Each `dsub` task produces log files whose destination is determined by the `--logging` flag.
-See [Logging](https://github.com/DataBiosphere/dsub/blob/master/docs/logging.md)
+See [Logging](https://github.com/DataBiosphere/dsub/blob/main/docs/logging.md)
 for more information.
 
 ## SSH to the VM

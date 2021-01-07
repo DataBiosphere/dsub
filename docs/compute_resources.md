@@ -92,7 +92,7 @@ For more information on Compute Engine IP addresses, see:
 Running the job on VMs without a public IP address has the advantage that it
 does not consume `In-use IP addresses` quota, which can otherwise limit your
 ability to scale up your concurrently running tasks.
-See the [Compute Quotas](https://github.com/DataBiosphere/dsub/blob/master/docs/compute_quotas.md)
+See the [Compute Quotas](https://github.com/DataBiosphere/dsub/blob/main/docs/compute_quotas.md)
 documentation for more details.
 
 Running jobs on VMs without a public IP address requires the following:
