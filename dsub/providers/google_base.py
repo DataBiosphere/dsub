@@ -21,15 +21,14 @@ import json
 import re
 import warnings
 
+import google.auth
+from google.oauth2 import service_account
 import googleapiclient.discovery
 import googleapiclient.errors
 from ..lib import job_model
 from ..lib import retry_util
 import pytz
 import tenacity
-
-import google.auth
-from google.oauth2 import service_account
 
 
 # The google v1 provider directly added the bigquery scope, but the v1alpha2
@@ -86,12 +85,18 @@ _ZONES = [
     'asia-northeast2-a',
     'asia-northeast2-b',
     'asia-northeast2-c',
+    'asia-northeast3-a',
+    'asia-northeast3-b',
+    'asia-northeast3-c',
     'asia-south1-a',
     'asia-south1-b',
     'asia-south1-c',
     'asia-southeast1-a',
     'asia-southeast1-b',
     'asia-southeast1-c',
+    'asia-southeast2-a',
+    'asia-southeast2-b',
+    'asia-southeast2-c',
     'australia-southeast1-a',
     'australia-southeast1-b',
     'australia-southeast1-c',
@@ -135,6 +140,12 @@ _ZONES = [
     'us-west2-a',
     'us-west2-b',
     'us-west2-c',
+    'us-west3-a',
+    'us-west3-b',
+    'us-west3-c',
+    'us-west4-a',
+    'us-west4-b',
+    'us-west4-c',
 ]
 
 
