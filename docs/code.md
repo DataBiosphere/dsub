@@ -3,7 +3,7 @@
 `dsub` provides a few choices for how to get your code into the Docker
 container in order to run:
 
-* --command "shell string"
+* --command 'shell string'
 * --script "script file (Bash, Python, etc.)"
 * --image "Docker image"
 * --input "path to file in cloud storage"
