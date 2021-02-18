@@ -564,6 +564,13 @@ def _parse_arguments(prog, argv):
       action='store_true',
       help="""If set to true, enables Stackdriver monitoring on the VM.
               (default: False)""")
+  google_common.add_argument(
+      '--block-external-network',
+      default=False,
+      action='store_true',
+      help="""If set to true, prevents the container for the user's
+          script/command from accessing the external network.
+          (default: False)""")
 
   google_cls_v2 = parser.add_argument_group(
       title='"google-cls-v2" provider options',
@@ -633,7 +640,8 @@ def _get_job_resources(args):
       ssh=args.ssh,
       enable_stackdriver_monitoring=args.enable_stackdriver_monitoring,
       max_retries=args.retries,
-      max_preemptible_attempts=args.preemptible)
+      max_preemptible_attempts=args.preemptible,
+      block_external_network=args.block_external_network)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids,

@@ -29,7 +29,7 @@ source "${SCRIPT_DIR}/test_setup_unit.sh"
 
 function call_dsub() {
   local image="${DOCKER_IMAGE_OVERRIDE:-dummy-image}"
-  
+
   dsub \
     --provider "${DSUB_PROVIDER}" \
     --project "${PROJECT_ID}" \
@@ -758,6 +758,53 @@ function test_no_stackdriver() {
 }
 readonly -f test_no_stackdriver
 
+function test_block_external_network() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --block-external-network; then
+
+    # Check that the output contains expected values
+    if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
+      assert_err_value_equals \
+        "[0].pipeline.actions.[3].blockExternalNetwork" "True"
+    elif [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+      assert_err_value_equals \
+        "[0].pipeline.actions.[3].flags.[0]" "BLOCK_EXTERNAL_NETWORK"
+    fi
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_block_external_network
+
+function test_no_block_external_network() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output does not contain block network flag
+    if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
+      assert_err_value_equals \
+       "[0].pipeline.actions.[3].blockExternalNetwork" "False"
+    elif [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+      assert_err_not_contains \
+       "BLOCK_EXTERNAL_NETWORK"
+    fi
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_no_block_external_network
+
 
 # Run the tests
 trap "exit_handler" EXIT
@@ -827,3 +874,7 @@ test_no_disk_type
 echo
 test_stackdriver
 test_no_stackdriver
+
+echo
+test_block_external_network
+test_no_block_external_network
