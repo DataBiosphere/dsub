@@ -140,8 +140,10 @@ def get_storage_service(credentials):
       'ignore', 'Your application has authenticated using end user credentials')
   if credentials is None:
     credentials, _ = google.auth.default()
+  # Set cache_discovery to False because we use google-auth
+  # See https://github.com/googleapis/google-api-python-client/issues/299
   return googleapiclient.discovery.build(
-      'storage', 'v1', credentials=credentials)
+      'storage', 'v1', credentials=credentials, cache_discovery=False)
 
 
 # Exponential backoff retrying downloads of GCS object chunks.
