@@ -94,7 +94,9 @@ function delocalize_logs_function() {
 readonly -f delocalize_logs_function
 
 function get_timestamp() {
-  python \
+  # Using Python instead of /usr/bin/date because the MacOS version cannot get
+  # microsecond precision in the format.
+  "${PYTHON}" \
     -c 'import datetime; print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"))'
 }
 readonly -f get_timestamp
@@ -224,7 +226,11 @@ function exit_if_canceled() {
 readonly -f exit_if_canceled
 
 # Begin main execution
-write_event "start"
+PYTHON="$(which python3 || which python)"
+if [[ -z "${PYTHON}" ]]; then
+  1>&2 echo "ERROR: Could not find python executable"
+  exit 1
+fi
 
 # Trap errors and handle them instead of using errexit
 set +o errexit
@@ -236,6 +242,8 @@ trap 'error ${LINENO} $? "Exit (undefined variable or kill?)"' EXIT
 
 # Make sure that ERR traps are inherited by shell functions
 set -o errtrace
+
+write_event "start"
 
 # Handle gcr.io images
 write_event "pulling-image"

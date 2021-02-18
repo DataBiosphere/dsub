@@ -824,6 +824,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
         google_v2_pipelines.build_action(
             name='user-command',
             pid_namespace=pid_namespace,
+            block_external_network=job_resources.block_external_network,
             image_uri=job_resources.image,
             mounts=[mnt_datadisk] + persistent_disk_mounts,
             environment=user_environment,
@@ -1509,6 +1510,10 @@ class GoogleOperation(base.Task):
 
       # The ssh flag is determined by if an action named 'ssh' exists.
       value['ssh'] = self._is_ssh_enabled(self._op)
+
+      value[
+          'block-external-network'] = google_v2_operations.external_network_blocked(
+              self._op)
 
       # The VM instance name and zone can be found in the WorkerAssignedEvent.
       # For a given operation, this may have occurred multiple times, so be

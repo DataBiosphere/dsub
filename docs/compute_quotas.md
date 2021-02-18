@@ -126,7 +126,7 @@ Most commonly, the quotas relevant for `dsub` tasks are:
 > **_NOTE:_** To eliminate dependence on the `In-use IP addresses` quota,
 > the Google providers support the `--use-private-address` flag.
 > See the `Public IP addresses` section of
-> [Compute Resources](https://github.com/DataBiosphere/dsub/blob/master/docs/compute_resources.md).
+> [Compute Resources](https://github.com/DataBiosphere/dsub/blob/main/docs/compute_resources.md).
 
 
 ## Troubleshooting Quota issues

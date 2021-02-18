@@ -166,7 +166,8 @@ def build_action(name=None,
                  labels=None,
                  always_run=None,
                  enable_fuse=None,
-                 run_in_background=None):
+                 run_in_background=None,
+                 block_external_network=None):
   """Build an Action object for a Pipeline request.
 
   Args:
@@ -183,6 +184,8 @@ def build_action(name=None,
     always_run (bool): Action must run even if pipeline has already failed.
     enable_fuse (bool): Enable access to the FUSE device for this action.
     run_in_background (bool): Allow the action to run in the background.
+    block_external_network (bool): Prevents the container from accessing the
+      external network.
 
   Returns:
     An object representing an Action resource.
@@ -210,6 +213,8 @@ def build_action(name=None,
       flags.append('ENABLE_FUSE')
     if run_in_background:
       flags.append('RUN_IN_BACKGROUND')
+    if block_external_network:
+      flags.append('BLOCK_EXTERNAL_NETWORK')
 
     if flags:
       action['flags'] = flags
@@ -221,6 +226,7 @@ def build_action(name=None,
     action['alwaysRun'] = always_run
     action['enableFuse'] = enable_fuse
     action['runInBackground'] = run_in_background
+    action['blockExternalNetwork'] = block_external_network
 
   else:
     assert False, 'Unexpected version: {}'.format(_API_VERSION)

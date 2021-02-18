@@ -158,6 +158,21 @@ def get_last_event(op):
   return None
 
 
+def external_network_blocked(op):
+  """Retun True if the blockExternalNetwork flag is set for the user action."""
+  user_action = get_action_by_name(op, 'user-command')
+  if user_action:
+    if _API_VERSION == google_v2_versions.V2ALPHA1:
+      flags = user_action.get('flags')
+      if flags:
+        return 'BLOCK_EXTERNAL_NETWORK' in flags
+    elif _API_VERSION == google_v2_versions.V2BETA:
+      return user_action.get('blockExternalNetwork')
+    else:
+      assert False, 'Unexpected version: {}'.format(_API_VERSION)
+  return False
+
+
 def is_unexpected_exit_status_event(e):
   """Retun True if the event is for an unexpected exit status."""
   if _API_VERSION == google_v2_versions.V2ALPHA1:

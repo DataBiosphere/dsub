@@ -436,6 +436,7 @@ class Resources(
         'enable_stackdriver_monitoring',
         'max_retries',
         'max_preemptible_attempts',
+        'block_external_network',
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -473,6 +474,8 @@ class Resources(
     max_preemptible_attempts (param_util.PreemptibleParam): Int representing
       maximum allowed number of attempts on a preemptible machine, or boolean
       representing always preemtible.
+    block_external_network (bool): Prevents the containers from accessing the
+      external network.
   """
   __slots__ = ()
 
@@ -503,7 +506,8 @@ class Resources(
               ssh=None,
               enable_stackdriver_monitoring=None,
               max_retries=None,
-              max_preemptible_attempts=None):
+              max_preemptible_attempts=None,
+              block_external_network=None):
     return super(Resources,
                  cls).__new__(cls, min_cores, min_ram, machine_type, disk_size,
                               disk_type, boot_disk_size, preemptible, image,
@@ -512,7 +516,8 @@ class Resources(
                               subnetwork, use_private_address, accelerator_type,
                               accelerator_count, nvidia_driver_version, timeout,
                               log_interval, ssh, enable_stackdriver_monitoring,
-                              max_retries, max_preemptible_attempts)
+                              max_retries, max_preemptible_attempts,
+                              block_external_network)
 
 
 def ensure_job_params_are_complete(job_params):

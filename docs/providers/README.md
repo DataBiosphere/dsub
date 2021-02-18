@@ -341,6 +341,9 @@ The following `dsub` parameters are specific to the `google-v2` and
     - `--use-private-address`:
       - If set to true, do not attach a public IP address to the VM.
         (default: False)
+    - `--block-external-network`:
+      - If set to true, prevents the container for the user's script/command
+        from accessing the external network. (default: False)
 
 - Per-task compute resources
     - `--boot-disk-size`:
