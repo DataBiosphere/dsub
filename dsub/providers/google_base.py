@@ -449,8 +449,10 @@ def setup_service(api_name, api_version, credentials=None):
       'ignore', 'Your application has authenticated using end user credentials')
   if not credentials:
     credentials, _ = google.auth.default()
+  # Set cache_discovery to False because we use google-auth
+  # See https://github.com/googleapis/google-api-python-client/issues/299
   return googleapiclient.discovery.build(
-      api_name, api_version, credentials=credentials)
+      api_name, api_version, cache_discovery=False, credentials=credentials)
 
 
 def credentials_from_service_account_info(credentials_file):
