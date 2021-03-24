@@ -56,6 +56,9 @@ class _Printer(object):
   def write(self, buf):
     self._fileobj.write(buf)
 
+  def flush(self):
+    self._fileobj.flush()
+
 
 @contextlib.contextmanager
 def replace_print(fileobj=sys.stderr):
