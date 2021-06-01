@@ -15,32 +15,41 @@
 """Utility functions used by dsub, dstat, ddel."""
 
 import contextlib
+import datetime
 import fnmatch
 import io
 import os
 import pwd
 import sys
 import warnings
-from . import retry_util
+from typing import List
+from typing import Tuple
+from typing import TextIO
+from typing import Union
 
+import google.auth
 import googleapiclient.discovery
 import googleapiclient.errors
 import googleapiclient.http
 import tenacity
+from google.auth.credentials import Credentials
+from googleapiclient.discovery import Resource as GCPResource
 
-import google.auth
+from . import retry_util
+from .job_model import OutputFileParam
+from ..providers.base import Task
 
 
 # this is the Job ID for jobs that are skipped.
 NO_JOB = 'NO_JOB'
 
 
-def replace_timezone(dt, tz):
+def replace_timezone(dt: datetime.datetime, tz: Union[datetime.tzinfo, None]):
   # pylint: disable=g-tzinfo-replace
   return dt.replace(tzinfo=tz)
 
 
-def datetime_is_timezone_aware(dt):
+def datetime_is_timezone_aware(dt: datetime.datetime) -> bool:
   # From datetime docs:
   # https://docs.python.org/3/library/datetime.html#determining-if-an-object-is-aware-or-naive
   return dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None
@@ -49,16 +58,16 @@ def datetime_is_timezone_aware(dt):
 class _Printer(object):
   """File-like stream object that redirects stdout to a file object."""
 
-  def __init__(self, fileobj):
+  def __init__(self, fileobj: TextIO):
     self._actual_stdout = sys.stdout
     self._fileobj = fileobj
 
-  def write(self, buf):
+  def write(self, buf: str) -> None:
     self._fileobj.write(buf)
 
 
 @contextlib.contextmanager
-def replace_print(fileobj=sys.stderr):
+def replace_print(fileobj: TextIO = sys.stderr):
   """Sys.out replacer, by default with stderr.
 
   Use it like this:
@@ -82,22 +91,22 @@ def replace_print(fileobj=sys.stderr):
     sys.stdout = previous_stdout
 
 
-def print_error(msg):
+def print_error(msg) -> None:
   """Utility routine to emit messages to stderr."""
   print(msg, file=sys.stderr)
 
 
-def get_os_user():
+def get_os_user() -> str:
   """Returns the current OS user, this may be different from the dsub user."""
   return pwd.getpwuid(os.getuid())[0]
 
 
-def tasks_to_job_ids(task_list):
+def tasks_to_job_ids(task_list: List[Task]):
   """Returns the set of job IDs for the given tasks."""
   return set([t.get_field('job-id') for t in task_list])
 
 
-def compact_interval_string(value_list):
+def compact_interval_string(value_list: List[int]) -> str:
   """Compact a list of integers into a comma-separated string of intervals.
 
   Args:
@@ -113,8 +122,8 @@ def compact_interval_string(value_list):
   value_list.sort()
 
   # Start by simply building up a list of separate contiguous intervals
-  interval_list = []
-  curr = []
+  interval_list: List[Tuple[int, int]] = []
+  curr: List[int] = []
   for val in value_list:
     if curr and (val > curr[-1] + 1):
       interval_list.append((curr[0], curr[-1]))
@@ -133,7 +142,7 @@ def compact_interval_string(value_list):
   ])
 
 
-def get_storage_service(credentials):
+def get_storage_service(credentials: Union[Credentials, None]) -> GCPResource:
   """Get a storage client using the provided credentials or defaults."""
   # dsub is not a server application, so it is ok to filter this warning.
   warnings.filterwarnings(
@@ -158,12 +167,14 @@ def get_storage_service(credentials):
     retry=retry_util.retry_auth_check,
     wait=tenacity.wait_exponential(multiplier=0.5, max=8),
     retry_error_callback=retry_util.on_give_up)
-def _downloader_next_chunk(downloader):
+def _downloader_next_chunk(downloader: googleapiclient.http.MediaIoBaseDownload):
   """Downloads the next chunk."""
   return downloader.next_chunk()
 
 
-def _load_file_from_gcs(gcs_file_path, credentials=None):
+def _load_file_from_gcs(
+    gcs_file_path: str, credentials: Union[Credentials, None] = None
+) -> str:
   """Load context from a text file in gcs.
 
   Args:
@@ -176,7 +187,7 @@ def _load_file_from_gcs(gcs_file_path, credentials=None):
   gcs_service = get_storage_service(credentials)
 
   bucket_name, object_name = gcs_file_path[len('gs://'):].split('/', 1)
-  request = gcs_service.objects().get_media(
+  request = gcs_service.objects().get_media(  # type: ignore
       bucket=bucket_name, object=object_name)
 
   file_handle = io.BytesIO()
@@ -191,7 +202,7 @@ def _load_file_from_gcs(gcs_file_path, credentials=None):
   return filevalue
 
 
-def load_file(file_path, credentials=None):
+def load_file(file_path: str, credentials: Union[Credentials, None] = None) -> str:
   """Load a file from either local or gcs.
 
   Args:
@@ -223,7 +234,11 @@ def load_file(file_path, credentials=None):
     retry=retry_util.retry_auth_check,
     wait=tenacity.wait_exponential(multiplier=0.5, max=8),
     retry_error_callback=retry_util.on_give_up)
-def _file_exists_in_gcs(gcs_file_path, credentials=None, storage_service=None):
+def _file_exists_in_gcs(
+    gcs_file_path: str,
+    credentials: Union[Credentials, None] = None,
+    storage_service: Union[GCPResource, None] = None,
+):
   """Check whether the file exists, in GCS.
 
   Args:
@@ -238,7 +253,7 @@ def _file_exists_in_gcs(gcs_file_path, credentials=None, storage_service=None):
     storage_service = get_storage_service(credentials)
 
   bucket_name, object_name = gcs_file_path[len('gs://'):].split('/', 1)
-  request = storage_service.objects().get(
+  request = storage_service.objects().get(  # type: ignore
       bucket=bucket_name, object=object_name, projection='noAcl')
   try:
     request.execute()
@@ -261,7 +276,11 @@ def _file_exists_in_gcs(gcs_file_path, credentials=None, storage_service=None):
     retry=retry_util.retry_auth_check,
     wait=tenacity.wait_exponential(multiplier=0.5, max=8),
     retry_error_callback=retry_util.on_give_up)
-def _prefix_exists_in_gcs(gcs_prefix, credentials=None, storage_service=None):
+def _prefix_exists_in_gcs(
+    gcs_prefix: str,
+    credentials: Union[Credentials, None] = None,
+    storage_service: Union[GCPResource, None] = None,
+):
   """Check whether there is a GCS object whose name starts with the prefix.
 
   Since GCS doesn't actually have folders, this is how we check instead.
@@ -283,13 +302,17 @@ def _prefix_exists_in_gcs(gcs_prefix, credentials=None, storage_service=None):
   bucket_name, prefix = gcs_prefix[len('gs://'):].split('/', 1)
   # documentation in
   # https://cloud.google.com/storage/docs/json_api/v1/objects/list
-  request = storage_service.objects().list(
+  request = storage_service.objects().list(  # type: ignore
       bucket=bucket_name, prefix=prefix, maxResults=1)
   response = request.execute()
   return response.get('items', None)
 
 
-def folder_exists(folder_path, credentials=None, storage_service=None):
+def folder_exists(
+    folder_path: str,
+    credentials: Union[Credentials, None] = None,
+    storage_service: Union[GCPResource, None] = None,
+):
   if folder_path.startswith('gs://'):
     return _prefix_exists_in_gcs(
         folder_path.rstrip('/') + '/', credentials, storage_service)
@@ -311,9 +334,11 @@ def folder_exists(folder_path, credentials=None, storage_service=None):
     retry=retry_util.retry_auth_check,
     wait=tenacity.wait_exponential(multiplier=0.5, max=8),
     retry_error_callback=retry_util.on_give_up)
-def simple_pattern_exists_in_gcs(file_pattern,
-                                 credentials=None,
-                                 storage_service=None):
+def simple_pattern_exists_in_gcs(
+    file_pattern: str,
+    credentials: Union[Credentials, None] = None,
+    storage_service: Union[GCPResource, None] = None,
+):
   """True iff an object exists matching the input GCS pattern.
 
   The GCS pattern must be a full object reference or a "simple pattern" that
@@ -348,7 +373,7 @@ def simple_pattern_exists_in_gcs(file_pattern,
   # and there isn't one in bucket_name. Hence it must be in prefix.
   assert '*' in prefix
   prefix_no_wildcard = prefix[:prefix.index('*')]
-  request = storage_service.objects().list(
+  request = storage_service.objects().list(  # type: ignore
       bucket=bucket_name, prefix=prefix_no_wildcard)
   response = request.execute()
   if 'items' not in response:
@@ -357,7 +382,10 @@ def simple_pattern_exists_in_gcs(file_pattern,
   return any(fnmatch.fnmatch(i, prefix) for i in items_list)
 
 
-def outputs_are_present(outputs, storage_service=None):
+def outputs_are_present(
+    outputs: set[OutputFileParam],
+    storage_service: Union[GCPResource, None] = None
+) -> bool:
   """True if each output contains at least one file or no output specified."""
   # outputs are OutputFileParam (see param_util.py)
 
@@ -371,7 +399,6 @@ def outputs_are_present(outputs, storage_service=None):
       if not folder_exists(o.value, storage_service=storage_service):
         return False
     else:
-      if not simple_pattern_exists_in_gcs(
-          o.value, storage_service=storage_service):
+      if not simple_pattern_exists_in_gcs(o.value, storage_service=storage_service):
         return False
   return True
