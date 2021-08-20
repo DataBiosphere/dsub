@@ -424,14 +424,14 @@ def cancel(batch_fn, cancel_fn, ops):
 @tenacity.retry(
     stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
     retry=retry_util.retry_api_check,
-    wait=tenacity.wait_exponential(multiplier=0.5, max=64),
+    wait=tenacity.wait_exponential(multiplier=1, max=64),
     retry_error_callback=retry_util.on_give_up)
 # For API errors dealing with auth, we want to retry, but not as often
 # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
 @tenacity.retry(
     stop=tenacity.stop_after_attempt(retry_util.MAX_AUTH_ATTEMPTS),
     retry=retry_util.retry_auth_check,
-    wait=tenacity.wait_exponential(multiplier=0.5, max=8),
+    wait=tenacity.wait_exponential(multiplier=1, max=8),
     retry_error_callback=retry_util.on_give_up)
 def setup_service(api_name, api_version, credentials=None):
   """Configures genomics API client.
@@ -469,14 +469,14 @@ class Api(object):
   @tenacity.retry(
       stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
       retry=retry_util.retry_api_check,
-      wait=tenacity.wait_exponential(multiplier=0.5, max=64),
+      wait=tenacity.wait_exponential(multiplier=1, max=64),
       retry_error_callback=retry_util.on_give_up)
   # For API errors dealing with auth, we want to retry, but not as often
   # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
   @tenacity.retry(
       stop=tenacity.stop_after_attempt(retry_util.MAX_AUTH_ATTEMPTS),
       retry=retry_util.retry_auth_check,
-      wait=tenacity.wait_exponential(multiplier=0.5, max=8),
+      wait=tenacity.wait_exponential(multiplier=1, max=8),
       retry_error_callback=retry_util.on_give_up)
   def execute(self, api):
     """Executes operation.
