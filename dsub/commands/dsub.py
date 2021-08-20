@@ -25,15 +25,14 @@ import re
 import sys
 import time
 import uuid
-from dateutil.tz import tzlocal
 
+import dateutil
 from ..lib import dsub_errors
 from ..lib import dsub_util
 from ..lib import job_model
 from ..lib import output_formatter
 from ..lib import param_util
 from ..lib import resources
-from ..lib.dsub_util import print_error
 from ..providers import google_base
 from ..providers import provider_base
 
@@ -660,7 +659,8 @@ def _get_job_metadata(provider, user_id, job_name, script, task_ids,
   Returns:
     A dictionary of job-specific metadata (such as job id, name, etc.)
   """
-  create_time = dsub_util.replace_timezone(datetime.datetime.now(), tzlocal())
+  create_time = dsub_util.replace_timezone(datetime.datetime.now(),
+                                           dateutil.tz.tzlocal())
   user_id = user_id or dsub_util.get_os_user()
   job_metadata = provider.prepare_job_metadata(script.name, job_name, user_id)
   if unique_job_id:
@@ -811,7 +811,7 @@ def _wait_after(provider, job_ids, poll_interval, stop_on_failure, summary):
       jobs_not_found = jobs_completed.difference(jobs_found)
       for j in jobs_not_found:
         error = '%s: not found' % j
-        print_error('  %s' % error)
+        dsub_util.print_error('  %s' % error)
         error_messages += [error]
 
     # Print the dominant task for the completed jobs
@@ -997,7 +997,8 @@ def _importance_of_task(task):
   return (importance[task.get_field('task-status')],
           task.get_field(
               'end-time',
-              dsub_util.replace_timezone(datetime.datetime.max, tzlocal())))
+              dsub_util.replace_timezone(datetime.datetime.max,
+                                         dateutil.tz.tzlocal())))
 
 
 def _wait_for_any_job(provider, job_ids, poll_interval, summary):
@@ -1289,7 +1290,7 @@ def run(provider,
                                    summary)
       if error_messages:
         for msg in error_messages:
-          print_error(msg)
+          dsub_util.print_error(msg)
         raise dsub_errors.PredecessorJobFailureError(
             'One or more predecessor jobs completed but did not succeed.',
             error_messages, None)
@@ -1331,7 +1332,7 @@ def run(provider,
                                    poll_interval, False, summary)
     if error_messages:
       for msg in error_messages:
-        print_error(msg)
+        dsub_util.print_error(msg)
       raise dsub_errors.JobExecutionError(
           'One or more jobs finished with status FAILURE or CANCELED'
           ' during wait.', error_messages, launched_job)
