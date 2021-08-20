@@ -22,7 +22,7 @@ _DEPENDENCIES = [
     'python-dateutil<=2.8.2',
     'pytz<=2021.1',
     'pyyaml<=5.4.1',
-    'tenacity<=5.0.4',
+    'tenacity<=7.0.0',
     'tabulate<=0.8.9',
 
     # downstream dependencies
