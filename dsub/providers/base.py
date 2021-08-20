@@ -184,7 +184,7 @@ class JobProvider(object, metaclass=abc.ABCMeta):
     raise NotImplementedError()
 
 
-class Task(object):
+class Task(object, metaclass=abc.ABCMeta):
   """Basic container for task metadata."""
 
   @abc.abstractmethod

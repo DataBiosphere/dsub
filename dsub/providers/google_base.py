@@ -300,7 +300,7 @@ def parse_rfc3339_utc_string(rfc3339_utc_string):
     # When nanoseconds are provided, we round
     micros = int(round(int(fraction) // 1000))
   else:
-    assert False, 'Fraction length not 0, 6, or 9: {}'.len(fraction)
+    assert False, 'Fraction length not 0, 6, or 9: {}'.format(len(fraction))
 
   try:
     return datetime.datetime(

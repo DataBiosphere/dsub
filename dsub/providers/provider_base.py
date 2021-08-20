@@ -110,7 +110,7 @@ def parse_args(parser, provider_required_args, argv):
 
   # For the selected provider, check the required arguments
   for arg in provider_required_args[args.provider]:
-    if not args.__getattribute__(arg):
+    if not vars(args)[arg]:
       parser.error('argument --%s is required' % arg)
 
   return args

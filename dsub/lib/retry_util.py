@@ -21,7 +21,7 @@ import ssl
 import sys
 
 import googleapiclient.errors
-from httplib2 import ServerNotFoundError
+import httplib2
 import tenacity
 
 import google.auth
@@ -127,7 +127,7 @@ def retry_api_check(retry_state: tenacity.RetryCallState) -> bool:
 
   # This has been observed as a transient error:
   #   ServerNotFoundError: Unable to find the server at genomics.googleapis.com
-  if isinstance(exception, ServerNotFoundError):
+  if isinstance(exception, httplib2.ServerNotFoundError):
     _print_retry_error(attempt_number, MAX_API_ATTEMPTS, exception)
     return True
 
