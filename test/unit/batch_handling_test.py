@@ -23,13 +23,19 @@ def callback_mock(request_id, response, exception):
   raise exception
 
 
+class ResponseMock(object):
+
+  def __init__(self):
+    self.reason = None
+
+
 class CancelMock(object):
 
   def __init__(self):
     pass
 
   def execute(self):
-    raise apiclient.errors.HttpError(None, b'test_exception')
+    raise apiclient.errors.HttpError(ResponseMock(), b'test_exception')
 
 
 class TestBatchHandling(unittest.TestCase):

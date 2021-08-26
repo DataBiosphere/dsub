@@ -271,7 +271,7 @@ def prepare_summary_table(rows):
   # Use the original table as the driver in order to preserve the order.
   new_rows = []
   for job_key in sorted(grouped.keys()):
-    group = grouped.get(job_key, None)
+    group = grouped[job_key]
     canonical_status = ['RUNNING', 'SUCCESS', 'FAILURE', 'CANCEL']
     # Written this way to ensure that if somehow a new status is introduced,
     # it shows up in our output.

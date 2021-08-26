@@ -409,7 +409,7 @@ class GoogleV2EventMap(object):
           continue
 
       if name == 'pulling-image':
-        if match.group(1) != user_image:
+        if match and match.group(1) != user_image:
           continue
 
       events[name] = mapped

@@ -4,7 +4,6 @@ File is based on this template: https://github.com/pypa/sampleproject
 """
 
 import os
-import sys
 import unittest
 # Always prefer setuptools over distutils
 from setuptools import find_packages
@@ -15,22 +14,22 @@ _DEPENDENCIES = [
     # dependencies for dsub, ddel, dstat
     # Pin to known working versions to prevent episodic breakage from library
     # version mismatches.
-    # This version list generated: 02/01/2021
+    # This version list generated: 08/18/2021
 
     # direct dependencies
-    'google-api-python-client<=1.12.8',
-    'google-auth<=1.24.0',
-    'python-dateutil<=2.8.1',
+    'google-api-python-client<=2.17.0',
+    'google-auth<=1.35.0',
+    'python-dateutil<=2.8.2',
     'pytz<=2021.1',
     'pyyaml<=5.4.1',
-    'tenacity<=5.0.4',
-    'tabulate<=0.8.7',
+    'tenacity<=7.0.0',
+    'tabulate<=0.8.9',
 
     # downstream dependencies
     'funcsigs<=1.0.2',
-    'google-api-core<=1.25.1',
-    'google-auth-httplib2<=0.0.4',
-    'httplib2<=0.19.0',
+    'google-api-core<=1.31.2',
+    'google-auth-httplib2<=0.1.0',
+    'httplib2<=0.19.1',
     'pyasn1<=0.4.8',
     'pyasn1-modules<=0.2.8',
     'rsa<=4.7',
@@ -40,9 +39,6 @@ _DEPENDENCIES = [
     'parameterized<=0.8.1',
     'mock<=4.0.3',
 ]
-
-if sys.version_info[0] == 2:
-  _DEPENDENCIES.append('cachetools==3.1.1')
 
 
 def unittest_suite():

@@ -300,7 +300,7 @@ def parse_rfc3339_utc_string(rfc3339_utc_string):
     # When nanoseconds are provided, we round
     micros = int(round(int(fraction) // 1000))
   else:
-    assert False, 'Fraction length not 0, 6, or 9: {}'.len(fraction)
+    assert False, 'Fraction length not 0, 6, or 9: {}'.format(len(fraction))
 
   try:
     return datetime.datetime(
@@ -424,14 +424,14 @@ def cancel(batch_fn, cancel_fn, ops):
 @tenacity.retry(
     stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
     retry=retry_util.retry_api_check,
-    wait=tenacity.wait_exponential(multiplier=0.5, max=64),
+    wait=tenacity.wait_exponential(multiplier=1, max=64),
     retry_error_callback=retry_util.on_give_up)
 # For API errors dealing with auth, we want to retry, but not as often
 # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
 @tenacity.retry(
     stop=tenacity.stop_after_attempt(retry_util.MAX_AUTH_ATTEMPTS),
     retry=retry_util.retry_auth_check,
-    wait=tenacity.wait_exponential(multiplier=0.5, max=8),
+    wait=tenacity.wait_exponential(multiplier=1, max=8),
     retry_error_callback=retry_util.on_give_up)
 def setup_service(api_name, api_version, credentials=None):
   """Configures genomics API client.
@@ -449,8 +449,10 @@ def setup_service(api_name, api_version, credentials=None):
       'ignore', 'Your application has authenticated using end user credentials')
   if not credentials:
     credentials, _ = google.auth.default()
+  # Set cache_discovery to False because we use google-auth
+  # See https://github.com/googleapis/google-api-python-client/issues/299
   return googleapiclient.discovery.build(
-      api_name, api_version, credentials=credentials)
+      api_name, api_version, cache_discovery=False, credentials=credentials)
 
 
 def credentials_from_service_account_info(credentials_file):
@@ -467,14 +469,14 @@ class Api(object):
   @tenacity.retry(
       stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
       retry=retry_util.retry_api_check,
-      wait=tenacity.wait_exponential(multiplier=0.5, max=64),
+      wait=tenacity.wait_exponential(multiplier=1, max=64),
       retry_error_callback=retry_util.on_give_up)
   # For API errors dealing with auth, we want to retry, but not as often
   # Maximum 4 retries. Wait 1, 2, 4, 8 seconds.
   @tenacity.retry(
       stop=tenacity.stop_after_attempt(retry_util.MAX_AUTH_ATTEMPTS),
       retry=retry_util.retry_auth_check,
-      wait=tenacity.wait_exponential(multiplier=0.5, max=8),
+      wait=tenacity.wait_exponential(multiplier=1, max=8),
       retry_error_callback=retry_util.on_give_up)
   def execute(self, api):
     """Executes operation.

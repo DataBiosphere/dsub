@@ -595,7 +595,7 @@ class TaskDescriptor(object):
     return task_descriptor
 
   def __str__(self):
-    return 'task-id: {}'.format(self.job_metadata.get('task-id'))
+    return 'task-id: {}'.format(self.task_metadata.get('task-id'))
 
   def __repr__(self):
     return ('task_metadata: {}, task_params: {}').format(

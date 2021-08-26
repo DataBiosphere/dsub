@@ -15,19 +15,25 @@
 
 import errno
 import socket
-import time
 import unittest
 
 import apiclient.errors
 from dsub.lib import retry_util
 from dsub.providers import google_base
+import fake_time
+import google.auth
+from mock import patch
 import parameterized
 
-import google.auth
+
+def chronology():
+  # Simulates the passing of time for fake_time.
+  while True:
+    yield 1  # Simulates 1 second passing.
 
 
-def current_time_ms():
-  return int(round(time.time() * 1000))
+def elapsed_time_in_seconds(fake_time_object):
+  return int(round(fake_time_object.now()))
 
 
 class GoogleApiMock(object):
@@ -56,41 +62,38 @@ class ResponseMock(object):
 class TestRetrying(unittest.TestCase):
 
   def test_success(self):
-    exception_list = []
-    api_wrapper_to_test = google_base.Api()
-    mock_api_object = GoogleApiMock(exception_list)
+    ft = fake_time.FakeTime(chronology())
+    with patch('time.sleep', new=ft.sleep):
+      exception_list = []
+      api_wrapper_to_test = google_base.Api()
+      mock_api_object = GoogleApiMock(exception_list)
 
-    start = current_time_ms()
-    api_wrapper_to_test.execute(mock_api_object)
-    end = current_time_ms()
+      api_wrapper_to_test.execute(mock_api_object)
 
-    # No expected retries, and no expected wait time
-    self.assertEqual(mock_api_object.retry_counter, 0)
-    self.assertLess(end - start, 1000)
+      # No expected retries, and no expected wait time
+      self.assertEqual(mock_api_object.retry_counter, 0)
+      self.assertLess(elapsed_time_in_seconds(ft), 1)
 
   @parameterized.parameterized.expand(
       [(error_code,)
        for error_code in list(retry_util.TRANSIENT_HTTP_ERROR_CODES) +
-       list(retry_util.HTTP_AUTH_ERROR_CODES)] +
-      [(error_code,)
-       for error_code in list(retry_util.TRANSIENT_HTTP_ERROR_CODES) +
        list(retry_util.HTTP_AUTH_ERROR_CODES)])
   def test_retry_once(self, error_code):
-    exception_list = [
-        apiclient.errors.HttpError(
-            ResponseMock(error_code, None), b'test_exception'),
-    ]
-    api_wrapper_to_test = google_base.Api()
-    mock_api_object = GoogleApiMock(exception_list)
+    ft = fake_time.FakeTime(chronology())
+    with patch('time.sleep', new=ft.sleep):
+      exception_list = [
+          apiclient.errors.HttpError(
+              ResponseMock(error_code, None), b'test_exception'),
+      ]
+      api_wrapper_to_test = google_base.Api()
+      mock_api_object = GoogleApiMock(exception_list)
 
-    start = current_time_ms()
-    api_wrapper_to_test.execute(mock_api_object)
-    end = current_time_ms()
+      api_wrapper_to_test.execute(mock_api_object)
 
-    # Expected to retry once, for about 1 second
-    self.assertEqual(mock_api_object.retry_counter, 1)
-    self.assertGreaterEqual(end - start, 1000)
-    self.assertLess(end - start, 1500)
+      # Expected to retry once, for about 1 second
+      self.assertEqual(mock_api_object.retry_counter, 1)
+      self.assertGreaterEqual(elapsed_time_in_seconds(ft), 1)
+      self.assertLess(elapsed_time_in_seconds(ft), 1.5)
 
   def test_auth_failure(self):
     exception_list = [
@@ -100,32 +103,32 @@ class TestRetrying(unittest.TestCase):
         apiclient.errors.HttpError(ResponseMock(401, None), b'test_exception'),
         apiclient.errors.HttpError(ResponseMock(403, None), b'test_exception'),
     ]
-    api_wrapper_to_test = google_base.Api()
-    mock_api_object = GoogleApiMock(exception_list)
-    # We don't want to retry auth errors as aggressively, so we expect
-    # this exception to be raised after 4 retries,
-    # for a total of 1 + 2 + 4 + 8 = 15 seconds
-    start = current_time_ms()
-    with self.assertRaises(apiclient.errors.HttpError):
-      api_wrapper_to_test.execute(mock_api_object)
-    end = current_time_ms()
-    self.assertGreaterEqual(end - start, 15000)
-    self.assertLess(end - start, 15500)
+    ft = fake_time.FakeTime(chronology())
+    with patch('time.sleep', new=ft.sleep):
+      api_wrapper_to_test = google_base.Api()
+      mock_api_object = GoogleApiMock(exception_list)
+      # We don't want to retry auth errors as aggressively, so we expect
+      # this exception to be raised after 4 retries,
+      # for a total of 1 + 2 + 4 + 8 = 15 seconds
+      with self.assertRaises(apiclient.errors.HttpError):
+        api_wrapper_to_test.execute(mock_api_object)
+      self.assertGreaterEqual(elapsed_time_in_seconds(ft), 15)
+      self.assertLess(elapsed_time_in_seconds(ft), 15.5)
 
   def test_transient_retries(self):
     exception_list = [
         apiclient.errors.HttpError(ResponseMock(500, None), b'test_exception'),
         apiclient.errors.HttpError(ResponseMock(503, None), b'test_exception'),
     ]
-    api_wrapper_to_test = google_base.Api()
-    mock_api_object = GoogleApiMock(exception_list)
-    start = current_time_ms()
-    api_wrapper_to_test.execute(mock_api_object)
-    end = current_time_ms()
-    # Expected to retry twice, for a total of 1 + 2 = 3 seconds
-    self.assertEqual(mock_api_object.retry_counter, 2)
-    self.assertGreaterEqual(end - start, 3000)
-    self.assertLess(end - start, 3500)
+    ft = fake_time.FakeTime(chronology())
+    with patch('time.sleep', new=ft.sleep):
+      api_wrapper_to_test = google_base.Api()
+      mock_api_object = GoogleApiMock(exception_list)
+      api_wrapper_to_test.execute(mock_api_object)
+      # Expected to retry twice, for a total of 1 + 2 = 3 seconds
+      self.assertEqual(mock_api_object.retry_counter, 2)
+      self.assertGreaterEqual(elapsed_time_in_seconds(ft), 3)
+      self.assertLess(elapsed_time_in_seconds(ft), 3.5)
 
   def test_broken_pipe_retries(self):
     # To construct a BrokenPipeError, we pass errno.EPIPE (32) to OSError
@@ -134,30 +137,30 @@ class TestRetrying(unittest.TestCase):
         OSError(errno.EPIPE, 'broken pipe exception test'),
         OSError(errno.EPIPE, 'broken pipe exception test'),
     ]
-    api_wrapper_to_test = google_base.Api()
-    mock_api_object = GoogleApiMock(exception_list)
-    start = current_time_ms()
-    api_wrapper_to_test.execute(mock_api_object)
-    end = current_time_ms()
-    # Expected to retry twice, for a total of 1 + 2 = 3 seconds
-    self.assertEqual(mock_api_object.retry_counter, 2)
-    self.assertGreaterEqual(end - start, 3000)
-    self.assertLess(end - start, 3500)
+    ft = fake_time.FakeTime(chronology())
+    with patch('time.sleep', new=ft.sleep):
+      api_wrapper_to_test = google_base.Api()
+      mock_api_object = GoogleApiMock(exception_list)
+      api_wrapper_to_test.execute(mock_api_object)
+      # Expected to retry twice, for a total of 1 + 2 = 3 seconds
+      self.assertEqual(mock_api_object.retry_counter, 2)
+      self.assertGreaterEqual(elapsed_time_in_seconds(ft), 3)
+      self.assertLess(elapsed_time_in_seconds(ft), 3.5)
 
   def test_socket_timeout(self):
     exception_list = [
         socket.timeout(),
         socket.timeout(),
     ]
-    api_wrapper_to_test = google_base.Api()
-    mock_api_object = GoogleApiMock(exception_list)
-    start = current_time_ms()
-    api_wrapper_to_test.execute(mock_api_object)
-    end = current_time_ms()
-    # Expected to retry twice, for a total of 1 + 2 = 3 seconds
-    self.assertEqual(mock_api_object.retry_counter, 2)
-    self.assertGreaterEqual(end - start, 3000)
-    self.assertLess(end - start, 3500)
+    ft = fake_time.FakeTime(chronology())
+    with patch('time.sleep', new=ft.sleep):
+      api_wrapper_to_test = google_base.Api()
+      mock_api_object = GoogleApiMock(exception_list)
+      api_wrapper_to_test.execute(mock_api_object)
+      # Expected to retry twice, for a total of 1 + 2 = 3 seconds
+      self.assertEqual(mock_api_object.retry_counter, 2)
+      self.assertGreaterEqual(elapsed_time_in_seconds(ft), 3)
+      self.assertLess(elapsed_time_in_seconds(ft), 3.5)
 
   @parameterized.parameterized.expand([
       (apiclient.errors.HttpError(ResponseMock(500, None), b'test_exception'),
@@ -178,16 +181,17 @@ class TestRetrying(unittest.TestCase):
         apiclient.errors.HttpError(ResponseMock(500, None), b'test_exception'),
         apiclient.errors.HttpError(ResponseMock(500, None), b'test_exception'),
     ]
-    api_wrapper_to_test = google_base.Api()
-    mock_api_object = GoogleApiMock(exception_list)
-    start = current_time_ms()
-    api_wrapper_to_test.execute(mock_api_object)
-    end = current_time_ms()
-    # Expected to retry 5 times, for a total of 1 + 2 + 4 + 8 + 16 = 31 seconds
-    # At the end we expect a recovery message to be emitted.
-    self.assertEqual(mock_api_object.retry_counter, 5)
-    self.assertGreaterEqual(end - start, 31000)
-    self.assertLess(end - start, 31500)
+    ft = fake_time.FakeTime(chronology())
+    with patch('time.sleep', new=ft.sleep):
+      api_wrapper_to_test = google_base.Api()
+      mock_api_object = GoogleApiMock(exception_list)
+      api_wrapper_to_test.execute(mock_api_object)
+      # Expected to retry 5 times,
+      # for a total of 1 + 2 + 4 + 8 + 16 = 31 seconds
+      # At the end we expect a recovery message to be emitted.
+      self.assertEqual(mock_api_object.retry_counter, 5)
+      self.assertGreaterEqual(elapsed_time_in_seconds(ft), 31)
+      self.assertLess(elapsed_time_in_seconds(ft), 31.5)
 
 
 if __name__ == '__main__':
