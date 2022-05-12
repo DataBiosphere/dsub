@@ -35,6 +35,16 @@ readonly TEST_IMAGE_NAME="dsub-e2e-test-image-$(echo ${TEST_TOKEN} | tr '_' '-')
 readonly TEST_IMAGE_GCS_LOCATION="gs://dsub-test-e2e-bucket/dsub-test-image.tar.gz"
 readonly TEST_IMAGE_URL="https://www.googleapis.com/compute/v1/projects/${PROJECT_ID}/global/images/${TEST_IMAGE_NAME}"
 
+# This is the name and URL of a disk that we create in order to test the PD
+# "mount existing disk" feature. Note that GCP supports regional disks,
+# but we test zonal, as it is most likely to be used in practice.
+# For the mount test, we create a disk from an image, so that the disk is
+# already formatted. Note that the mount fails if the disk is not formatted.
+readonly TEST_EXISTING_DISK_IMAGE_NAME="dsub-e2e-test-disk-image-$(echo ${TEST_TOKEN} | tr '_' '-')-$$"
+readonly TEST_EXISTING_DISK_NAME="dsub-e2e-test-disk-$(echo ${TEST_TOKEN} | tr '_' '-')-$$"
+readonly TEST_EXISTING_DISK_ZONE="us-central1-a"
+readonly TEST_EXISTING_DISK_URL="https://www.googleapis.com/compute/v1/projects/${PROJECT_ID}/zones/${TEST_EXISTING_DISK_ZONE}/disks/${TEST_EXISTING_DISK_NAME}"
+
 # This is the path we use to test local file:// mounts
 readonly TEST_TMP_PATH="/tmp/dsub_test_files"
 readonly TEST_LOCAL_MOUNT_PARAMETER="file://${TEST_TMP_PATH}"
@@ -50,21 +60,75 @@ function io_setup::mount_local_path_setup() {
 }
 readonly -f io_setup::mount_local_path_setup
 
-function io_setup::exit_handler() {
+function io_setup::exit_handler_image() {
   local code="${?}"
+
   echo "Deleting image ${TEST_IMAGE_NAME}..."
   gcloud --quiet compute images delete "${TEST_IMAGE_NAME}"
   echo "Image successfully deleted."
+
   return "${code}"
 }
-readonly -f io_setup::exit_handler
+readonly -f io_setup::exit_handler_image
 
 function io_setup::image_setup() {
-  echo "Creating image from ${TEST_IMAGE_GCS_LOCATION}..."
+  trap "io_setup::exit_handler_image" EXIT
+
+  echo "Creating image ${TEST_IMAGE_NAME} from ${TEST_IMAGE_GCS_LOCATION}..."
   gcloud compute images create "${TEST_IMAGE_NAME}" \
     --source-uri "${TEST_IMAGE_GCS_LOCATION}"
   echo "Image successfully created."
-  trap "io_setup::exit_handler" EXIT
+}
+readonly -f io_setup::image_setup
+
+
+function io_setup::exit_handler_disk() {
+  local code="${?}"
+
+  echo "Deleting image ${TEST_EXISTING_DISK_IMAGE_NAME}..."
+  gcloud --quiet compute images delete "${TEST_EXISTING_DISK_IMAGE_NAME}"
+  echo "Image successfully deleted."
+
+  # Delete the disk, but in a retry loop - if the VM has not yet gone away,
+  # it'll be marked as "in use" and the delete fails
+  echo "Deleting disk ${TEST_EXISTING_DISK_NAME}..."
+  local TOTAL_WAIT_SECONDS="$((60 * 2))"
+  local WAIT_INTERVAL=5
+
+  for ((waited = 0; waited <= TOTAL_WAIT_SECONDS; waited += WAIT_INTERVAL)); do
+    if gcloud --quiet compute disks delete "${TEST_EXISTING_DISK_NAME}" \
+      --zone="${TEST_EXISTING_DISK_ZONE}"; then
+      break
+    fi
+
+    if ((waited >= TOTAL_WAIT_SECONDS)); then
+      1>&2 echo "Failed to delete disk after ${waited} seconds"
+      exit 1
+    fi
+
+    echo "Sleeping ${WAIT_INTERVAL}s"
+    sleep "${WAIT_INTERVAL}s"
+  done
+  echo "Disk successfully deleted."
+
+  return "${code}"
+}
+readonly -f io_setup::exit_handler_disk
+
+
+function io_setup::existing_disk_setup() {
+  trap "io_setup::exit_handler_disk" EXIT
+
+  echo "Creating image ${TEST_EXISTING_DISK_IMAGE_NAME} from ${TEST_IMAGE_GCS_LOCATION}..."
+  gcloud compute images create "${TEST_EXISTING_DISK_IMAGE_NAME}" \
+    --source-uri "${TEST_IMAGE_GCS_LOCATION}"
+  echo "Image successfully created."
+
+  echo "Creating disk from ${TEST_IMAGE_GCS_LOCATION} from ${TEST_EXISTING_DISK_IMAGE_NAME}..."
+  gcloud compute disks create "${TEST_EXISTING_DISK_NAME}" \
+    --image="${TEST_EXISTING_DISK_IMAGE_NAME}" \
+    --zone="${TEST_EXISTING_DISK_ZONE}"
+  echo "Disk successfully created from image."
 }
 readonly -f io_setup::image_setup
 
@@ -159,7 +223,7 @@ function io_setup::check_dstat() {
   local check_requester_pays_inputs="${4:-}"
 
   echo
-  echo "Checking dstat output..."
+  echo "Checking dstat output for job-id: ${job_id}..."
 
   local dstat_output=$(run_dstat --status '*' --jobs "${job_id}" --full)
 

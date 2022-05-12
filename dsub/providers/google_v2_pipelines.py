@@ -14,6 +14,8 @@
 """Utility routines for constructing a Google Genomics Pipelines v2 API request.
 """
 
+from typing import Dict
+
 from . import google_v2_versions
 
 _API_VERSION = None
@@ -41,13 +43,24 @@ def build_network(name, subnetwork, use_private_address):
   }
 
 
-def build_disk(name, size_gb, source_image, disk_type):
+def build_persistent_disk(size_gb, source_image, disk_type):
   return {
-      'name': name,
       'sizeGb': size_gb,
       'type': disk_type,
       'sourceImage': source_image,
   }
+
+
+def build_existing_disk(disk: str) -> Dict[str, str]:
+  return {'disk': disk}
+
+
+def build_volume_persistent_disk(volume, disk):
+  return {'volume': volume, 'persistentDisk': disk}
+
+
+def build_volume_existing_disk(volume, disk):
+  return {'volume': volume, 'existingDisk': disk}
 
 
 def build_accelerator(accelerator_type, accelerator_count):
@@ -66,7 +79,7 @@ def build_machine(network=None,
                   preemptible=None,
                   service_account=None,
                   boot_disk_size_gb=None,
-                  disks=None,
+                  volumes=None,
                   accelerators=None,
                   labels=None,
                   cpu_platform=None,
@@ -80,7 +93,7 @@ def build_machine(network=None,
     preemptible (bool): Use a preemptible VM for the job.
     service_account (dict): Service account configuration for the VM.
     boot_disk_size_gb (int): Boot disk size in GB.
-    disks (list[dict]): List of disks to mount.
+    volumes (list[dict]): List of volumes to create or mount on the VM.
     accelerators (list[dict]): List of accelerators to attach to the VM.
     labels (dict[string, string]): Labels for the VM.
     cpu_platform (str): The CPU platform to request.
@@ -98,7 +111,7 @@ def build_machine(network=None,
       'preemptible': preemptible,
       'serviceAccount': service_account,
       'bootDiskSizeGb': boot_disk_size_gb,
-      'disks': disks,
+      'volumes': volumes,
       'accelerators': accelerators,
       'labels': labels,
       'cpuPlatform': cpu_platform,

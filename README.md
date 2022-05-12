@@ -423,57 +423,88 @@ specified and they can be specified in any order.
 
 #### Mounting "resource data"
 
-If you have one of the following:
+While explicitly specifying inputs improves tracking provenance of your data,
+there are cases where you might not want to expliclty localize all inputs
+from Cloud Storage to your job VM.
 
-1. A large set of resource files, your code only reads a subset of those files,
-and the decision of which files to read is determined at runtime, or
-2. A large input file over which your code makes a single read pass or only
-needs to read a small range of bytes,
+For example, if you have:
 
-then you may find it more efficient at runtime to access this resource data via
-mounting a Google Cloud Storage bucket read-only or mounting a persistent disk
-created from a
-[Compute Engine Image](https://cloud.google.com/compute/docs/images) read-only.
+- a large set of resource files
+- your code only reads a subset of those files
+- runtime decisions of which files to read
 
-The `google-v2` and `google-cls-v2` providers support these two methods of providing access to
-resource data. The `local` provider supports mounting a local directory in a
-similar fashion to support your local development.
+OR
+
+- a large input file over which your code makes a single read pass
+
+OR
+
+- a large input file that your code does not read in its entirety
+
+then you may find it more efficient or convenient to access this data by
+mounting read-only:
+
+- a Google Cloud Storage bucket
+- a persistent disk that you pre-create and populate
+- a persistent disk that gets created from a
+[Compute Engine Image](https://cloud.google.com/compute/docs/images) that you
+pre-create.
+
+The `google-v2` and `google-cls-v2` providers support these methods of
+providing access to resource data.
+
+The `local` provider supports mounting a
+local directory in a similar fashion to support your local development.
+
+##### Mounting a Google Cloud Storage bucket
 
 To have the `google-v2` or `google-cls-v2` provider mount a Cloud Storage bucket using
 Cloud Storage FUSE, use the `--mount` command line flag:
 
-    --mount MYBUCKET=gs://mybucket
+    --mount RESOURCES=gs://mybucket
 
 The bucket will be mounted into the Docker container running your `--script`
 or `--command` and the location made available via the environment variable
-`${MYBUCKET}`. Inside your script, you can reference the mounted path using the
+`${RESOURCES}`. Inside your script, you can reference the mounted path using the
 environment variable. Please read
 [Key differences from a POSIX file system](https://cloud.google.com/storage/docs/gcs-fuse#notes)
 and [Semantics](https://github.com/GoogleCloudPlatform/gcsfuse/blob/master/docs/semantics.md)
 before using Cloud Storage FUSE.
 
+##### Mounting an existing peristent disk
+
+To have the `google-v2` or `google-cls-v2` provider mount a persistent disk that
+you have pre-created and populated, use the `--mount` command line flag and the
+url of the source disk:
+
+    --mount RESOURCES="https://www.googleapis.com/compute/v1/projects/your-project/global/images/your-image 50"
+
+##### Mounting a persistent disk, created from an image
+
 To have the `google-v2` or `google-cls-v2` provider mount a persistent disk created from an image,
 use the `--mount` command line flag and the url of the source image and the size
 (in GB) of the disk:
 
-    --mount MYDISK="https://www.googleapis.com/compute/v1/projects/your-project/global/images/your-image 50"
+    --mount RESOURCES="https://www.googleapis.com/compute/v1/projects/your-project/global/images/your-image 50"
 
 The image will be used to create a new persistent disk, which will be attached
 to a Compute Engine VM. The disk will mounted into the Docker container running
 your `--script` or `--command` and the location made available by the
-environment variable `${MYDISK}`. Inside your script, you can reference the
+environment variable `${RESOURCES}`. Inside your script, you can reference the
 mounted path using the environment variable.
 
 To create an image, see [Creating a custom image](https://cloud.google.com/compute/docs/images/create-delete-deprecate-private-images).
 
+##### Mounting a local directory (`local` provider)
+
 To have the `local` provider mount a directory read-only, use the `--mount`
 command line flag and a `file://` prefix:
 
-    --mount LOCAL_MOUNT=file://path/to/my/dir
+    --mount RESOURCES=file://path/to/my/dir
 
 The local directory will be mounted into the Docker container running your
 `--script`or `--command` and the location made available via the environment
-variable `${LOCAL_MOUNT}`. Inside your script, you can reference the mounted
+variable `${RESOURCES}`. Inside your script, you can reference the mounted
 path using the environment variable.
 
 ### Setting resource requirements
