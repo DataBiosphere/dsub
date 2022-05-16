@@ -17,24 +17,17 @@ and Azure Batch.
 
 ## Getting started
 
-You can install `dsub` from [PyPI](https://pypi.org/project/dsub/), or you can clone and
-install from [github](https://github.com/DataBiosphere/dsub).
+`dsub` is written in Python and requires Python 3.6 or higher.
 
-### Sunsetting Python 2 support
-
-Python 2 support ended in January 2020.
-See Python's official [Sunsetting Python 2 announcement](https://www.python.org/doc/sunset-python-2/) for details.
-
-Automated `dsub` tests running on Python 2 have been disabled.
-[Release 0.3.10](https://github.com/DataBiosphere/dsub/releases/tag/v0.3.10) is
-the last version of `dsub` that supports Python 2.
-
-Use Python 3.6 or greater. For earlier versions of Python 3, use `dsub` 0.4.1.
+* For earlier versions of Python 3, use `dsub` [0.4.1](https://github.com/DataBiosphere/dsub/releases/tag/v0.4.11).
+* For Python 2, use `dsub`[0.3.10](https://github.com/DataBiosphere/dsub/releases/tag/v0.3.10).
 
 ### Pre-installation steps
 
+#### Create a Python virtual environment
+
 This is optional, but whether installing from PyPI or from github,
-you are encouraged to use a
+you are strongly encouraged to use a
 [Python virtual environment](https://docs.python.org/3/library/venv.html).
 
 You can do this in a directory of your choosing.
@@ -56,9 +49,27 @@ virutalenv before calling `dsub`, `dstat`, and `ddel`. They are in the
 use these scripts if you don't want to activate the virtualenv explicitly in
 your shell.
 
+#### Install the Google Cloud SDK
+
+While not used directly by `dsub` for the `google-v2` or `google-cls-v2` providers, you are likely to want to install the command line tools found in the [Google
+Cloud SDK](https://cloud.google.com/sdk/).
+
+If you will be using the `local` provider for faster job development,
+you *will* need to install the Google Cloud SDK, which uses `gsutil` to ensure
+file operation semantics consistent with the Google `dsub` providers.
+
+1. [Install the Google Cloud SDK](https://cloud.google.com/sdk/)
+2. Run
+
+        gcloud init
+
+
+    `gcloud` will prompt you to set your default project and to grant
+    credentials to the Google Cloud SDK.
+
 ### Install `dsub`
 
-Choose one of the following:
+Choose **one** of the following:
 
 #### Install from PyPI
 
@@ -167,12 +178,7 @@ The steps for getting started differ slightly as indicated in the steps below:
 
      [Enable the Cloud Life Sciences, Storage, and Compute APIs](https://console.cloud.google.com/flows/enableapi?apiid=lifesciences.googleapis.com,storage_component,compute_component&redirect=https://console.cloud.google.com)
 
-1.  [Install the Google Cloud SDK](https://cloud.google.com/sdk/) and run
-
-        gcloud init
-
-    This will set up your default project and grant credentials to the Google
-    Cloud SDK. Now provide [credentials](https://developers.google.com/identity/protocols/application-default-credentials)
+1. Provide [credentials](https://developers.google.com/identity/protocols/application-default-credentials)
     so `dsub` can call Google APIs:
 
         gcloud auth application-default login
