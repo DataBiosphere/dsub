@@ -44,8 +44,10 @@ readonly -f call_dsub
 
 if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
   readonly NETWORK_NAME_KEY="network"
+  readonly CONTAINER_NAME_KEY="containerName"
 elif [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
   readonly NETWORK_NAME_KEY="name"
+  readonly CONTAINER_NAME_KEY="name"
 fi
 
 # Define tests
@@ -694,7 +696,13 @@ function test_disk_type() {
 
     # Check that the output contains expected values
     assert_err_value_equals \
-      "[0].pipeline.resources.virtualMachine.disks.[0].type" "pd-ssd"
+      "[0].pipeline.resources.virtualMachine.volumes.[0].volume" "datadisk"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.sizeGb" "200"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.type" "pd-ssd"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.sourceImage" "None"
 
     test_passed "${subtest}"
   else
@@ -712,7 +720,13 @@ function test_no_disk_type() {
 
     # Check that the output contains expected values
     assert_err_value_equals \
-      "[0].pipeline.resources.virtualMachine.disks.[0].type" "pd-standard"
+      "[0].pipeline.resources.virtualMachine.volumes.[0].volume" "datadisk"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.sizeGb" "200"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.type" "pd-standard"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.sourceImage" "None"
 
     test_passed "${subtest}"
   else
@@ -720,6 +734,119 @@ function test_no_disk_type() {
   fi
 }
 readonly -f test_no_disk_type
+
+function test_mount_image() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --mount 'MOUNT_POINT=https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-image 250'; then
+
+    # Check that the output contains expected values
+
+    # The volumes aren't order dependent, but we know the code adds the
+    # data disk first
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].volume" "datadisk"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.sizeGb" "200"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.type" "pd-standard"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.sourceImage" "None"
+
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[1].volume" "MOUNT-POINT"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[1].persistentDisk.sizeGb" "250"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[1].persistentDisk.type" "pd-standard"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[1].persistentDisk.sourceImage" "https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-image"
+
+    # Check the mount points and environment variables for the user-command
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].${CONTAINER_NAME_KEY}" "user-command"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].environment.MOUNT_POINT" "/mnt/data/mount/https/www.googleapis.com/compute/v1/projects/my-project/global/images/my-image"
+
+    # The mounts aren't order dependent, but we know the code adds the
+    # data disk first
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[0].disk" "datadisk"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[0].path" "/mnt/data"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[0].readOnly" "False"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[1].disk" "MOUNT-POINT"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[1].path" "/mnt/data/mount/https/www.googleapis.com/compute/v1/projects/my-project/global/images/my-image"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[1].readOnly" "True"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_mount_image
+
+
+function test_mount_existing_disk() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --mount 'MOUNT_POINT=https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/disks/my-existing-disk'; then
+
+    # Check that the output contains expected values
+
+    # The volumes aren't order dependent, but we know the code adds the
+    # data disk first
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].volume" "datadisk"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.sizeGb" "200"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.type" "pd-standard"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[0].persistentDisk.sourceImage" "None"
+
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[1].volume" "MOUNT-POINT"
+    assert_err_value_equals \
+      "[0].pipeline.resources.virtualMachine.volumes.[1].existingDisk.disk" "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/disks/my-existing-disk"
+
+    # Check the mount points and environment variables for the user-command
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].${CONTAINER_NAME_KEY}" "user-command"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].environment.MOUNT_POINT" "/mnt/data/mount/https/www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/disks/my-existing-disk"
+
+    # The mounts aren't order dependent, but we know the code adds the
+    # data disk first
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[0].disk" "datadisk"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[0].path" "/mnt/data"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[0].readOnly" "False"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[1].disk" "MOUNT-POINT"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[1].path" "/mnt/data/mount/https/www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/disks/my-existing-disk"
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].mounts.[1].readOnly" "True"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_mount_existing_disk
 
 function test_stackdriver() {
   local subtest="${FUNCNAME[0]}"
@@ -870,6 +997,10 @@ test_no_service_account
 echo
 test_disk_type
 test_no_disk_type
+
+echo
+test_mount_image
+test_mount_existing_disk
 
 echo
 test_stackdriver

@@ -1,4 +1,3 @@
-# Lint as: python3
 # Copyright 2016 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -237,8 +236,32 @@ class MountParamUtil(object):
   def __init__(self, docker_path):
     self._relative_path = docker_path
 
-  def _parse_image_uri(self, raw_uri):
-    """Return a valid docker_path from a Google Persistent Disk url."""
+  def _is_gce_disk_uri(self, raw_uri):
+    """Returns true if we can parse the URI as a GCE disk path."""
+
+    # Full disk URI should look something like:
+    # https://www.googleapis.com/compute/<api_version>/projects/<project>/regions/<region>/disks/<disk>
+    # https://www.googleapis.com/compute/<api_version>/projects/<project>/zones/<zone>/disks/<disk>
+    #
+    # This function only returns True if we were able to recognize the path
+    # as clearly for a GCE disk. This is different than the Image path parsing
+    # in "make_param" below, which was made very forgiving.
+
+    if raw_uri.startswith('https://www.googleapis.com/compute'):
+      parts = raw_uri.split('/')
+
+      # Parts will look something like
+      # ['https:', '', 'www.googleapis.com', 'compute', '<version>', 'projects',
+      #  '<project>', '[regions/zones]', '<region/zone>', 'disks', '<disk>']
+      #
+      return ((parts[0] == 'https:') and (not parts[1]) and
+              (parts[2] == 'www.googleapis.com') and (parts[3] == 'compute') and
+              (parts[5] == 'projects') and (parts[9] == 'disks'))
+
+    return False
+
+  def _gce_uri_to_docker_uri(self, raw_uri):
+    """Return a valid docker_path from a GCE disk or image url."""
     # The string replace is so we don't have colons and double slashes in the
     # mount path. The idea is the resulting mount path would look like:
     # /mnt/data/mount/http/www.googleapis.com/compute/v1/projects/...
@@ -263,13 +286,22 @@ class MountParamUtil(object):
     return docker_uri
 
   def make_param(self, name, raw_uri, disk_size):
-    """Return a MountParam given a GCS bucket, disk image or local path."""
-    if raw_uri.startswith('https://www.googleapis.com/compute'):
+    """Return a MountParam given a GCS bucket, disk uri, image uri or local path."""
+
+    if self._is_gce_disk_uri(raw_uri):
+      docker_path = self._gce_uri_to_docker_uri(raw_uri)
+      return job_model.ExistingDiskMountParam(name, raw_uri, docker_path)
+    elif raw_uri.startswith('https://www.googleapis.com/compute'):
+      # In retrospect, this function should have been more precise to only
+      # treat a raw_uri as being for an "Image" if the path followed a known
+      # format. Just checking for the googleapis.com/compute prefix is too
+      # forgiving.
+
       # Full Image URI should look something like:
       # https://www.googleapis.com/compute/v1/projects/<project>/global/images/
       # But don't validate further, should the form of a valid image URI
       # change (v1->v2, for example)
-      docker_path = self._parse_image_uri(raw_uri)
+      docker_path = self._gce_uri_to_docker_uri(raw_uri)
       return job_model.PersistentDiskMountParam(
           name, raw_uri, docker_path, disk_size, disk_type=None)
     elif raw_uri.startswith('file://'):
@@ -372,6 +404,11 @@ def get_gcs_mounts(mounts):
 def get_persistent_disk_mounts(mounts):
   """Returns the persistent disk mounts from mounts."""
   return _get_filtered_mounts(mounts, job_model.PersistentDiskMountParam)
+
+
+def get_existing_disk_mounts(mounts):
+  """Returns the existing disk mounts from mounts."""
+  return _get_filtered_mounts(mounts, job_model.ExistingDiskMountParam)
 
 
 def get_local_mounts(mounts):

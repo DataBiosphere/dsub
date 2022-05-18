@@ -1,4 +1,3 @@
-# Lint as: python3
 # Copyright 2018 Verily Life Sciences Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -684,24 +683,43 @@ class GoogleV2JobProviderBase(base.JobProvider):
     gcs_mounts = param_util.get_gcs_mounts(mounts)
 
     persistent_disk_mount_params = param_util.get_persistent_disk_mounts(mounts)
+    existing_disk_mount_params = param_util.get_existing_disk_mounts(mounts)
 
     # pylint: disable=g-complex-comprehension
     persistent_disks = [
-        google_v2_pipelines.build_disk(
-            name=disk.name.replace('_', '-'),  # Underscores not allowed
-            size_gb=disk.disk_size or job_model.DEFAULT_MOUNTED_DISK_SIZE,
-            source_image=disk.value,
-            disk_type=disk.disk_type or job_model.DEFAULT_DISK_TYPE)
+        google_v2_pipelines.build_volume_persistent_disk(
+            volume=disk.name.replace('_', '-'),  # Underscores not allowed
+            disk=google_v2_pipelines.build_persistent_disk(
+                size_gb=disk.disk_size or job_model.DEFAULT_MOUNTED_DISK_SIZE,
+                source_image=disk.value,
+                disk_type=disk.disk_type or job_model.DEFAULT_DISK_TYPE))
         for disk in persistent_disk_mount_params
     ]
     persistent_disk_mounts = [
         google_v2_pipelines.build_mount(
-            disk=persistent_disk.get('name'),
+            disk=persistent_disk.get('volume'),
             path=os.path.join(providers_util.DATA_MOUNT_POINT,
                               persistent_disk_mount_param.docker_path),
             read_only=True)
         for persistent_disk, persistent_disk_mount_param in zip(
             persistent_disks, persistent_disk_mount_params)
+    ]
+    # pylint: enable=g-complex-comprehension
+
+    # pylint: disable=g-complex-comprehension
+    existing_disks = [
+        google_v2_pipelines.build_volume_existing_disk(
+            volume=disk.name.replace('_', '-'),  # Underscores not allowed
+            disk=google_v2_pipelines.build_existing_disk(disk=disk.value))
+        for disk in existing_disk_mount_params
+    ]
+    existing_disk_mounts = [
+        google_v2_pipelines.build_mount(
+            disk=existing_disk.get('volume'),
+            path=os.path.join(providers_util.DATA_MOUNT_POINT,
+                              existing_disk_mount_param.docker_path),
+            read_only=True) for existing_disk, existing_disk_mount_param in zip(
+                existing_disks, existing_disk_mount_params)
     ]
     # pylint: enable=g-complex-comprehension
 
@@ -826,7 +844,8 @@ class GoogleV2JobProviderBase(base.JobProvider):
             pid_namespace=pid_namespace,
             block_external_network=job_resources.block_external_network,
             image_uri=job_resources.image,
-            mounts=[mnt_datadisk] + persistent_disk_mounts,
+            mounts=[mnt_datadisk] + persistent_disk_mounts +
+            existing_disk_mounts,
             environment=user_environment,
             entrypoint='/usr/bin/env',
             commands=[
@@ -865,14 +884,18 @@ class GoogleV2JobProviderBase(base.JobProvider):
     assert len(actions) == final_logging_action
 
     # Prepare the VM (resources) configuration
-    disks = [
-        google_v2_pipelines.build_disk(
-            _DATA_DISK_NAME,
-            job_resources.disk_size,
-            source_image=None,
-            disk_type=job_resources.disk_type or job_model.DEFAULT_DISK_TYPE)
+    volumes = [
+        google_v2_pipelines.build_volume_persistent_disk(
+            volume=_DATA_DISK_NAME,
+            disk=google_v2_pipelines.build_persistent_disk(
+                job_resources.disk_size,
+                source_image=None,
+                disk_type=job_resources.disk_type or
+                job_model.DEFAULT_DISK_TYPE))
     ]
-    disks.extend(persistent_disks)
+    volumes.extend(persistent_disks)
+    volumes.extend(existing_disks)
+
     network = google_v2_pipelines.build_network(
         job_resources.network, job_resources.subnetwork,
         job_resources.use_private_address)
@@ -904,7 +927,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
             preemptible=task_resources.preemptible,
             service_account=service_account,
             boot_disk_size_gb=job_resources.boot_disk_size,
-            disks=disks,
+            volumes=volumes,
             accelerators=accelerators,
             nvidia_driver_version=job_resources.nvidia_driver_version,
             labels=labels,
@@ -1548,12 +1571,42 @@ class GoogleOperation(base.Task):
         value['enable-stackdriver-monitoring'] = vm.get(
             'enableStackdriverMonitoring', False)
         value['service-account'] = vm.get('serviceAccount', {}).get('email')
-        if 'disks' in vm:
+
+        # dsub now use "volumes" instead of "disks" (following the lead of the
+        # Life Sciences API). This block is included for compatibility with
+        # jobs in the operations list run by older versions of dsub.
+        if vm.get('disks'):
           datadisk = next(
               (d for d in vm['disks'] if d['name'] == _DATA_DISK_NAME))
           if datadisk:
             value['disk-size'] = datadisk.get('sizeGb')
             value['disk-type'] = datadisk.get('type')
+        if vm.get('volumes'):
+          volumes = []
+          for v in vm['volumes']:
+            if v['volume'] == _DATA_DISK_NAME:
+              d = v.get('persistentDisk', {})
+              value['disk-size'] = d.get('sizeGb')
+              value['disk-type'] = d.get('type')
+            else:
+              d = None
+              if v.get('persistentDisk'):
+                d = v.get('persistentDisk')
+              elif v.get('existingDisk'):
+                d = v.get('existingDisk')
+
+              if d:
+                volume = {'name': v['volume']}
+                if d.get('disk'):
+                  volume['disk-name'] = d.get('disk')
+                if d.get('type'):
+                  volume['disk-type'] = d.get('type')
+                if d.get('sizeGb'):
+                  volume['disk-size'] = d.get('sizeGb')
+                volumes.append(volume)
+
+            value['volumes'] = volumes
+
     elif field == 'events':
       value = GoogleV2EventMap(self._op).get_filtered_normalized_events()
     elif field == 'script-name':

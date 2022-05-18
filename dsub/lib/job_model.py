@@ -1,4 +1,3 @@
-# Lint as: python3
 # Copyright 2017 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -397,6 +396,14 @@ class PersistentDiskMountParam(MountParam):
   def __new__(cls, name, value, docker_path, disk_size, disk_type):
     return super(PersistentDiskMountParam, cls).__new__(
         cls, name, value, docker_path, disk_size=disk_size, disk_type=disk_type)
+
+
+class ExistingDiskMountParam(MountParam):
+  """A MountParam representing an existing Google Persistent Disk."""
+
+  def __new__(cls, name, value, docker_path):
+    return super(ExistingDiskMountParam, cls).__new__(cls, name, value,
+                                                      docker_path)
 
 
 class LocalMountParam(MountParam):
