@@ -93,7 +93,7 @@ Choose **one** of the following:
 
 1.  Install dsub (this will also install the dependencies)
 
-        python setup.py install
+        python -m pip install .
 
 1.  Set up Bash tab completion (optional).
 

@@ -4,10 +4,13 @@ File is based on this template: https://github.com/pypa/sampleproject
 """
 
 import os
+import subprocess
 import unittest
 # Always prefer setuptools over distutils
 from setuptools import find_packages
 from setuptools import setup
+from setuptools.command.develop import develop
+from setuptools.command.install import install
 
 
 _DEPENDENCIES = [
@@ -39,6 +42,28 @@ _DEPENDENCIES = [
     'parameterized<=0.8.1',
     'mock<=4.0.3',
 ]
+
+
+class DevelopLocalPackage(develop):
+
+  def run(self):
+    develop.run(self)
+    # Temporarily install from local tarfile until available through pypi
+    # This will be skipped if the client file doesn't exist
+    command = ('test -f batch-v1alpha1-py.tar.gz && pip install '
+               'batch-v1alpha1-py.tar.gz')
+    subprocess.call(command, shell=True)
+
+
+class InstallLocalPackage(install):
+
+  def run(self):
+    install.run(self)
+    # Temporarily install from local tarfile until available through pypi
+    # This will be skipped if the client file doesn't exist
+    command = ('test -f batch-v1alpha1-py.tar.gz && pip install '
+               'batch-v1alpha1-py.tar.gz')
+    subprocess.call(command, shell=True)
 
 
 def unittest_suite():
@@ -143,5 +168,12 @@ setup(
             'dstat=dsub.commands.dstat:main',
             'ddel=dsub.commands.ddel:main',
         ],
+    },
+    cmdclass={
+        # For installing Batch client library. See:
+        # https://stackoverflow.com/questions/20288711/post-install-script-with-python-setuptools/36902139
+        # https://stackoverflow.com/questions/40831794/call-another-setup-py-in-setup-py
+        'install': InstallLocalPackage,
+        'develop': DevelopLocalPackage,
     },
 )
