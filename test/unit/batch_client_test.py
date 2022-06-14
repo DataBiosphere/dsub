@@ -14,14 +14,14 @@
 """Simple unit test for importing Batch python client lib."""
 
 import unittest
-from google.cloud import batch_v1alpha1
+from google.cloud import batch_v1
 
 
 class TestBatchClient(unittest.TestCase):
 
   def test_success(self):
     # Dummy test
-    job = batch_v1alpha1.Job()
+    job = batch_v1.Job()
     self.assertIsNotNone(job)
 
 

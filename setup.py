@@ -50,8 +50,7 @@ class DevelopLocalPackage(develop):
     develop.run(self)
     # Temporarily install from local tarfile until available through pypi
     # This will be skipped if the client file doesn't exist
-    command = ('test -f batch-v1alpha1-py.tar.gz && pip install '
-               'batch-v1alpha1-py.tar.gz')
+    command = ('test -f batch-v1-py.tar && pip install batch-v1-py.tar')
     subprocess.call(command, shell=True)
 
 
@@ -61,8 +60,7 @@ class InstallLocalPackage(install):
     install.run(self)
     # Temporarily install from local tarfile until available through pypi
     # This will be skipped if the client file doesn't exist
-    command = ('test -f batch-v1alpha1-py.tar.gz && pip install '
-               'batch-v1alpha1-py.tar.gz')
+    command = ('test -f batch-v1-py.tar && pip install batch-v1-py.tar')
     subprocess.call(command, shell=True)
 
 
