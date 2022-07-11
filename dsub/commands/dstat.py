@@ -155,6 +155,7 @@ def _parse_arguments():
 
   return provider_base.parse_args(
       parser, {
+          'google-batch': ['project'],
           'google-cls-v2': ['project'],
           'google-v2': ['project'],
           'test-fails': [],

@@ -15,13 +15,6 @@
 
 from . import google_v2_versions
 
-STATUS_FILTER_MAP = {
-    'RUNNING': 'done = false',
-    'CANCELED': 'error = 1',
-    'FAILURE': 'error > 1',
-    'SUCCESS': 'error = 0',
-}
-
 _API_VERSION = None
 
 
@@ -30,16 +23,6 @@ def set_api_version(api_version):
 
   global _API_VERSION
   _API_VERSION = api_version
-
-
-def label_filter(label_key, label_value):
-  """Return a valid label filter for operations.list()."""
-  return 'labels."{}" = "{}"'.format(label_key, label_value)
-
-
-def create_time_filter(create_time, comparator):
-  """Return a valid createTime filter for operations.list()."""
-  return 'createTime {} "{}"'.format(comparator, create_time)
 
 
 def get_create_time(op):

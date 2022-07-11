@@ -439,8 +439,8 @@ def _parse_arguments(prog, argv):
   # Shared between the "google-cls-v2" and "google-v2" providers
   google_common = parser.add_argument_group(
       title='google-common',
-      description="""Options common to the "google-cls-v2" and "google-v2"
-        providers""")
+      description="""Options common to the "google-cls-v2", "google-v2" and
+        "google-batch" providers""")
   google_common.add_argument(
       '--project', help='Cloud project ID in which to run the job')
   google_common.add_argument(
@@ -584,6 +584,7 @@ def _parse_arguments(prog, argv):
 
   args = provider_base.parse_args(
       parser, {
+          'google-batch': ['project', 'logging'],
           'google-cls-v2': ['project', 'logging'],
           'google-v2': ['project', 'logging'],
           'test-fails': [],

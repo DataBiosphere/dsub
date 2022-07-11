@@ -214,8 +214,18 @@ function get_test_providers() {
     fi
     return
   fi
-
-  local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2}"
+  if [[ ${NO_GOOGLE_BATCH_TESTS:-0} -eq 1 ]]; then
+    echo -n "local google-v2 google-cls-v2"
+    return
+  fi
+  case "${test_file}" in
+    e2e_io.sh)
+      local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2 google-batch}"
+      ;;
+    *)
+      local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2}"
+      ;;
+  esac
 
   echo -n "${all_provider_list}"
 }

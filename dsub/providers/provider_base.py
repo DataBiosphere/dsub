@@ -18,6 +18,7 @@ import argparse
 import os
 
 from . import google_base
+from . import google_batch
 from . import google_cls_v2
 from . import google_v2
 from . import local
@@ -27,6 +28,7 @@ from . import test_fails
 PROVIDER_NAME_MAP = {
     google_v2.GoogleV2JobProvider: 'google-v2',
     google_cls_v2.GoogleCLSV2JobProvider: 'google-cls-v2',
+    google_batch.GoogleBatchJobProvider: 'google-batch',
     local.LocalJobProvider: 'local',
     test_fails.FailsJobProvider: 'test-fails',
 }
@@ -52,7 +54,10 @@ def get_provider(args, resources, credentials_fn=None):
 
   provider = getattr(args, 'provider', 'google-v2')
 
-  if provider == 'google-cls-v2':
+  if provider == 'google-batch':
+    return google_batch.GoogleBatchJobProvider(
+        getattr(args, 'dry_run', False), args.project, args.location)
+  elif provider == 'google-cls-v2':
     return google_cls_v2.GoogleCLSV2JobProvider(
         getattr(args, 'dry_run', False),
         args.project,
@@ -84,9 +89,12 @@ def create_parser(prog):
   parser.add_argument(
       '--provider',
       default='google-v2',
-      choices=['local', 'google-v2', 'google-cls-v2', 'test-fails'],
+      choices=[
+          'local', 'google-v2', 'google-cls-v2', 'google-batch', 'test-fails'
+      ],
       help="""Job service provider. Valid values are "google-v2" (Google's
-        Pipeline API v2alpha1), "google-cls-v2" (Google's Pipelines API v2beta)
+        Pipeline API v2alpha1), "google-cls-v2" (Google's Pipelines API v2beta),
+        "google-batch" (Google's Batch API v1alpha1),
         and "local" (local Docker execution).
         "test-*" providers are for testing purposes only.
         (default: google-v2)""",
@@ -121,9 +129,11 @@ def get_dstat_provider_args(provider, project, location):
 
   args = []
   if provider_name == 'google-cls-v2':
-    args.append('--project %s --location %s' % (project, location))
+    args.append(f'--project {project} --location {location}')
   elif provider_name == 'google-v2':
-    args.append('--project %s' % project)
+    args.append(f'--project {project}')
+  elif provider_name == 'google-batch':
+    args.append(f'--project {project} --location {location}')
   elif provider_name == 'local':
     pass
   elif provider_name == 'test-fails':

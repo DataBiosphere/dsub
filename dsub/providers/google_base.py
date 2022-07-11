@@ -247,20 +247,6 @@ def build_pipeline_labels(job_metadata, task_metadata, task_id_pattern=None):
   return labels
 
 
-def prepare_query_label_value(labels):
-  """Converts the label strings to contain label-appropriate characters.
-
-  Args:
-    labels: A set of strings to be converted.
-
-  Returns:
-    A list of converted strings.
-  """
-  if not labels:
-    return None
-  return [job_model.convert_to_label_chars(label) for label in labels]
-
-
 def parse_rfc3339_utc_string(rfc3339_utc_string):
   """Converts a datestamp from RFC3339 UTC to a datetime.
 
