@@ -4,13 +4,10 @@ File is based on this template: https://github.com/pypa/sampleproject
 """
 
 import os
-import subprocess
 import unittest
 # Always prefer setuptools over distutils
 from setuptools import find_packages
 from setuptools import setup
-from setuptools.command.develop import develop
-from setuptools.command.install import install
 
 
 _DEPENDENCIES = [
@@ -20,8 +17,9 @@ _DEPENDENCIES = [
     # This version list generated: 05/16/2022
 
     # direct dependencies
-    'google-api-python-client<=2.47.0',
-    'google-auth<=2.6.6',
+    'google-api-python-client>=2.47.0,<=2.55.0',
+    'google-auth>=2.6.6,<=2.9.1',
+    'google-cloud-batch<=0.1.0',
     'python-dateutil<=2.8.2',
     'pytz<=2022.1',
     'pyyaml<=6.0',
@@ -29,8 +27,8 @@ _DEPENDENCIES = [
     'tabulate<=0.8.9',
 
     # downstream dependencies
-    'funcsigs<=1.0.2',
-    'google-api-core<=2.7.3',
+    'funcsigs==1.0.2',
+    'google-api-core>=2.7.3,<=2.8.2',
     'google-auth-httplib2<=0.1.0',
     'httplib2<=0.20.4',
     'pyasn1<=0.4.8',
@@ -42,26 +40,6 @@ _DEPENDENCIES = [
     'parameterized<=0.8.1',
     'mock<=4.0.3',
 ]
-
-
-class DevelopLocalPackage(develop):
-
-  def run(self):
-    develop.run(self)
-    # Temporarily install from local tarfile until available through pypi
-    # This will be skipped if the client file doesn't exist
-    command = ('test -f batch-v1-py.tar && pip install batch-v1-py.tar')
-    subprocess.call(command, shell=True)
-
-
-class InstallLocalPackage(install):
-
-  def run(self):
-    install.run(self)
-    # Temporarily install from local tarfile until available through pypi
-    # This will be skipped if the client file doesn't exist
-    command = ('test -f batch-v1-py.tar && pip install batch-v1-py.tar')
-    subprocess.call(command, shell=True)
 
 
 def unittest_suite():
@@ -105,7 +83,7 @@ setup(
     name='dsub',
 
     # Python 2 is no longer supported. Use Python 3.
-    python_requires='>=3.6',
+    python_requires='>=3.7',
 
     # Versions should comply with PEP440.
     version=get_dsub_version(),
@@ -140,9 +118,10 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
     ],
 
     # What does your project relate to?
@@ -166,12 +145,5 @@ setup(
             'dstat=dsub.commands.dstat:main',
             'ddel=dsub.commands.ddel:main',
         ],
-    },
-    cmdclass={
-        # For installing Batch client library. See:
-        # https://stackoverflow.com/questions/20288711/post-install-script-with-python-setuptools/36902139
-        # https://stackoverflow.com/questions/40831794/call-another-setup-py-in-setup-py
-        'install': InstallLocalPackage,
-        'develop': DevelopLocalPackage,
     },
 )

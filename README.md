@@ -17,10 +17,11 @@ and Azure Batch.
 
 ## Getting started
 
-`dsub` is written in Python and requires Python 3.6 or higher.
+`dsub` is written in Python and requires Python 3.7 or higher.
 
-* For earlier versions of Python 3, use `dsub` [0.4.1](https://github.com/DataBiosphere/dsub/releases/tag/v0.4.11).
-* For Python 2, use `dsub`[0.3.10](https://github.com/DataBiosphere/dsub/releases/tag/v0.3.10).
+* The last version to support Python 3.6 was `dsub` [0.4.7](https://github.com/DataBiosphere/dsub/releases/tag/v0.4.7).
+* For earlier versions of Python 3, use `dsub` [0.4.1](https://github.com/DataBiosphere/dsub/releases/tag/v0.4.1).
+* For Python 2, use `dsub` [0.3.10](https://github.com/DataBiosphere/dsub/releases/tag/v0.3.10).
 
 ### Pre-installation steps
 
