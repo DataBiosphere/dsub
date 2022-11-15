@@ -484,7 +484,7 @@ To have the `google-v2` or `google-cls-v2` provider mount a persistent disk that
 you have pre-created and populated, use the `--mount` command line flag and the
 url of the source disk:
 
-    --mount RESOURCES="https://www.googleapis.com/compute/v1/projects/your-project/global/images/your-image 50"
+    --mount RESOURCES="https://www.googleapis.com/compute/v1/projects/your-project/zones/your_disk_zone/disks/your-disk"
 
 ##### Mounting a persistent disk, created from an image
 
