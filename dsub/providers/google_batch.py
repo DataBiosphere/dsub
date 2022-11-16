@@ -44,6 +44,13 @@ _SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 
+# Mount point for the data disk in the user's Docker container
+_DATA_MOUNT_POINT = '/mnt/disks/data'
+
+_SCRIPT_DIR = f'{_DATA_MOUNT_POINT}/script'
+_TMP_DIR = f'{_DATA_MOUNT_POINT}/tmp'
+_WORKING_DIR = f'{_DATA_MOUNT_POINT}/workingdir'
+
 
 class GoogleBatchOperation(base.Task):
   """Task wrapper around a Batch API Job object."""
@@ -223,7 +230,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
     # Set up VM-specific variables
     datadisk_volume = google_batch_operations.build_volume(
-        disk=google_utils.DATA_DISK_NAME, path=providers_util.DATA_MOUNT_POINT)
+        disk=google_utils.DATA_DISK_NAME, path=_DATA_MOUNT_POINT)
 
     # Set up the task labels
     labels = {
@@ -256,11 +263,12 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
     # Set up command and environments for the prepare, localization, user,
     # and de-localization actions
-    script_path = os.path.join(providers_util.SCRIPT_DIR, script.name)
+    script_path = os.path.join(_SCRIPT_DIR, script.name)
 
     prepare_command = google_utils.PREPARE_CMD.format(
         log_msg_fn=google_utils.LOG_MSG_FN,
-        mk_runtime_dirs=google_utils.MK_RUNTIME_DIRS_CMD,
+        mk_runtime_dirs=google_utils.make_runtime_dirs_command(
+            _SCRIPT_DIR, _TMP_DIR, _WORKING_DIR),
         script_var=google_utils.SCRIPT_VARNAME,
         python_decode_script=google_utils.PYTHON_DECODE_SCRIPT,
         script_path=script_path,
@@ -286,9 +294,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             always_run=False,
             image_uri=google_utils.CLOUD_SDK_IMAGE,
             entrypoint='/bin/bash',
-            volumes=[
-                f'{providers_util.DATA_MOUNT_POINT}:{providers_util.DATA_MOUNT_POINT}'
-            ],
+            volumes=[f'{_DATA_MOUNT_POINT}:{_DATA_MOUNT_POINT}'],
             commands=['-c', prepare_command]))
 
     runnables.append(
@@ -298,9 +304,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             always_run=False,
             image_uri=google_utils.CLOUD_SDK_IMAGE,
             entrypoint='/bin/bash',
-            volumes=[
-                f'{providers_util.DATA_MOUNT_POINT}:{providers_util.DATA_MOUNT_POINT}'
-            ],
+            volumes=[f'{_DATA_MOUNT_POINT}:{_DATA_MOUNT_POINT}'],
             commands=[
                 '-c',
                 google_utils.LOCALIZATION_CMD.format(
@@ -317,14 +321,12 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             always_run=False,
             image_uri=job_resources.image,
             entrypoint='/usr/bin/env',
-            volumes=[
-                f'{providers_util.DATA_MOUNT_POINT}:{providers_util.DATA_MOUNT_POINT}'
-            ],
+            volumes=[f'{_DATA_MOUNT_POINT}:{_DATA_MOUNT_POINT}'],
             commands=[
                 'bash', '-c',
                 google_utils.USER_CMD.format(
-                    tmp_dir=providers_util.TMP_DIR,
-                    working_dir=providers_util.WORKING_DIR,
+                    tmp_dir=_TMP_DIR,
+                    working_dir=_WORKING_DIR,
                     user_script=script_path)
             ]))
 
@@ -335,9 +337,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             always_run=False,
             image_uri=google_utils.CLOUD_SDK_IMAGE,
             entrypoint='/bin/bash',
-            volumes=[
-                f'{providers_util.DATA_MOUNT_POINT}:{providers_util.DATA_MOUNT_POINT}:ro'
-            ],
+            volumes=[f'{_DATA_MOUNT_POINT}:{_DATA_MOUNT_POINT}:ro'],
             commands=[
                 '-c',
                 google_utils.LOCALIZATION_CMD.format(
@@ -411,11 +411,13 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     mounts = job_params['mounts']
 
     prepare_env = self._get_prepare_env(script, task_view, inputs, outputs,
-                                        mounts)
-    localization_env = self._get_localization_env(inputs, user_project)
+                                        mounts, _DATA_MOUNT_POINT)
+    localization_env = self._get_localization_env(inputs, user_project,
+                                                  _DATA_MOUNT_POINT)
     user_environment = self._build_user_environment(envs, inputs, outputs,
-                                                    mounts)
-    delocalization_env = self._get_delocalization_env(outputs, user_project)
+                                                    mounts, _DATA_MOUNT_POINT)
+    delocalization_env = self._get_delocalization_env(outputs, user_project,
+                                                      _DATA_MOUNT_POINT)
     # This merges all the envs into one dict. Need to use this syntax because
     # of python3.6. In python3.9 we'd prefer to use | operator.
     all_env = {

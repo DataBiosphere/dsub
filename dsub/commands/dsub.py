@@ -664,7 +664,7 @@ def _get_job_metadata(provider, user_id, job_name, script, task_ids,
   user_id = user_id or dsub_util.get_os_user()
   job_metadata = provider.prepare_job_metadata(script.name, job_name, user_id)
   if unique_job_id:
-    job_metadata['job-id'] = uuid.uuid4().hex
+    job_metadata['job-id'] = _generate_unique_job_id()
   else:
     # Build the job-id. We want the job-id to be expressive while also
     # having a low-likelihood of collisions.
@@ -689,6 +689,28 @@ def _get_job_metadata(provider, user_id, job_name, script, task_ids,
     job_metadata['task-ids'] = dsub_util.compact_interval_string(list(task_ids))
 
   return job_metadata
+
+
+def _generate_unique_job_id() -> str:
+  """Generates a unique job identifier.
+
+  Uses uuid4() to generate a Universally Unique IDentifier and performs a
+  small transformation to accomodate the Google Batch API.
+
+  Google Batch requires a client-provided job identifier and
+  requires that the first character be a non-digit.
+
+  Since we know the UUID is unique and consists of hexadecimal characters
+  [0-9a-f] we can transform 0-9 to g->p without risk of removing uniqueness.
+
+  Returns:
+    String for unique job identifier.
+  """
+  uuid_value = uuid.uuid4().hex
+  if uuid_value[0].isdigit():
+    return chr(ord('g') + int(uuid_value[0])) + uuid_value[1:]
+  else:
+    return uuid_value
 
 
 def _resolve_task_logging(job_metadata, job_resources, task_descriptors):
@@ -1113,7 +1135,7 @@ def main(prog=None, argv=None):
 
   try:
     dsub_main(prog, argv)
-  except dsub_errors.PredecessorJobFailureError as e:
+  except dsub_errors.PredecessorJobFailureError:
     # Never tried to launch. Failure occurred in the --after wait.
     print(dsub_util.NO_JOB)
     sys.exit(1)

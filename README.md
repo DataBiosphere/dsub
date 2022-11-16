@@ -525,6 +525,20 @@ of a wide range of CPU, RAM, disk, and hardware accelerator (eg. GPU) options.
 See the [Compute Resources](https://github.com/DataBiosphere/dsub/blob/main/docs/compute_resources.md)
 documentation for details.
 
+### Job Identifiers
+
+By default, `dsub` generates a `job-id` with the form
+`job-name--userid--timestamp` where the `job-name` is truncated at 10 characters
+and the `timestamp` is of the form `YYMMDD-HHMMSS-XX`, unique to hundredths of a
+second. If you are submitting multiple jobs concurrently, you may still run into
+situations where the `job-id` is not unique. If you require a unique `job-id`
+for this situation, you may use the `--unique-job-id` parameter.
+
+If the `--unique-job-id` parameter is set, `job-id` will instead be a unique 32
+character UUID created by https://docs.python.org/3/library/uuid.html. Because
+some providers require that the `job-id` begin with a letter, `dsub` will
+replace any starting digit with a letter in a manner that preserves uniqueness.
+
 ### Submitting a batch job
 
 Each of the examples above has demonstrated submitting a single task with
@@ -630,9 +644,10 @@ each job includes:
 *   `job-name`: defaults to the name of your script file or the first word of
     your script command; it can be explicitly set with the `--name` parameter.
 *   `user-id`: the `USER` environment variable value.
-*   `job-id`: takes the form `job-name--userid--timestamp` where the `job-name`
-    is truncated at 10 characters and the `timestamp` is of the form
-    `YYMMDD-HHMMSS-XX`, unique to hundredths of a second.
+*   `job-id`: identifier of the job, which can be used in calls to `dstat` and
+    `ddel` for job monitoring and canceling respectively. See
+    [Job Identifiers](https://github.com/DataBiosphere/dsub#job-identifiers) for more
+    details on the `job-id` format.
 *   `task-id`: if the job is submitted with the `--tasks` parameter, each task
     gets a sequential value of the form "task-*n*" where *n* is 1-based.
 

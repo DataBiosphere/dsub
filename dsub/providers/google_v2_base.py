@@ -137,6 +137,13 @@ _EVENT_REGEX_MAP = {
     'canceled': _ABORT_REGEX,
 }
 
+# Mount point for the data disk in the user's Docker container
+_DATA_MOUNT_POINT = '/mnt/data'
+
+_SCRIPT_DIR = f'{_DATA_MOUNT_POINT}/script'
+_TMP_DIR = f'{_DATA_MOUNT_POINT}/tmp'
+_WORKING_DIR = f'{_DATA_MOUNT_POINT}/workingdir'
+
 
 class GoogleV2EventMap(object):
   """Helper for extracing a set of normalized, filtered operation events."""
@@ -304,17 +311,15 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
               mounts=[mnt_datadisk],
               commands=[
                   '--implicit-dirs', '--foreground', '-o ro', bucket,
-                  os.path.join(providers_util.DATA_MOUNT_POINT, mount_path)
+                  os.path.join(_DATA_MOUNT_POINT, mount_path)
               ]),
           google_v2_pipelines.build_action(
               name='mount-wait-{}'.format(bucket),
               enable_fuse=True,
               image_uri=_GCSFUSE_IMAGE,
               mounts=[mnt_datadisk],
-              commands=[
-                  'wait',
-                  os.path.join(providers_util.DATA_MOUNT_POINT, mount_path)
-              ])
+              commands=['wait',
+                        os.path.join(_DATA_MOUNT_POINT, mount_path)])
       ])
     return actions_to_add
 
@@ -330,7 +335,7 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
     # Set up VM-specific variables
     mnt_datadisk = google_v2_pipelines.build_mount(
         disk=google_utils.DATA_DISK_NAME,
-        path=providers_util.DATA_MOUNT_POINT,
+        path=_DATA_MOUNT_POINT,
         read_only=False)
     scopes = job_resources.scopes or google_base.DEFAULT_SCOPES
 
@@ -367,7 +372,7 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
     persistent_disk_mounts = [
         google_v2_pipelines.build_mount(
             disk=persistent_disk.get('volume'),
-            path=os.path.join(providers_util.DATA_MOUNT_POINT,
+            path=os.path.join(_DATA_MOUNT_POINT,
                               persistent_disk_mount_param.docker_path),
             read_only=True)
         for persistent_disk, persistent_disk_mount_param in zip(
@@ -385,7 +390,7 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
     existing_disk_mounts = [
         google_v2_pipelines.build_mount(
             disk=existing_disk.get('volume'),
-            path=os.path.join(providers_util.DATA_MOUNT_POINT,
+            path=os.path.join(_DATA_MOUNT_POINT,
                               existing_disk_mount_param.docker_path),
             read_only=True) for existing_disk, existing_disk_mount_param in zip(
                 existing_disks, existing_disk_mount_params)
@@ -438,21 +443,24 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
 
     # Set up command and environments for the prepare, localization, user,
     # and de-localization actions
-    script_path = os.path.join(providers_util.SCRIPT_DIR, script.name)
+    script_path = os.path.join(_SCRIPT_DIR, script.name)
     prepare_command = google_utils.PREPARE_CMD.format(
         log_msg_fn=google_utils.LOG_MSG_FN,
-        mk_runtime_dirs=google_utils.MK_RUNTIME_DIRS_CMD,
+        mk_runtime_dirs=google_utils.make_runtime_dirs_command(
+            _SCRIPT_DIR, _TMP_DIR, _WORKING_DIR),
         script_var=google_utils.SCRIPT_VARNAME,
         python_decode_script=google_utils.PYTHON_DECODE_SCRIPT,
         script_path=script_path,
         mk_io_dirs=google_utils.MK_IO_DIRS)
 
     prepare_env = self._get_prepare_env(script, task_view, inputs, outputs,
-                                        mounts)
-    localization_env = self._get_localization_env(inputs, user_project)
+                                        mounts, _DATA_MOUNT_POINT)
+    localization_env = self._get_localization_env(inputs, user_project,
+                                                  _DATA_MOUNT_POINT)
     user_environment = self._build_user_environment(envs, inputs, outputs,
-                                                    mounts)
-    delocalization_env = self._get_delocalization_env(outputs, user_project)
+                                                    mounts, _DATA_MOUNT_POINT)
+    delocalization_env = self._get_delocalization_env(outputs, user_project,
+                                                      _DATA_MOUNT_POINT)
 
     # When --ssh is enabled, run all actions in the same process ID namespace
     pid_namespace = 'shared' if job_resources.ssh else None
@@ -520,8 +528,8 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
             commands=[
                 'bash', '-c',
                 google_utils.USER_CMD.format(
-                    tmp_dir=providers_util.TMP_DIR,
-                    working_dir=providers_util.WORKING_DIR,
+                    tmp_dir=_TMP_DIR,
+                    working_dir=_WORKING_DIR,
                     user_script=script_path)
             ]),
         google_v2_pipelines.build_action(

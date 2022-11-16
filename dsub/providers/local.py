@@ -103,8 +103,11 @@ _RUNNER_SH_RESOURCE = 'dsub/providers/local/runner.sh'
 
 _DATA_SUBDIR = 'data'
 
-_SCRIPT_DIR = 'script'
-_WORKING_DIR = 'workingdir'
+_SCRIPT_SUBDIR = 'script'
+_WORKING_SUBDIR = 'workingdir'
+
+# Mount point for the data disk in the user's Docker container
+_DATA_MOUNT_POINT = f'/mnt/{_DATA_SUBDIR}'
 
 # Set file provider whitelist.
 _SUPPORTED_FILE_PROVIDERS = frozenset([job_model.P_GCS, job_model.P_LOCAL])
@@ -319,11 +322,10 @@ class LocalJobProvider(base.JobProvider):
 
     # Build the local runner script
     volumes = ('-v ' + task_dir + '/' + _DATA_SUBDIR + '/'
-               ':' + providers_util.DATA_MOUNT_POINT)
+               ':' + _DATA_MOUNT_POINT)
     for mount in param_util.get_local_mounts(job_params['mounts']):
       volumes += '\n'
-      docker_path = os.path.join(providers_util.DATA_MOUNT_POINT,
-                                 mount.docker_path)
+      docker_path = os.path.join(_DATA_MOUNT_POINT, mount.docker_path)
       volumes += '-v {}:{}:ro'.format(mount.uri, docker_path)
 
     script_data = script_header.format(
@@ -332,14 +334,14 @@ class LocalJobProvider(base.JobProvider):
             job_metadata.get('job-id'), task_metadata.get('task-id'),
             task_metadata.get('task-attempt')),
         image=job_resources.image,
-        script=providers_util.DATA_MOUNT_POINT + '/' + _SCRIPT_DIR + '/' +
+        script=_DATA_MOUNT_POINT + '/' + _SCRIPT_SUBDIR + '/' +
         job_metadata['script'].name,
         env_file=task_dir + '/' + 'docker.env',
         uid=os.getuid(),
-        data_mount_point=providers_util.DATA_MOUNT_POINT,
+        data_mount_point=_DATA_MOUNT_POINT,
         data_dir=task_dir + '/' + _DATA_SUBDIR,
         date_format='+%Y-%m-%d %H:%M:%S',
-        workingdir=_WORKING_DIR,
+        workingdir=_WORKING_SUBDIR,
         export_input_dirs=providers_util.build_recursive_localize_env(
             task_dir, job_params['inputs'] | task_params['inputs']),
         recursive_localize_command=self._localize_inputs_recursive_command(
@@ -369,8 +371,8 @@ class LocalJobProvider(base.JobProvider):
 
     # Write the environment variables
     env_vars = set(env.items()) | job_params['envs'] | task_params['envs'] | {
-        job_model.EnvParam('DATA_ROOT', providers_util.DATA_MOUNT_POINT),
-        job_model.EnvParam('TMPDIR', providers_util.DATA_MOUNT_POINT + '/tmp')
+        job_model.EnvParam('DATA_ROOT', _DATA_MOUNT_POINT),
+        job_model.EnvParam('TMPDIR', _DATA_MOUNT_POINT + '/tmp')
     }
     env_fname = task_dir + '/docker.env'
     with open(env_fname, 'wt') as f:
@@ -749,9 +751,15 @@ class LocalJobProvider(base.JobProvider):
   def _make_environment(self, inputs, outputs, mounts):
     """Return a dictionary of environment variables for the container."""
     env = {}
-    env.update(providers_util.get_file_environment_variables(inputs))
-    env.update(providers_util.get_file_environment_variables(outputs))
-    env.update(providers_util.get_file_environment_variables(mounts))
+    env.update(
+        providers_util.get_file_environment_variables(inputs,
+                                                      _DATA_MOUNT_POINT))
+    env.update(
+        providers_util.get_file_environment_variables(outputs,
+                                                      _DATA_MOUNT_POINT))
+    env.update(
+        providers_util.get_file_environment_variables(mounts,
+                                                      _DATA_MOUNT_POINT))
     return env
 
   def _localize_inputs_recursive_command(self, task_dir, inputs):
@@ -817,7 +825,7 @@ class LocalJobProvider(base.JobProvider):
     return '\n'.join(commands)
 
   def _mkdir_outputs(self, task_dir, outputs):
-    os.makedirs(task_dir + '/' + _DATA_SUBDIR + '/' + _WORKING_DIR)
+    os.makedirs(task_dir + '/' + _DATA_SUBDIR + '/' + _WORKING_SUBDIR)
     os.makedirs(task_dir + '/' + _DATA_SUBDIR + '/tmp')
     for o in outputs:
       if not o.value:
@@ -869,7 +877,7 @@ class LocalJobProvider(base.JobProvider):
     return '\n'.join(commands)
 
   def _get_script_path(self, task_dir, script_name):
-    return os.path.join(task_dir, _DATA_SUBDIR, _SCRIPT_DIR, script_name)
+    return os.path.join(task_dir, _DATA_SUBDIR, _SCRIPT_SUBDIR, script_name)
 
   def _write_script(self, task_dir, script_name, script_text):
     path = self._get_script_path(task_dir, script_name)

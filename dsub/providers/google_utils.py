@@ -57,6 +57,17 @@ def create_time_filter(create_time, comparator):
   return 'createTime {} "{}"'.format(comparator, create_time)
 
 
+# Generate command to create the directories for the dsub user environment
+# pylint: disable=g-complex-comprehension
+def make_runtime_dirs_command(script_dir: str, tmp_dir: str,
+                              working_dir: str) -> str:
+  return '\n'.join('mkdir -m 777 -p "%s" ' % dir
+                   for dir in [script_dir, tmp_dir, working_dir])
+
+
+# pylint: enable=g-complex-comprehension
+
+
 # Action steps that interact with GCS need gsutil and Python.
 # Use the 'slim' variant of the cloud-sdk image as it is much smaller.
 CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:294.0.0-slim'
@@ -219,14 +230,6 @@ LOCALIZATION_CMD = textwrap.dedent("""\
   {cp_loop}
 """)
 
-# Command to create the directories for the dsub user environment
-# pylint: disable=g-complex-comprehension
-MK_RUNTIME_DIRS_CMD = '\n'.join('mkdir -m 777 -p "%s" ' % dir for dir in [
-    providers_util.SCRIPT_DIR, providers_util.TMP_DIR,
-    providers_util.WORKING_DIR
-])
-# pylint: enable=g-complex-comprehension
-
 # The user's script or command is made available to the container in
 #   /mnt/data/script/<script-name>
 #
@@ -286,8 +289,8 @@ USER_CMD = textwrap.dedent("""\
 class GoogleJobProviderBase(base.JobProvider):
   """dsub provider implementation managing Jobs on Google Cloud."""
 
-  def _get_prepare_env(self, script, job_descriptor, inputs, outputs,
-                       mounts) -> Dict[str, str]:
+  def _get_prepare_env(self, script, job_descriptor, inputs, outputs, mounts,
+                       mount_point) -> Dict[str, str]:
     """Return a dict with variables for the 'prepare' action."""
 
     # Add the _SCRIPT_REPR with the repr(script) contents
@@ -319,12 +322,12 @@ class GoogleJobProviderBase(base.JobProvider):
     }
 
     for idx, path in enumerate(docker_paths):
-      env['DIR_{}'.format(idx)] = os.path.join(providers_util.DATA_MOUNT_POINT,
-                                               path)
+      env['DIR_{}'.format(idx)] = os.path.join(mount_point, path)
 
     return env
 
-  def _get_localization_env(self, inputs, user_project) -> Dict[str, str]:
+  def _get_localization_env(self, inputs, user_project,
+                            mount_point) -> Dict[str, str]:
     """Return a dict with variables for the 'localization' action."""
 
     # Add variables for paths that need to be localized, for example:
@@ -343,7 +346,7 @@ class GoogleJobProviderBase(base.JobProvider):
       env['INPUT_SRC_{}'.format(idx)] = var.value
 
       # For wildcard paths, the destination must be a directory
-      dst = os.path.join(providers_util.DATA_MOUNT_POINT, var.docker_path)
+      dst = os.path.join(mount_point, var.docker_path)
       path, filename = os.path.split(dst)
       if '*' in filename:
         dst = '{}/'.format(path)
@@ -353,7 +356,8 @@ class GoogleJobProviderBase(base.JobProvider):
 
     return env
 
-  def _get_delocalization_env(self, outputs, user_project) -> Dict[str, str]:
+  def _get_delocalization_env(self, outputs, user_project,
+                              mount_point) -> Dict[str, str]:
     """Return a dict with variables for the 'delocalization' action."""
 
     # Add variables for paths that need to be delocalized, for example:
@@ -369,8 +373,8 @@ class GoogleJobProviderBase(base.JobProvider):
     for idx, var in enumerate(non_empty_outputs):
       env['OUTPUT_{}'.format(idx)] = var.name
       env['OUTPUT_RECURSIVE_{}'.format(idx)] = str(int(var.recursive))
-      env['OUTPUT_SRC_{}'.format(idx)] = os.path.join(
-          providers_util.DATA_MOUNT_POINT, var.docker_path)
+      env['OUTPUT_SRC_{}'.format(idx)] = os.path.join(mount_point,
+                                                      var.docker_path)
 
       # For wildcard paths, the destination must be a directory
       if '*' in var.uri.basename:
@@ -383,13 +387,16 @@ class GoogleJobProviderBase(base.JobProvider):
 
     return env
 
-  def _build_user_environment(self, envs, inputs, outputs,
-                              mounts) -> Dict[str, str]:
+  def _build_user_environment(self, envs, inputs, outputs, mounts,
+                              mount_point) -> Dict[str, str]:
     """Returns a dictionary of for the user container environment."""
     envs = {env.name: env.value for env in envs}
-    envs.update(providers_util.get_file_environment_variables(inputs))
-    envs.update(providers_util.get_file_environment_variables(outputs))
-    envs.update(providers_util.get_file_environment_variables(mounts))
+    envs.update(
+        providers_util.get_file_environment_variables(inputs, mount_point))
+    envs.update(
+        providers_util.get_file_environment_variables(outputs, mount_point))
+    envs.update(
+        providers_util.get_file_environment_variables(mounts, mount_point))
     return envs
 
   def prepare_job_metadata(self, script: str, job_name: str,

@@ -50,15 +50,8 @@ _LOCALIZE_COMMAND_MAP = {
 #               This is also the explicit working directory set before the
 #               user script runs.
 
-# Mount point for the data disk in the user's Docker container
-DATA_MOUNT_POINT = '/mnt/data'
 
-SCRIPT_DIR = '%s/script' % DATA_MOUNT_POINT
-TMP_DIR = '%s/tmp' % DATA_MOUNT_POINT
-WORKING_DIR = '%s/workingdir' % DATA_MOUNT_POINT
-
-
-def get_file_environment_variables(file_params):
+def get_file_environment_variables(file_params, mount_point):
   """Return a dictionary of environment variables for the user container."""
   env = {}
   for param in file_params:
@@ -67,7 +60,7 @@ def get_file_environment_variables(file_params):
     # The case that this is specifically handling is --input-recursive and
     # --output-recursive variables, which are directory values.
     env[param.name] = os.path.join(
-        DATA_MOUNT_POINT, param.docker_path.rstrip('/')) if param.value else ''
+        mount_point, param.docker_path.rstrip('/')) if param.value else ''
   return env
 
 
