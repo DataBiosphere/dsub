@@ -19,9 +19,9 @@ import datetime
 import os
 import re
 import sys
-from . import dsub_util
-from . import job_model
-from .._dsub_version import DSUB_VERSION
+from . import dsub_util  # pytype: disable=import-error
+from . import job_model  # pytype: disable=import-error
+from .._dsub_version import DSUB_VERSION  # pytype: disable=import-error
 from dateutil.tz import tzlocal
 import pytz
 
