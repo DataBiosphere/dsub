@@ -160,7 +160,7 @@ def emit_provider_message(provider):
 def check_for_unsupported_flag(args):
   """Raise an error if the provider doesn't support a provided flag."""
   if args.label and args.provider not in [
-      'test-fails', 'local', 'google-v2', 'google-cls-v2'
+      'test-fails', 'local', 'google-v2', 'google-cls-v2', 'google-batch'
   ]:
     raise ValueError(
         '--label is not supported by the "%s" provider.' % args.provider)

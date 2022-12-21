@@ -370,7 +370,11 @@ def _cancel_batch(batch_fn, cancel_fn, ops):
   for op in ops:
     op_name = op.get_field('internal-id')
     ops_by_name[op_name] = op
-    batch.add(cancel_fn(name=op_name, body={}), request_id=op_name)
+    try:
+      batch.add(cancel_fn(name=op_name, body={}), request_id=op_name)
+    except TypeError:
+      # Batch API delete_job method doesn't take a body parameter
+      batch.add(cancel_fn(name=op_name), request_id=op_name)
 
   # Cancel the operations
   batch.execute()

@@ -226,6 +226,16 @@ function ddel_google-v2() {
     "${@}"
 }
 
+function ddel_google-batch() {
+  local location="${LOCATION:-}"
+
+  ddel \
+    --provider google-batch \
+    --project "${PROJECT_ID}" \
+    ${location:+--location "${location}"} \
+    "${@}"
+}
+
 function ddel_local() {
   ddel \
     --provider local \

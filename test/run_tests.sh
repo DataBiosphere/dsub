@@ -219,7 +219,7 @@ function get_test_providers() {
     return
   fi
   case "${test_file}" in
-    e2e_io.sh)
+    e2e_io.sh | e2e_logging_paths.sh | e2e_logging_paths_basic_tasks.sh | e2e_logging_paths_log_suffix_tasks.sh | e2e_logging_paths_pattern_tasks.sh)
       local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2 google-batch}"
       ;;
     *)

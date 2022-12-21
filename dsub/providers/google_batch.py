@@ -19,6 +19,7 @@ Google Batch v1 APIs.
 import ast
 import json
 import os
+import sys
 from typing import Dict, List, Set
 
 from . import base
@@ -201,7 +202,30 @@ class GoogleBatchOperation(base.Task):
     # TODO: This is intended to grab as much detail as possible
     # Currently, just grabbing the description field from the last status_event
     status_events = google_batch_operations.get_status_events(self._op)
-    return status_events[-1].description
+    if status_events:
+      return status_events[-1].description
+
+
+class GoogleBatchBatchHandler(object):
+  """Implement the HttpBatch interface to enable simple serial batches."""
+
+  def __init__(self, callback):
+    self._cancel_list = []
+    self._response_handler = callback
+
+  def add(self, cancel_fn, request_id):
+    self._cancel_list.append((request_id, cancel_fn))
+
+  def execute(self):
+    for (request_id, cancel_fn) in self._cancel_list:
+      response = None
+      exception = None
+      try:
+        response = cancel_fn.result()
+      except:  # pylint: disable=bare-except
+        exception = sys.exc_info()[1]
+
+      self._response_handler(request_id, response, exception)
 
 
 class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
@@ -215,6 +239,12 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     self._dry_run = dry_run
     self._location = location
     self._project = project
+
+  def _batch_handler_def(self):
+    return GoogleBatchBatchHandler
+
+  def _operations_cancel_api_def(self):
+    return batch_v1.BatchServiceClient().delete_job
 
   def _get_create_time_filters(self, create_time_min, create_time_max):
     # TODO: Currently, Batch API does not support filtering by create t.
@@ -476,8 +506,34 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
                   labels,
                   create_time_min=None,
                   create_time_max=None):
-    # TODO: Need to implement
-    raise NotImplementedError()
+    """Kills the operations associated with the specified job or job.task.
+
+    Args:
+      user_ids: List of user ids who "own" the job(s) to cancel.
+      job_ids: List of job_ids to cancel.
+      task_ids: List of task-ids to cancel.
+      labels: List of LabelParam, each must match the job(s) to be canceled.
+      create_time_min: a timezone-aware datetime value for the earliest create
+        time of a task, inclusive.
+      create_time_max: a timezone-aware datetime value for the most recent
+        create time of a task, inclusive.
+
+    Returns:
+      A list of tasks canceled and a list of error messages.
+    """
+    # Look up the job(s)
+    tasks = list(
+        self.lookup_job_tasks({'RUNNING'},
+                              user_ids=user_ids,
+                              job_ids=job_ids,
+                              task_ids=task_ids,
+                              labels=labels,
+                              create_time_min=create_time_min,
+                              create_time_max=create_time_max))
+
+    print('Found %d tasks to delete.' % len(tasks))
+    return google_base.cancel(self._batch_handler_def(),
+                              self._operations_cancel_api_def(), tasks)
 
   def lookup_job_tasks(self,
                        statuses: Set[str],
@@ -492,8 +548,10 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
                        max_tasks=0,
                        page_size=0):
     client = batch_v1.BatchServiceClient()
-
-    ops_filter = self._build_query_filter(statuses, user_ids, job_ids,
+    # TODO: Batch API has no 'done' filter like lifesciences API.
+    # Need to figure out how to filter for jobs that are completed.
+    empty_statuses = set()
+    ops_filter = self._build_query_filter(empty_statuses, user_ids, job_ids,
                                           job_names, task_ids, task_attempts,
                                           labels, create_time_min,
                                           create_time_max)
