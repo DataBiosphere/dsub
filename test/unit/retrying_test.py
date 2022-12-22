@@ -15,6 +15,7 @@
 
 import errno
 import socket
+import sys
 import unittest
 
 import apiclient.errors
@@ -167,7 +168,10 @@ class TestRetrying(unittest.TestCase):
        'googleapiclient.errors.HttpError'),
       (google.auth.exceptions.RefreshError(),
        'google.auth.exceptions.RefreshError'),
-      (socket.timeout(), 'socket.timeout'),
+      # In Python 3.10 socket.timeout became an alias for TimeoutError
+      # See https://docs.python.org/3.10/library/socket.html#socket.timeout
+      (socket.timeout(),
+       'TimeoutError' if sys.version_info.minor >= 10 else 'socket.timeout'),
   ])
   def test_get_exception_type_string(self, exception, expected_type_string):
     actual_exception_string = retry_util.get_exception_type_string(exception)

@@ -14,25 +14,26 @@ _DEPENDENCIES = [
     # dependencies for dsub, ddel, dstat
     # Pin to known working versions to prevent episodic breakage from library
     # version mismatches.
-    # This version list generated: 05/16/2022
+    # This version list generated: 12/15/2022
 
     # direct dependencies
-    'google-api-python-client<=2.47.0',
-    'google-auth<=2.6.6',
+    'google-api-python-client>=2.47.0,<=2.70.0',
+    'google-auth>=2.6.6,<=2.15.0',
+    'google-cloud-batch==0.6.0',
     'python-dateutil<=2.8.2',
-    'pytz<=2022.1',
+    'pytz<=2022.7',
     'pyyaml<=6.0',
     'tenacity<=7.0.0',
     'tabulate<=0.8.9',
 
     # downstream dependencies
-    'funcsigs<=1.0.2',
-    'google-api-core<=2.7.3',
+    'funcsigs==1.0.2',
+    'google-api-core>=2.7.3,<=2.11.0',
     'google-auth-httplib2<=0.1.0',
-    'httplib2<=0.20.4',
+    'httplib2<=0.21.0',
     'pyasn1<=0.4.8',
     'pyasn1-modules<=0.2.8',
-    'rsa<=4.8',
+    'rsa<=4.9',
     'uritemplate<=4.1.1',
 
     # dependencies for test code
@@ -82,7 +83,7 @@ setup(
     name='dsub',
 
     # Python 2 is no longer supported. Use Python 3.
-    python_requires='>=3.6',
+    python_requires='>=3.7',
 
     # Versions should comply with PEP440.
     version=get_dsub_version(),
@@ -117,9 +118,10 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
     ],
 
     # What does your project relate to?

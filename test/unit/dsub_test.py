@@ -332,5 +332,15 @@ class TestDsubVersion(unittest.TestCase):
     self.assertIsNotNone(re.search(self.VERSION_REGEX, dsub_init.__version__))
 
 
+class TestDsubGenerateUniqueJobId(unittest.TestCase):
+
+  def test_generate_unique_job_id(self):
+    # Generate several unique job ids
+    # Confirm that none of them begin with a number
+    num_test_cases = 100
+    for _ in range(num_test_cases):
+      result = dsub_command._generate_unique_job_id()
+      self.assertFalse(result[0].isdigit())
+
 if __name__ == '__main__':
   unittest.main()

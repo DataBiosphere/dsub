@@ -206,15 +206,7 @@ class Task(object, metaclass=abc.ABCMeta):
     'error-message', 'create-time', 'start-time', 'end-time', 'inputs',
     'outputs', 'events'
 
-    The following are required by dstat:
-    - status: The task status ('RUNNING', 'CANCELED', 'FAILED', 'SUCCESS')
-    - status-message: A short message that is displayed in the default
-                      dstat output. This should be as concise and useful as
-                      possible ("Pending", "Running", "Error: invalid...")
-    - status-detail: A longer status message that is displayed in full dstat
-                     output. Ideally, this is the last few lines of a log which
-                     gives the user enough information that they do not need
-                     to go to the log files.
+    See output_formatter.prepare_row to see a full list of fields to implement.
 
     dstat's short output shows status-message.
     dstat's full output shows status and status-detail

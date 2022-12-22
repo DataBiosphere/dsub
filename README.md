@@ -17,10 +17,11 @@ and Azure Batch.
 
 ## Getting started
 
-`dsub` is written in Python and requires Python 3.6 or higher.
+`dsub` is written in Python and requires Python 3.7 or higher.
 
-* For earlier versions of Python 3, use `dsub` [0.4.1](https://github.com/DataBiosphere/dsub/releases/tag/v0.4.11).
-* For Python 2, use `dsub`[0.3.10](https://github.com/DataBiosphere/dsub/releases/tag/v0.3.10).
+* The last version to support Python 3.6 was `dsub` [0.4.7](https://github.com/DataBiosphere/dsub/releases/tag/v0.4.7).
+* For earlier versions of Python 3, use `dsub` [0.4.1](https://github.com/DataBiosphere/dsub/releases/tag/v0.4.1).
+* For Python 2, use `dsub` [0.3.10](https://github.com/DataBiosphere/dsub/releases/tag/v0.3.10).
 
 ### Pre-installation steps
 
@@ -93,7 +94,7 @@ Choose **one** of the following:
 
 1.  Install dsub (this will also install the dependencies)
 
-        python setup.py install
+        python -m pip install .
 
 1.  Set up Bash tab completion (optional).
 
@@ -483,7 +484,7 @@ To have the `google-v2` or `google-cls-v2` provider mount a persistent disk that
 you have pre-created and populated, use the `--mount` command line flag and the
 url of the source disk:
 
-    --mount RESOURCES="https://www.googleapis.com/compute/v1/projects/your-project/global/images/your-image 50"
+    --mount RESOURCES="https://www.googleapis.com/compute/v1/projects/your-project/zones/your_disk_zone/disks/your-disk"
 
 ##### Mounting a persistent disk, created from an image
 
@@ -523,6 +524,20 @@ of a wide range of CPU, RAM, disk, and hardware accelerator (eg. GPU) options.
 
 See the [Compute Resources](https://github.com/DataBiosphere/dsub/blob/main/docs/compute_resources.md)
 documentation for details.
+
+### Job Identifiers
+
+By default, `dsub` generates a `job-id` with the form
+`job-name--userid--timestamp` where the `job-name` is truncated at 10 characters
+and the `timestamp` is of the form `YYMMDD-HHMMSS-XX`, unique to hundredths of a
+second. If you are submitting multiple jobs concurrently, you may still run into
+situations where the `job-id` is not unique. If you require a unique `job-id`
+for this situation, you may use the `--unique-job-id` parameter.
+
+If the `--unique-job-id` parameter is set, `job-id` will instead be a unique 32
+character UUID created by https://docs.python.org/3/library/uuid.html. Because
+some providers require that the `job-id` begin with a letter, `dsub` will
+replace any starting digit with a letter in a manner that preserves uniqueness.
 
 ### Submitting a batch job
 
@@ -629,9 +644,10 @@ each job includes:
 *   `job-name`: defaults to the name of your script file or the first word of
     your script command; it can be explicitly set with the `--name` parameter.
 *   `user-id`: the `USER` environment variable value.
-*   `job-id`: takes the form `job-name--userid--timestamp` where the `job-name`
-    is truncated at 10 characters and the `timestamp` is of the form
-    `YYMMDD-HHMMSS-XX`, unique to hundredths of a second.
+*   `job-id`: identifier of the job, which can be used in calls to `dstat` and
+    `ddel` for job monitoring and canceling respectively. See
+    [Job Identifiers](https://github.com/DataBiosphere/dsub#job-identifiers) for more
+    details on the `job-id` format.
 *   `task-id`: if the job is submitted with the `--tasks` parameter, each task
     gets a sequential value of the form "task-*n*" where *n* is 1-based.
 

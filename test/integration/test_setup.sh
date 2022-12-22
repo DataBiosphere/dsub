@@ -87,6 +87,15 @@ function run_dsub() {
   dsub_"${DSUB_PROVIDER}" "${@}"
 }
 
+function dsub_google-batch() {
+  dsub \
+    --provider google-batch \
+    --project "${PROJECT_ID}" \
+    ${location:+--location "${location}"} \
+    --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
+    "${@}"
+}
+
 function dsub_google-cls-v2() {
   local location="${LOCATION:-}"
   local zones="${ZONES:-}"
@@ -149,6 +158,16 @@ function run_dstat() {
   run_dstat_age "45m" "${@}"
 }
 
+function dstat_google-batch() {
+  local location="${LOCATION:-}"
+
+  dstat \
+    --provider google-batch \
+    --project "${PROJECT_ID}" \
+    ${location:+--location "${location}"} \
+    "${@}"
+}
+
 function dstat_google-cls-v2() {
   local location="${LOCATION:-}"
 
@@ -204,6 +223,16 @@ function ddel_google-v2() {
   ddel \
     --provider google-v2 \
     --project "${PROJECT_ID}" \
+    "${@}"
+}
+
+function ddel_google-batch() {
+  local location="${LOCATION:-}"
+
+  ddel \
+    --provider google-batch \
+    --project "${PROJECT_ID}" \
+    ${location:+--location "${location}"} \
     "${@}"
 }
 

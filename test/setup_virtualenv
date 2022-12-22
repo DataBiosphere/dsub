@@ -83,7 +83,7 @@ echo "python version is..."
 python --version
 
 echo "Running setup.py."
-python setup.py install
+python -m pip install .
 
 echo "virtualenv should be correctly set up now. When you are done type"
 echo "'deactivate' to exit the virtualenv environment."

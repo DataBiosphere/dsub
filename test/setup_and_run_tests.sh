@@ -6,7 +6,7 @@ set -o nounset
 if [[ "${1:-}" == "--help" ]]; then
   cat <<EOF
 USAGE:
-  $0 [2.7|3.5] [unit|e2e|pythonunit]
+  $0 [2.7|3.7] [unit|e2e|pythonunit]
 
 Sets up a virtualenv in the current working directory and runs the specified
 tests (or all if none is specified).
@@ -18,7 +18,7 @@ EOF
 fi
 
 # Get the python version.
-if grep -qP "^[23]\.?[567]?.?[1-9]$" <<< "${1}" ; then
+if grep -qP "^[23]\.?[789]?.?[1-9]$" <<< "${1}" ; then
   PYTHON_VERSION="${1}"
   shift
 else

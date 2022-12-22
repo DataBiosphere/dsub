@@ -28,6 +28,7 @@ import textwrap
 
 from . import base
 from . import google_base
+from . import google_utils
 from . import google_v2_operations
 from . import google_v2_pipelines
 from . import google_v2_versions
@@ -43,126 +44,12 @@ _SUPPORTED_LOGGING_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_INPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 _SUPPORTED_OUTPUT_PROVIDERS = _SUPPORTED_FILE_PROVIDERS
 
-# Action steps that interact with GCS need gsutil and Python.
-# Use the 'slim' variant of the cloud-sdk image as it is much smaller.
-_CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:294.0.0-slim'
-
 # This image is for an optional ssh container.
 _SSH_IMAGE = 'gcr.io/cloud-genomics-pipelines/tools'
 _DEFAULT_SSH_PORT = 22
 
 # This image is for an optional mount on a bucket using GCS Fuse
 _GCSFUSE_IMAGE = 'gcr.io/cloud-genomics-pipelines/gcsfuse:latest'
-
-# Name of the data disk
-_DATA_DISK_NAME = 'datadisk'
-
-# Define a bash function for "echo" that includes timestamps
-_LOG_MSG_FN = textwrap.dedent("""\
-  function get_datestamp() {
-    date "+%Y-%m-%d %H:%M:%S"
-  }
-
-  function log_info() {
-    echo "$(get_datestamp) INFO: $@"
-  }
-
-  function log_warning() {
-    1>&2 echo "$(get_datestamp) WARNING: $@"
-  }
-
-  function log_error() {
-    1>&2 echo "$(get_datestamp) ERROR: $@"
-  }
-""")
-
-# Define a bash function for "gsutil cp" to be used by the logging,
-# localization, and delocalization actions.
-_GSUTIL_CP_FN = textwrap.dedent("""\
-  function gsutil_cp() {
-    local src="${1}"
-    local dst="${2}"
-    local content_type="${3}"
-    local user_project_name="${4}"
-
-    local headers=""
-    if [[ -n "${content_type}" ]]; then
-      headers="-h Content-Type:${content_type}"
-    fi
-
-    local user_project_flag=""
-    if [[ -n "${user_project_name}" ]]; then
-      user_project_flag="-u ${user_project_name}"
-    fi
-
-    local attempt
-    for ((attempt = 0; attempt < 4; attempt++)); do
-      log_info "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
-      if gsutil ${headers} ${user_project_flag} -mq cp "${src}" "${dst}"; then
-        return
-      fi
-      if (( attempt < 3 )); then
-        log_warning "Sleeping 10s before the next attempt of failed gsutil command"
-        log_warning "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
-        sleep 10s
-      fi
-    done
-
-    log_error "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
-    exit 1
-  }
-
-  function log_cp() {
-    local src="${1}"
-    local dst="${2}"
-    local tmp="${3}"
-    local check_src="${4}"
-    local user_project_name="${5}"
-
-    if [[ "${check_src}" == "true" ]] && [[ ! -e "${src}" ]]; then
-      return
-    fi
-
-    # Copy the log files to a local temporary location so that our "gsutil cp" is never
-    # executed on a file that is changing.
-
-    local tmp_path="${tmp}/$(basename ${src})"
-    cp "${src}" "${tmp_path}"
-
-    gsutil_cp "${tmp_path}" "${dst}" "text/plain" "${user_project_name}"
-  }
-""")
-
-# Define a bash function for "gsutil rsync" to be used by the logging,
-# localization, and delocalization actions.
-_GSUTIL_RSYNC_FN = textwrap.dedent("""\
-  function gsutil_rsync() {
-    local src="${1}"
-    local dst="${2}"
-    local user_project_name="${3}"
-
-    local user_project_flag=""
-    if [[ -n "${user_project_name}" ]]; then
-      user_project_flag="-u ${user_project_name}"
-    fi
-
-    local attempt
-    for ((attempt = 0; attempt < 4; attempt++)); do
-      log_info "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
-      if gsutil ${user_project_flag} -mq rsync -r "${src}" "${dst}"; then
-        return
-      fi
-      if (( attempt < 3 )); then
-        log_warning "Sleeping 10s before the next attempt of failed gsutil command"
-        log_warning "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
-        sleep 10s
-      fi
-    done
-
-    log_error "gsutil ${user_project_flag} -mq rsync -r \"${src}\" \"${dst}\""
-    exit 1
-  }
-""")
 
 # The logging in v2alpha1 is different than in v1alpha2.
 # v1alpha2 would provide:
@@ -221,116 +108,6 @@ _CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
   done
 """)
 
-_LOCALIZATION_LOOP = textwrap.dedent("""\
-  set -o errexit
-  set -o nounset
-  set -o pipefail
-
-  for ((i=0; i < INPUT_COUNT; i++)); do
-    INPUT_VAR="INPUT_${i}"
-    INPUT_RECURSIVE="INPUT_RECURSIVE_${i}"
-    INPUT_SRC="INPUT_SRC_${i}"
-    INPUT_DST="INPUT_DST_${i}"
-
-    log_info "Localizing ${!INPUT_VAR}"
-    if [[ "${!INPUT_RECURSIVE}" -eq "1" ]]; then
-      gsutil_rsync "${!INPUT_SRC}" "${!INPUT_DST}" "${USER_PROJECT}"
-    else
-      gsutil_cp "${!INPUT_SRC}" "${!INPUT_DST}" "" "${USER_PROJECT}"
-    fi
-  done
-""")
-
-_DELOCALIZATION_LOOP = textwrap.dedent("""\
-  set -o errexit
-  set -o nounset
-  set -o pipefail
-
-  for ((i=0; i < OUTPUT_COUNT; i++)); do
-    OUTPUT_VAR="OUTPUT_${i}"
-    OUTPUT_RECURSIVE="OUTPUT_RECURSIVE_${i}"
-    OUTPUT_SRC="OUTPUT_SRC_${i}"
-    OUTPUT_DST="OUTPUT_DST_${i}"
-
-    log_info "Delocalizing ${!OUTPUT_VAR}"
-    if [[ "${!OUTPUT_RECURSIVE}" -eq "1" ]]; then
-      gsutil_rsync "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "${USER_PROJECT}"
-    else
-      gsutil_cp "${!OUTPUT_SRC}" "${!OUTPUT_DST}" "" "${USER_PROJECT}"
-    fi
-  done
-""")
-
-_LOCALIZATION_CMD = textwrap.dedent("""\
-  {log_msg_fn}
-  {recursive_cp_fn}
-  {cp_fn}
-
-  {cp_loop}
-""")
-
-
-# Command to create the directories for the dsub user environment
-_MK_RUNTIME_DIRS_CMD = '\n'.join('mkdir -m 777 -p "%s" ' % dir for dir in [
-    providers_util.SCRIPT_DIR, providers_util.TMP_DIR,
-    providers_util.WORKING_DIR
-])
-
-# The user's script or command is made available to the container in
-#   /mnt/data/script/<script-name>
-#
-# To get it there, it is passed in through the environment in the "prepare"
-# action and "echo"-ed to a file.
-#
-# Pipelines v2alpha1 uses Docker environment files which do not support
-# multi-line environment variables, so we encode the script using Python's
-# repr() function and then decoded it using ast.literal_eval().
-# This has the advantage over other encoding schemes (such as base64) of being
-# user-readable in the Genomics "operation" object.
-_SCRIPT_VARNAME = '_SCRIPT_REPR'
-_META_YAML_VARNAME = '_META_YAML_REPR'
-
-_PYTHON_DECODE_SCRIPT = textwrap.dedent("""\
-  import ast
-  import sys
-
-  sys.stdout.write(ast.literal_eval(sys.stdin.read()))
-""")
-
-_MK_IO_DIRS = textwrap.dedent("""\
-  for ((i=0; i < DIR_COUNT; i++)); do
-    DIR_VAR="DIR_${i}"
-
-    log_info "mkdir -m 777 -p \"${!DIR_VAR}\""
-    mkdir -m 777 -p "${!DIR_VAR}"
-  done
-""")
-
-_PREPARE_CMD = textwrap.dedent("""\
-  #!/bin/bash
-
-  set -o errexit
-  set -o nounset
-  set -o pipefail
-
-  {log_msg_fn}
-  {mk_runtime_dirs}
-
-  echo "${{{script_var}}}" \
-    | python -c '{python_decode_script}' \
-    > "{script_path}"
-  chmod a+x "{script_path}"
-
-  {mk_io_dirs}
-""")
-
-_USER_CMD = textwrap.dedent("""\
-  export TMPDIR="{tmp_dir}"
-  cd {working_dir}
-
-  "{user_script}"
-""")
-
 _ACTION_LOGGING = 'logging'
 _ACTION_PREPARE = 'prepare'
 _ACTION_LOCALIZATION = 'localization'
@@ -359,6 +136,13 @@ _EVENT_REGEX_MAP = {
     'fail': _FAIL_REGEX,
     'canceled': _ABORT_REGEX,
 }
+
+# Mount point for the data disk in the user's Docker container
+_DATA_MOUNT_POINT = '/mnt/data'
+
+_SCRIPT_DIR = f'{_DATA_MOUNT_POINT}/script'
+_TMP_DIR = f'{_DATA_MOUNT_POINT}/tmp'
+_WORKING_DIR = f'{_DATA_MOUNT_POINT}/workingdir'
 
 
 class GoogleV2EventMap(object):
@@ -461,7 +245,7 @@ class GoogleV2BatchHandler(object):
       self._response_handler(request_id, response, exception)
 
 
-class GoogleV2JobProviderBase(base.JobProvider):
+class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
   """dsub provider implementation managing Jobs on Google Cloud."""
 
   def __init__(self, provider_name, api_version, credentials, project, dry_run):
@@ -499,10 +283,6 @@ class GoogleV2JobProviderBase(base.JobProvider):
     """Returns a function object for the provider-specific batch handler."""
     raise NotImplementedError('Derived class must implement this function')
 
-  def prepare_job_metadata(self, script, job_name, user_id):
-    """Returns a dictionary of metadata fields for the job."""
-    return providers_util.prepare_job_metadata(script, job_name, user_id)
-
   def _get_logging_env(self, logging_uri, user_project):
     """Returns the environment for actions that copy logging files."""
     if not logging_uri.endswith('.log'):
@@ -515,110 +295,6 @@ class GoogleV2JobProviderBase(base.JobProvider):
         'STDERR_PATH': '{}-stderr.log'.format(logging_prefix),
         'USER_PROJECT': user_project,
     }
-
-  def _get_prepare_env(self, script, job_descriptor, inputs, outputs, mounts):
-    """Return a dict with variables for the 'prepare' action."""
-
-    # Add the _SCRIPT_REPR with the repr(script) contents
-    # Add the _META_YAML_REPR with the repr(meta) contents
-
-    # Add variables for directories that need to be created, for example:
-    # DIR_COUNT: 2
-    # DIR_0: /mnt/data/input/gs/bucket/path1/
-    # DIR_1: /mnt/data/output/gs/bucket/path2
-
-    # List the directories in sorted order so that they are created in that
-    # order. This is primarily to ensure that permissions are set as we create
-    # each directory.
-    # For example:
-    #   mkdir -m 777 -p /root/first/second
-    #   mkdir -m 777 -p /root/first
-    # *may* not actually set 777 on /root/first
-
-    docker_paths = sorted([
-        var.docker_path if var.recursive else os.path.dirname(var.docker_path)
-        for var in inputs | outputs | mounts
-        if var.value
-    ])
-
-    env = {
-        _SCRIPT_VARNAME: repr(script.value),
-        _META_YAML_VARNAME: repr(job_descriptor.to_yaml()),
-        'DIR_COUNT': str(len(docker_paths))
-    }
-
-    for idx, path in enumerate(docker_paths):
-      env['DIR_{}'.format(idx)] = os.path.join(providers_util.DATA_MOUNT_POINT,
-                                               path)
-
-    return env
-
-  def _get_localization_env(self, inputs, user_project):
-    """Return a dict with variables for the 'localization' action."""
-
-    # Add variables for paths that need to be localized, for example:
-    # INPUT_COUNT: 1
-    # INPUT_0: MY_INPUT_FILE
-    # INPUT_RECURSIVE_0: 0
-    # INPUT_SRC_0: gs://mybucket/mypath/myfile
-    # INPUT_DST_0: /mnt/data/inputs/mybucket/mypath/myfile
-
-    non_empty_inputs = [var for var in inputs if var.value]
-    env = {'INPUT_COUNT': str(len(non_empty_inputs))}
-
-    for idx, var in enumerate(non_empty_inputs):
-      env['INPUT_{}'.format(idx)] = var.name
-      env['INPUT_RECURSIVE_{}'.format(idx)] = str(int(var.recursive))
-      env['INPUT_SRC_{}'.format(idx)] = var.value
-
-      # For wildcard paths, the destination must be a directory
-      dst = os.path.join(providers_util.DATA_MOUNT_POINT, var.docker_path)
-      path, filename = os.path.split(dst)
-      if '*' in filename:
-        dst = '{}/'.format(path)
-      env['INPUT_DST_{}'.format(idx)] = dst
-
-    env['USER_PROJECT'] = user_project
-
-    return env
-
-  def _get_delocalization_env(self, outputs, user_project):
-    """Return a dict with variables for the 'delocalization' action."""
-
-    # Add variables for paths that need to be delocalized, for example:
-    # OUTPUT_COUNT: 1
-    # OUTPUT_0: MY_OUTPUT_FILE
-    # OUTPUT_RECURSIVE_0: 0
-    # OUTPUT_SRC_0: gs://mybucket/mypath/myfile
-    # OUTPUT_DST_0: /mnt/data/outputs/mybucket/mypath/myfile
-
-    non_empty_outputs = [var for var in outputs if var.value]
-    env = {'OUTPUT_COUNT': str(len(non_empty_outputs))}
-
-    for idx, var in enumerate(non_empty_outputs):
-      env['OUTPUT_{}'.format(idx)] = var.name
-      env['OUTPUT_RECURSIVE_{}'.format(idx)] = str(int(var.recursive))
-      env['OUTPUT_SRC_{}'.format(idx)] = os.path.join(
-          providers_util.DATA_MOUNT_POINT, var.docker_path)
-
-      # For wildcard paths, the destination must be a directory
-      if '*' in var.uri.basename:
-        dst = var.uri.path
-      else:
-        dst = var.uri
-      env['OUTPUT_DST_{}'.format(idx)] = dst
-
-    env['USER_PROJECT'] = user_project
-
-    return env
-
-  def _build_user_environment(self, envs, inputs, outputs, mounts):
-    """Returns a dictionary of for the user container environment."""
-    envs = {env.name: env.value for env in envs}
-    envs.update(providers_util.get_file_environment_variables(inputs))
-    envs.update(providers_util.get_file_environment_variables(outputs))
-    envs.update(providers_util.get_file_environment_variables(mounts))
-    return envs
 
   def _get_mount_actions(self, mounts, mnt_datadisk):
     """Returns a list of two actions per gcs bucket to mount."""
@@ -635,17 +311,15 @@ class GoogleV2JobProviderBase(base.JobProvider):
               mounts=[mnt_datadisk],
               commands=[
                   '--implicit-dirs', '--foreground', '-o ro', bucket,
-                  os.path.join(providers_util.DATA_MOUNT_POINT, mount_path)
+                  os.path.join(_DATA_MOUNT_POINT, mount_path)
               ]),
           google_v2_pipelines.build_action(
               name='mount-wait-{}'.format(bucket),
               enable_fuse=True,
               image_uri=_GCSFUSE_IMAGE,
               mounts=[mnt_datadisk],
-              commands=[
-                  'wait',
-                  os.path.join(providers_util.DATA_MOUNT_POINT, mount_path)
-              ])
+              commands=['wait',
+                        os.path.join(_DATA_MOUNT_POINT, mount_path)])
       ])
     return actions_to_add
 
@@ -660,8 +334,8 @@ class GoogleV2JobProviderBase(base.JobProvider):
 
     # Set up VM-specific variables
     mnt_datadisk = google_v2_pipelines.build_mount(
-        disk=_DATA_DISK_NAME,
-        path=providers_util.DATA_MOUNT_POINT,
+        disk=google_utils.DATA_DISK_NAME,
+        path=_DATA_MOUNT_POINT,
         read_only=False)
     scopes = job_resources.scopes or google_base.DEFAULT_SCOPES
 
@@ -698,7 +372,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     persistent_disk_mounts = [
         google_v2_pipelines.build_mount(
             disk=persistent_disk.get('volume'),
-            path=os.path.join(providers_util.DATA_MOUNT_POINT,
+            path=os.path.join(_DATA_MOUNT_POINT,
                               persistent_disk_mount_param.docker_path),
             read_only=True)
         for persistent_disk, persistent_disk_mount_param in zip(
@@ -716,7 +390,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     existing_disk_mounts = [
         google_v2_pipelines.build_mount(
             disk=existing_disk.get('volume'),
-            path=os.path.join(providers_util.DATA_MOUNT_POINT,
+            path=os.path.join(_DATA_MOUNT_POINT,
                               existing_disk_mount_param.docker_path),
             read_only=True) for existing_disk, existing_disk_mount_param in zip(
                 existing_disks, existing_disk_mount_params)
@@ -752,13 +426,13 @@ class GoogleV2JobProviderBase(base.JobProvider):
 
     # Set up the commands and environment for the logging actions
     logging_cmd = _LOGGING_CMD.format(
-        log_msg_fn=_LOG_MSG_FN,
-        log_cp_fn=_GSUTIL_CP_FN,
+        log_msg_fn=google_utils.LOG_MSG_FN,
+        log_cp_fn=google_utils.GSUTIL_CP_FN,
         log_cp_cmd=_LOG_CP_CMD.format(
             user_action=user_action, logging_action='logging_action'))
     continuous_logging_cmd = _CONTINUOUS_LOGGING_CMD.format(
-        log_msg_fn=_LOG_MSG_FN,
-        log_cp_fn=_GSUTIL_CP_FN,
+        log_msg_fn=google_utils.LOG_MSG_FN,
+        log_cp_fn=google_utils.GSUTIL_CP_FN,
         log_cp_cmd=_LOG_CP_CMD.format(
             user_action=user_action,
             logging_action='continuous_logging_action'),
@@ -769,21 +443,24 @@ class GoogleV2JobProviderBase(base.JobProvider):
 
     # Set up command and environments for the prepare, localization, user,
     # and de-localization actions
-    script_path = os.path.join(providers_util.SCRIPT_DIR, script.name)
-    prepare_command = _PREPARE_CMD.format(
-        log_msg_fn=_LOG_MSG_FN,
-        mk_runtime_dirs=_MK_RUNTIME_DIRS_CMD,
-        script_var=_SCRIPT_VARNAME,
-        python_decode_script=_PYTHON_DECODE_SCRIPT,
+    script_path = os.path.join(_SCRIPT_DIR, script.name)
+    prepare_command = google_utils.PREPARE_CMD.format(
+        log_msg_fn=google_utils.LOG_MSG_FN,
+        mk_runtime_dirs=google_utils.make_runtime_dirs_command(
+            _SCRIPT_DIR, _TMP_DIR, _WORKING_DIR),
+        script_var=google_utils.SCRIPT_VARNAME,
+        python_decode_script=google_utils.PYTHON_DECODE_SCRIPT,
         script_path=script_path,
-        mk_io_dirs=_MK_IO_DIRS)
+        mk_io_dirs=google_utils.MK_IO_DIRS)
 
     prepare_env = self._get_prepare_env(script, task_view, inputs, outputs,
-                                        mounts)
-    localization_env = self._get_localization_env(inputs, user_project)
+                                        mounts, _DATA_MOUNT_POINT)
+    localization_env = self._get_localization_env(inputs, user_project,
+                                                  _DATA_MOUNT_POINT)
     user_environment = self._build_user_environment(envs, inputs, outputs,
-                                                    mounts)
-    delocalization_env = self._get_delocalization_env(outputs, user_project)
+                                                    mounts, _DATA_MOUNT_POINT)
+    delocalization_env = self._get_delocalization_env(outputs, user_project,
+                                                      _DATA_MOUNT_POINT)
 
     # When --ssh is enabled, run all actions in the same process ID namespace
     pid_namespace = 'shared' if job_resources.ssh else None
@@ -795,7 +472,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
             name='logging',
             pid_namespace=pid_namespace,
             run_in_background=True,
-            image_uri=_CLOUD_SDK_IMAGE,
+            image_uri=google_utils.CLOUD_SDK_IMAGE,
             environment=logging_env,
             entrypoint='/bin/bash',
             commands=['-c', continuous_logging_cmd]))
@@ -815,7 +492,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
         google_v2_pipelines.build_action(
             name='prepare',
             pid_namespace=pid_namespace,
-            image_uri=_CLOUD_SDK_IMAGE,
+            image_uri=google_utils.CLOUD_SDK_IMAGE,
             mounts=[mnt_datadisk],
             environment=prepare_env,
             entrypoint='/bin/bash',
@@ -827,17 +504,17 @@ class GoogleV2JobProviderBase(base.JobProvider):
         google_v2_pipelines.build_action(
             name='localization',
             pid_namespace=pid_namespace,
-            image_uri=_CLOUD_SDK_IMAGE,
+            image_uri=google_utils.CLOUD_SDK_IMAGE,
             mounts=[mnt_datadisk],
             environment=localization_env,
             entrypoint='/bin/bash',
             commands=[
                 '-c',
-                _LOCALIZATION_CMD.format(
-                    log_msg_fn=_LOG_MSG_FN,
-                    recursive_cp_fn=_GSUTIL_RSYNC_FN,
-                    cp_fn=_GSUTIL_CP_FN,
-                    cp_loop=_LOCALIZATION_LOOP)
+                google_utils.LOCALIZATION_CMD.format(
+                    log_msg_fn=google_utils.LOG_MSG_FN,
+                    recursive_cp_fn=google_utils.GSUTIL_RSYNC_FN,
+                    cp_fn=google_utils.GSUTIL_CP_FN,
+                    cp_loop=google_utils.LOCALIZATION_LOOP)
             ]),
         google_v2_pipelines.build_action(
             name='user-command',
@@ -850,31 +527,31 @@ class GoogleV2JobProviderBase(base.JobProvider):
             entrypoint='/usr/bin/env',
             commands=[
                 'bash', '-c',
-                _USER_CMD.format(
-                    tmp_dir=providers_util.TMP_DIR,
-                    working_dir=providers_util.WORKING_DIR,
+                google_utils.USER_CMD.format(
+                    tmp_dir=_TMP_DIR,
+                    working_dir=_WORKING_DIR,
                     user_script=script_path)
             ]),
         google_v2_pipelines.build_action(
             name='delocalization',
             pid_namespace=pid_namespace,
-            image_uri=_CLOUD_SDK_IMAGE,
+            image_uri=google_utils.CLOUD_SDK_IMAGE,
             mounts=[mnt_datadisk],
             environment=delocalization_env,
             entrypoint='/bin/bash',
             commands=[
                 '-c',
-                _LOCALIZATION_CMD.format(
-                    log_msg_fn=_LOG_MSG_FN,
-                    recursive_cp_fn=_GSUTIL_RSYNC_FN,
-                    cp_fn=_GSUTIL_CP_FN,
-                    cp_loop=_DELOCALIZATION_LOOP)
+                google_utils.LOCALIZATION_CMD.format(
+                    log_msg_fn=google_utils.LOG_MSG_FN,
+                    recursive_cp_fn=google_utils.GSUTIL_RSYNC_FN,
+                    cp_fn=google_utils.GSUTIL_CP_FN,
+                    cp_loop=google_utils.DELOCALIZATION_LOOP)
             ]),
         google_v2_pipelines.build_action(
             name='final_logging',
             pid_namespace=pid_namespace,
             always_run=True,
-            image_uri=_CLOUD_SDK_IMAGE,
+            image_uri=google_utils.CLOUD_SDK_IMAGE,
             environment=logging_env,
             entrypoint='/bin/bash',
             commands=['-c', logging_cmd]),
@@ -886,7 +563,7 @@ class GoogleV2JobProviderBase(base.JobProvider):
     # Prepare the VM (resources) configuration
     volumes = [
         google_v2_pipelines.build_volume_persistent_disk(
-            volume=_DATA_DISK_NAME,
+            volume=google_utils.DATA_DISK_NAME,
             disk=google_v2_pipelines.build_persistent_disk(
                 job_resources.disk_size,
                 source_image=None,
@@ -1016,102 +693,6 @@ class GoogleV2JobProviderBase(base.JobProvider):
     for task in tasks:
       completion_messages.append(task.error_message())
     return completion_messages
-
-  def _get_status_filters(self, statuses):
-    if not statuses or statuses == {'*'}:
-      return None
-
-    return [google_v2_operations.STATUS_FILTER_MAP[s] for s in statuses]
-
-  def _get_user_id_filter_value(self, user_ids):
-    if not user_ids or user_ids == {'*'}:
-      return None
-
-    return google_base.prepare_query_label_value(user_ids)
-
-  def _get_label_filters(self, label_key, values):
-    if not values or values == {'*'}:
-      return None
-
-    return [google_v2_operations.label_filter(label_key, v) for v in values]
-
-  def _get_labels_filters(self, labels):
-    if not labels:
-      return None
-
-    return [google_v2_operations.label_filter(l.name, l.value) for l in labels]
-
-  def _get_create_time_filters(self, create_time_min, create_time_max):
-    filters = []
-    for create_time, comparator in [(create_time_min, '>='), (create_time_max,
-                                                              '<=')]:
-      if not create_time:
-        continue
-
-      filters.append(
-          google_v2_operations.create_time_filter(create_time, comparator))
-    return filters
-
-  def _build_query_filter(self,
-                          statuses,
-                          user_ids=None,
-                          job_ids=None,
-                          job_names=None,
-                          task_ids=None,
-                          task_attempts=None,
-                          labels=None,
-                          create_time_min=None,
-                          create_time_max=None):
-    # The Pipelines v2 API allows for building fairly elaborate filter
-    # clauses. We can group (). We can AND, OR, and NOT.
-    #
-    # The first set of filters, labeled here as OR filters are elements
-    # where more than one value cannot be true at the same time. For example,
-    # an operation cannot have a status of both RUNNING and CANCELED.
-    #
-    # The second set of filters, labeled here as AND filters are elements
-    # where more than one value can be true. For example,
-    # an operation can have a label with key1=value2 AND key2=value2.
-
-    # Translate the semantic requests into a v2alpha1-specific filter.
-
-    # 'OR' filtering arguments.
-    status_filters = self._get_status_filters(statuses)
-    user_id_filters = self._get_label_filters(
-        'user-id', self._get_user_id_filter_value(user_ids))
-    job_id_filters = self._get_label_filters('job-id', job_ids)
-    job_name_filters = self._get_label_filters(
-        'job-name', google_base.prepare_query_label_value(job_names))
-    task_id_filters = self._get_label_filters('task-id', task_ids)
-    task_attempt_filters = self._get_label_filters('task-attempt',
-                                                   task_attempts)
-    # 'AND' filtering arguments.
-    label_filters = self._get_labels_filters(labels)
-    create_time_filters = self._get_create_time_filters(create_time_min,
-                                                        create_time_max)
-
-    if job_id_filters and job_name_filters:
-      raise ValueError(
-          'Filtering by both job IDs and job names is not supported')
-
-    # Now build up the full text filter.
-    # OR all of the OR filter arguments together.
-    # AND all of the AND arguments together.
-    or_arguments = []
-    for or_filters in [
-        status_filters, user_id_filters, job_id_filters, job_name_filters,
-        task_id_filters, task_attempt_filters
-    ]:
-      if or_filters:
-        or_arguments.append('(' + ' OR '.join(or_filters) + ')')
-
-    and_arguments = []
-    for and_filters in [label_filters, create_time_filters]:
-      if and_filters:
-        and_arguments.append('(' + ' AND '.join(and_filters) + ')')
-
-    # Now and all of these arguments together.
-    return ' AND '.join(or_arguments + and_arguments)
 
   def _operations_list(self, ops_filter, max_tasks, page_size, page_token):
     """Gets the list of operations for the specified filter.
@@ -1274,7 +855,7 @@ class GoogleOperation(base.Task):
     if not env:
       return
 
-    meta = env.get(_META_YAML_VARNAME)
+    meta = env.get(google_utils.META_YAML_VARNAME)
     if not meta:
       return
 
@@ -1283,7 +864,7 @@ class GoogleOperation(base.Task):
   def _try_op_to_script_body(self):
     env = google_v2_operations.get_action_environment(self._op, _ACTION_PREPARE)
     if env:
-      return ast.literal_eval(env.get(_SCRIPT_VARNAME))
+      return ast.literal_eval(env.get(google_utils.SCRIPT_VARNAME))
 
   def _operation_status(self):
     """Returns the status of this operation.
@@ -1576,15 +1157,15 @@ class GoogleOperation(base.Task):
         # Life Sciences API). This block is included for compatibility with
         # jobs in the operations list run by older versions of dsub.
         if vm.get('disks'):
-          datadisk = next(
-              (d for d in vm['disks'] if d['name'] == _DATA_DISK_NAME))
+          datadisk = next((d for d in vm['disks']
+                           if d['name'] == google_utils.DATA_DISK_NAME))
           if datadisk:
             value['disk-size'] = datadisk.get('sizeGb')
             value['disk-type'] = datadisk.get('type')
         if vm.get('volumes'):
           volumes = []
           for v in vm['volumes']:
-            if v['volume'] == _DATA_DISK_NAME:
+            if v['volume'] == google_utils.DATA_DISK_NAME:
               d = v.get('persistentDisk', {})
               value['disk-size'] = d.get('sizeGb')
               value['disk-type'] = d.get('type')
