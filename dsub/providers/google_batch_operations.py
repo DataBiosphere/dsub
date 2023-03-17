@@ -46,7 +46,7 @@ def is_done(op: batch_v1.types.Job) -> bool:
   """Return whether the operation has been marked done."""
   return op.status.state in [
       batch_v1.types.job.JobStatus.State.SUCCEEDED,
-      batch_v1.types.job.JobStatus.State.FAILED
+      batch_v1.types.job.JobStatus.State.FAILED,
   ]
 
 
@@ -98,10 +98,12 @@ def get_status_events(op: batch_v1.types.Job):
   return op.status.status_events
 
 
-def build_job(task_groups: List[batch_v1.types.TaskGroup],
-              allocation_policy: batch_v1.types.AllocationPolicy,
-              labels: Dict[str, str],
-              logs_policy: batch_v1.types.LogsPolicy) -> batch_v1.types.Job:
+def build_job(
+    task_groups: List[batch_v1.types.TaskGroup],
+    allocation_policy: batch_v1.types.AllocationPolicy,
+    labels: Dict[str, str],
+    logs_policy: batch_v1.types.LogsPolicy,
+) -> batch_v1.types.Job:
   job = batch_v1.Job()
   job.task_groups = task_groups
   job.allocation_policy = allocation_policy
@@ -112,7 +114,8 @@ def build_job(task_groups: List[batch_v1.types.TaskGroup],
 
 def build_task_spec(
     runnables: List[batch_v1.types.task.Runnable],
-    volumes: List[batch_v1.types.Volume]) -> batch_v1.types.TaskSpec:
+    volumes: List[batch_v1.types.Volume],
+) -> batch_v1.types.TaskSpec:
   task_spec = batch_v1.TaskSpec()
   task_spec.runnables = runnables
   task_spec.volumes = volumes
@@ -125,10 +128,12 @@ def build_environment(env_vars: Dict[str, str]):
   return environment
 
 
-def build_task_group(task_spec: batch_v1.types.TaskSpec,
-                     task_environments: List[batch_v1.types.Environment],
-                     task_count: int,
-                     task_count_per_node: int) -> batch_v1.types.TaskGroup:
+def build_task_group(
+    task_spec: batch_v1.types.TaskSpec,
+    task_environments: List[batch_v1.types.Environment],
+    task_count: int,
+    task_count_per_node: int,
+) -> batch_v1.types.TaskGroup:
   """Build a TaskGroup object for a Batch request.
 
   Args:
@@ -149,8 +154,8 @@ def build_task_group(task_spec: batch_v1.types.TaskSpec,
 
 
 def build_container(
-    image_uri: str, entrypoint: str, volumes: List[str],
-    commands: List[str]) -> batch_v1.types.task.Runnable.Container:
+    image_uri: str, entrypoint: str, volumes: List[str], commands: List[str]
+) -> batch_v1.types.task.Runnable.Container:
   container = batch_v1.types.task.Runnable.Container()
   container.image_uri = image_uri
   container.entrypoint = entrypoint
@@ -159,14 +164,36 @@ def build_container(
   return container
 
 
-def build_runnable(image_uri: str, entrypoint: str, commands: List[str],
-                   run_in_background: bool, volumes: List[str],
-                   always_run: bool) -> batch_v1.types.task.Runnable:
+def build_runnable(
+    run_in_background: bool,
+    always_run: bool,
+    environment: batch_v1.types.Environment,
+    image_uri: str,
+    entrypoint: str,
+    volumes: List[str],
+    commands: List[str],
+) -> batch_v1.types.task.Runnable:
+  """Build a Runnable object for a Batch request.
+
+  Args:
+    run_in_background (bool): True for the action to run in the background
+    always_run (bool): True for the action to run even in case of error from
+      prior actions
+    environment (Environment): Environment variables for action
+    image_uri (str): Docker image path
+    entrypoint (str): Docker image entrypoint path
+    volumes (List[str]): List of volume mounts (host_path:container_path)
+    commands (List[str]): Command arguments to pass to the entrypoint
+
+  Returns:
+    An object representing a Runnable
+  """
   container = build_container(image_uri, entrypoint, volumes, commands)
   runnable = batch_v1.Runnable()
   runnable.container = container
   runnable.background = run_in_background
   runnable.always_run = always_run
+  runnable.environment = environment
   return runnable
 
 
@@ -187,7 +214,7 @@ def build_volume(disk: str, path: str) -> batch_v1.types.Volume:
 
 
 def build_allocation_policy(
-    ipts: List[batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate]
+    ipts: List[batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate],
 ) -> batch_v1.types.AllocationPolicy:
   allocation_policy = batch_v1.AllocationPolicy()
   allocation_policy.instances = ipts
@@ -195,15 +222,25 @@ def build_allocation_policy(
 
 
 def build_instance_policy_or_template(
-    instance_policy: batch_v1.types.AllocationPolicy.InstancePolicy
+    instance_policy: batch_v1.types.AllocationPolicy.InstancePolicy,
 ) -> batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate:
   ipt = batch_v1.AllocationPolicy.InstancePolicyOrTemplate()
   ipt.policy = instance_policy
   return ipt
 
 
+def build_logs_policy(
+    destination: batch_v1.types.LogsPolicy.Destination, logs_path: str
+) -> batch_v1.types.LogsPolicy:
+  logs_policy = batch_v1.LogsPolicy()
+  logs_policy.destination = destination
+  logs_policy.logs_path = logs_path
+
+  return logs_policy
+
+
 def build_instance_policy(
-    disks: List[batch_v1.types.AllocationPolicy.AttachedDisk]
+    disks: List[batch_v1.types.AllocationPolicy.AttachedDisk],
 ) -> batch_v1.types.AllocationPolicy.InstancePolicy:
   instance_policy = batch_v1.AllocationPolicy.InstancePolicy()
   instance_policy.disks = [disks]
@@ -211,8 +248,8 @@ def build_instance_policy(
 
 
 def build_attached_disk(
-    disk: batch_v1.types.AllocationPolicy.Disk,
-    device_name: str) -> batch_v1.types.AllocationPolicy.AttachedDisk:
+    disk: batch_v1.types.AllocationPolicy.Disk, device_name: str
+) -> batch_v1.types.AllocationPolicy.AttachedDisk:
   attached_disk = batch_v1.AllocationPolicy.AttachedDisk()
   attached_disk.new_disk = disk
   attached_disk.device_name = device_name
@@ -220,7 +257,8 @@ def build_attached_disk(
 
 
 def build_persistent_disk(
-    size_gb: int, disk_type: str) -> batch_v1.types.AllocationPolicy.Disk:
+    size_gb: int, disk_type: str
+) -> batch_v1.types.AllocationPolicy.Disk:
   disk = batch_v1.AllocationPolicy.Disk()
   disk.type = disk_type
   disk.size_gb = size_gb

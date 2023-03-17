@@ -129,6 +129,9 @@ GSUTIL_CP_FN = textwrap.dedent("""\
     log_error "gsutil ${headers} ${user_project_flag} -mq cp \"${src}\" \"${dst}\""
     exit 1
   }
+""")
+
+LOG_CP_FN = GSUTIL_CP_FN + textwrap.dedent("""\
 
   function log_cp() {
     local src="${1}"

@@ -82,7 +82,7 @@ _LOG_CP_CMD = textwrap.dedent("""\
   wait "${{LOG_PID}}"
 """)
 
-_LOGGING_CMD = textwrap.dedent("""\
+_FINAL_LOGGING_CMD = textwrap.dedent("""\
   set -o errexit
   set -o nounset
   set -o pipefail
@@ -425,19 +425,22 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
     final_logging_action = 6 + optional_actions
 
     # Set up the commands and environment for the logging actions
-    logging_cmd = _LOGGING_CMD.format(
+    final_logging_cmd = _FINAL_LOGGING_CMD.format(
         log_msg_fn=google_utils.LOG_MSG_FN,
-        log_cp_fn=google_utils.GSUTIL_CP_FN,
+        log_cp_fn=google_utils.LOG_CP_FN,
         log_cp_cmd=_LOG_CP_CMD.format(
-            user_action=user_action, logging_action='logging_action'))
+            user_action=user_action, logging_action='logging_action'
+        ),
+    )
     continuous_logging_cmd = _CONTINUOUS_LOGGING_CMD.format(
         log_msg_fn=google_utils.LOG_MSG_FN,
-        log_cp_fn=google_utils.GSUTIL_CP_FN,
+        log_cp_fn=google_utils.LOG_CP_FN,
         log_cp_cmd=_LOG_CP_CMD.format(
-            user_action=user_action,
-            logging_action='continuous_logging_action'),
+            user_action=user_action, logging_action='continuous_logging_action'
+        ),
         final_logging_action=final_logging_action,
-        log_interval=job_resources.log_interval or '60s')
+        log_interval=job_resources.log_interval or '60s',
+    )
     logging_env = self._get_logging_env(task_resources.logging_path.uri,
                                         user_project)
 
@@ -514,24 +517,30 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
                     log_msg_fn=google_utils.LOG_MSG_FN,
                     recursive_cp_fn=google_utils.GSUTIL_RSYNC_FN,
                     cp_fn=google_utils.GSUTIL_CP_FN,
-                    cp_loop=google_utils.LOCALIZATION_LOOP)
-            ]),
+                    cp_loop=google_utils.LOCALIZATION_LOOP,
+                ),
+            ],
+        ),
         google_v2_pipelines.build_action(
             name='user-command',
             pid_namespace=pid_namespace,
             block_external_network=job_resources.block_external_network,
             image_uri=job_resources.image,
-            mounts=[mnt_datadisk] + persistent_disk_mounts +
-            existing_disk_mounts,
+            mounts=[mnt_datadisk]
+            + persistent_disk_mounts
+            + existing_disk_mounts,
             environment=user_environment,
             entrypoint='/usr/bin/env',
             commands=[
-                'bash', '-c',
+                'bash',
+                '-c',
                 google_utils.USER_CMD.format(
                     tmp_dir=_TMP_DIR,
                     working_dir=_WORKING_DIR,
-                    user_script=script_path)
-            ]),
+                    user_script=script_path,
+                ),
+            ],
+        ),
         google_v2_pipelines.build_action(
             name='delocalization',
             pid_namespace=pid_namespace,
@@ -545,8 +554,10 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
                     log_msg_fn=google_utils.LOG_MSG_FN,
                     recursive_cp_fn=google_utils.GSUTIL_RSYNC_FN,
                     cp_fn=google_utils.GSUTIL_CP_FN,
-                    cp_loop=google_utils.DELOCALIZATION_LOOP)
-            ]),
+                    cp_loop=google_utils.DELOCALIZATION_LOOP,
+                ),
+            ],
+        ),
         google_v2_pipelines.build_action(
             name='final_logging',
             pid_namespace=pid_namespace,
@@ -554,7 +565,8 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
             image_uri=google_utils.CLOUD_SDK_IMAGE,
             environment=logging_env,
             entrypoint='/bin/bash',
-            commands=['-c', logging_cmd]),
+            commands=['-c', final_logging_cmd],
+        ),
     ])
 
     assert len(actions) - 2 == user_action
