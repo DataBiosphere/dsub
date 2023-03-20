@@ -55,12 +55,12 @@ To run a Bash script to decompress the VCF file, type:
 
 ```
 dsub \
-  --provider google-v2 \
+  --provider google-cls-v2 \
   --project MY-PROJECT \
-  --zones "us-central1-*" \
+  --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids.sh/logging" \
   --disk-size 200 \
-  --image ubuntu:14.04 \
+  --image debian:stable-slim \
   --input INPUT_VCF="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/working/20130723_phase3_wg/cornell/ALL.ChrY.Cornell.20130502.SNPs.Genotypes.vcf.gz" \
   --output OUTPUT_FILE="gs://MY-BUCKET/get_vcf_sample_ids.sh/output/sample_ids.txt" \
   --script ./examples/custom_scripts/get_vcf_sample_ids.sh \
@@ -134,12 +134,12 @@ To run a Python script to decompress the VCF file, type:
 
 ```
 dsub \
-  --provider google-v2 \
+  --provider google-cls-v2 \
   --project MY-PROJECT \
-  --zones "us-central1-*" \
+  --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids.py/logging" \
   --disk-size 200 \
-  --image python:2.7 \
+  --image python:slim \
   --input INPUT_VCF="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/technical/working/20130723_phase3_wg/cornell/ALL.ChrY.Cornell.20130502.SNPs.Genotypes.vcf.gz" \
   --output OUTPUT_FILE="gs://MY-BUCKET/get_vcf_sample_ids.py/output/sample_ids.txt" \
   --script ./examples/custom_scripts/get_vcf_sample_ids.py \
@@ -221,12 +221,12 @@ Run either of the following commands:
 
 ```
 dsub \
-  --provider google-v2 \
+  --provider google-cls-v2 \
   --project MY-PROJECT \
-  --zones "us-central1-*" \
+  --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids/logging" \
   --disk-size 200 \
-  --image ubuntu:14.04 \
+  --image debian:stable-slim \
   --script ./examples/custom_scripts/get_vcf_sample_ids.sh \
   --tasks submit_list.tsv \
   --wait
@@ -234,12 +234,12 @@ dsub \
 
 ```
 dsub \
-  --provider google-v2 \
+  --provider google-cls-v2 \
   --project MY-PROJECT \
-  --zones "us-central1-*" \
+  --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids/logging" \
   --disk-size 200 \
-  --image python:2.7 \
+  --image python:slim \
   --script ./examples/custom_scripts/get_vcf_sample_ids.py \
   --tasks submit_list.tsv \
   --wait

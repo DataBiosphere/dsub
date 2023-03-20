@@ -1,4 +1,4 @@
-#!/usr/bin/env python # pylint: disable=g-unknown-interpreter
+#!/usr/bin/env python3
 
 # Copyright 2017 Google Inc. All Rights Reserved.
 #
@@ -25,9 +25,9 @@ OUTPUT_FILE = os.environ['OUTPUT_FILE']
 
 # If the input VCF is compressed, then open it with the gzip library
 if INPUT_VCF.endswith('.gz'):
-  infile = gzip.open(INPUT_VCF, 'r')
+  infile = gzip.open(INPUT_VCF, 'rt')
 else:
-  infile = open(INPUT_VCF, 'r')
+  infile = open(INPUT_VCF, 'rt')
 
 ## Extract the "#CHROM" header
 for line in infile:
