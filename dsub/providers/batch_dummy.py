@@ -22,7 +22,6 @@ class types(object):
   """Dummy docstring."""
   Job = None
   TaskGroup = None
-  LogsPolicy = None
   Volume = None
   TaskSpec = None
   Environment = None
@@ -37,6 +36,9 @@ class types(object):
     InstancePolicy = None
     AttachedDisk = None
     Disk = None
+
+  class LogsPolicy(object):
+    Destination = None
 
 
 # pylint: enable=invalid-name

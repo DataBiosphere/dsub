@@ -42,9 +42,9 @@ readonly MY_PROJECT=${1}
 readonly MY_BUCKET_PATH=${2}
 readonly SCRIPT=${3}
 
-declare IMAGE="ubuntu:14.04"
+declare IMAGE="debian:stable-slim"
 if [[ ${SCRIPT} == *.py ]]; then
-  IMAGE="python:2.7"
+  IMAGE="python:slim"
 fi
 readonly IMAGE
 
@@ -57,9 +57,9 @@ echo
 
 # Launch the task
 dsub \
-  --provider google-v2 \
+  --provider google-cls-v2 \
   --project "${MY_PROJECT}" \
-  --zones "us-central1-*" \
+  --regions "us-central1" \
   --logging "${LOGGING}" \
   --disk-size 200 \
   --image "${IMAGE}" \

@@ -156,6 +156,31 @@ def run_dsub(dsub_args):
   return globals()["dsub_%s" % DSUB_PROVIDER.replace("-", "_")](dsub_args)
 
 
+def dsub_google_batch(dsub_args):
+  """Call dsub appending google-batch required arguments."""
+  # pyformat: disable
+  google_batch_opt_args = [
+      ("BOOT_DISK_SIZE", "--boot-disk-size"),
+      ("DISK_SIZE", "--disk-size")
+  ]
+  # pyformat: enable
+
+  opt_args = []
+  for var in google_batch_opt_args:
+    val = globals().get(var[0])
+    if val:
+      opt_args.append(var[1], val)
+
+  # pyformat: disable
+  return dsub_command.call([
+      "--provider", "google-batch",
+      "--project", PROJECT_ID,
+      "--logging", LOGGING,
+      "--regions", "us-central1"
+      ] + opt_args + dsub_args)
+  # pyformat: enable
+
+
 def dsub_google_cls_v2(dsub_args):
   """Call dsub appending google-cls-v2 required arguments."""
   # pyformat: disable

@@ -145,26 +145,7 @@ function error() {
 }
 readonly -f error
 
-function fetch_image() {
-  local image="$1"
-
-  for ((attempt=0; attempt < 3; attempt++)); do
-    log_info "Using gcloud to fetch ${image}."
-    if gcloud docker -- pull "${image}"; then
-      return
-    fi
-    if (( attempt < 2 )); then
-      log_info "Sleeping 30s before the next attempt."
-      sleep 30s
-    fi
-  done
-
-  log_error "FAILED to fetch ${image}"
-  exit 1
-}
-readonly -f fetch_image
-
-function fetch_image_if_necessary() {
+function configure_docker_if_necessary() {
   local image="$1"
 
   # Remove everything from the first / on
@@ -173,10 +154,11 @@ function fetch_image_if_necessary() {
   # Check that the prefix is gcr.io or <location>.gcr.io
   if [[ "${prefix}" == "gcr.io" ]] ||
      [[ "${prefix}" == *.gcr.io ]]; then
-    fetch_image "${image}"
+    log_info "Ensuring docker auth is configured for ${prefix}"
+    gcloud --quiet auth configure-docker "${prefix}"
   fi
 }
-readonly -f fetch_image_if_necessary
+readonly -f configure_docker_if_necessary
 
 function get_docker_user() {
   # Get the userid and groupid the Docker image is set to run as.
@@ -247,7 +229,7 @@ write_event "start"
 
 # Handle gcr.io images
 write_event "pulling-image"
-fetch_image_if_necessary "${IMAGE}"
+configure_docker_if_necessary "${IMAGE}"
 
 # Copy inputs
 cd "${TASK_DIR}"
