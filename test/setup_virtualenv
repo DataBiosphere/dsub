@@ -8,7 +8,7 @@
 # If you execute this instead of sourcing it, it will not work.
 #
 # This script accepts one optional argument; a python version number. The
-# version is expected to be one of 2, 3, 2.7, 3.5, 3.6, or 3.7. The version
+# version is expected to be one of 2, 3, 3.5, 3.6, 3.7, 3.8 or 3.9. The version
 # defaults to "2".
 
 readonly VERSION_ARG="${1}"
@@ -17,11 +17,11 @@ declare PY_VERSION=""
 declare LIBS_FOLDER=""
 if [[ -z "${VERSION_ARG}" ]]; then
   PY_VERSION="python2"
-elif grep -Pq "^[23]\.?[567]?.?[1-9]$" <<< "${VERSION_ARG}" ; then
+elif grep -Pq "^[23]\.?[5-9]?.?[1-9]$" <<< "${VERSION_ARG}" ; then
   PY_VERSION="python${VERSION_ARG}"
 else
-  echo "ERROR: Python version must be a value from 2.7 to 3.7"
-  exit 1
+  echo "ERROR: Python version must be a value from 2.7 to 3.9"
+  return
 fi
 readonly PY_VERSION
 
@@ -34,9 +34,12 @@ readonly LIBS_FOLDER
 
 if ! PY_PATH="$(which "$PY_VERSION")"; then
   echo "${PY_VERSION} executable not found. Instead, attempt to change pyenv to ${VERSION_ARG}"
-  eval "$(pyenv init -)"
+  # Check what versions are available and which one is set
   pyenv versions
-  pyenv shell "${VERSION_ARG}"
+  # pyenv global will set the PATH for python to be this specific version
+  pyenv global "${VERSION_ARG}"
+  # Confirm the specified version is set
+  pyenv versions
 fi
 
 if [[ $(basename "${VIRTUAL_ENV:-}") == "${LIBS_FOLDER}" && -d "${VIRTUAL_ENV:-}" ]]; then
@@ -56,8 +59,8 @@ fi
 
 if [[ ! -f "${LIBS_FOLDER}/bin/activate" ]]; then
   echo "setting up ${LIBS_FOLDER}/"
-  if ! virtualenv "${LIBS_FOLDER}" --python="${PY_PATH}" ; then
-    echo "virtualenv call failed"
+  if ! python -m venv "${LIBS_FOLDER}"; then
+    echo "Virtual environment creation failed."
     return
   fi
 fi

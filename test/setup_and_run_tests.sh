@@ -6,7 +6,7 @@ set -o nounset
 if [[ "${1:-}" == "--help" ]]; then
   cat <<EOF
 USAGE:
-  $0 [2.7|3.7] [unit|e2e|pythonunit]
+  $0 [2.7|3.9] [unit|e2e|pythonunit]
 
 Sets up a virtualenv in the current working directory and runs the specified
 tests (or all if none is specified).
