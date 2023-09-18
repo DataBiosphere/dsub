@@ -1,5 +1,7 @@
 # Google Batch provider
 
+The `google-batch` API is in active development. Various features might not always work perfectly as we continue to make them better.  
+
 The `google-batch` provider utilizes the Google Batch API to queue a request for the following sequence of events.
 
 1. Create a Google Compute Engine
