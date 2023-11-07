@@ -256,14 +256,27 @@ the name of the input parameter must comply with the
 
 ## Requester Pays
 
-To access a Google Cloud Storage
-[Requester Pays bucket](https://cloud.google.com/storage/docs/requester-pays),
-you will need to specify a billing project. To do so, use the `dsub`
-command-line option `--user-project`:
+Unless specifically enabled, a Google Cloud Storage bucket is "owner pays"
+for all requests. This includes
+[network charges](https://cloud.google.com/vpc/network-pricing) for egress
+(data downloads or copies to a different cloud region), as well as 
+[retrieval charges](https://cloud.google.com/storage/pricing#retrieval-pricing)
+on files in "cold" storage classes, such as Nearline, Coldline, and Archive.
+
+When [Requester Pays](https://cloud.google.com/storage/docs/requester-pays)
+is enabled on a bucket, the requester must specify a Cloud project to which
+charges can be billed. Use the `dsub` command-line option `--user-project`:
 
 ```
 --user-project my-cloud-project
 ```
+
+The user project specified will be passed for all GCS interactions, including:
+
+- Logging
+- Localization (inputs)
+- Delocalization (outputs)
+- Mount (gcs fuse)
 
 ## Unsupported path formats:
 

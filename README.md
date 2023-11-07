@@ -465,8 +465,9 @@ local directory in a similar fashion to support your local development.
 
 ##### Mounting a Google Cloud Storage bucket
 
-To have the `google-v2` or `google-cls-v2` provider mount a Cloud Storage bucket using
-Cloud Storage FUSE, use the `--mount` command line flag:
+To have the `google-v2` or `google-cls-v2` provider mount a Cloud Storage bucket
+using [Cloud Storage FUSE](https://cloud.google.com/storage/docs/gcs-fuse),
+use the `--mount` command line flag:
 
     --mount RESOURCES=gs://mybucket
 

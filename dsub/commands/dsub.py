@@ -360,8 +360,10 @@ def _parse_arguments(prog, argv):
   parser.add_argument(
       '--user-project',
       help="""Specify a user project to be billed for all requests to Google
-         Cloud Storage (logging, localization, delocalization). This flag exists
-         to support accessing Requester Pays buckets (default: None)""")
+         Cloud Storage (logging, localization, delocalization, mounting).
+         This flag exists to support accessing Requester Pays buckets
+         (default: None)""",
+  )
   parser.add_argument(
       '--mount',
       nargs='*',

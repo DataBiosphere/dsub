@@ -296,12 +296,24 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
         'USER_PROJECT': user_project,
     }
 
-  def _get_mount_actions(self, mounts, mnt_datadisk):
+  def _get_mount_actions(self, mounts, mnt_datadisk, user_project):
     """Returns a list of two actions per gcs bucket to mount."""
     actions_to_add = []
     for mount in mounts:
       bucket = mount.value[len('gs://'):]
       mount_path = mount.docker_path
+
+      mount_command = (
+          ['--billing-project', user_project] if user_project else []
+      )
+      mount_command.extend([
+          '--implicit-dirs',
+          '--foreground',
+          '-o ro',
+          bucket,
+          os.path.join(_DATA_MOUNT_POINT, mount_path),
+      ])
+
       actions_to_add.extend([
           google_v2_pipelines.build_action(
               name='mount-{}'.format(bucket),
@@ -309,17 +321,18 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
               run_in_background=True,
               image_uri=_GCSFUSE_IMAGE,
               mounts=[mnt_datadisk],
-              commands=[
-                  '--implicit-dirs', '--foreground', '-o ro', bucket,
-                  os.path.join(_DATA_MOUNT_POINT, mount_path)
-              ]),
+              commands=mount_command,
+          ),
           google_v2_pipelines.build_action(
               name='mount-wait-{}'.format(bucket),
               enable_fuse=True,
               image_uri=_GCSFUSE_IMAGE,
               mounts=[mnt_datadisk],
-              commands=['wait',
-                        os.path.join(_DATA_MOUNT_POINT, mount_path)])
+              commands=[
+                  'wait',
+                  os.path.join(_DATA_MOUNT_POINT, mount_path),
+              ],
+          ),
       ])
     return actions_to_add
 
@@ -418,7 +431,9 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
     if job_resources.ssh:
       optional_actions += 1
 
-    mount_actions = self._get_mount_actions(gcs_mounts, mnt_datadisk)
+    mount_actions = self._get_mount_actions(
+        gcs_mounts, mnt_datadisk, user_project
+    )
     optional_actions += len(mount_actions)
 
     user_action = 4 + optional_actions
