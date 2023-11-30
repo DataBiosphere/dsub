@@ -376,7 +376,8 @@ If your script has dependent files, you can make them available to your script
 by:
 
  * Building a private Docker image with the dependent files and publishing the
-   image to a public site, or privately to Google Container Registry
+   image to a public site, or privately to Google Container Registry or
+   Artifact Registry
  * Uploading the files to Google Cloud Storage
 
 To upload the files to Google Cloud Storage, you can use the
