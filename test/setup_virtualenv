@@ -11,6 +11,21 @@
 # version is expected to be one of 2, 3, 3.5, 3.6, 3.7, 3.8 or 3.9. The version
 # defaults to "2".
 
+set -o nounset
+set -o xtrace
+set -o errexit
+
+function install_pyenv() {
+  if ! which pyenv; then
+    echo "pyenv is not installed. Installing..."
+    git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+    export PYENV_ROOT="${HOME}/.pyenv"
+    export PATH="${PYENV_ROOT}/bin:${PATH}"
+    eval "$(pyenv init --path)"
+  fi
+}
+readonly -f install_pyenv
+
 readonly VERSION_ARG="${1}"
 
 declare PY_VERSION=""
@@ -32,11 +47,13 @@ else
 fi
 readonly LIBS_FOLDER
 
-if ! PY_PATH="$(which "$PY_VERSION")"; then
+if ! PY_PATH="$(which "${PY_VERSION}")"; then
   echo "${PY_VERSION} executable not found. Instead, attempt to change pyenv to ${VERSION_ARG}"
   # Check what versions are available and which one is set
+  install_pyenv
   pyenv versions
   # pyenv global will set the PATH for python to be this specific version
+  pyenv install "${VERSION_ARG}"
   pyenv global "${VERSION_ARG}"
   # Confirm the specified version is set
   pyenv versions

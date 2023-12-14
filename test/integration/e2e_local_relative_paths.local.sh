@@ -35,9 +35,9 @@ cd "${TEST_LOCAL_ROOT}"
 #   OUTPUT_FILE=outputs/relative/test.txt
 
 readonly INPUT_PATH_RELATIVE="$(
-  python -c "import os; print(os.path.relpath('"${LOCAL_INPUTS}/relative"'));")"
+  python3 -c "import os; print(os.path.relpath('"${LOCAL_INPUTS}/relative"'));")"
 readonly OUTPUT_PATH_RELATIVE="$(
-  python -c "import os; print(os.path.relpath('"${LOCAL_OUTPUTS}/relative"'));")"
+  python3 -c "import os; print(os.path.relpath('"${LOCAL_OUTPUTS}/relative"'));")"
 
 readonly INPUT_TEST_FILE="${INPUT_PATH_RELATIVE}/test.txt"
 readonly OUTPUT_TEST_FILE="${OUTPUT_PATH_RELATIVE}/test.txt"

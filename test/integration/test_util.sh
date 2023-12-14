@@ -36,7 +36,7 @@ readonly -f util::exit_handler
 
 # util::join
 #
-# Bash analog to Python string join() routine.
+# Bash analog to python string join() routine.
 # First argument is a delimiter.
 # Remaining arguments will be joined together, separated by the delimiter.
 function util::join() {
@@ -108,7 +108,7 @@ function util::get_job_status() {
     return 1
   fi
 
-  python "${SCRIPT_DIR}"/get_data_value.py \
+  python3 "${SCRIPT_DIR}"/get_data_value.py \
     "json" "${dstat_out}" "[0].status"
 }
 readonly -f util::get_job_status
@@ -130,7 +130,7 @@ function util::get_job_status_detail() {
     return 1
   fi
 
-  python "${SCRIPT_DIR}"/get_data_value.py \
+  python3 "${SCRIPT_DIR}"/get_data_value.py \
     "json" "${dstat_out}" "[0].status-detail"
 }
 readonly -f util::get_job_status_detail
@@ -148,7 +148,7 @@ function util::get_job_logging() {
       --full \
       --format json)
 
-  python "${SCRIPT_DIR}"/get_data_value.py \
+  python3 "${SCRIPT_DIR}"/get_data_value.py \
     "json" "${dstat_out}" "[0].logging"
 }
 readonly -f util::get_job_logging
@@ -167,7 +167,7 @@ function util::wait_for_canceled_status() {
   # "operations.cancel" will return success when the operation is internally
   # marked for deletion and there can be a short delay before it is externally
   # marked as CANCELED.
-  local max_wait_sec=10
+  local max_wait_sec=20
 
   local status
   echo "Waiting up to ${max_wait_sec} sec for CANCELED status of ${job_id}"
@@ -192,7 +192,7 @@ function util::is_valid_dstat_datetime() {
   local datetime="${1}"
 
   # If this fails to parse, it will exit with a non-zero exit code
-  python -c '
+  python3 -c '
 import datetime
 import sys
 datetime.datetime.strptime(sys.argv[1], "%Y-%m-%d %H:%M:%S.%f")
@@ -204,7 +204,7 @@ function util::dstat_yaml_output_value() {
   local dstat_out="${1}"
   local field="${2}"
 
-  python "${SCRIPT_DIR}"/get_data_value.py \
+  python3 "${SCRIPT_DIR}"/get_data_value.py \
     "yaml" "${dstat_out}" "${field}"
 }
 readonly -f util::dstat_yaml_output_value

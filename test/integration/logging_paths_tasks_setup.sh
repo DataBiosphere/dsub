@@ -70,7 +70,7 @@ function logging_paths_tasks_setup::dstat_get_logging() {
       --format json)
 
   # Tasks are listed in reverse order, so use -${task_id}.
-  python "${SCRIPT_DIR}"/get_data_value.py \
+  python3 "${SCRIPT_DIR}"/get_data_value.py \
     "json" "${dstat_out}" "[-${task_id}].logging"
 }
 readonly -f logging_paths_tasks_setup::dstat_get_logging
