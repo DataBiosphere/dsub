@@ -111,9 +111,10 @@ sites such as [Docker Hub](https://hub.docker.com/). Images can be pulled
 from Docker Hub or any container registry:
 
 ```
---image debian:jessie           # pull image implicitly from Docker hub.
---image gcr.io/PROJECT/IMAGE    # pull from GCR registry.
---image quay.io/quay/ubuntu     # pull from Quay.io.
+--image debian:jessie           # pull image implicitly from Docker hub
+--image gcr.io/PROJECT/IMAGE    # pull from Google Container Registry
+--image us-central1.pkg.dev/PROJECT/REPO/IMAGE # pull from Artifact Registry
+--image quay.io/quay/ubuntu     # pull from Quay.io
 ```
 
 When you have more than a single custom script to run or you have dependent
@@ -123,8 +124,9 @@ store it in a container registry.
 
 A quick way to start using custom Docker images is to use Google Container
 Builder which will build an image remotely and store it in the [Google Container
-Registry](https://cloud.google.com/container-registry/docs/). Alternatively you
-can build a Docker image locally and push it to a registry. See the
+Registry](https://cloud.google.com/container-registry/docs)
+or [Artifact Registry](https://cloud.google.com/artifact-registry/docs).
+Alternatively you can build a Docker image locally and push it to a registry. See the
 [FastQC example](../examples/fastqc) for a demonstration of both strategies.
 
 For information on building Docker images, see the Docker documentation:

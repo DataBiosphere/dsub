@@ -82,8 +82,8 @@ A Compute Engine VM by default has both a public (external) IP address and a
 private (internal) IP address. For batch processing, it is often the case that
 no public IP address is necessary. If your job only accesses Google services,
 such as Cloud Storage (inputs, outputs, and logging) and Google Container
-Registry (your Docker image), then you can run your `dsub` job on VMs without a
-public IP address.
+Registry or Artifact Registry (your Docker image), then you can run your `dsub`
+job on VMs without a public IP address.
 
 For more information on Compute Engine IP addresses, see:
 
@@ -132,7 +132,9 @@ was assigned.**
 The default `--image` used for `dsub` tasks is `ubuntu:14.04` which is pulled
 from Dockerhub. For VMs that do not have a public IP address, set the `--image`
 flag to a Docker image hosted by
-[Google Container Registry](https://cloud.google.com/container-registry/docs).
+[Google Container Registry](https://cloud.google.com/container-registry/docs) or
+[Artifact Registry](https://cloud.google.com/artifact-registry/docs).
+
 Google provides a set of
 [Managed Base Images](https://cloud.google.com/container-registry/docs/managed-base-images)
 in Container Registry that can be used as simple replacements for your tasks.

@@ -180,20 +180,26 @@ def get_credentials(args):
 
 
 def _check_private_address(args):
-  """If --use-private-address is enabled, ensure the Docker path is for GCR."""
+  """If --use-private-address is enabled, Docker path must be for GCR or AR."""
   if args.use_private_address:
     image = args.image or DEFAULT_IMAGE
     split = image.split('/', 1)
-    if len(split) == 1 or not split[0].endswith('gcr.io'):
+    if len(split) == 1 or not (
+        split[0].endswith('gcr.io') or split[0].endswith('pkg.dev')
+    ):
       raise ValueError(
-          '--use-private-address must specify a --image with a gcr.io host')
+          '--use-private-address must specify a --image with a gcr.io or'
+          ' pkg.dev host'
+      )
 
 
 def _check_nvidia_driver_version(args):
   """If --nvidia-driver-version is set, warn that it is ignored."""
   if args.nvidia_driver_version:
-    print('***WARNING: The --nvidia-driver-version flag is deprecated and will '
-          'be ignored.')
+    print(
+        '***WARNING: The --nvidia-driver-version flag is deprecated and will '
+        'be ignored.'
+    )
 
 
 def _google_cls_v2_parse_arguments(args):
@@ -360,8 +366,10 @@ def _parse_arguments(prog, argv):
   parser.add_argument(
       '--user-project',
       help="""Specify a user project to be billed for all requests to Google
-         Cloud Storage (logging, localization, delocalization). This flag exists
-         to support accessing Requester Pays buckets (default: None)""")
+         Cloud Storage (logging, localization, delocalization, mounting).
+         This flag exists to support accessing Requester Pays buckets
+         (default: None)""",
+  )
   parser.add_argument(
       '--mount',
       nargs='*',

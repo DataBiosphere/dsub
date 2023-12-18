@@ -137,7 +137,7 @@ function io_setup::run_dsub_requester_pays() {
   run_dsub \
     --unique-job-id \
     ${IMAGE:+--image "${IMAGE}"} \
-    --user-project "$PROJECT_ID" \
+    --user-project "${PROJECT_ID}" \
     --script "${SCRIPT_DIR}/script_io_test.sh" \
     --env TASK_ID="task" \
     --input INPUT_PATH="${REQUESTER_PAYS_INPUT_BAM_FULL_PATH}" \
@@ -151,10 +151,12 @@ readonly -f io_setup::run_dsub_requester_pays
 
 function io_setup::run_dsub_with_mount() {
   local mount_point="${1}"
+  local requester_pays="${2:-}"
 
   run_dsub \
     --unique-job-id \
     ${IMAGE:+--image "${IMAGE}"} \
+    ${requester_pays:+--user-project "${PROJECT_ID}"} \
     --script "${SCRIPT_DIR}/script_io_test.sh" \
     --env TASK_ID="task" \
     --output OUTPUT_PATH="${OUTPUTS}/task/*.md5" \

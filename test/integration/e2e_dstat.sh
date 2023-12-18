@@ -35,9 +35,9 @@ function verify_dstat_output() {
 
   # Verify that that the jobs are found and are in the expected order.
   # dstat sort ordering is by create-time (descending), so job 0 here should be the last started.
-  local first_job_name="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[0].job-name")"
-  local second_job_name="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[1].job-name")"
-  local third_job_name="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[2].job-name")"
+  local first_job_name="$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[0].job-name")"
+  local second_job_name="$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[1].job-name")"
+  local third_job_name="$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[2].job-name")"
 
   if [[ "${first_job_name}" != "${RUNNING_JOB_NAME_2}" ]]; then
     1>&2 echo "Job ${RUNNING_JOB_NAME_2} not found in the correct location in the dstat output! "
@@ -87,8 +87,8 @@ function verify_dstat_google_provider_fields() {
 
   for (( task=0; task < 3; task++ )); do
     # Run the provider test.
-    local job_name="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].job-name")"
-    local job_provider="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider")"
+    local job_name="$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].job-name")"
+    local job_provider="$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider")"
 
     # Validate provider.
     if [[ "${job_provider}" != "${DSUB_PROVIDER}" ]]; then
@@ -99,7 +99,7 @@ function verify_dstat_google_provider_fields() {
 
     # For google-cls-v2, validate that the correct "location" was used for the request.
     if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
-      local op_name="$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${DSTAT_OUTPUT}" "[0].internal-id")"
+      local op_name="$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${DSTAT_OUTPUT}" "[0].internal-id")"
 
       # The operation name format is projects/<project-number>/locations/<location>/operations/<operation-id>
       local op_location="$(echo -n "${op_name}" | awk -F '/' '{ print $4 }')"
@@ -131,7 +131,7 @@ function verify_dstat_google_provider_fields() {
     util::dstat_yaml_assert_boolean_field_equal "${dstat_out}" "[${task}].provider-attributes.preemptible" "false"
 
     # Check that instance name is not empty
-    local instance_name=$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider-attributes.instance-name")
+    local instance_name=$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider-attributes.instance-name")
     if [[ -z "${instance_name}" ]]; then
       1>&2 echo "  - FAILURE: Instance ${instance_name} for job ${job_name}, task $((task+1)) is empty."
       1>&2 echo "${dstat_out}"
@@ -139,7 +139,7 @@ function verify_dstat_google_provider_fields() {
     fi
 
     # Check zone exists and is expected format
-    local job_zone=$(python "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider-attributes.zone")
+    local job_zone=$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider-attributes.zone")
     if ! [[ "${job_zone}" =~ ^[a-z]{1,4}-[a-z]{2,15}[0-9]-[a-z]$ ]]; then
       1>&2 echo "  - FAILURE: Zone ${job_zone} for job ${job_name}, task $((task+1)) not valid."
       1>&2 echo "${dstat_out}"

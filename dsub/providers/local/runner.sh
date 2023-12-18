@@ -153,7 +153,9 @@ function configure_docker_if_necessary() {
 
   # Check that the prefix is gcr.io or <location>.gcr.io
   if [[ "${prefix}" == "gcr.io" ]] ||
-     [[ "${prefix}" == *.gcr.io ]]; then
+     [[ "${prefix}" == *.gcr.io ]] ||
+     [[ "${prefix}" == "pkg.dev" ]] ||
+     [[ "${prefix}" == *.pkg.dev ]] ; then
     log_info "Ensuring docker auth is configured for ${prefix}"
     gcloud --quiet auth configure-docker "${prefix}"
   fi

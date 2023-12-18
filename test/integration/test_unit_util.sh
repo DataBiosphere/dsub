@@ -65,7 +65,7 @@ readonly -f test_failed
 function get_stderr_value() {
   local value="${1}"
 
-  python "${SCRIPT_DIR}"/get_data_value.py \
+  python3 "${SCRIPT_DIR}"/get_data_value.py \
     "json" "$(<"${TEST_STDERR}")" "${value}"
 }
 readonly -f get_stderr_value

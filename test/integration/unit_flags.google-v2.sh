@@ -451,12 +451,50 @@ function test_use_private_address_with_public_image() {
     assert_output_empty
 
     assert_err_contains \
-      "ValueError: --use-private-address must specify a --image with a gcr.io host"
+      "ValueError: --use-private-address must specify a --image with a gcr.io or pkg.dev host"
 
     test_passed "${subtest}"
   fi
 }
 readonly -f test_use_private_address_with_public_image
+
+function test_use_private_address_with_gcr_io() {
+  local subtest="${FUNCNAME[0]}"
+
+  if DOCKER_IMAGE_OVERRIDE="marketplace.gcr.io/google/debian9" call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --use-private-address; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].imageUri" "marketplace.gcr.io/google/debian9"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_use_private_address_with_gcr_io
+
+function test_use_private_address_with_pkg_dev() {
+  local subtest="${FUNCNAME[0]}"
+
+  if DOCKER_IMAGE_OVERRIDE="us-central1-docker.pkg.dev/my-project/my-repo/my-image" call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --use-private-address; then
+
+    # Check that the output contains expected values
+    assert_err_value_equals \
+     "[0].pipeline.actions.[3].imageUri" "us-central1-docker.pkg.dev/my-project/my-repo/my-image"
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_use_private_address_with_pkg_dev
 
 function test_cpu_platform() {
   local subtest="${FUNCNAME[0]}"
@@ -969,6 +1007,8 @@ echo
 test_network
 test_no_network
 test_use_private_address_with_public_image
+test_use_private_address_with_gcr_io
+test_use_private_address_with_pkg_dev
 
 echo
 test_cpu_platform

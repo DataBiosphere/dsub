@@ -27,7 +27,7 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 source "${SCRIPT_DIR}/test_setup_unit.sh"
 
 readonly VERSION_NUMBER="$(
-  python -c "from dsub._dsub_version import DSUB_VERSION; print(DSUB_VERSION)")"
+  python3 -c "from dsub._dsub_version import DSUB_VERSION; print(DSUB_VERSION)")"
 readonly EXPECTED_STRING="dsub version: ${VERSION_NUMBER}"
 
 # Define tests template.

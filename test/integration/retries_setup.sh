@@ -98,7 +98,7 @@ function retries_setup::check_job_attr() {
   local expected
   for expected in ${expected_values}; do
     local result="$(
-      python "${SCRIPT_DIR}"/get_data_value.py \
+      python3 "${SCRIPT_DIR}"/get_data_value.py \
         yaml "${dstat_out}" "[${num}].${attr}")"
 
     if [[ "${result}" != "${expected}" ]]; then
@@ -115,7 +115,7 @@ function retries_setup::check_job_attr() {
   # Check that there were no extra attempts
   echo "Checking that there are no unexpected attempts"
   local -r beyond="$(
-      python "${SCRIPT_DIR}"/get_data_value.py \
+      python3 "${SCRIPT_DIR}"/get_data_value.py \
         yaml "${dstat_out}" "[${num}].${attr}")"
   if [[ -n "${beyond}" ]]; then
     echo "Unexpected attempt for job ${job_name}"
