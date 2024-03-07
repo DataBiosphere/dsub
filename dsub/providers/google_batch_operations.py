@@ -13,7 +13,7 @@
 # limitations under the License.
 """Utility routines for constructing a Google Batch API request."""
 import logging
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, MutableSequence
 from google.cloud.batch_v1 import ServiceAccount, AllocationPolicy
 
 # pylint: disable=g-import-not-at-top
@@ -272,12 +272,13 @@ def build_service_account(service_account_email: str) -> batch_v1.ServiceAccount
 def build_allocation_policy(
         ipts: List[batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate],
         service_account: batch_v1.ServiceAccount,
-        network_policy: batch_v1.types.job.AllocationPolicy.NetworkPolicy,
+        network_policy: batch_v1.types.job.AllocationPolicy.NetworkPolicy
 ) -> batch_v1.types.AllocationPolicy:
     allocation_policy = batch_v1.AllocationPolicy()
     allocation_policy.instances = ipts
     allocation_policy.service_account = service_account
     allocation_policy.network = network_policy
+
     return allocation_policy
 
 
@@ -301,9 +302,14 @@ def build_logs_policy(
 
 def build_instance_policy(
         disks: List[batch_v1.types.AllocationPolicy.AttachedDisk],
+        machine_type: str,
+        accelerators: MutableSequence[batch_v1.types.AllocationPolicy.Accelerator]
 ) -> batch_v1.types.AllocationPolicy.InstancePolicy:
     instance_policy = batch_v1.AllocationPolicy.InstancePolicy()
     instance_policy.disks = [disks]
+    instance_policy.machine_type = machine_type
+    instance_policy.accelerators = accelerators
+
     return instance_policy
 
 
@@ -323,3 +329,16 @@ def build_persistent_disk(
     disk.type = disk_type
     disk.size_gb = size_gb
     return disk
+
+
+def build_accelerators(
+        accelerator_type,
+        accelerator_count
+) -> MutableSequence[batch_v1.types.AllocationPolicy.Accelerator]:
+    accelerators = []
+    accelerator = batch_v1.AllocationPolicy.Accelerator()
+    accelerator.count = accelerator_count
+    accelerator.type = accelerator_type
+    accelerators.append(accelerator)
+
+    return accelerators

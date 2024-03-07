@@ -22,13 +22,13 @@ import json
 import os
 import sys
 import textwrap
-from typing import Dict, List, Set
+from typing import Dict, List, Set, MutableSequence
 
 from . import base
 from . import google_base
 from . import google_batch_operations
 from . import google_utils
-from .google_batch_operations import build_compute_resource
+from .google_batch_operations import build_compute_resource, build_accelerators, build_instance_policy_or_template
 from ..lib import job_model
 from ..lib import param_util
 from ..lib import providers_util
@@ -669,9 +669,16 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         attached_disk = google_batch_operations.build_attached_disk(
             disk=disk, device_name=google_utils.DATA_DISK_NAME
         )
+
         instance_policy = google_batch_operations.build_instance_policy(
-            attached_disk
+            disks=attached_disk,
+            machine_type=job_resources.machine_type,
+            accelerators=build_accelerators(
+                accelerator_type=job_resources.accelerator_type,
+                accelerator_count=job_resources.accelerator_count,
+            )
         )
+
         ipt = google_batch_operations.build_instance_policy_or_template(
             instance_policy
         )
@@ -688,7 +695,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         allocation_policy = google_batch_operations.build_allocation_policy(
             ipts=[ipt],
             service_account=service_account,
-            network_policy=network_policy
+            network_policy=network_policy,
         )
 
         logs_policy = google_batch_operations.build_logs_policy(
