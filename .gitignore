@@ -1,6 +1,8 @@
 *.py[cod]
 *$py.class
 
+.idea
+
 build/
 dist/
 dsub_libs/
