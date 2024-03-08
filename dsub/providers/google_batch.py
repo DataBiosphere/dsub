@@ -28,7 +28,7 @@ from . import base
 from . import google_base
 from . import google_batch_operations
 from . import google_utils
-from .google_batch_operations import build_compute_resource, build_accelerators, build_instance_policy_or_template
+from .google_batch_operations import build_compute_resource, build_accelerators
 from ..lib import job_model
 from ..lib import param_util
 from ..lib import providers_util
@@ -603,6 +603,14 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             )
         )
 
+        # user-command volumes
+        user_command_volumes = [f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}']
+        if job_resources.accelerator_type is not None:
+            user_command_volumes.extend([
+                "/var/lib/nvidia/lib64:/usr/local/nvidia/lib64",
+                "/var/lib/nvidia/bin:/usr/local/nvidia/bin"
+            ])
+
         runnables.append(
             # user-command
             google_batch_operations.build_runnable(
@@ -611,7 +619,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
                 image_uri=job_resources.image,
                 environment=None,
                 entrypoint='/usr/bin/env',
-                volumes=[f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}'],
+                volumes=user_command_volumes,
                 commands=[
                     'bash',
                     '-c',
@@ -680,7 +688,9 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         )
 
         ipt = google_batch_operations.build_instance_policy_or_template(
-            instance_policy
+            instance_policy=instance_policy,
+            install_gpu_drivers=True if job_resources.accelerator_type is not None else False
+
         )
 
         service_account = google_batch_operations.build_service_account(

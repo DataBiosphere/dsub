@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utility routines for constructing a Google Batch API request."""
-import logging
 from typing import List, Optional, Dict, MutableSequence
 from google.cloud.batch_v1 import ServiceAccount, AllocationPolicy
 
@@ -284,9 +283,11 @@ def build_allocation_policy(
 
 def build_instance_policy_or_template(
         instance_policy: batch_v1.types.AllocationPolicy.InstancePolicy,
+        install_gpu_drivers: bool
 ) -> batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate:
     ipt = batch_v1.AllocationPolicy.InstancePolicyOrTemplate()
     ipt.policy = instance_policy
+    ipt.install_gpu_drivers = install_gpu_drivers
     return ipt
 
 
