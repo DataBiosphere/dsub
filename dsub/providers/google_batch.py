@@ -684,7 +684,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             accelerators=build_accelerators(
                 accelerator_type=job_resources.accelerator_type,
                 accelerator_count=job_resources.accelerator_count,
-            )
+            ) if job_resources.accelerator_type is not None else None
         )
 
         ipt = google_batch_operations.build_instance_policy_or_template(
