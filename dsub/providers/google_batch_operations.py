@@ -163,22 +163,22 @@ def build_environment(env_vars: Dict[str, str]):
 
 
 def build_task_group(
-  task_spec: batch_v1.types.TaskSpec,
-  task_environments: List[batch_v1.types.Environment],
-  task_count: int,
-  task_count_per_node: int,
+    task_spec: batch_v1.types.TaskSpec,
+    task_environments: List[batch_v1.types.Environment],
+    task_count: int,
+    task_count_per_node: int,
 ) -> batch_v1.types.TaskGroup:
   """Build a TaskGroup object for a Batch request.
 
-Args:
-  task_spec (TaskSpec): TaskSpec object
-  task_environments (List[Environment]): List of Environment objects
-  task_count (int): The number of total tasks in the job
-  task_count_per_node (int): The number of tasks to schedule on one VM
+  Args:
+    task_spec (TaskSpec): TaskSpec object
+    task_environments (List[Environment]): List of Environment objects
+    task_count (int): The number of total tasks in the job
+    task_count_per_node (int): The number of tasks to schedule on one VM
 
-Returns:
-  A TaskGroup object.
-"""
+  Returns:
+    A TaskGroup object.
+  """
   task_group = batch_v1.TaskGroup()
   task_group.task_spec = task_spec
   task_group.task_environments = task_environments
