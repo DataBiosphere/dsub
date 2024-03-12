@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utility routines for constructing a Google Batch API request."""
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, MutableSequence
+from google.cloud.batch_v1 import ServiceAccount, AllocationPolicy
 
 # pylint: disable=g-import-not-at-top
 try:
@@ -20,6 +21,8 @@ try:
 except ImportError:
   # TODO: Remove conditional import when batch library is available
   from . import batch_dummy as batch_v1
+
+
 # pylint: enable=g-import-not-at-top
 
 
@@ -45,8 +48,8 @@ def get_environment(op: batch_v1.types.Job) -> Dict[str, str]:
 def is_done(op: batch_v1.types.Job) -> bool:
   """Return whether the operation has been marked done."""
   return op.status.state in [
-      batch_v1.types.job.JobStatus.State.SUCCEEDED,
-      batch_v1.types.job.JobStatus.State.FAILED,
+    batch_v1.types.job.JobStatus.State.SUCCEEDED,
+    batch_v1.types.job.JobStatus.State.FAILED,
   ]
 
 
@@ -78,18 +81,18 @@ def _pad_timestamps(ts: str) -> str:
 
 def get_update_time(op: batch_v1.types.Job) -> Optional[str]:
   """Return the update time string of the operation."""
-  update_time = op.update_time
+  update_time = op.update_time.ToDatetime() if op.update_time else None
   if update_time:
-    return _pad_timestamps(op.update_time.rfc3339())
+    return update_time.isoformat('T') + 'Z'  # Representing the datetime object in rfc3339 format
   else:
     return None
 
 
 def get_create_time(op: batch_v1.types.Job) -> Optional[str]:
   """Return the create time string of the operation."""
-  create_time = op.create_time
+  create_time = op.create_time.ToDatetime() if op.create_time else None
   if create_time:
-    return _pad_timestamps(op.create_time.rfc3339())
+    return create_time.isoformat('T') + 'Z'
   else:
     return None
 
@@ -99,10 +102,10 @@ def get_status_events(op: batch_v1.types.Job):
 
 
 def build_job(
-    task_groups: List[batch_v1.types.TaskGroup],
-    allocation_policy: batch_v1.types.AllocationPolicy,
-    labels: Dict[str, str],
-    logs_policy: batch_v1.types.LogsPolicy,
+  task_groups: List[batch_v1.types.TaskGroup],
+  allocation_policy: batch_v1.types.AllocationPolicy,
+  labels: Dict[str, str],
+  logs_policy: batch_v1.types.LogsPolicy,
 ) -> batch_v1.types.Job:
   job = batch_v1.Job()
   job.task_groups = task_groups
@@ -112,13 +115,44 @@ def build_job(
   return job
 
 
+def build_compute_resource(cpu_milli: int, memory_mib: int, boot_disk_mib: int) -> batch_v1.types.ComputeResource:
+  """Build a ComputeResource object for a Batch request.
+
+  Args:
+      cpu_milli (int): Number of milliCPU units
+      memory_mib (int): Amount of memory in Mebibytes (MiB)
+      boot_disk_mib (int): The boot disk size in Mebibytes (MiB)
+
+  Returns:
+      A ComputeResource object.
+  """
+  compute_resource = batch_v1.ComputeResource(
+    cpu_milli=cpu_milli,
+    memory_mib=memory_mib,
+    boot_disk_mib=boot_disk_mib
+  )
+  return compute_resource
+
+
 def build_task_spec(
-    runnables: List[batch_v1.types.task.Runnable],
-    volumes: List[batch_v1.types.Volume],
+  runnables: List[batch_v1.types.task.Runnable],
+  volumes: List[batch_v1.types.Volume],
+  compute_resource: batch_v1.types.ComputeResource,
 ) -> batch_v1.types.TaskSpec:
+  """Build a TaskSpec object for a Batch request.
+
+  Args:
+      runnables (List[Runnable]): List of Runnable objects
+      volumes (List[Volume]): List of Volume objects
+      compute_resource (ComputeResource): The compute resources to use
+
+  Returns:
+      A TaskSpec object.
+  """
   task_spec = batch_v1.TaskSpec()
   task_spec.runnables = runnables
   task_spec.volumes = volumes
+  task_spec.compute_resource = compute_resource
   return task_spec
 
 
@@ -129,10 +163,10 @@ def build_environment(env_vars: Dict[str, str]):
 
 
 def build_task_group(
-    task_spec: batch_v1.types.TaskSpec,
-    task_environments: List[batch_v1.types.Environment],
-    task_count: int,
-    task_count_per_node: int,
+  task_spec: batch_v1.types.TaskSpec,
+  task_environments: List[batch_v1.types.Environment],
+  task_count: int,
+  task_count_per_node: int,
 ) -> batch_v1.types.TaskGroup:
   """Build a TaskGroup object for a Batch request.
 
@@ -154,7 +188,7 @@ def build_task_group(
 
 
 def build_container(
-    image_uri: str, entrypoint: str, volumes: List[str], commands: List[str]
+  image_uri: str, entrypoint: str, volumes: List[str], commands: List[str]
 ) -> batch_v1.types.task.Runnable.Container:
   container = batch_v1.types.task.Runnable.Container()
   container.image_uri = image_uri
@@ -165,13 +199,13 @@ def build_container(
 
 
 def build_runnable(
-    run_in_background: bool,
-    always_run: bool,
-    environment: batch_v1.types.Environment,
-    image_uri: str,
-    entrypoint: str,
-    volumes: List[str],
-    commands: List[str],
+  run_in_background: bool,
+  always_run: bool,
+  environment: batch_v1.types.Environment,
+  image_uri: str,
+  entrypoint: str,
+  volumes: List[str],
+  commands: List[str],
 ) -> batch_v1.types.task.Runnable:
   """Build a Runnable object for a Batch request.
 
@@ -213,24 +247,52 @@ def build_volume(disk: str, path: str) -> batch_v1.types.Volume:
   return volume
 
 
+def build_network_policy(network: str, subnetwork: str,
+                         no_external_ip_address: bool) -> batch_v1.types.job.AllocationPolicy.NetworkPolicy:
+  network_polycy = AllocationPolicy.NetworkPolicy(
+    network_interfaces=[
+      AllocationPolicy.NetworkInterface(
+        network=network,
+        subnetwork=subnetwork,
+        no_external_ip_address=no_external_ip_address,
+      )
+    ]
+  )
+  return network_polycy
+
+
+def build_service_account(service_account_email: str) -> batch_v1.ServiceAccount:
+  service_account = ServiceAccount(
+    email=service_account_email
+  )
+  return service_account
+
+
 def build_allocation_policy(
-    ipts: List[batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate],
+  ipts: List[batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate],
+  service_account: batch_v1.ServiceAccount,
+  network_policy: batch_v1.types.job.AllocationPolicy.NetworkPolicy
 ) -> batch_v1.types.AllocationPolicy:
   allocation_policy = batch_v1.AllocationPolicy()
   allocation_policy.instances = ipts
+  allocation_policy.service_account = service_account
+  allocation_policy.network = network_policy
+
   return allocation_policy
 
 
 def build_instance_policy_or_template(
-    instance_policy: batch_v1.types.AllocationPolicy.InstancePolicy,
+  instance_policy: batch_v1.types.AllocationPolicy.InstancePolicy,
+  install_gpu_drivers: bool
 ) -> batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate:
   ipt = batch_v1.AllocationPolicy.InstancePolicyOrTemplate()
   ipt.policy = instance_policy
+  ipt.install_gpu_drivers = install_gpu_drivers
   return ipt
 
 
 def build_logs_policy(
-    destination: batch_v1.types.LogsPolicy.Destination, logs_path: str
+  destination: batch_v1.types.LogsPolicy.Destination, logs_path: str
 ) -> batch_v1.types.LogsPolicy:
   logs_policy = batch_v1.LogsPolicy()
   logs_policy.destination = destination
@@ -240,15 +302,20 @@ def build_logs_policy(
 
 
 def build_instance_policy(
-    disks: List[batch_v1.types.AllocationPolicy.AttachedDisk],
+  disks: List[batch_v1.types.AllocationPolicy.AttachedDisk],
+  machine_type: str,
+  accelerators: MutableSequence[batch_v1.types.AllocationPolicy.Accelerator]
 ) -> batch_v1.types.AllocationPolicy.InstancePolicy:
   instance_policy = batch_v1.AllocationPolicy.InstancePolicy()
   instance_policy.disks = [disks]
+  instance_policy.machine_type = machine_type
+  instance_policy.accelerators = accelerators
+
   return instance_policy
 
 
 def build_attached_disk(
-    disk: batch_v1.types.AllocationPolicy.Disk, device_name: str
+  disk: batch_v1.types.AllocationPolicy.Disk, device_name: str
 ) -> batch_v1.types.AllocationPolicy.AttachedDisk:
   attached_disk = batch_v1.AllocationPolicy.AttachedDisk()
   attached_disk.new_disk = disk
@@ -257,9 +324,22 @@ def build_attached_disk(
 
 
 def build_persistent_disk(
-    size_gb: int, disk_type: str
+  size_gb: int, disk_type: str
 ) -> batch_v1.types.AllocationPolicy.Disk:
   disk = batch_v1.AllocationPolicy.Disk()
   disk.type = disk_type
   disk.size_gb = size_gb
   return disk
+
+
+def build_accelerators(
+  accelerator_type,
+  accelerator_count
+) -> MutableSequence[batch_v1.types.AllocationPolicy.Accelerator]:
+  accelerators = []
+  accelerator = batch_v1.AllocationPolicy.Accelerator()
+  accelerator.count = accelerator_count
+  accelerator.type = accelerator_type
+  accelerators.append(accelerator)
+
+  return accelerators

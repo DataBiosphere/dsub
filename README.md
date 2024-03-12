@@ -724,7 +724,7 @@ The image below illustrates this:
 
 By default, `dsub` will use the [default Compute Engine service account](https://cloud.google.com/compute/docs/access/service-accounts#default_service_account)
 as the authorized service account on the VM instance. You can choose to specify
-the email address of another service acount using `--service-account`.
+the email address of another service account using `--service-account`.
 
 By default, `dsub` will grant the following access scopes to the service account:
 
