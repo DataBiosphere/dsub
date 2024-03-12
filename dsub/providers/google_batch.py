@@ -258,19 +258,19 @@ class GoogleBatchOperation(base.Task):
   def get_field(self, field: str, default: str = None):
     """Returns a value from the operation for a specific set of field names.
 
-  This is the implementation of base.Task's abstract get_field method. See
-  base.py get_field for more details.
+    This is the implementation of base.Task's abstract get_field method. See
+    base.py get_field for more details.
 
-  Args:
-    field: a dsub-specific job metadata key
-    default: default value to return if field does not exist or is empty.
+    Args:
+      field: a dsub-specific job metadata key
+      default: default value to return if field does not exist or is empty.
 
-  Returns:
-    A text string for the field or a list for 'inputs'.
+    Returns:
+      A text string for the field or a list for 'inputs'.
 
-  Raises:
-    ValueError: if the field label is not supported by the operation
-  """
+    Raises:
+      ValueError: if the field label is not supported by the operation
+    """
     value = None
     if field == 'internal-id':
       value = self._op.name
@@ -370,12 +370,12 @@ class GoogleBatchOperation(base.Task):
   def _operation_status(self):
     """Returns the status of this operation.
 
-  Raises:
-    ValueError: if the operation status cannot be determined.
+    Raises:
+      ValueError: if the operation status cannot be determined.
 
-  Returns:
-    A printable status string (RUNNING, SUCCESS, CANCELED or FAILURE).
-  """
+    Returns:
+      A printable status string (RUNNING, SUCCESS, CANCELED or FAILURE).
+    """
     if not google_batch_operations.is_done(self._op):
       return 'RUNNING'
     if google_batch_operations.is_success(self._op):
