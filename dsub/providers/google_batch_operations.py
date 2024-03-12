@@ -163,10 +163,10 @@ def build_environment(env_vars: Dict[str, str]):
 
 
 def build_task_group(
-    task_spec: batch_v1.types.TaskSpec,
-    task_environments: List[batch_v1.types.Environment],
-    task_count: int,
-    task_count_per_node: int,
+  task_spec: batch_v1.types.TaskSpec,
+  task_environments: List[batch_v1.types.Environment],
+  task_count: int,
+  task_count_per_node: int,
 ) -> batch_v1.types.TaskGroup:
   """Build a TaskGroup object for a Batch request.
 
@@ -209,19 +209,19 @@ def build_runnable(
 ) -> batch_v1.types.task.Runnable:
   """Build a Runnable object for a Batch request.
 
-Args:
-  run_in_background (bool): True for the action to run in the background
-  always_run (bool): True for the action to run even in case of error from
-    prior actions
-  environment (Environment): Environment variables for action
-  image_uri (str): Docker image path
-  entrypoint (str): Docker image entrypoint path
-  volumes (List[str]): List of volume mounts (host_path:container_path)
-  commands (List[str]): Command arguments to pass to the entrypoint
+  Args:
+    run_in_background (bool): True for the action to run in the background
+    always_run (bool): True for the action to run even in case of error from
+      prior actions
+    environment (Environment): Environment variables for action
+    image_uri (str): Docker image path
+    entrypoint (str): Docker image entrypoint path
+    volumes (List[str]): List of volume mounts (host_path:container_path)
+    commands (List[str]): Command arguments to pass to the entrypoint
 
-Returns:
-  An object representing a Runnable
-"""
+  Returns:
+    An object representing a Runnable
+  """
   container = build_container(image_uri, entrypoint, volumes, commands)
   runnable = batch_v1.Runnable()
   runnable.container = container
@@ -234,13 +234,13 @@ Returns:
 def build_volume(disk: str, path: str) -> batch_v1.types.Volume:
   """Build a Volume object for a Batch request.
 
-Args:
-  disk (str): Name of disk to mount, as specified in the resources section.
-  path (str): Path to mount the disk at inside the container.
+  Args:
+    disk (str): Name of disk to mount, as specified in the resources section.
+    path (str): Path to mount the disk at inside the container.
 
-Returns:
-  An object representing a Mount.
-"""
+  Returns:
+    An object representing a Mount.
+  """
   volume = batch_v1.Volume()
   volume.device_name = disk
   volume.mount_path = path
