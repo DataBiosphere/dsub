@@ -2,6 +2,7 @@
 *$py.class
 
 .idea
+.editorconfig
 
 build/
 dist/
