@@ -258,19 +258,19 @@ class GoogleBatchOperation(base.Task):
   def get_field(self, field: str, default: str = None):
     """Returns a value from the operation for a specific set of field names.
 
-This is the implementation of base.Task's abstract get_field method. See
-base.py get_field for more details.
+  This is the implementation of base.Task's abstract get_field method. See
+  base.py get_field for more details.
 
-Args:
-  field: a dsub-specific job metadata key
-  default: default value to return if field does not exist or is empty.
+  Args:
+    field: a dsub-specific job metadata key
+    default: default value to return if field does not exist or is empty.
 
-Returns:
-  A text string for the field or a list for 'inputs'.
+  Returns:
+    A text string for the field or a list for 'inputs'.
 
-Raises:
-  ValueError: if the field label is not supported by the operation
-"""
+  Raises:
+    ValueError: if the field label is not supported by the operation
+  """
     value = None
     if field == 'internal-id':
       value = self._op.name
@@ -370,12 +370,12 @@ Raises:
   def _operation_status(self):
     """Returns the status of this operation.
 
-Raises:
-  ValueError: if the operation status cannot be determined.
+  Raises:
+    ValueError: if the operation status cannot be determined.
 
-Returns:
-  A printable status string (RUNNING, SUCCESS, CANCELED or FAILURE).
-"""
+  Returns:
+    A printable status string (RUNNING, SUCCESS, CANCELED or FAILURE).
+  """
     if not google_batch_operations.is_done(self._op):
       return 'RUNNING'
     if google_batch_operations.is_success(self._op):
@@ -838,19 +838,19 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
   ):
     """Kills the operations associated with the specified job or job.task.
 
-Args:
-  user_ids: List of user ids who "own" the job(s) to cancel.
-  job_ids: List of job_ids to cancel.
-  task_ids: List of task-ids to cancel.
-  labels: List of LabelParam, each must match the job(s) to be canceled.
-  create_time_min: a timezone-aware datetime value for the earliest create
-    time of a task, inclusive.
-  create_time_max: a timezone-aware datetime value for the most recent
-    create time of a task, inclusive.
+  Args:
+    user_ids: List of user ids who "own" the job(s) to cancel.
+    job_ids: List of job_ids to cancel.
+    task_ids: List of task-ids to cancel.
+    labels: List of LabelParam, each must match the job(s) to be canceled.
+    create_time_min: a timezone-aware datetime value for the earliest create
+      time of a task, inclusive.
+    create_time_max: a timezone-aware datetime value for the most recent
+      create time of a task, inclusive.
 
-Returns:
-  A list of tasks canceled and a list of error messages.
-"""
+  Returns:
+    A list of tasks canceled and a list of error messages.
+  """
     # Look up the job(s)
     tasks = list(
       self.lookup_job_tasks(
