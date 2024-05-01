@@ -209,12 +209,16 @@ function get_test_providers() {
     # Special case the google-v2 tests - run them against google-cls-v2 as well
     if [[ "${providers}" == "google-v2" ]]; then
       echo -n "google-v2 google-cls-v2"
+    # Special case the google-batch tests - don't run them when this flag is set
+    # To be renabled once batch client library is available in G3
+    elif [[ "${providers}" == "google-batch" ]] && [[ "${NO_GOOGLE_BATCH_TESTS:-0}" -eq 1 ]]; then
+      echo -n ""
     else
       echo -n "${providers}"
     fi
     return
   fi
-  if [[ ${NO_GOOGLE_BATCH_TESTS:-0} -eq 1 ]]; then
+  if [[ "${NO_GOOGLE_BATCH_TESTS:-0}" -eq 1 ]]; then
     echo -n "local google-v2 google-cls-v2"
     return
   fi

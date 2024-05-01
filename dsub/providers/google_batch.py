@@ -18,7 +18,6 @@ Google Batch v1 APIs.
 """
 
 import ast
-import json
 import os
 import sys
 import textwrap
@@ -27,6 +26,7 @@ from typing import Dict, List, Set
 from . import base
 from . import google_base
 from . import google_batch_operations
+from . import google_custom_machine
 from . import google_utils
 from ..lib import job_model
 from ..lib import param_util
@@ -662,6 +662,10 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     # instance type and resources attached to each VM. The AllocationPolicy
     # describes when, where, and how compute resources should be allocated
     # for the Job.
+    boot_disk = google_batch_operations.build_persistent_disk(
+        size_gb=job_resources.boot_disk_size,
+        disk_type=job_model.DEFAULT_DISK_TYPE,
+    )
     disk = google_batch_operations.build_persistent_disk(
         size_gb=job_resources.disk_size,
         disk_type=job_resources.disk_type or job_model.DEFAULT_DISK_TYPE,
@@ -669,13 +673,55 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     attached_disk = google_batch_operations.build_attached_disk(
         disk=disk, device_name=google_utils.DATA_DISK_NAME
     )
+
+    if job_resources.machine_type:
+      machine_type = job_resources.machine_type
+    elif job_resources.min_cores or job_resources.min_ram:
+      machine_type = (
+          google_custom_machine.GoogleCustomMachine.build_machine_type(
+              job_resources.min_cores, job_resources.min_ram
+          )
+      )
+    else:
+      machine_type = job_model.DEFAULT_MACHINE_TYPE
+
     instance_policy = google_batch_operations.build_instance_policy(
-        attached_disk
+        boot_disk=boot_disk,
+        disks=attached_disk,
+        machine_type=machine_type,
+        accelerators=google_batch_operations.build_accelerators(
+            accelerator_type=job_resources.accelerator_type,
+            accelerator_count=job_resources.accelerator_count,
+        ),
     )
+
     ipt = google_batch_operations.build_instance_policy_or_template(
-        instance_policy
+        instance_policy=instance_policy,
+        install_gpu_drivers=True
+        if job_resources.accelerator_type is not None
+        else False,
     )
-    allocation_policy = google_batch_operations.build_allocation_policy([ipt])
+
+    if job_resources.service_account:
+      scopes = job_resources.scopes or google_base.DEFAULT_SCOPES
+      service_account = google_batch_operations.build_service_account(
+          service_account_email=job_resources.service_account, scopes=scopes
+      )
+    else:
+      service_account = None
+
+    network_policy = google_batch_operations.build_network_policy(
+        network=job_resources.network,
+        subnetwork=job_resources.subnetwork,
+        no_external_ip_address=job_resources.use_private_address,
+    )
+
+    allocation_policy = google_batch_operations.build_allocation_policy(
+        ipts=[ipt],
+        service_account=service_account,
+        network_policy=network_policy,
+    )
+
     logs_policy = google_batch_operations.build_logs_policy(
         batch_v1.LogsPolicy.Destination.PATH, _BATCH_LOG_FILE_PATH
     )
@@ -775,14 +821,15 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     if self._dry_run:
       requests.append(request)
     else:
-      # task_id = client.create_job(request=request)
       task_id = self._submit_batch_job(request)
       launched_tasks.append(task_id)
-    # If this is a dry-run, emit all the pipeline request objects
+    # If this is a dry-run, emit all the batch request objects
     if self._dry_run:
-      print(
-          json.dumps(requests, indent=2, sort_keys=True, separators=(',', ': '))
-      )
+      # Each request is a google.cloud.batch_v1.types.batch.CreateJobRequest
+      # object. The __repr__ method for this object outputs something that
+      # closely resembles yaml, but can't actually be serialized into yaml.
+      # Ideally, we could serialize these request objects to yaml or json.
+      print(requests)
     return {
         'job-id': job_id,
         'user-id': job_descriptor.job_metadata.get('user-id'),
