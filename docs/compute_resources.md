@@ -44,8 +44,8 @@ or a
 
 ## Disks
 
-By default, `dsub` launches a Compute Engine VM with a boot disk of 10 GB and an
-attached data disk of size 200 GB.
+By default, `dsub` launches a Compute Engine VM with a boot disk of 10 GB (30 GB
+for `google-batch`) and an attached data disk of size 200 GB.
 
 To change the boot disk size, use the `--boot-disk-size` flag.<sup>(\*)</sup>
 

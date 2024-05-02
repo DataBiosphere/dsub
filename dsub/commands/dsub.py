@@ -455,8 +455,13 @@ def _parse_arguments(prog, argv):
       '--boot-disk-size',
       default=job_model.DEFAULT_BOOT_DISK_SIZE,
       type=int,
-      help='Size (in GB) of the boot disk (default: {})'.format(
-          job_model.DEFAULT_BOOT_DISK_SIZE))
+      help=(
+          'Size (in GB) of the boot disk (default: {}, {} for google-batch)'
+          .format(
+              job_model.DEFAULT_BOOT_DISK_SIZE, job_model.LARGE_BOOT_DISK_SIZE
+          )
+      ),
+  )
   google_common.add_argument(
       '--preemptible',
       const=param_util.preemptile_param_type(True),

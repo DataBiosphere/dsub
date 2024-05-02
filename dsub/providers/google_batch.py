@@ -663,7 +663,9 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     # describes when, where, and how compute resources should be allocated
     # for the Job.
     boot_disk = google_batch_operations.build_persistent_disk(
-        size_gb=job_resources.boot_disk_size,
+        size_gb=max(
+            job_resources.boot_disk_size, job_model.LARGE_BOOT_DISK_SIZE
+        ),
         disk_type=job_model.DEFAULT_DISK_TYPE,
     )
     disk = google_batch_operations.build_persistent_disk(
