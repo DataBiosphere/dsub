@@ -25,6 +25,7 @@ class types(object):
   Volume = None
   TaskSpec = None
   Environment = None
+  ServiceAccount = None
 
   class task(object):
 
@@ -36,6 +37,8 @@ class types(object):
     InstancePolicy = None
     AttachedDisk = None
     Disk = None
+    NetworkPolicy = None
+    Accelerator = None
 
   class LogsPolicy(object):
     Destination = None

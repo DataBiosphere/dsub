@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Unit tests for GoogleV2CustomMachine class."""
+"""Unit tests for GoogleCustomMachine class."""
 
 import unittest
-from dsub.providers import google_v2_base
+from dsub.providers import google_custom_machine
 import parameterized
 
 
@@ -30,8 +30,9 @@ class CustomMachineTest(unittest.TestCase):
       (6, 6),
   ])
   def test_validate_cores(self, input_cpu, expected_output):
-    actual_output = google_v2_base.GoogleV2CustomMachine._validate_cores(
-        input_cpu)
+    actual_output = google_custom_machine.GoogleCustomMachine._validate_cores(
+        input_cpu
+    )
     self.assertEqual(actual_output, expected_output)
 
   @parameterized.parameterized.expand([
@@ -56,8 +57,9 @@ class CustomMachineTest(unittest.TestCase):
       (10.8, 11264),
   ])
   def test_validate_ram(self, input_ram, expected_output):
-    actual_output = google_v2_base.GoogleV2CustomMachine._validate_ram(
-        input_ram * google_v2_base.GoogleV2CustomMachine._MB_PER_GB)
+    actual_output = google_custom_machine.GoogleCustomMachine._validate_ram(
+        input_ram * google_custom_machine.GoogleCustomMachine._MB_PER_GB
+    )
     self.assertEqual(actual_output, expected_output)
 
   @parameterized.parameterized.expand([
@@ -88,7 +90,7 @@ class CustomMachineTest(unittest.TestCase):
       (None, None, 'custom-1-3840')
   ])
   def test_build_machine_type(self, min_cpu, min_ram, expected_output):
-    custom_machine = google_v2_base.GoogleV2CustomMachine()
+    custom_machine = google_custom_machine.GoogleCustomMachine()
     actual_output = custom_machine.build_machine_type(min_cpu, min_ram)
     self.assertEqual(actual_output, expected_output)
 

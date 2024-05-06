@@ -14,23 +14,23 @@ _DEPENDENCIES = [
     # dependencies for dsub, ddel, dstat
     # Pin to known working versions to prevent episodic breakage from library
     # version mismatches.
-    # This version list generated: 12/07/2023
+    # This version list generated: 05/03/2024
     # direct dependencies
-    'google-api-python-client>=2.47.0,<=2.109.0',
-    'google-auth>=2.6.6,<=2.25.1',
-    'google-cloud-batch==0.17.5',
-    'python-dateutil<=2.8.2',
-    'pytz<=2023.3',
+    'google-api-python-client>=2.47.0,<=2.127.0',
+    'google-auth>=2.6.6,<=2.29.0',
+    'google-cloud-batch<=0.17.18',
+    'python-dateutil<=2.9.0',
+    'pytz<=2024.1',
     'pyyaml<=6.0.1',
     'tenacity<=8.2.3',
     'tabulate<=0.9.0',
     # downstream dependencies
     'funcsigs==1.0.2',
-    'google-api-core>=2.7.3,<=2.15.0',
-    'google-auth-httplib2<=0.1.1',
+    'google-api-core>=2.7.3,<=2.19.0',
+    'google-auth-httplib2<=0.2.0',
     'httplib2<=0.22.0',
-    'pyasn1<=0.5.1',
-    'pyasn1-modules<=0.3.0',
+    'pyasn1<=0.6.0',
+    'pyasn1-modules<=0.4.0',
     'rsa<=4.9',
     'uritemplate<=4.1.1',
     # dependencies for test code

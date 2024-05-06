@@ -109,6 +109,7 @@ def main():
           print('Cannot value match on non-list object.', file=sys.stderr)
           print('Key: %s' % key, file=sys.stderr)
           print('Value: %s' % curr, file=sys.stderr)
+          print('Entire input: %s' % data, file=sys.stderr)
           sys.exit(1)
 
         found = None
@@ -128,12 +129,14 @@ def main():
         print('Cannot index into a non-list object.', file=sys.stderr)
         print('Key: %s' % key, file=sys.stderr)
         print('Value: %s' % curr, file=sys.stderr)
+        print('Entire input: %s' % data, file=sys.stderr)
         sys.exit(1)
 
       if idx >= len(curr):
         print('Index of key out of bounds', file=sys.stderr)
         print('Key: %s' % key, file=sys.stderr)
         print('Value: %s' % curr, file=sys.stderr)
+        print('Entire input: %s' % data, file=sys.stderr)
         sys.exit(1)
 
       curr = curr[idx]
@@ -146,6 +149,7 @@ def main():
       print('Key not found', file=sys.stderr)
       print('Key: %s' % key, file=sys.stderr)
       print('Value: %s' % curr, file=sys.stderr)
+      print('Entire input: %s' % data, file=sys.stderr)
       sys.exit(1)
 
   print(curr)

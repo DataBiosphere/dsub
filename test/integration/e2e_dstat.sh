@@ -275,7 +275,11 @@ fi
 
 echo "Waiting for all jobs to complete."
 
-DSTAT_OUTPUT="$(run_dstat --status '*' --full --wait --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"
+run_dstat --status '*' --wait --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}"
+
+echo "All jobs completed. Calling dstat one last time and verifying output."
+
+DSTAT_OUTPUT="$(run_dstat --status '*' --full --jobs "${RUNNING_JOB_ID_2}" "${RUNNING_JOB_ID}" "${COMPLETED_JOB_ID}")"
 verify_dstat_output "${DSTAT_OUTPUT}" "true"
 
 echo "SUCCESS"

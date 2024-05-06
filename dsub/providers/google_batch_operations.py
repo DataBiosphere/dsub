@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utility routines for constructing a Google Batch API request."""
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, MutableSequence
 
 # pylint: disable=g-import-not-at-top
 try:
@@ -116,6 +116,15 @@ def build_task_spec(
     runnables: List[batch_v1.types.task.Runnable],
     volumes: List[batch_v1.types.Volume],
 ) -> batch_v1.types.TaskSpec:
+  """Build a TaskSpec object for a Batch request.
+
+  Args:
+      runnables (List[Runnable]): List of Runnable objects
+      volumes (List[Volume]): List of Volume objects
+
+  Returns:
+      A TaskSpec object.
+  """
   task_spec = batch_v1.TaskSpec()
   task_spec.runnables = runnables
   task_spec.volumes = volumes
@@ -213,19 +222,64 @@ def build_volume(disk: str, path: str) -> batch_v1.types.Volume:
   return volume
 
 
+def build_network_policy(
+    network: str,
+    subnetwork: str,
+    no_external_ip_address: bool,
+) -> batch_v1.types.AllocationPolicy.NetworkPolicy:
+  """Build a network policy for a Batch request.
+
+  Args:
+    network (str): The URL of an existing network resource.
+    subnetwork (str): The URL of an existing subnetwork resource in the network.
+    no_external_ip_address (bool): No external public IP address.
+
+  Returns:
+    An object representing a network policy.
+  """
+  network_policy = batch_v1.AllocationPolicy.NetworkPolicy(
+      network_interfaces=[
+          batch_v1.AllocationPolicy.NetworkInterface(
+              network=network,
+              subnetwork=subnetwork,
+              no_external_ip_address=no_external_ip_address,
+          )
+      ]
+  )
+  return network_policy
+
+
+def build_service_account(
+    service_account_email: str,
+    scopes: List[str],
+) -> batch_v1.types.ServiceAccount:
+  service_account = batch_v1.ServiceAccount(
+      email=service_account_email,
+      scopes=scopes,
+  )
+  return service_account
+
+
 def build_allocation_policy(
     ipts: List[batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate],
+    service_account: batch_v1.types.ServiceAccount,
+    network_policy: batch_v1.types.AllocationPolicy.NetworkPolicy,
 ) -> batch_v1.types.AllocationPolicy:
   allocation_policy = batch_v1.AllocationPolicy()
   allocation_policy.instances = ipts
+  allocation_policy.service_account = service_account
+  allocation_policy.network = network_policy
+
   return allocation_policy
 
 
 def build_instance_policy_or_template(
     instance_policy: batch_v1.types.AllocationPolicy.InstancePolicy,
+    install_gpu_drivers: bool,
 ) -> batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate:
   ipt = batch_v1.AllocationPolicy.InstancePolicyOrTemplate()
   ipt.policy = instance_policy
+  ipt.install_gpu_drivers = install_gpu_drivers
   return ipt
 
 
@@ -240,10 +294,28 @@ def build_logs_policy(
 
 
 def build_instance_policy(
+    boot_disk: batch_v1.types.AllocationPolicy.Disk,
     disks: List[batch_v1.types.AllocationPolicy.AttachedDisk],
+    machine_type: str,
+    accelerators: MutableSequence[batch_v1.types.AllocationPolicy.Accelerator],
 ) -> batch_v1.types.AllocationPolicy.InstancePolicy:
+  """Build an instance policy for a Batch request.
+
+  Args:
+    boot_disk (Disk): Boot disk to be created and attached to each VM by.
+    disks (List[AttachedDisk]): Non-boot disks to be attached for each VM.
+    machine_type (str): The Compute Engine machine type.
+    accelerators (List): The accelerators attached to each VM instance.
+
+  Returns:
+    An object representing an instance policy.
+  """
   instance_policy = batch_v1.AllocationPolicy.InstancePolicy()
+  instance_policy.boot_disk = boot_disk
   instance_policy.disks = [disks]
+  instance_policy.machine_type = machine_type
+  instance_policy.accelerators = accelerators
+
   return instance_policy
 
 
@@ -263,3 +335,16 @@ def build_persistent_disk(
   disk.type = disk_type
   disk.size_gb = size_gb
   return disk
+
+
+def build_accelerators(
+    accelerator_type, accelerator_count
+) -> MutableSequence[batch_v1.types.AllocationPolicy.Accelerator]:
+  accelerators = []
+  if accelerator_type:
+    accelerator = batch_v1.AllocationPolicy.Accelerator()
+    accelerator.count = accelerator_count
+    accelerator.type = accelerator_type
+    accelerators.append(accelerator)
+
+  return accelerators
