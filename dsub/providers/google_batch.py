@@ -58,10 +58,9 @@ _SCRIPT_DIR = f'{_DATA_MOUNT_POINT}/script'
 _TMP_DIR = f'{_DATA_MOUNT_POINT}/tmp'
 _WORKING_DIR = f'{_DATA_MOUNT_POINT}/workingdir'
 
-# These are visible to the user; not yet documented, as we'd *like* to
+# These are visible to the user task; not yet documented, as we'd *like* to
 # find a way to have them visible only to the logging tasks.
-_BATCH_LOG_FILE_PATH = f'{_VOLUME_MOUNT_POINT}/.log.txt'
-_LOG_FILE_PATH = f'{_DATA_MOUNT_POINT}/.log.txt'
+_BATCH_LOG_DIR = f'{_VOLUME_MOUNT_POINT}/.logging'
 _LOGGING_DIR = f'{_DATA_MOUNT_POINT}/.logging'
 
 _LOG_FILTER_VAR = '_LOG_FILTER_REPR'
@@ -70,105 +69,76 @@ _LOG_FILTER_SCRIPT_PATH = f'{_DATA_MOUNT_POINT}/.log_filter_script.py'
 # _LOG_FILTER_PYTHON is a block of Python code to execute in both the
 # "continuous_logging" and "final_logging" tasks.
 #
-# Batch API gives us one log file that is an interleave of all of the task
-# outputs to both STDOUT and STDERR. A typical line looks something like:
+# Batch API will eventually create three log files in the _BATCH_LOG_FILE_PATH
+# directory. They are named:
 #
-# [batch_task_logs]<date> logging.go:227: INFO: [task_id:<task>]
-#  Task task/<task>-0/0/0/1, STDOUT: <message emitted from the task>
+# - output-*.log
+# - stdout-*.log
+# - stderr-*.log
 #
-# Parsing text inputs can be fragile, so we try to be loose but accurate with
-# our assumptions on log file format.
+# We will be creating a "staging" location for each of these files.
 #
-# The way the following Python executes is to
-# - Open the log file
-#   - For each line
-#   - If the line is *not* associated with the "user command", only emit it
-#     to the aggregate log (and emit it as-is)
-#   - AND if we find "<stuff>/<user_task_number>, STDOUT: " (or "...STDERR: ")
-#     - emit the task-generated message to either the stdout or stderr log file
+# If any of the batch log files don't exist, touch the associated staging file.
 #
-# Thus the stdout and stderr log files only contain output from the user task,
-# while the aggregate log contains everything.
+# If the output batch log file exists, copy it directly to the staging
+# location.
 #
-# There's tricky behavior to handle blank lines in the GCP Batch log file.
-# What we observe is that *every* valid message emitted to the log is followed
-# by a blank line.
-# So we'd like to filter out those blank lines, but we need to be careful
-# because a user command can emit blank lines, *which we want to preserve.*
-# Thus when we see a blank line, we "hold" it as we don't know if we are going
-# to print it until we see the next line.
-#
-# Note that to find the user task messages, we set up search strings
-# (STDOUT_STR, STDERR_STR) which look something like: "/3, STDOUT: "
+# If the stdout/stderr batch log files exist, copy them to their staging
+# location. Then filter it so that only user-action logs exist and the prefixes
+# are removed. The prefixes look something like:
+# [batch_task_logs]<datetime> ERROR:
+#   [task_id:task/<job_uid>,runnable_index:<action_number>]
 
+# pylint: disable=anomalous-backslash-in-string
 _LOG_FILTER_PYTHON = textwrap.dedent("""
+import fileinput
+import glob
+import re
+import shutil
 import sys
 from pathlib import Path
 
-INFILE_PATH = sys.argv[1]
+LOGGING_DIR = sys.argv[1]
 LOG_FILE_PATH = sys.argv[2]
 STDOUT_FILE_PATH = sys.argv[3]
 STDERR_FILE_PATH = sys.argv[4]
-EMIT_UNEXPECTED_PATH = sys.argv[5]
-USER_TASK = sys.argv[6]
+USER_TASK = sys.argv[5]
 
-EMIT_UNEXPECTED_ONCE = Path(EMIT_UNEXPECTED_PATH)
+def filter_log_file(staging_path: str, stream_string: str):
+  # Replaces lines in file inplace
+  for line in fileinput.input(staging_path, inplace=True):
+    re_search_string = fr"^\[batch_task_logs\].*{stream_string}: \[task_id:task\/.*runnable_index:{USER_TASK}] (.*)"
+    match = re.search(re_search_string, line)
+    if match:
+      modified_line = match.group(1)
+      print(modified_line)
 
-STDOUT_STR = f"/{USER_TASK}, STDOUT: "
-STDERR_STR = f"/{USER_TASK}, STDERR: "
+def copy_log_to_staging(glob_str: str, staging_path: str, filter_str: str = None):
+  # Check if log files exist, and copy to their staging location
+  matching_files = list(Path(LOGGING_DIR).glob(glob_str))
+  if matching_files:
+    assert(len(matching_files) == 1)
+    shutil.copy(matching_files[0], staging_path)
+    if filter_str:
+      filter_log_file(staging_path, filter_str)
+  else:
+    Path(staging_path).touch()
 
-with open(INFILE_PATH) as IN_FILE:
-
-  LOG_FILE = open(LOG_FILE_PATH, "w")
-  STDOUT_FILE = open(STDOUT_FILE_PATH, "w")
-  STDERR_FILE = open(STDERR_FILE_PATH, "w")
-
-  BLANK_LINE_HOLD = False
-  WHICH_STD_FILE = None
-  line_no = 0
-  for line in IN_FILE:
-    line_no += 1
-
-    line = line.splitlines()[0]
-    if not line:
-      BLANK_LINE_HOLD = True
-      continue
-    elif line.startswith("[batch_task_logs]"):
-      BLANK_LINE_HOLD = False
-      WHICH_STD_FILE = None
-    else:
-      if BLANK_LINE_HOLD and WHICH_STD_FILE:
-        print(file=LOG_FILE)
-        print(file=WHICH_STD_FILE)
-
-    print(line, file=LOG_FILE)
-
-    stdout = line.find(STDOUT_STR)
-    stderr = line.find(STDERR_STR)
-    stdout = sys.maxsize if stdout == -1 else stdout
-    stderr = sys.maxsize if stderr == -1 else stderr
-
-    if stdout < stderr:
-      print(line[stdout + len(STDOUT_STR):], file=STDOUT_FILE)
-      WHICH_STD_FILE = STDOUT_FILE
-    elif stdout > stderr:
-      print(line[stderr + len(STDERR_STR):], file=STDERR_FILE)
-      WHICH_STD_FILE = STDERR_FILE
-    elif WHICH_STD_FILE:
-      print(line, file=WHICH_STD_FILE)
-    elif not EMIT_UNEXPECTED_ONCE.is_file():
-      print(f"Unexpected log format at line {line_no}: {line}")
-      EMIT_UNEXPECTED_ONCE.touch()
+# We know the log file is named output-<job-uid>.log
+# and the stdout/stderr files are named stdout-<job-uid>.log and
+# stderr-<job-uid>.log
+copy_log_to_staging("output-*.log", LOG_FILE_PATH)
+copy_log_to_staging("stdout-*.log", STDOUT_FILE_PATH, filter_str="INFO")
+copy_log_to_staging("stderr-*.log", STDERR_FILE_PATH, filter_str="ERROR")
 """)
+# pylint: enable=anomalous-backslash-in-string
 
 _LOG_CP = textwrap.dedent("""
-  cp "{log_file_path}" .
   python3 "{log_filter_script_path}" \
-      "{log_file_path}" \
+      "${{LOGGING_DIR}}" \
       "${{LOGGING_DIR}}/log.txt" \
       "${{LOGGING_DIR}}/stdout.txt" \
       "${{LOGGING_DIR}}/stderr.txt" \
-      "${{LOGGING_DIR}}/emit_unexpected_sentinel.txt" \
       "{user_action}"
 
   gsutil_cp "${{LOGGING_DIR}}/stdout.txt" "${{STDOUT_PATH}}" "text/plain" "${{USER_PROJECT}}" &
@@ -218,9 +188,6 @@ _CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
     | python -c '{python_decode_script}' \
     > "{log_filter_script_path}"
   chmod a+x "{log_filter_script_path}"
-
-  # Make sure the log file exists
-  touch "{log_file_path}"
 
   while [[ ! -e "${{LOGGING_DIR}}/.stop_logging" ]]; do
     {log_cp}
@@ -501,10 +468,8 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         log_filter_script_path=_LOG_FILTER_SCRIPT_PATH,
         python_decode_script=google_utils.PYTHON_DECODE_SCRIPT,
         logging_dir=_LOGGING_DIR,
-        log_file_path=_LOG_FILE_PATH,
         log_cp=_LOG_CP.format(
             log_filter_script_path=_LOG_FILTER_SCRIPT_PATH,
-            log_file_path=_LOG_FILE_PATH,
             user_action=user_action,
         ),
         log_interval=job_resources.log_interval or '60s',
@@ -517,10 +482,8 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         log_filter_script_path=_LOG_FILTER_SCRIPT_PATH,
         python_decode_script=google_utils.PYTHON_DECODE_SCRIPT,
         logging_dir=_LOGGING_DIR,
-        log_file_path=_LOG_FILE_PATH,
         log_cp=_LOG_CP.format(
             log_filter_script_path=_LOG_FILTER_SCRIPT_PATH,
-            log_file_path=_LOG_FILE_PATH,
             user_action=user_action,
         ),
     )
@@ -725,7 +688,11 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     )
 
     logs_policy = google_batch_operations.build_logs_policy(
-        batch_v1.LogsPolicy.Destination.PATH, _BATCH_LOG_FILE_PATH
+        # Explicitly end the logging path with a slash.
+        # This will prompt Batch API to create the log, stdout, and stderr
+        # files in the specified directory.
+        batch_v1.LogsPolicy.Destination.PATH,
+        _BATCH_LOG_DIR + '/',
     )
 
     # Bring together the task definition(s) and build the Job request.
