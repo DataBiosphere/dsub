@@ -229,6 +229,7 @@ function get_test_providers() {
     e2e_image.sh | \
     e2e_input_wildcards.sh | \
     e2e_io.sh | \
+    e2e_io_auto.sh | \
     e2e_io_recursive.sh | \
     e2e_logging_content.sh | \
     e2e_logging_fail.sh | \

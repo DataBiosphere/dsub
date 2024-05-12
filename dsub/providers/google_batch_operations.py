@@ -33,13 +33,14 @@ def get_label(op: batch_v1.types.Job, name: str) -> str:
   return op.labels.get(name)
 
 
-def get_environment(op: batch_v1.types.Job) -> Dict[str, str]:
+def get_environment(
+    op: batch_v1.types.Job, runnable_index: int
+) -> Dict[str, str]:
   # Currently Batch only supports task_groups of size 1
   task_group = op.task_groups[0]
-  env_dict = {}
-  for env in task_group.task_environments:
-    env_dict.update(env.variables)
-  return env_dict
+  task_spec = task_group.task_spec
+  runnables = task_spec.runnables
+  return runnables[runnable_index].environment.variables
 
 
 def is_done(op: batch_v1.types.Job) -> bool:
@@ -139,7 +140,6 @@ def build_environment(env_vars: Dict[str, str]):
 
 def build_task_group(
     task_spec: batch_v1.types.TaskSpec,
-    task_environments: List[batch_v1.types.Environment],
     task_count: int,
     task_count_per_node: int,
 ) -> batch_v1.types.TaskGroup:
@@ -147,7 +147,6 @@ def build_task_group(
 
   Args:
     task_spec (TaskSpec): TaskSpec object
-    task_environments (List[Environment]): List of Environment objects
     task_count (int): The number of total tasks in the job
     task_count_per_node (int): The number of tasks to schedule on one VM
 
@@ -156,7 +155,6 @@ def build_task_group(
   """
   task_group = batch_v1.TaskGroup()
   task_group.task_spec = task_spec
-  task_group.task_environments = task_environments
   task_group.task_count = task_count
   task_group.task_count_per_node = task_count_per_node
   return task_group
