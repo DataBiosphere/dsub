@@ -226,11 +226,13 @@ function get_test_providers() {
     e2e_command_flag.sh | \
     e2e_dsub_summary.sh | \
     e2e_env_list.py | \
+    e2e_env_tasks.sh | \
     e2e_image.sh | \
     e2e_input_wildcards.sh | \
     e2e_io.sh | \
     e2e_io_auto.sh | \
     e2e_io_recursive.sh | \
+    e2e_io_tasks.sh | \
     e2e_logging_content.sh | \
     e2e_logging_fail.sh | \
     e2e_logging_paths.sh | \

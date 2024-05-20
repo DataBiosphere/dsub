@@ -428,7 +428,6 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
   def _create_batch_request(
       self,
       task_view: job_model.JobDescriptor,
-      job_id,
   ):
     job_metadata = task_view.job_metadata
     job_params = task_view.job_params
@@ -728,10 +727,20 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         [task_group], allocation_policy, labels, logs_policy
     )
 
+    # Each dsub task is submitted as its own Batch API job, so we
+    # append the dsub task-id to the job-id for the batch job ID.
+    # For single-task dsub jobs, there is no task-id.
+    # Use a '-' character as the delimeter because Batch API job ID
+    # must match regex ^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$
+    task_id = task_metadata.get('task-id')
+    batch_job_id = job_metadata.get('job-id')
+    if task_id:
+      batch_job_id = f'{batch_job_id}-{task_id}'
+
     job_request = batch_v1.CreateJobRequest(
         parent=f'projects/{self._project}/locations/{self._location}',
         job=job,
-        job_id=job_id,
+        job_id=batch_job_id,
     )
     # pylint: enable=line-too-long
     return job_request
@@ -760,10 +769,9 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     # Prepare and submit jobs.
     launched_tasks = []
     requests = []
-    job_id = job_descriptor.job_metadata['job-id']
 
     for task_view in job_model.task_view_generator(job_descriptor):
-      request = self._create_batch_request(task_view, job_id)
+      request = self._create_batch_request(task_view)
       if self._dry_run:
         requests.append(request)
       else:
@@ -778,7 +786,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
       # Ideally, we could serialize these request objects to yaml or json.
       print(requests)
     return {
-        'job-id': job_id,
+        'job-id': job_descriptor.job_metadata['job-id'],
         'user-id': job_descriptor.job_metadata.get('user-id'),
         'task-id': [task_id for task_id in launched_tasks if task_id],
     }
