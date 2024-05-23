@@ -425,6 +425,18 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
     return env
 
+  def _format_batch_job_id(self, task_metadata, job_metadata) -> str:
+    # Each dsub task is submitted as its own Batch API job, so we
+    # append the dsub task-id and task-attempt to the job-id for the
+    # batch job ID.
+    # For single-task dsub jobs, there is no task-id, so use 0.
+    # Use a '-' character as the delimeter because Batch API job ID
+    # must match regex ^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$
+    task_id = task_metadata.get('task-id') or 0
+    task_attempt = task_metadata.get('task-attempt') or 0
+    batch_job_id = job_metadata.get('job-id')
+    return f'{batch_job_id}-{task_id}-{task_attempt}'
+
   def _create_batch_request(
       self,
       task_view: job_model.JobDescriptor,
@@ -727,15 +739,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         [task_group], allocation_policy, labels, logs_policy
     )
 
-    # Each dsub task is submitted as its own Batch API job, so we
-    # append the dsub task-id to the job-id for the batch job ID.
-    # For single-task dsub jobs, there is no task-id.
-    # Use a '-' character as the delimeter because Batch API job ID
-    # must match regex ^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$
-    task_id = task_metadata.get('task-id')
-    batch_job_id = job_metadata.get('job-id')
-    if task_id:
-      batch_job_id = f'{batch_job_id}-{task_id}'
+    batch_job_id = self._format_batch_job_id(task_metadata, job_metadata)
 
     job_request = batch_v1.CreateJobRequest(
         parent=f'projects/{self._project}/locations/{self._location}',
@@ -870,8 +874,11 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
     # Make the request
     response = client.list_jobs(request=request)
-    for page in response:
-      yield GoogleBatchOperation(page)
+    # Sort the operations by create-time to match sort of other providers
+    operations = [GoogleBatchOperation(page) for page in response]
+    operations.sort(key=lambda op: op.get_field('create-time'), reverse=True)
+    for op in operations:
+      yield op
 
   def get_tasks_completion_messages(self, tasks):
     # TODO: This needs to return a list of error messages for each task

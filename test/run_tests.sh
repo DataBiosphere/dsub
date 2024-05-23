@@ -243,6 +243,9 @@ function get_test_providers() {
     e2e_non_root.sh | \
     e2e_python.sh | \
     e2e_requester_pays_buckets.sh | \
+    e2e_retries_success.sh | \
+    e2e_retries_fail_1.sh | \
+    e2e_retries_fail_2.sh | \
     e2e_runtime.sh)
       local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2 google-batch}"
       ;;
