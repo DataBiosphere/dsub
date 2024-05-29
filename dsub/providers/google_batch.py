@@ -21,7 +21,7 @@ import ast
 import os
 import sys
 import textwrap
-from typing import Dict, Set
+from typing import Dict, List, Set
 
 from . import base
 from . import google_base
@@ -404,6 +404,28 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
   def _operations_cancel_api_def(self):
     return batch_v1.BatchServiceClient().delete_job
 
+  def _get_batch_job_regions(self, regions, zones) -> List[str]:
+    """Returns the list of regions and zones to use for a Batch Job request.
+
+    If neither regions nor zones were specified for the Job, then use the
+    Batch Job API location as the default region.
+
+    Regions need to be prefixed with "regions/" and zones need to be prefixed
+    with "zones/" as documented in
+    https://cloud.google.com/batch/docs/reference/rest/v1/projects.locations.jobs#LocationPolicy
+
+    Args:
+      regions (str): A space separated list of regions to use for the Job.
+      zones (str): A space separated list of zones to use for the Job.
+    """
+    if regions:
+      regions = [f'regions/{region}' for region in regions]
+    if zones:
+      zones = [f'zones/{zone}' for zone in zones]
+    if not regions and not zones:
+      return [f'regions/{self._location}']
+    return (regions or []) + (zones or [])
+
   def _get_create_time_filters(self, create_time_min, create_time_max):
     # TODO: Currently, Batch API does not support filtering by create t.
     return []
@@ -713,10 +735,17 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         no_external_ip_address=job_resources.use_private_address,
     )
 
+    location_policy = google_batch_operations.build_location_policy(
+        allowed_locations=self._get_batch_job_regions(
+            regions=job_resources.regions, zones=job_resources.zones
+        ),
+    )
+
     allocation_policy = google_batch_operations.build_allocation_policy(
         ipts=[ipt],
         service_account=service_account,
         network_policy=network_policy,
+        location_policy=location_policy,
     )
 
     logs_policy = google_batch_operations.build_logs_policy(

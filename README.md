@@ -247,31 +247,36 @@ implements a consistent runtime environment. The current providers are:
 
 - local
 - google-v2 (the default)
-- google-cls-v2 (*new*)
+- google-cls-v2
+- google-batch (*new*)
 
 More details on the runtime environment implemented by the backend providers
 can be found in [dsub backend providers](https://github.com/DataBiosphere/dsub/blob/main/docs/providers/README.md).
 
-### Differences between `google-v2` and `google-cls-v2`
+### Differences between `google-v2`, `google-cls-v2` and `google-batch`
 
 The `google-cls-v2` provider is built on the Cloud Life Sciences `v2beta` API.
 This API is very similar to its predecessor, the Genomics `v2alpha1` API.
 Details of the differences can be found in the
 [Migration Guide](https://cloud.google.com/life-sciences/docs/how-tos/migration).
 
-`dsub` largely hides the differences between the two APIs, but there are a
+The `google-batch` provider is built on the Cloud Batch API.
+Details of Cloud Life Sciences versus Batch can be found in this
+[Migration Guide](https://cloud.google.com/batch/docs/migrate-to-batch-from-cloud-life-sciences).
+
+`dsub` largely hides the differences between the APIs, but there are a
 few difference to note:
 
-- `v2beta` is a regional service, `v2alpha1` is a global service
+- `v2beta` and Cloud Batch are regional services, `v2alpha1` is a global service
 
 What this means is that with `v2alpha1`, the metadata about your tasks
-(called "operations"), is stored in a global database, while with `v2beta`, the
-metadata about your tasks are stored in a regional database. If your operation
-information needs to stay in a particular region, use the `v2beta` API
-(the `google-cls-v2` provider), and specify the `--location` where your
-operation information should be stored.
+(called "operations"), is stored in a global database, while with `v2beta` and
+Cloud Batch, the metadata about your tasks are stored in a regional database. If
+your operation/job information needs to stay in a particular region, use the
+`v2beta` or Batch API (the `google-cls-v2` or `google-batch` provider), and
+specify the `--location` where your operation/job information should be stored.
 
-- The `--regions` and `--zones` flags can be omitted when using `google-cls-v2`
+- The `--regions` and `--zones` flags can be omitted when using `google-cls-v2` and `google-batch`
 
 The `--regions` and `--zones` flags for `dsub` specify where the tasks should
 run. More specifically, this specifies what Compute Engine Zones to use for
@@ -280,9 +285,9 @@ the VMs that run your tasks.
 With the `google-v2` provider, there is no default region or zone, and thus
 one of the `--regions` or `--zones` flags is required.
 
-With `google-cls-v2`, the `--location` flag defaults to `us-central1`, and
-if the `--regions` and `--zones` flags are omitted, the `location` will be
-used as the default `regions` list.
+With `google-cls-v2` and `google-batch`, the `--location` flag defaults to
+`us-central1`, and if the `--regions` and `--zones` flags are omitted, the
+`location` will be used as the default `regions` list.
 
 ## `dsub` features
 

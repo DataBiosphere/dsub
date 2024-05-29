@@ -262,12 +262,13 @@ def build_allocation_policy(
     ipts: List[batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate],
     service_account: batch_v1.types.ServiceAccount,
     network_policy: batch_v1.types.AllocationPolicy.NetworkPolicy,
+    location_policy: batch_v1.types.AllocationPolicy.LocationPolicy,
 ) -> batch_v1.types.AllocationPolicy:
   allocation_policy = batch_v1.AllocationPolicy()
   allocation_policy.instances = ipts
   allocation_policy.service_account = service_account
   allocation_policy.network = network_policy
-
+  allocation_policy.location = location_policy
   return allocation_policy
 
 
@@ -346,3 +347,11 @@ def build_accelerators(
     accelerators.append(accelerator)
 
   return accelerators
+
+
+def build_location_policy(
+    allowed_locations: List[str],
+) -> batch_v1.types.AllocationPolicy.LocationPolicy:
+  location_policy = batch_v1.AllocationPolicy.LocationPolicy()
+  location_policy.allowed_locations = allowed_locations
+  return location_policy
