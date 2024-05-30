@@ -459,6 +459,33 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     batch_job_id = job_metadata.get('job-id')
     return f'{batch_job_id}-{task_id}-{task_attempt}'
 
+  def _get_gcs_volumes(self, mounts) -> List[batch_v1.types.Volume]:
+    # Return a list of GCS volumes for the Batch Job request.
+    gcs_volumes = []
+    for gcs_mount in param_util.get_gcs_mounts(mounts):
+      mount_path = os.path.join(_VOLUME_MOUNT_POINT, gcs_mount.docker_path)
+      # Normalize mount path because API does not allow trailing slashes
+      normalized_mount_path = os.path.normpath(mount_path)
+      gcs_volume = google_batch_operations.build_gcs_volume(
+          gcs_mount.value[len('gs://') :], normalized_mount_path, ['-o ro']
+      )
+      gcs_volumes.append(gcs_volume)
+    return gcs_volumes
+
+  def _get_gcs_volumes_for_user_command(self, mounts) -> List[str]:
+    # Return a list of GCS volumes to be included with the
+    # user-command runnable
+    user_command_volumes = []
+    for gcs_mount in param_util.get_gcs_mounts(mounts):
+      volume_mount_point = os.path.normpath(
+          os.path.join(_VOLUME_MOUNT_POINT, gcs_mount.docker_path)
+      )
+      data_mount_point = os.path.normpath(
+          os.path.join(_DATA_MOUNT_POINT, gcs_mount.docker_path)
+      )
+      user_command_volumes.append(f'{volume_mount_point}:{data_mount_point}')
+    return user_command_volumes
+
   def _create_batch_request(
       self,
       task_view: job_model.JobDescriptor,
@@ -552,6 +579,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     inputs = job_params['inputs'] | task_params['inputs']
     outputs = job_params['outputs'] | task_params['outputs']
     mounts = job_params['mounts']
+    gcs_volumes = self._get_gcs_volumes(mounts)
 
     prepare_env = google_batch_operations.build_environment(
         self._get_prepare_env(
@@ -620,6 +648,9 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         )
     )
 
+    user_command_volumes = [f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}']
+    for gcs_volume in self._get_gcs_volumes_for_user_command(mounts):
+      user_command_volumes.append(gcs_volume)
     runnables.append(
         # user-command
         google_batch_operations.build_runnable(
@@ -628,7 +659,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             image_uri=job_resources.image,
             environment=user_environment,
             entrypoint='/usr/bin/env',
-            volumes=[f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}'],
+            volumes=user_command_volumes,
             commands=[
                 'bash',
                 '-c',
@@ -758,7 +789,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
     # Bring together the task definition(s) and build the Job request.
     task_spec = google_batch_operations.build_task_spec(
-        runnables=runnables, volumes=[datadisk_volume]
+        runnables=runnables, volumes=([datadisk_volume] + gcs_volumes)
     )
     task_group = google_batch_operations.build_task_group(
         task_spec, task_count=1, task_count_per_node=1

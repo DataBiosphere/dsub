@@ -220,6 +220,26 @@ def build_volume(disk: str, path: str) -> batch_v1.types.Volume:
   return volume
 
 
+def build_gcs_volume(
+    bucket: str, path: str, mount_options: List[str]
+) -> batch_v1.types.Volume:
+  """Build a Volume object mounted to a GCS bucket for a Batch request.
+
+  Args:
+    bucket (str): Name of bucket to mount (without the gs:// prefix)
+    path (str): Path to mount the bucket at inside the container.
+    mount_options (List[str]): List of mount options
+
+  Returns:
+    An object representing a Mount.
+  """
+  volume = batch_v1.Volume()
+  volume.gcs = batch_v1.GCS(remote_path=bucket)
+  volume.mount_path = path
+  volume.mount_options = mount_options
+  return volume
+
+
 def build_network_policy(
     network: str,
     subnetwork: str,

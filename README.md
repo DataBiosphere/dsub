@@ -471,16 +471,17 @@ local directory in a similar fashion to support your local development.
 
 ##### Mounting a Google Cloud Storage bucket
 
-To have the `google-v2` or `google-cls-v2` provider mount a Cloud Storage bucket
-using [Cloud Storage FUSE](https://cloud.google.com/storage/docs/gcs-fuse),
-use the `--mount` command line flag:
+To have the `google-v2`, `google-cls-v2`, or `google-batch` provider mount a
+Cloud Storage bucket using
+[Cloud Storage FUSE](https://cloud.google.com/storage/docs/gcs-fuse), use the
+`--mount` command line flag:
 
     --mount RESOURCES=gs://mybucket
 
-The bucket will be mounted into the Docker container running your `--script`
-or `--command` and the location made available via the environment variable
-`${RESOURCES}`. Inside your script, you can reference the mounted path using the
-environment variable. Please read
+The bucket will be mounted read-only into the Docker container running your
+`--script` or `--command` and the location made available via the environment
+variable `${RESOURCES}`. Inside your script, you can reference the mounted path
+using the environment variable. Please read
 [Key differences from a POSIX file system](https://cloud.google.com/storage/docs/gcs-fuse#notes)
 and [Semantics](https://github.com/GoogleCloudPlatform/gcsfuse/blob/master/docs/semantics.md)
 before using Cloud Storage FUSE.

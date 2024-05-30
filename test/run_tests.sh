@@ -232,6 +232,7 @@ function get_test_providers() {
     e2e_io.sh | \
     e2e_io_auto.sh | \
     e2e_io_gcs_tasks.sh | \
+    e2e_io_mount_bucket.google-v2.sh | \
     e2e_io_recursive.sh | \
     e2e_io_tasks.sh | \
     e2e_logging_content.sh | \

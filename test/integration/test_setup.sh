@@ -34,7 +34,8 @@
 #   If the script name is <test>.<provider>.sh, pull out the provider.
 #   If the script name is <test>.sh, use "local".
 # If the DSUB_PROVIDER is set, make sure it is correct for a provider test.
-#   Special-case the google-v2 tests to be runnable for google-cls-v2.
+#   Special-case the google-v2 tests to be runnable for google-cls-v2
+#   and google-batch.
 
 readonly SCRIPT_NAME="$(basename "$0")"
 readonly SCRIPT_DEFAULT_PROVIDER=$(
@@ -48,6 +49,9 @@ elif [[ -n "${SCRIPT_DEFAULT_PROVIDER}" ]]; then
   if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] && \
      [[ "${SCRIPT_DEFAULT_PROVIDER}" == "google-v2" ]]; then
      echo "Running google-v2 e2e/unit tests with provider google-cls-v2"
+  elif [[ "${DSUB_PROVIDER}" == "google-batch" ]] && \
+     [[ "${SCRIPT_DEFAULT_PROVIDER}" == "google-v2" ]]; then
+     echo "Running google-v2 e2e/unit tests with provider google-batch"
   elif [[ "${DSUB_PROVIDER}" != "${SCRIPT_DEFAULT_PROVIDER}" ]]; then
     1>&2 echo "DSUB_PROVIDER is '${DSUB_PROVIDER:-}' not '${SCRIPT_DEFAULT_PROVIDER}'"
     exit 1
