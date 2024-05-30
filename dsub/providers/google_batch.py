@@ -41,6 +41,8 @@ except ImportError:
   from . import batch_dummy as batch_v1
 # pylint: enable=g-import-not-at-top
 _PROVIDER_NAME = 'google-batch'
+# Index of the prepare action in the runnable list
+_PREPARE_INDEX = 1
 
 # Create file provider whitelist.
 _SUPPORTED_FILE_PROVIDERS = frozenset([job_model.P_GCS])
@@ -210,9 +212,8 @@ class GoogleBatchOperation(base.Task):
   def _try_op_to_job_descriptor(self):
     # The _META_YAML_REPR field in the 'prepare' action enables reconstructing
     # the original job descriptor.
-    # TODO: Currently, we set the environment across all runnables
-    # We really only want the env for the prepare action (runnable) here.
-    env = google_batch_operations.get_environment(self._op)
+    # We only need the env for the prepare action (runnable) here.
+    env = google_batch_operations.get_environment(self._op, _PREPARE_INDEX)
     if not env:
       return
 
@@ -328,9 +329,8 @@ class GoogleBatchOperation(base.Task):
     return value if value else default
 
   def _try_op_to_script_body(self):
-    # TODO: Currently, we set the environment across all runnables
-    # We really only want the env for the prepare action (runnable) here.
-    env = google_batch_operations.get_environment(self._op)
+    # We only need the env for the prepare action (runnable) here.
+    env = google_batch_operations.get_environment(self._op, _PREPARE_INDEX)
     if env:
       return ast.literal_eval(env.get(google_utils.SCRIPT_VARNAME))
 
@@ -404,6 +404,28 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
   def _operations_cancel_api_def(self):
     return batch_v1.BatchServiceClient().delete_job
 
+  def _get_batch_job_regions(self, regions, zones) -> List[str]:
+    """Returns the list of regions and zones to use for a Batch Job request.
+
+    If neither regions nor zones were specified for the Job, then use the
+    Batch Job API location as the default region.
+
+    Regions need to be prefixed with "regions/" and zones need to be prefixed
+    with "zones/" as documented in
+    https://cloud.google.com/batch/docs/reference/rest/v1/projects.locations.jobs#LocationPolicy
+
+    Args:
+      regions (str): A space separated list of regions to use for the Job.
+      zones (str): A space separated list of zones to use for the Job.
+    """
+    if regions:
+      regions = [f'regions/{region}' for region in regions]
+    if zones:
+      zones = [f'zones/{zone}' for zone in zones]
+    if not regions and not zones:
+      return [f'regions/{self._location}']
+    return (regions or []) + (zones or [])
+
   def _get_create_time_filters(self, create_time_min, create_time_max):
     # TODO: Currently, Batch API does not support filtering by create t.
     return []
@@ -425,11 +447,48 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
     return env
 
+  def _format_batch_job_id(self, task_metadata, job_metadata) -> str:
+    # Each dsub task is submitted as its own Batch API job, so we
+    # append the dsub task-id and task-attempt to the job-id for the
+    # batch job ID.
+    # For single-task dsub jobs, there is no task-id, so use 0.
+    # Use a '-' character as the delimeter because Batch API job ID
+    # must match regex ^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$
+    task_id = task_metadata.get('task-id') or 0
+    task_attempt = task_metadata.get('task-attempt') or 0
+    batch_job_id = job_metadata.get('job-id')
+    return f'{batch_job_id}-{task_id}-{task_attempt}'
+
+  def _get_gcs_volumes(self, mounts) -> List[batch_v1.types.Volume]:
+    # Return a list of GCS volumes for the Batch Job request.
+    gcs_volumes = []
+    for gcs_mount in param_util.get_gcs_mounts(mounts):
+      mount_path = os.path.join(_VOLUME_MOUNT_POINT, gcs_mount.docker_path)
+      # Normalize mount path because API does not allow trailing slashes
+      normalized_mount_path = os.path.normpath(mount_path)
+      gcs_volume = google_batch_operations.build_gcs_volume(
+          gcs_mount.value[len('gs://') :], normalized_mount_path, ['-o ro']
+      )
+      gcs_volumes.append(gcs_volume)
+    return gcs_volumes
+
+  def _get_gcs_volumes_for_user_command(self, mounts) -> List[str]:
+    # Return a list of GCS volumes to be included with the
+    # user-command runnable
+    user_command_volumes = []
+    for gcs_mount in param_util.get_gcs_mounts(mounts):
+      volume_mount_point = os.path.normpath(
+          os.path.join(_VOLUME_MOUNT_POINT, gcs_mount.docker_path)
+      )
+      data_mount_point = os.path.normpath(
+          os.path.join(_DATA_MOUNT_POINT, gcs_mount.docker_path)
+      )
+      user_command_volumes.append(f'{volume_mount_point}:{data_mount_point}')
+    return user_command_volumes
+
   def _create_batch_request(
       self,
       task_view: job_model.JobDescriptor,
-      job_id,
-      all_envs: List[batch_v1.types.Environment],
   ):
     job_metadata = task_view.job_metadata
     job_params = task_view.job_params
@@ -516,6 +575,29 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         )
     )
 
+    envs = job_params['envs'] | task_params['envs']
+    inputs = job_params['inputs'] | task_params['inputs']
+    outputs = job_params['outputs'] | task_params['outputs']
+    mounts = job_params['mounts']
+    gcs_volumes = self._get_gcs_volumes(mounts)
+
+    prepare_env = google_batch_operations.build_environment(
+        self._get_prepare_env(
+            script, task_view, inputs, outputs, mounts, _DATA_MOUNT_POINT
+        )
+    )
+    localization_env = google_batch_operations.build_environment(
+        self._get_localization_env(inputs, user_project, _DATA_MOUNT_POINT)
+    )
+    user_environment = google_batch_operations.build_environment(
+        self._build_user_environment(
+            envs, inputs, outputs, mounts, _DATA_MOUNT_POINT
+        )
+    )
+    delocalization_env = google_batch_operations.build_environment(
+        self._get_delocalization_env(outputs, user_project, _DATA_MOUNT_POINT)
+    )
+
     # Build the list of runnables (aka actions)
     runnables = []
 
@@ -538,7 +620,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             run_in_background=False,
             always_run=False,
             image_uri=google_utils.CLOUD_SDK_IMAGE,
-            environment=None,
+            environment=prepare_env,
             entrypoint='/bin/bash',
             volumes=[f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}'],
             commands=['-c', prepare_command],
@@ -551,7 +633,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             run_in_background=False,
             always_run=False,
             image_uri=google_utils.CLOUD_SDK_IMAGE,
-            environment=None,
+            environment=localization_env,
             entrypoint='/bin/bash',
             volumes=[f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}'],
             commands=[
@@ -566,15 +648,18 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         )
     )
 
+    user_command_volumes = [f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}']
+    for gcs_volume in self._get_gcs_volumes_for_user_command(mounts):
+      user_command_volumes.append(gcs_volume)
     runnables.append(
         # user-command
         google_batch_operations.build_runnable(
             run_in_background=False,
             always_run=False,
             image_uri=job_resources.image,
-            environment=None,
+            environment=user_environment,
             entrypoint='/usr/bin/env',
-            volumes=[f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}'],
+            volumes=user_command_volumes,
             commands=[
                 'bash',
                 '-c',
@@ -593,7 +678,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             run_in_background=False,
             always_run=False,
             image_uri=google_utils.CLOUD_SDK_IMAGE,
-            environment=None,
+            environment=delocalization_env,
             entrypoint='/bin/bash',
             volumes=[f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}:ro'],
             commands=[
@@ -681,10 +766,17 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         no_external_ip_address=job_resources.use_private_address,
     )
 
+    location_policy = google_batch_operations.build_location_policy(
+        allowed_locations=self._get_batch_job_regions(
+            regions=job_resources.regions, zones=job_resources.zones
+        ),
+    )
+
     allocation_policy = google_batch_operations.build_allocation_policy(
         ipts=[ipt],
         service_account=service_account,
         network_policy=network_policy,
+        location_policy=location_policy,
     )
 
     logs_policy = google_batch_operations.build_logs_policy(
@@ -697,20 +789,22 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
     # Bring together the task definition(s) and build the Job request.
     task_spec = google_batch_operations.build_task_spec(
-        runnables=runnables, volumes=[datadisk_volume]
+        runnables=runnables, volumes=([datadisk_volume] + gcs_volumes)
     )
     task_group = google_batch_operations.build_task_group(
-        task_spec, all_envs, task_count=len(all_envs), task_count_per_node=1
+        task_spec, task_count=1, task_count_per_node=1
     )
 
     job = google_batch_operations.build_job(
         [task_group], allocation_policy, labels, logs_policy
     )
 
+    batch_job_id = self._format_batch_job_id(task_metadata, job_metadata)
+
     job_request = batch_v1.CreateJobRequest(
         parent=f'projects/{self._project}/locations/{self._location}',
         job=job,
-        job_id=job_id,
+        job_id=batch_job_id,
     )
     # pylint: enable=line-too-long
     return job_request
@@ -721,43 +815,6 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     op = GoogleBatchOperation(job_response)
     print(f'Provider internal-id (operation): {job_response.name}')
     return op.get_field('task-id')
-
-  def _create_env_for_task(
-      self, task_view: job_model.JobDescriptor
-  ) -> Dict[str, str]:
-    job_params = task_view.job_params
-    task_params = task_view.task_descriptors[0].task_params
-
-    # Set local variables for the core pipeline values
-    script = task_view.job_metadata['script']
-    user_project = task_view.job_metadata['user-project'] or ''
-
-    envs = job_params['envs'] | task_params['envs']
-    inputs = job_params['inputs'] | task_params['inputs']
-    outputs = job_params['outputs'] | task_params['outputs']
-    mounts = job_params['mounts']
-
-    prepare_env = self._get_prepare_env(
-        script, task_view, inputs, outputs, mounts, _DATA_MOUNT_POINT
-    )
-    localization_env = self._get_localization_env(
-        inputs, user_project, _DATA_MOUNT_POINT
-    )
-    user_environment = self._build_user_environment(
-        envs, inputs, outputs, mounts, _DATA_MOUNT_POINT
-    )
-    delocalization_env = self._get_delocalization_env(
-        outputs, user_project, _DATA_MOUNT_POINT
-    )
-    # This merges all the envs into one dict. Need to use this syntax because
-    # of python3.6. In python3.9 we'd prefer to use | operator.
-    all_env = {
-        **prepare_env,
-        **localization_env,
-        **user_environment,
-        **delocalization_env,
-    }
-    return all_env
 
   def submit_job(
       self,
@@ -776,22 +833,15 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     # Prepare and submit jobs.
     launched_tasks = []
     requests = []
-    job_id = job_descriptor.job_metadata['job-id']
-    # Instead of creating one job per task, create one job with several tasks.
-    # We also need to create a list of environments per task. The length of this
-    # list determines how many tasks are in the job, and is specified in the
-    # TaskGroup's task_count field.
-    envs = []
-    for task_view in job_model.task_view_generator(job_descriptor):
-      env = self._create_env_for_task(task_view)
-      envs.append(google_batch_operations.build_environment(env))
 
-    request = self._create_batch_request(job_descriptor, job_id, envs)
-    if self._dry_run:
-      requests.append(request)
-    else:
-      task_id = self._submit_batch_job(request)
-      launched_tasks.append(task_id)
+    for task_view in job_model.task_view_generator(job_descriptor):
+      request = self._create_batch_request(task_view)
+      if self._dry_run:
+        requests.append(request)
+      else:
+        task_id = self._submit_batch_job(request)
+        launched_tasks.append(task_id)
+
     # If this is a dry-run, emit all the batch request objects
     if self._dry_run:
       # Each request is a google.cloud.batch_v1.types.batch.CreateJobRequest
@@ -800,7 +850,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
       # Ideally, we could serialize these request objects to yaml or json.
       print(requests)
     return {
-        'job-id': job_id,
+        'job-id': job_descriptor.job_metadata['job-id'],
         'user-id': job_descriptor.job_metadata.get('user-id'),
         'task-id': [task_id for task_id in launched_tasks if task_id],
     }
@@ -884,8 +934,11 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
     # Make the request
     response = client.list_jobs(request=request)
-    for page in response:
-      yield GoogleBatchOperation(page)
+    # Sort the operations by create-time to match sort of other providers
+    operations = [GoogleBatchOperation(page) for page in response]
+    operations.sort(key=lambda op: op.get_field('create-time'), reverse=True)
+    for op in operations:
+      yield op
 
   def get_tasks_completion_messages(self, tasks):
     # TODO: This needs to return a list of error messages for each task

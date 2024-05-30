@@ -33,13 +33,14 @@ def get_label(op: batch_v1.types.Job, name: str) -> str:
   return op.labels.get(name)
 
 
-def get_environment(op: batch_v1.types.Job) -> Dict[str, str]:
+def get_environment(
+    op: batch_v1.types.Job, runnable_index: int
+) -> Dict[str, str]:
   # Currently Batch only supports task_groups of size 1
   task_group = op.task_groups[0]
-  env_dict = {}
-  for env in task_group.task_environments:
-    env_dict.update(env.variables)
-  return env_dict
+  task_spec = task_group.task_spec
+  runnables = task_spec.runnables
+  return runnables[runnable_index].environment.variables
 
 
 def is_done(op: batch_v1.types.Job) -> bool:
@@ -139,7 +140,6 @@ def build_environment(env_vars: Dict[str, str]):
 
 def build_task_group(
     task_spec: batch_v1.types.TaskSpec,
-    task_environments: List[batch_v1.types.Environment],
     task_count: int,
     task_count_per_node: int,
 ) -> batch_v1.types.TaskGroup:
@@ -147,7 +147,6 @@ def build_task_group(
 
   Args:
     task_spec (TaskSpec): TaskSpec object
-    task_environments (List[Environment]): List of Environment objects
     task_count (int): The number of total tasks in the job
     task_count_per_node (int): The number of tasks to schedule on one VM
 
@@ -156,7 +155,6 @@ def build_task_group(
   """
   task_group = batch_v1.TaskGroup()
   task_group.task_spec = task_spec
-  task_group.task_environments = task_environments
   task_group.task_count = task_count
   task_group.task_count_per_node = task_count_per_node
   return task_group
@@ -222,6 +220,26 @@ def build_volume(disk: str, path: str) -> batch_v1.types.Volume:
   return volume
 
 
+def build_gcs_volume(
+    bucket: str, path: str, mount_options: List[str]
+) -> batch_v1.types.Volume:
+  """Build a Volume object mounted to a GCS bucket for a Batch request.
+
+  Args:
+    bucket (str): Name of bucket to mount (without the gs:// prefix)
+    path (str): Path to mount the bucket at inside the container.
+    mount_options (List[str]): List of mount options
+
+  Returns:
+    An object representing a Mount.
+  """
+  volume = batch_v1.Volume()
+  volume.gcs = batch_v1.GCS(remote_path=bucket)
+  volume.mount_path = path
+  volume.mount_options = mount_options
+  return volume
+
+
 def build_network_policy(
     network: str,
     subnetwork: str,
@@ -264,12 +282,13 @@ def build_allocation_policy(
     ipts: List[batch_v1.types.AllocationPolicy.InstancePolicyOrTemplate],
     service_account: batch_v1.types.ServiceAccount,
     network_policy: batch_v1.types.AllocationPolicy.NetworkPolicy,
+    location_policy: batch_v1.types.AllocationPolicy.LocationPolicy,
 ) -> batch_v1.types.AllocationPolicy:
   allocation_policy = batch_v1.AllocationPolicy()
   allocation_policy.instances = ipts
   allocation_policy.service_account = service_account
   allocation_policy.network = network_policy
-
+  allocation_policy.location = location_policy
   return allocation_policy
 
 
@@ -348,3 +367,11 @@ def build_accelerators(
     accelerators.append(accelerator)
 
   return accelerators
+
+
+def build_location_policy(
+    allowed_locations: List[str],
+) -> batch_v1.types.AllocationPolicy.LocationPolicy:
+  location_policy = batch_v1.AllocationPolicy.LocationPolicy()
+  location_policy.allowed_locations = allowed_locations
+  return location_policy

@@ -226,10 +226,15 @@ function get_test_providers() {
     e2e_command_flag.sh | \
     e2e_dsub_summary.sh | \
     e2e_env_list.py | \
+    e2e_env_tasks.sh | \
     e2e_image.sh | \
     e2e_input_wildcards.sh | \
     e2e_io.sh | \
+    e2e_io_auto.sh | \
+    e2e_io_gcs_tasks.sh | \
+    e2e_io_mount_bucket.google-v2.sh | \
     e2e_io_recursive.sh | \
+    e2e_io_tasks.sh | \
     e2e_logging_content.sh | \
     e2e_logging_fail.sh | \
     e2e_logging_paths.sh | \
@@ -239,6 +244,9 @@ function get_test_providers() {
     e2e_non_root.sh | \
     e2e_python.sh | \
     e2e_requester_pays_buckets.sh | \
+    e2e_retries_success.sh | \
+    e2e_retries_fail_1.sh | \
+    e2e_retries_fail_2.sh | \
     e2e_runtime.sh)
       local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2 google-batch}"
       ;;

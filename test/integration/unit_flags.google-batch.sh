@@ -258,7 +258,124 @@ function test_network() {
 }
 readonly -f test_network
 
-# Run the tests
+function test_location() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --location us-west2 \
+    --command 'echo "${TEST_NAME}"'; then
+
+    # Check that the output contains expected values
+    location_result=$(grep " allowed_locations:" "${TEST_STDERR}" | awk -F\" '{print $2}')
+    if [[ "${location_result}" != "regions/us-west2" ]]; then
+        1>&2 echo "location was actually ${location_result}, expected regions/us-west2"
+        exit 1
+    fi
+
+    test_passed "${subtest}"
+  else
+    1>&2 echo "Using the location flag generated an error"
+
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_location
+
+function test_neither_region_nor_zone() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"'; then
+
+    # Check that the output contains expected values
+    location_result=$(grep " allowed_locations:" "${TEST_STDERR}" | awk -F\" '{print $2}')
+    if [[ "${location_result}" != "regions/us-central1" ]]; then
+        1>&2 echo "location was actually ${location_result}, expected regions/us-central1"
+        exit 1
+    fi
+
+    test_passed "${subtest}"
+  else
+    1>&2 echo "Location not used as default region"
+
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_neither_region_nor_zone
+
+function test_region_and_zone() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --zones us-central1-f \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    regions_result=$(grep " allowed_locations: \"regions/" "${TEST_STDERR}" | awk -F\" '{print $2}')
+    if [[ "${regions_result}" != "regions/us-central1" ]]; then
+        1>&2 echo "location was actually ${regions_result}, expected regions/us-central1"
+        exit 1
+    fi
+
+    zones_result=$(grep " allowed_locations: \"zones/" "${TEST_STDERR}" | awk -F\" '{print $2}')
+    if [[ "${zones_result}" != "zones/us-central1-f" ]]; then
+        1>&2 echo "location was actually ${zones_result}, expected zones/us-central1-f"
+        exit 1
+    fi
+
+    test_passed "${subtest}"
+  else
+    1>&2 echo "Location not used as default region"
+
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_neither_region_nor_zone
+
+function test_regions() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    location_result=$(grep " allowed_locations:" "${TEST_STDERR}" | awk -F\" '{print $2}')
+    if [[ "${location_result}" != "regions/us-central1" ]]; then
+        1>&2 echo "location was actually ${location_result}, expected regions/us-central1"
+        exit 1
+    fi
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_regions
+
+function test_zones() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --zones us-central1-a; then
+
+    # Check that the output contains expected values
+    location_result=$(grep " allowed_locations:" "${TEST_STDERR}" | awk -F\" '{print $2}')
+    if [[ "${location_result}" != "zones/us-central1-a" ]]; then
+        1>&2 echo "location was actually ${location_result}, expected zones/us-central1-a"
+        exit 1
+    fi
+
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_zones
+
+# # Run the tests
 trap "exit_handler" EXIT
 
 mkdir -p "${TEST_TMP}"
@@ -284,3 +401,10 @@ test_no_service_account
 
 echo
 test_network
+
+echo
+test_location
+test_neither_region_nor_zone
+test_region_and_zone
+test_regions
+test_zones

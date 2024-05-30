@@ -39,6 +39,7 @@ class types(object):
     Disk = None
     NetworkPolicy = None
     Accelerator = None
+    LocationPolicy = None
 
   class LogsPolicy(object):
     Destination = None
