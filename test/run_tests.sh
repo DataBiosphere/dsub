@@ -246,6 +246,7 @@ function get_test_providers() {
     e2e_logging_paths_log_suffix_tasks.sh | \
     e2e_logging_paths_pattern_tasks.sh | \
     e2e_non_root.sh | \
+    e2e_preemptible_retries_fail.google-v2.sh | \
     e2e_python.sh | \
     e2e_requester_pays_buckets.sh | \
     e2e_retries_success.sh | \

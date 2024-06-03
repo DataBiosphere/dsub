@@ -99,6 +99,16 @@ def get_status_events(op: batch_v1.types.Job):
   return op.status.status_events
 
 
+def get_preemptible(op: batch_v1.types.Job) -> bool:
+  pm = op.allocation_policy.instances[0].policy.provisioning_model
+  if pm == batch_v1.AllocationPolicy.ProvisioningModel.SPOT:
+    return True
+  elif pm == batch_v1.AllocationPolicy.ProvisioningModel.STANDARD:
+    return False
+  else:
+    raise ValueError(f'Invalid provisioning_model value: {pm}')
+
+
 def build_job(
     task_groups: List[batch_v1.types.TaskGroup],
     allocation_policy: batch_v1.types.AllocationPolicy,
@@ -317,6 +327,7 @@ def build_instance_policy(
     disks: List[batch_v1.types.AllocationPolicy.AttachedDisk],
     machine_type: str,
     accelerators: MutableSequence[batch_v1.types.AllocationPolicy.Accelerator],
+    provisioning_model: batch_v1.types.AllocationPolicy.ProvisioningModel,
 ) -> batch_v1.types.AllocationPolicy.InstancePolicy:
   """Build an instance policy for a Batch request.
 
@@ -325,6 +336,7 @@ def build_instance_policy(
     disks (List[AttachedDisk]): Non-boot disks to be attached for each VM.
     machine_type (str): The Compute Engine machine type.
     accelerators (List): The accelerators attached to each VM instance.
+    provisioning_model (enum): Either SPOT (preemptible) or STANDARD
 
   Returns:
     An object representing an instance policy.
@@ -334,6 +346,7 @@ def build_instance_policy(
   instance_policy.disks = [disks]
   instance_policy.machine_type = machine_type
   instance_policy.accelerators = accelerators
+  instance_policy.provisioning_model = provisioning_model
 
   return instance_policy
 

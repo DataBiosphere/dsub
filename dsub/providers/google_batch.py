@@ -298,6 +298,7 @@ class GoogleBatchOperation(base.Task):
     elif field == 'provider-attributes':
       # TODO: This needs to return instance (VM) metadata
       value = {}
+      value['preemptible'] = google_batch_operations.get_preemptible(self._op)
     elif field == 'events':
       # TODO: This needs to return a list of events
       value = []
@@ -403,6 +404,12 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
   def _operations_cancel_api_def(self):
     return batch_v1.BatchServiceClient().delete_job
+
+  def _get_provisioning_model(self, task_resources):
+    if task_resources.preemptible:
+      return batch_v1.AllocationPolicy.ProvisioningModel.SPOT
+    else:
+      return batch_v1.AllocationPolicy.ProvisioningModel.STANDARD
 
   def _get_batch_job_regions(self, regions, zones) -> List[str]:
     """Returns the list of regions and zones to use for a Batch Job request.
@@ -743,6 +750,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             accelerator_type=job_resources.accelerator_type,
             accelerator_count=job_resources.accelerator_count,
         ),
+        provisioning_model=self._get_provisioning_model(task_resources),
     )
 
     ipt = google_batch_operations.build_instance_policy_or_template(

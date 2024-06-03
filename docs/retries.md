@@ -63,6 +63,10 @@ current attempt will still be treated as a preemptible attempt used.
 Transient failure rates should be much lower in practice than preemption rates
 and more complex retry logic is not clearly more desirable.
 
+When using the `google-batch` provider, using the `--preemptible` flag will
+cause your tasks to be run on [Spot VMs](https://cloud.google.com/spot-vms).
+Unlike standard GCE preemptible VMs, Spot VMs do not have a 24-hour time limit.
+
 ## Tracking task attempts
 
 When viewing tasks with `dstat --full` the attempt number will be available
