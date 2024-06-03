@@ -16,9 +16,9 @@ _DEPENDENCIES = [
     # version mismatches.
     # This version list generated: 05/03/2024
     # direct dependencies
-    'google-api-python-client>=2.47.0,<=2.127.0',
+    'google-api-python-client>=2.47.0,<=2.131.0',
     'google-auth>=2.6.6,<=2.29.0',
-    'google-cloud-batch<=0.17.18',
+    'google-cloud-batch<=0.17.20',
     'python-dateutil<=2.9.0',
     'pytz<=2024.1',
     'pyyaml<=6.0.1',
@@ -29,6 +29,7 @@ _DEPENDENCIES = [
     'google-api-core>=2.7.3,<=2.19.0',
     'google-auth-httplib2<=0.2.0',
     'httplib2<=0.22.0',
+    'protobuf>=3.19.0,<=5.26.0',
     'pyasn1<=0.6.0',
     'pyasn1-modules<=0.4.0',
     'rsa<=4.9',
