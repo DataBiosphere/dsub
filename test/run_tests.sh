@@ -223,6 +223,10 @@ function get_test_providers() {
     return
   fi
   case "${test_file}" in
+    e2e_after.py | \
+    e2e_after.sh | \
+    e2e_after_fail.py | \
+    e2e_after_fail.sh | \
     e2e_command_flag.sh | \
     e2e_dsub_summary.sh | \
     e2e_env_list.py | \
