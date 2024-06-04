@@ -237,6 +237,7 @@ function get_test_providers() {
     e2e_io_auto.sh | \
     e2e_io_gcs_tasks.sh | \
     e2e_io_mount_bucket.google-v2.sh | \
+    e2e_io_mount_bucket_requester_pays.google-v2.sh | \
     e2e_io_recursive.sh | \
     e2e_io_tasks.sh | \
     e2e_logging_content.sh | \
@@ -245,6 +246,8 @@ function get_test_providers() {
     e2e_logging_paths_basic_tasks.sh | \
     e2e_logging_paths_log_suffix_tasks.sh | \
     e2e_logging_paths_pattern_tasks.sh | \
+    e2e_logging_paths_retry_failure_tasks.sh | \
+    e2e_logging_paths_retry_tasks.sh | \
     e2e_non_root.sh | \
     e2e_preemptible_retries_fail.google-v2.sh | \
     e2e_python.sh | \
@@ -252,7 +255,9 @@ function get_test_providers() {
     e2e_retries_success.sh | \
     e2e_retries_fail_1.sh | \
     e2e_retries_fail_2.sh | \
-    e2e_runtime.sh)
+    e2e_runtime.sh | \
+    e2e_skip.sh | \
+    e2e_skip_tasks.sh)
       local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2 google-batch}"
       ;;
     *)
