@@ -61,6 +61,7 @@ EOF
 )"
 
 run_dsub \
+  --unique-job-id \
   --command '\
     echo -n '"'${STDOUT_MSG%.}'"' && \
     1>&2 echo -n '"'${STDERR_MSG%.}'"'

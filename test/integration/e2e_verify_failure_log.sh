@@ -26,6 +26,7 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
 # Run the job
 if JOB_ID=$(run_dsub \
+             --unique-job-id \
              --image gcr.io/no.such.image \
              --command 'echo "Test"' \
              --wait); then
