@@ -74,8 +74,16 @@ echo "Checking output..."
 # Check the results
 readonly STDOUT_RESULT_EXPECTED="$(echo -n "${STDOUT_MSG%.}")"
 
+# There is a bug with the Batch API where blank lines
+# do not get printed to log files.
+# Temporarily ignore blank lines for the Batch provider.
+diff_args=()
+if [[ "${DSUB_PROVIDER}" == "google-batch" ]]; then
+  diff_args+=("--ignore-blank-lines")
+fi
+
 readonly STDOUT_RESULT="$(gsutil cat "${STDOUT_LOG}")"
-if ! diff <(echo "${STDOUT_RESULT_EXPECTED}") <(echo "${STDOUT_RESULT}"); then
+if ! diff "${diff_args[@]}" <(echo "${STDOUT_RESULT_EXPECTED}") <(echo "${STDOUT_RESULT}"); then
   echo "STDOUT file does not match expected"
   exit 1
 fi
@@ -83,7 +91,7 @@ fi
 readonly STDERR_RESULT_EXPECTED="$(echo -n "${STDERR_MSG%.}")"
 
 readonly STDERR_RESULT="$(gsutil cat "${STDERR_LOG}")"
-if ! diff <(echo "${STDERR_RESULT_EXPECTED}") <(echo "${STDERR_RESULT}"); then
+if ! diff "${diff_args[@]}" <(echo "${STDERR_RESULT_EXPECTED}") <(echo "${STDERR_RESULT}"); then
   echo "STDERR file does not match expected"
   exit 1
 fi
