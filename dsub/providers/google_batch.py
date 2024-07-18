@@ -23,15 +23,15 @@ import sys
 import textwrap
 from typing import Dict, List, Set
 
+from ..lib import dsub_util
+from ..lib import job_model
+from ..lib import param_util
+from ..lib import providers_util
 from . import base
 from . import google_base
 from . import google_batch_operations
 from . import google_custom_machine
 from . import google_utils
-from ..lib import job_model
-from ..lib import param_util
-from ..lib import providers_util
-
 
 # pylint: disable=g-import-not-at-top
 try:
@@ -298,6 +298,7 @@ class GoogleBatchOperation(base.Task):
     elif field == 'provider-attributes':
       # TODO: This needs to return instance (VM) metadata
       value = {}
+      value['preemptible'] = google_batch_operations.get_preemptible(self._op)
     elif field == 'events':
       # TODO: This needs to return a list of events
       value = []
@@ -394,15 +395,24 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
   def __init__(
       self, dry_run: bool, project: str, location: str, credentials=None
   ):
+    storage_service = dsub_util.get_storage_service(credentials=credentials)
+
     self._dry_run = dry_run
     self._location = location
     self._project = project
+    self._storage_service = storage_service
 
   def _batch_handler_def(self):
     return GoogleBatchBatchHandler
 
   def _operations_cancel_api_def(self):
     return batch_v1.BatchServiceClient().delete_job
+
+  def _get_provisioning_model(self, task_resources):
+    if task_resources.preemptible:
+      return batch_v1.AllocationPolicy.ProvisioningModel.SPOT
+    else:
+      return batch_v1.AllocationPolicy.ProvisioningModel.STANDARD
 
   def _get_batch_job_regions(self, regions, zones) -> List[str]:
     """Returns the list of regions and zones to use for a Batch Job request.
@@ -743,6 +753,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             accelerator_type=job_resources.accelerator_type,
             accelerator_count=job_resources.accelerator_count,
         ),
+        provisioning_model=self._get_provisioning_model(task_resources),
     )
 
     ipt = google_batch_operations.build_instance_policy_or_template(
@@ -835,6 +846,17 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     requests = []
 
     for task_view in job_model.task_view_generator(job_descriptor):
+
+      job_params = task_view.job_params
+      task_params = task_view.task_descriptors[0].task_params
+
+      outputs = job_params['outputs'] | task_params['outputs']
+      if skip_if_output_present:
+        # check whether the output's already there
+        if dsub_util.outputs_are_present(outputs, self._storage_service):
+          print('Skipping task because its outputs are present')
+          continue
+
       request = self._create_batch_request(task_view)
       if self._dry_run:
         requests.append(request)
@@ -849,6 +871,10 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
       # closely resembles yaml, but can't actually be serialized into yaml.
       # Ideally, we could serialize these request objects to yaml or json.
       print(requests)
+
+    if not requests and not launched_tasks:
+      return {'job-id': dsub_util.NO_JOB}
+
     return {
         'job-id': job_descriptor.job_metadata['job-id'],
         'user-id': job_descriptor.job_metadata.get('user-id'),

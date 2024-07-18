@@ -375,6 +375,67 @@ function test_zones() {
 }
 readonly -f test_zones
 
+function test_preemptible_zero() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --preemptible 0; then
+
+    # Check that the output contains expected values
+    result=$(grep " provisioning_model:" "${TEST_STDERR}" | awk '{print $2}')
+    if [[ "${result}" != "STANDARD" ]]; then
+        1>&2 echo "provisioning_model was actually ${result}, expected STANDARD"
+        exit 1
+    fi
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_preemptible_zero
+
+function test_preemptible_off() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1; then
+
+    # Check that the output contains expected values
+    result=$(grep " provisioning_model:" "${TEST_STDERR}" | awk '{print $2}')
+    if [[ "${result}" != "STANDARD" ]]; then
+        1>&2 echo "provisioning_model was actually ${result}, expected STANDARD"
+        exit 1
+    fi
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_preemptible_off
+
+function test_preemptible_on() {
+  local subtest="${FUNCNAME[0]}"
+
+  if call_dsub \
+    --command 'echo "${TEST_NAME}"' \
+    --regions us-central1 \
+    --preemptible; then
+
+    # Check that the output contains expected values
+    result=$(grep " provisioning_model:" "${TEST_STDERR}" | awk '{print $2}')
+    if [[ "${result}" != "SPOT" ]]; then
+        1>&2 echo "provisioning_model was actually ${result}, expected SPOT"
+        exit 1
+    fi
+    test_passed "${subtest}"
+  else
+    test_failed "${subtest}"
+  fi
+}
+readonly -f test_preemptible_on
+
 # # Run the tests
 trap "exit_handler" EXIT
 
@@ -408,3 +469,8 @@ test_neither_region_nor_zone
 test_region_and_zone
 test_regions
 test_zones
+
+echo
+test_preemptible_zero
+test_preemptible_off
+test_preemptible_on

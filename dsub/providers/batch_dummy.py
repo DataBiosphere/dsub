@@ -40,6 +40,7 @@ class types(object):
     NetworkPolicy = None
     Accelerator = None
     LocationPolicy = None
+    ProvisioningModel = None
 
   class LogsPolicy(object):
     Destination = None
