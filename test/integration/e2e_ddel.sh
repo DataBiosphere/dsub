@@ -82,11 +82,11 @@ if util::wait_for_canceled_status "${JOB_ID}"; then
   exit 1
 fi
 
-# For the google v2 providers, wait a sufficiently long time so that all the
+# For the google providers, wait a sufficiently long time so that all the
 # startup events occur prior to canceling so that the output event list is
 # consistent..
 if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
-   [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+   [[ "${DSUB_PROVIDER}" == "google-batch" ]]; then
   echo "Sleeping for 60s"
   sleep 60
 fi
