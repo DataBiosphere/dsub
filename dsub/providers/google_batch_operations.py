@@ -126,12 +126,14 @@ def build_job(
 def build_task_spec(
     runnables: List[batch_v1.types.task.Runnable],
     volumes: List[batch_v1.types.Volume],
+    compute_resource: batch_v1.types.ComputeResource
 ) -> batch_v1.types.TaskSpec:
   """Build a TaskSpec object for a Batch request.
 
   Args:
       runnables (List[Runnable]): List of Runnable objects
       volumes (List[Volume]): List of Volume objects
+      compute_resource: The compute resource object
 
   Returns:
       A TaskSpec object.
@@ -139,6 +141,7 @@ def build_task_spec(
   task_spec = batch_v1.TaskSpec()
   task_spec.runnables = runnables
   task_spec.volumes = volumes
+  task_spec.compute_resource = compute_resource
   return task_spec
 
 
@@ -321,6 +324,24 @@ def build_logs_policy(
 
   return logs_policy
 
+def build_compute_resource(
+    cpu_milli: int,
+    memory_mib: int
+) -> batch_v1.types.ComputeResource:
+  """Build an compute resource for a Batch request.
+
+  Args:
+    cpu_milli (int): the amount of CPU resources per task in milliCPU units.
+    memory_mib (int): the amount of memory per task in MiB units.
+    
+  Returns:
+    An object representing an compute resource.
+  """
+  compute_resource = batch_v1.ComputeResource()
+  compute_resource.cpu_milli = cpu_milli
+  compute_resource.memory_mib = memory_mib
+  compute_resource.boot_disk_mib = 0
+  return compute_resource
 
 def build_instance_policy(
     boot_disk: batch_v1.types.AllocationPolicy.Disk,

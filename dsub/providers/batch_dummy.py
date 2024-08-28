@@ -26,6 +26,7 @@ class types(object):
   TaskSpec = None
   Environment = None
   ServiceAccount = None
+  ComputeResource = None
 
   class task(object):
 

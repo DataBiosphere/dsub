@@ -797,10 +797,11 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         batch_v1.LogsPolicy.Destination.PATH,
         _BATCH_LOG_DIR + '/',
     )
-
+    compute_resource = google_batch_operations.build_compute_resource(cpu_milli=(job_resources.min_cores  * 1000 if job_resources.min_cores else None), 
+                                                                      memory_mib = (job_resources.min_ram * 1024) if job_resources.min_ram else None)
     # Bring together the task definition(s) and build the Job request.
     task_spec = google_batch_operations.build_task_spec(
-        runnables=runnables, volumes=([datadisk_volume] + gcs_volumes)
+        runnables=runnables, volumes=([datadisk_volume] + gcs_volumes), compute_resource=compute_resource
     )
     task_group = google_batch_operations.build_task_group(
         task_spec, task_count=1, task_count_per_node=1
