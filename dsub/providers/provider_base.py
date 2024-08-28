@@ -20,13 +20,11 @@ import os
 from . import google_base
 from . import google_batch
 from . import google_cls_v2
-from . import google_v2
 from . import local
 from . import test_fails
 
 
 PROVIDER_NAME_MAP = {
-    google_v2.GoogleV2JobProvider: 'google-v2',
     google_cls_v2.GoogleCLSV2JobProvider: 'google-cls-v2',
     google_batch.GoogleBatchJobProvider: 'google-batch',
     local.LocalJobProvider: 'local',
@@ -52,7 +50,7 @@ def get_provider(args, resources, credentials_fn=None):
   if not credentials_fn:
     credentials_fn = credentials_from_args
 
-  provider = getattr(args, 'provider', 'google-v2')
+  provider = getattr(args, 'provider', 'google-cls-v2')
 
   if provider == 'google-batch':
     return google_batch.GoogleBatchJobProvider(
@@ -62,11 +60,6 @@ def get_provider(args, resources, credentials_fn=None):
         getattr(args, 'dry_run', False),
         args.project,
         args.location,
-        credentials=credentials_fn(args))
-  elif provider == 'google-v2':
-    return google_v2.GoogleV2JobProvider(
-        getattr(args, 'dry_run', False),
-        args.project,
         credentials=credentials_fn(args))
   elif provider == 'local':
     return local.LocalJobProvider(resources)
@@ -88,17 +81,16 @@ def create_parser(prog):
 
   parser.add_argument(
       '--provider',
-      default='google-v2',
-      choices=[
-          'local', 'google-v2', 'google-cls-v2', 'google-batch', 'test-fails'
-      ],
-      help="""Job service provider. Valid values are "google-v2" (Google's
-        Pipeline API v2alpha1), "google-cls-v2" (Google's Pipelines API v2beta),
+      default='google-cls-v2',
+      choices=['local', 'google-cls-v2', 'google-batch', 'test-fails'],
+      help="""Job service provider. Valid values are
+        "google-cls-v2" (Google's Pipelines API v2beta),
         "google-batch" (Google's Batch API v1alpha1),
         and "local" (local Docker execution).
         "test-*" providers are for testing purposes only.
-        (default: google-v2)""",
-      metavar='PROVIDER')
+        (default: google-cls-v2)""",
+      metavar='PROVIDER',
+  )
 
   return parser
 
@@ -130,8 +122,6 @@ def get_dstat_provider_args(provider, project, location):
   args = []
   if provider_name == 'google-cls-v2':
     args.append(f'--project {project} --location {location}')
-  elif provider_name == 'google-v2':
-    args.append(f'--project {project}')
   elif provider_name == 'google-batch':
     args.append(f'--project {project} --location {location}')
   elif provider_name == 'local':
@@ -160,7 +150,10 @@ def emit_provider_message(provider):
 def check_for_unsupported_flag(args):
   """Raise an error if the provider doesn't support a provided flag."""
   if args.label and args.provider not in [
-      'test-fails', 'local', 'google-v2', 'google-cls-v2', 'google-batch'
+      'test-fails',
+      'local',
+      'google-cls-v2',
+      'google-batch',
   ]:
     raise ValueError(
         '--label is not supported by the "%s" provider.' % args.provider)

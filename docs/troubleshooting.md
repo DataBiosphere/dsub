@@ -20,7 +20,7 @@ When submitted with no filter arguments, `dstat` shows  information for all
 tasks in the `RUNNING` state belonging to the current user:
 
 ```
-$ dstat --provider google-v2 --project my-project
+$ dstat --provider google-cls-v2 --project my-project
 Job Name        Task    Status            Last Update
 --------------  ------  ----------------  -------------------
 my-job-name     task-3  localizing-files  2017-04-06 16:03:34
@@ -44,7 +44,7 @@ them separately. To check on a specific job, pass the `--jobs` (or `-j`)
 flag. For example:
 
 ```
-$ dstat --provider google-v2 --project my-project --jobs my-job-id
+$ dstat --provider google-cls-v2 --project my-project --jobs my-job-id
 Job Name        Status    Last Update
 --------------  --------  -------------------
 my-job-name     Pending   2017-04-11 16:05:35
@@ -59,7 +59,7 @@ value `*` to `dstat`:
 
 ```
 $ dstat \
-  --provider google-v2 \
+  --provider google-cls-v2 \
   --project my-project \
   --jobs my-job-id \
   --status '*'
@@ -75,7 +75,7 @@ Be sure to quote the `*` to prevent shell expansion.
 To view results for all jobs associated with your user id:
 
 ```
-dstat --provider google-v2 --project my-project --status '*'
+dstat --provider google-cls-v2 --project my-project --status '*'
 ```
 
 ### Check jobs with my own labels
@@ -176,7 +176,7 @@ use the `--age` flag.
 For example, the following command will return all jobs started in the last day:
 
 ```
-./dstat --provider google-v2 --project my-project --status '*' --age 1d
+./dstat --provider google-cls-v2 --project my-project --status '*' --age 1d
 ```
 
 The `--age` flags supports the following types of values:
@@ -218,7 +218,7 @@ The following examples shows minute-by-minute progression of 3 tasks
 
 ```
 $ dstat \
-  --provider google-v2 \
+  --provider google-cls-v2 \
   --project my-project \
   --jobs my-job-id \
   --wait --poll-interval 60
@@ -281,7 +281,7 @@ maintain consistency between dsub versions.
 
 ```
 $ dstat \
-  --provider google-v2 \
+  --provider google-cls-v2 \
   --project my-project \
   --jobs my-job-id \
   --full
@@ -306,7 +306,7 @@ Note the `Internal ID` in this example provides the
 
 ```
 $ dstat \
-  --provider google-v2 \
+  --provider google-cls-v2 \
   --project my-project \
   --jobs my-job-id \
   --format text \

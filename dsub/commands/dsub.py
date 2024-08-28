@@ -220,19 +220,6 @@ def _google_cls_v2_parse_arguments(args):
   _check_nvidia_driver_version(args)
 
 
-def _google_v2_parse_arguments(args):
-  """Validated google-v2 arguments."""
-  if (args.zones and args.regions) or (not args.zones and not args.regions):
-    raise ValueError('Exactly one of --regions and --zones must be specified')
-
-  if args.machine_type and (args.min_cores or args.min_ram):
-    raise ValueError(
-        '--machine-type not supported together with --min-cores or --min-ram.')
-
-  _check_private_address(args)
-  _check_nvidia_driver_version(args)
-
-
 def _local_parse_arguments(args):
   """Validated local arguments."""
   if args.user and args.user != dsub_util.get_os_user():
@@ -420,16 +407,18 @@ def _parse_arguments(prog, argv):
       '--min-cores',
       type=int,
       help="""Minimum CPU cores for each job. The default is provider-specific.
-           The google-v2 provider default is 1 core.
+           The google-cls-v2 provider default is 1 core.
            The local provider does not allocate resources, but uses available
-           resources of your machine.""")
+           resources of your machine.""",
+  )
   parser.add_argument(
       '--min-ram',
       type=float,
       help="""Minimum RAM per job in GB. The default is provider-specific.
-           The google-v2 provider default is 3.75 GB.
+           The google-cls-v2 provider default is 3.75 GB.
            The local provider does not allocate resources, but uses available
-           resources of your machine.""")
+           resources of your machine.""",
+  )
   parser.add_argument(
       '--disk-size',
       default=job_model.DEFAULT_DISK_SIZE,
@@ -444,11 +433,12 @@ def _parse_arguments(prog, argv):
 
   # Add provider-specific arguments
 
-  # Shared between the "google-cls-v2" and "google-v2" providers
+  # Shared between the "google-cls-v2" and "google-batch" providers
   google_common = parser.add_argument_group(
       title='google-common',
-      description="""Options common to the "google-cls-v2", "google-v2" and
-        "google-batch" providers""")
+      description="""Options common to the "google-cls-v2" and
+        "google-batch" providers""",
+  )
   google_common.add_argument(
       '--project', help='Cloud project ID in which to run the job')
   google_common.add_argument(
@@ -582,32 +572,27 @@ def _parse_arguments(prog, argv):
       help="""If set to true, prevents the container for the user's
           script/command from accessing the external network.
           (default: False)""")
-
-  google_cls_v2 = parser.add_argument_group(
-      title='"google-cls-v2" provider options',
-      description='See also the "google-common" options listed above')
-  google_cls_v2.add_argument(
+  google_common.add_argument(
       '--location',
       default=job_model.DEFAULT_LOCATION,
       help="""Specifies the Google Cloud region to which the pipeline request
         will be sent and where operation metadata will be stored. The associated
         dsub task may be executed in another region if the --regions or --zones
         arguments are specified. (default: {})""".format(
-            job_model.DEFAULT_LOCATION))
+          job_model.DEFAULT_LOCATION
+      ),
+  )
 
   args = provider_base.parse_args(
       parser, {
           'google-batch': ['project', 'logging'],
           'google-cls-v2': ['project', 'logging'],
-          'google-v2': ['project', 'logging'],
           'test-fails': [],
           'local': ['logging'],
       }, argv)
 
   if args.provider == 'google-cls-v2':
     _google_cls_v2_parse_arguments(args)
-  if args.provider == 'google-v2':
-    _google_v2_parse_arguments(args)
 
   return args
 

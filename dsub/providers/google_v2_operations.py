@@ -19,7 +19,7 @@ _API_VERSION = None
 
 
 def set_api_version(api_version):
-  assert api_version in (google_v2_versions.V2ALPHA1, google_v2_versions.V2BETA)
+  assert api_version in (google_v2_versions.V2BETA)
 
   global _API_VERSION
   _API_VERSION = api_version
@@ -103,10 +103,7 @@ def get_action_by_name(op, name):
 
 
 def get_action_name(action):
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-    return action.get('name')
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
     return action.get('containerName')
 
   else:
@@ -144,11 +141,7 @@ def external_network_blocked(op):
   """Retun True if the blockExternalNetwork flag is set for the user action."""
   user_action = get_action_by_name(op, 'user-command')
   if user_action:
-    if _API_VERSION == google_v2_versions.V2ALPHA1:
-      flags = user_action.get('flags')
-      if flags:
-        return 'BLOCK_EXTERNAL_NETWORK' in flags
-    elif _API_VERSION == google_v2_versions.V2BETA:
+    if _API_VERSION == google_v2_versions.V2BETA:
       return user_action.get('blockExternalNetwork')
     else:
       assert False, 'Unexpected version: {}'.format(_API_VERSION)
@@ -157,13 +150,7 @@ def external_network_blocked(op):
 
 def is_unexpected_exit_status_event(e):
   """Retun True if the event is for an unexpected exit status."""
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-
-    return e.get('details', {}).get(
-        '@type'
-    ) == 'type.googleapis.com/google.genomics.v2alpha1.UnexpectedExitStatusEvent'
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
 
     return 'unexpectedExitStatus' in e
 
@@ -173,12 +160,7 @@ def is_unexpected_exit_status_event(e):
 
 def is_failed_event(e):
   """Retun True if the event is an operation failed event."""
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-
-    return e.get('details', {}).get(
-        '@type') == 'type.googleapis.com/google.genomics.v2alpha1.FailedEvent'
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
 
     return 'failed' in e
 
@@ -188,13 +170,7 @@ def is_failed_event(e):
 
 def is_container_stopped_event(e):
   """Retun True if the event is a container stopped event."""
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-
-    return e.get('details', {}).get(
-        '@type'
-    ) == 'type.googleapis.com/google.genomics.v2alpha1.ContainerStoppedEvent'
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
 
     return 'containerStopped' in e
 
@@ -204,12 +180,7 @@ def is_container_stopped_event(e):
 
 def is_worker_assigned_event(event):
   """Return True if the event is a "Worker assigned..." event."""
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-    return event.get('details', {}).get(
-        '@type'
-    ) == 'type.googleapis.com/google.genomics.v2alpha1.WorkerAssignedEvent'
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
     return 'workerAssigned' in event
 
   else:
@@ -218,12 +189,7 @@ def is_worker_assigned_event(event):
 
 def is_pull_started_event(event):
   """Return True if the event is a "Started Pulling..." event."""
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-    return event.get('details', {}).get(
-        '@type'
-    ) == 'type.googleapis.com/google.genomics.v2alpha1.PullStartedEvent'
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
     return 'pullStarted' in event
 
   else:
@@ -245,14 +211,7 @@ def get_container_stopped_error_events(op):
   if not events:
     return None
 
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-
-    return [
-        e for e in events if is_container_stopped_event(e) and
-        e.get('details', {}).get('exitStatus', 0) != 0
-    ]
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
 
     return [
         e for e in events if is_container_stopped_event(e) and
@@ -284,11 +243,7 @@ def get_worker_assigned_events(op):
 
 def get_event_action_id(e):
   """Return the actionId associated with the specified event."""
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-
-    return e.get('details', {}).get('actionId')
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
 
     for event_type in ['containerStopped', 'unexpectedExitStatus']:
       if event_type in e:
@@ -305,11 +260,7 @@ def get_event_description(e):
 
 def get_event_stderr(e):
   """Return the stderr field (if any) associated with the event."""
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-
-    return e.get('details', {}).get('stderr')
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
 
     for event_type in ['containerStopped']:
       if event_type in e:
@@ -326,10 +277,7 @@ def get_worker_assigned_event_details(op):
   if not events:
     return None
 
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-    return events[0].get('details', {})
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
     return events[0].get('workerAssigned', {})
 
   else:
@@ -359,10 +307,7 @@ def get_resources(op):
 def get_vm_network_name(vm):
   """Return the name of the network from the virtualMachine."""
 
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-    return vm.get('network', {}).get('name')
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
     return vm.get('network', {}).get('network')
 
   else:
@@ -370,10 +315,10 @@ def get_vm_network_name(vm):
 
 
 def is_pipeline(op):
-  """Check that an operation is a genomics pipeline run.
+  """Check that an operation is a lifesciences pipeline run.
 
-  An operation is a Genomics Pipeline run if the request metadata's @type
-  is "type.googleapis.com/google.genomics.v2alpha1.Metadata".
+  An operation is a Lifesciences Pipeline run if the request metadata's @type
+  is "type.googleapis.com/google.cloud.lifesciences.v2beta.Metadata".
 
   Args:
     op: a pipelines operation.
@@ -382,11 +327,7 @@ def is_pipeline(op):
     Boolean, true if the operation is a RunPipelineRequest.
   """
 
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-    return get_metadata_type(
-        op) == 'type.googleapis.com/google.genomics.v2alpha1.Metadata'
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
     return get_metadata_type(
         op) == 'type.googleapis.com/google.cloud.lifesciences.v2beta.Metadata'
 
@@ -402,7 +343,7 @@ def is_dsub_operation(op):
   been part of dsub operations.
 
   - labels: job-id, job-name, and user-id have always existed. The dsub-version
-            label has always existed for the google-v2 provider.
+            label has always existed since the google-v2 provider.
 
   Args:
     op: a pipelines operation.

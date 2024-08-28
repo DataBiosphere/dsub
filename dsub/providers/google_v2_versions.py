@@ -13,13 +13,10 @@
 # limitations under the License.
 """Constants and methods for Google's Pipelines API v2."""
 
-V2ALPHA1 = 'v2alpha1'
 V2BETA = 'v2beta'
 
 
 def get_api_name(version):
-  if version == V2ALPHA1:
-    return 'genomics'
 
   if version == V2BETA:
     return 'lifesciences'

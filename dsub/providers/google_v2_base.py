@@ -13,9 +13,9 @@
 # limitations under the License.
 """Provider for running jobs on Google Cloud Platform.
 
-This module serves as the base class for the google-v2 and google-cls-v2
-providers. The APIs they are based on are very similar and can benefit from
-sharing code.
+This module serves as the base class for the google-cls-v2 provider. It also
+used to be the base class for the now gone google-v2 provider.
+The APIs they were based on were very similar and benefited from sharing code.
 """
 import ast
 import json

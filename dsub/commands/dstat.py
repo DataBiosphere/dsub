@@ -136,28 +136,25 @@ def _parse_arguments():
       action='store_true',
       help='Display a summary of the results, grouped by (job, status).')
 
-  # Shared between the "google-cls-v2" and "google-v2" providers
+  # Shared between the "google-cls-v2" and "google-batch" providers
   google_common = parser.add_argument_group(
       title='google-common',
-      description="""Options common to the "google", "google-cls-v2", and
-        "google-v2" providers""")
+      description="""Options common to the "google-cls-v2" and
+        "google-batch" providers""",
+  )
   google_common.add_argument(
       '--project', help='Cloud project ID in which to find and the job(s)')
-
-  google_cls_v2 = parser.add_argument_group(
-      title='"google-cls-v2" provider options',
-      description='See also the "google-common" options listed')
-  google_cls_v2.add_argument(
+  google_common.add_argument(
       '--location',
       default=job_model.DEFAULT_LOCATION,
       help="""Specifies the Google Cloud region to which the dsub job was
-        submitted. (default: {})""".format(job_model.DEFAULT_LOCATION))
+        submitted. (default: {})""".format(job_model.DEFAULT_LOCATION),
+  )
 
   return provider_base.parse_args(
       parser, {
           'google-batch': ['project'],
           'google-cls-v2': ['project'],
-          'google-v2': ['project'],
           'test-fails': [],
           'local': [],
       }, sys.argv[1:])

@@ -22,16 +22,14 @@ _API_VERSION = None
 
 
 def set_api_version(api_version):
-  assert api_version in (google_v2_versions.V2ALPHA1, google_v2_versions.V2BETA)
+  assert api_version in (google_v2_versions.V2BETA)
 
   global _API_VERSION
   _API_VERSION = api_version
 
 
 def build_network(name, subnetwork, use_private_address):
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-    network_key = 'name'
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
     network_key = 'network'
   else:
     assert False, 'Unexpected version: {}'.format(_API_VERSION)
@@ -142,9 +140,6 @@ def build_resources(project=None,
       'virtualMachine': virtual_machine,
   }
 
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-    resources['projectId'] = project
-
   return resources
 
 
@@ -214,24 +209,7 @@ def build_action(name=None,
       'labels': labels,
   }
 
-  if _API_VERSION == google_v2_versions.V2ALPHA1:
-    action['name'] = name
-
-    # In v2alpha1, the flags are passed as a list of strings
-    flags = []
-    if always_run:
-      flags.append('ALWAYS_RUN')
-    if enable_fuse:
-      flags.append('ENABLE_FUSE')
-    if run_in_background:
-      flags.append('RUN_IN_BACKGROUND')
-    if block_external_network:
-      flags.append('BLOCK_EXTERNAL_NETWORK')
-
-    if flags:
-      action['flags'] = flags
-
-  elif _API_VERSION == google_v2_versions.V2BETA:
+  if _API_VERSION == google_v2_versions.V2BETA:
     action['containerName'] = name
 
     # In v2beta, the flags are direct members of the action
