@@ -32,6 +32,7 @@ from . import google_base
 from . import google_batch_operations
 from . import google_custom_machine
 from . import google_utils
+from proto import message
 
 # pylint: disable=g-import-not-at-top
 try:
@@ -207,7 +208,7 @@ class GoogleBatchOperation(base.Task):
     self._job_descriptor = self._try_op_to_job_descriptor()
 
   def raw_task_data(self):
-    return self._op
+    return message.Message.to_dict(self._op)
 
   def _try_op_to_job_descriptor(self):
     # The _META_YAML_REPR field in the 'prepare' action enables reconstructing
