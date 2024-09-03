@@ -52,7 +52,7 @@ your shell.
 
 #### Install the Google Cloud SDK
 
-While not used directly by `dsub` for the `google-v2` or `google-cls-v2` providers, you are likely to want to install the command line tools found in the [Google
+While not used directly by `dsub` for the `google-batch` or `google-cls-v2` providers, you are likely to want to install the command line tools found in the [Google
 Cloud SDK](https://cloud.google.com/sdk/).
 
 If you will be using the `local` provider for faster job development,
@@ -156,13 +156,13 @@ You'll get quicker turnaround times and won't incur cloud charges using it.
 
 ### Getting started on Google Cloud
 
-`dsub` supports the use of two different APIs from Google Cloud for running
-tasks. Google Cloud is transitioning from `Genomics v2alpha1`
-to [Cloud Life Sciences v2beta](https://cloud.google.com/life-sciences/docs/reference/rest).
+`dsub` currently supports the [Cloud Life Sciences v2beta](https://cloud.google.com/life-sciences/docs/reference/rest)
+API from Google Cloud and is is developing support for the [Batch](https://cloud.google.com/batch/docs/reference/rest)
+API from Google Cloud. 
 
-`dsub` supports both APIs with the (old) `google-v2` and (new) `google-cls-v2`
-providers respectively. `google-v2` is the current default provider. `dsub`
-will be transitioning to make `google-cls-v2` the default in coming releases.
+`dsub` supports the v2beta API with the `google-cls-v2` provider.
+`google-cls-v2` is the current default provider. `dsub` will be transitioning to
+make `google-batch` the default in coming releases.
 
 The steps for getting started differ slightly as indicated in the steps below:
 
@@ -171,13 +171,14 @@ The steps for getting started differ slightly as indicated in the steps below:
 
 1.  Enable the APIs:
 
-    - For the `v2alpha1` API (provider: `google-v2`):
-
-     [Enable the Genomics, Storage, and Compute APIs](https://console.cloud.google.com/flows/enableapi?apiid=genomics,storage_component,compute_component&redirect=https://console.cloud.google.com).
-
     - For the `v2beta` API (provider: `google-cls-v2`):
 
-     [Enable the Cloud Life Sciences, Storage, and Compute APIs](https://console.cloud.google.com/flows/enableapi?apiid=lifesciences.googleapis.com,storage_component,compute_component&redirect=https://console.cloud.google.com)
+     [Enable the Cloud Life Sciences, Storage, and Compute APIs](https://console.cloud.google.com/flows/enableapi?apiid=lifesciences.googleapis.com,storage.googleapis.com,compute.googleapis.com&redirect=https://console.cloud.google.com)
+
+    - For the `batch` API (provider: `google-batch`):
+
+     [Enable the Batch, Storage, and Compute APIs](https://console.cloud.google.com/flows/enableapi?apiid=batch.googleapis.com,storage.googleapis.com,compute.googleapis.com&redirect=https://console.cloud.google.com).
+
 
 1. Provide [credentials](https://developers.google.com/identity/protocols/application-default-credentials)
     so `dsub` can call Google APIs:
@@ -202,10 +203,10 @@ The steps for getting started differ slightly as indicated in the steps below:
 
 1.  Run a very simple "Hello World" `dsub` job and wait for completion.
 
-    - For the `v2alpha1` API (provider: `google-v2`):
+    - For the `v2beta` API (provider: `google-cls-v2`):
 
             dsub \
-              --provider google-v2 \
+              --provider google-cls-v2 \
               --project my-cloud-project \
               --regions us-central1 \
               --logging gs://my-bucket/logging/ \
@@ -216,10 +217,10 @@ The steps for getting started differ slightly as indicated in the steps below:
     Change `my-cloud-project` to your Google Cloud project, and `my-bucket` to
     the bucket you created above.
 
-    - For the `v2beta` API (provider: `google-cls-v2`):
+    - For the `batch` API (provider: `google-batch`):
 
             dsub \
-              --provider google-cls-v2 \
+              --provider google-batch \
               --project my-cloud-project \
               --regions us-central1 \
               --logging gs://my-bucket/logging/ \
@@ -246,14 +247,13 @@ To this end, `dsub` provides multiple "backend providers", each of which
 implements a consistent runtime environment. The current providers are:
 
 - local
-- google-v2 (the default)
-- google-cls-v2
+- google-cls-v2(the default)
 - google-batch (*new*)
 
 More details on the runtime environment implemented by the backend providers
 can be found in [dsub backend providers](https://github.com/DataBiosphere/dsub/blob/main/docs/providers/README.md).
 
-### Differences between `google-v2`, `google-cls-v2` and `google-batch`
+### Differences between `google-cls-v2` and `google-batch`
 
 The `google-cls-v2` provider is built on the Cloud Life Sciences `v2beta` API.
 This API is very similar to its predecessor, the Genomics `v2alpha1` API.
@@ -265,29 +265,15 @@ Details of Cloud Life Sciences versus Batch can be found in this
 [Migration Guide](https://cloud.google.com/batch/docs/migrate-to-batch-from-cloud-life-sciences).
 
 `dsub` largely hides the differences between the APIs, but there are a
-few difference to note:
+few differences to note:
 
-- `v2beta` and Cloud Batch are regional services, `v2alpha1` is a global service
-
-What this means is that with `v2alpha1`, the metadata about your tasks
-(called "operations"), is stored in a global database, while with `v2beta` and
-Cloud Batch, the metadata about your tasks are stored in a regional database. If
-your operation/job information needs to stay in a particular region, use the
-`v2beta` or Batch API (the `google-cls-v2` or `google-batch` provider), and
-specify the `--location` where your operation/job information should be stored.
-
-- The `--regions` and `--zones` flags can be omitted when using `google-cls-v2` and `google-batch`
+- `google-batch` requires jobs to run in one region
 
 The `--regions` and `--zones` flags for `dsub` specify where the tasks should
-run. More specifically, this specifies what Compute Engine Zones to use for
-the VMs that run your tasks.
-
-With the `google-v2` provider, there is no default region or zone, and thus
-one of the `--regions` or `--zones` flags is required.
-
-With `google-cls-v2` and `google-batch`, the `--location` flag defaults to
-`us-central1`, and if the `--regions` and `--zones` flags are omitted, the
-`location` will be used as the default `regions` list.
+run. The `google-cls-v2` allows you to specify a multi-region like `US`,
+multiple regions, or multiple zones across regions.  With the `google-batch`
+provider, you must specify either one region or multiple zones within a single
+region.
 
 ## `dsub` features
 
@@ -463,7 +449,7 @@ mounting read-only:
 [Compute Engine Image](https://cloud.google.com/compute/docs/images) that you
 pre-create.
 
-The `google-v2` and `google-cls-v2` providers support these methods of
+The `google-cls-v2` and `google-batch` provider support these methods of
 providing access to resource data.
 
 The `local` provider supports mounting a
@@ -471,7 +457,7 @@ local directory in a similar fashion to support your local development.
 
 ##### Mounting a Google Cloud Storage bucket
 
-To have the `google-v2`, `google-cls-v2`, or `google-batch` provider mount a
+To have the `google-cls-v2` or `google-batch` provider mount a
 Cloud Storage bucket using
 [Cloud Storage FUSE](https://cloud.google.com/storage/docs/gcs-fuse), use the
 `--mount` command line flag:
@@ -488,7 +474,7 @@ before using Cloud Storage FUSE.
 
 ##### Mounting an existing peristent disk
 
-To have the `google-v2` or `google-cls-v2` provider mount a persistent disk that
+To have the `google-cls-v2` or `google-batch` provider mount a persistent disk that
 you have pre-created and populated, use the `--mount` command line flag and the
 url of the source disk:
 
@@ -496,7 +482,7 @@ url of the source disk:
 
 ##### Mounting a persistent disk, created from an image
 
-To have the `google-v2` or `google-cls-v2` provider mount a persistent disk created from an image,
+To have the `google-cls-v2` or `google-batch` provider mount a persistent disk created from an image,
 use the `--mount` command line flag and the url of the source image and the size
 (in GB) of the disk:
 
@@ -527,7 +513,7 @@ path using the environment variable.
 `dsub` tasks run using the `local` provider will use the resources available on
 your local machine.
 
-`dsub` tasks run using the `google`, `google-v2`, or `google-cls-v2` providers can take advantage
+`dsub` tasks run using the `google-cls-v2` or `google-batch` providers can take advantage
 of a wide range of CPU, RAM, disk, and hardware accelerator (eg. GPU) options.
 
 See the [Compute Resources](https://github.com/DataBiosphere/dsub/blob/main/docs/compute_resources.md)
@@ -634,14 +620,14 @@ For more details, see [Checking Status and Troubleshooting Jobs](https://github.
 
 The `dstat` command displays the status of jobs:
 
-    dstat --provider google-v2 --project my-cloud-project
+    dstat --provider google-cls-v2 --project my-cloud-project
 
 With no additional arguments, dstat will display a list of *running* jobs for
 the current `USER`.
 
 To display the status of a specific job, use the `--jobs` flag:
 
-    dstat --provider google-v2 --project my-cloud-project --jobs job-id
+    dstat --provider google-cls-v2 --project my-cloud-project --jobs job-id
 
 For a batch job, the output will list all *running* tasks.
 
@@ -673,7 +659,7 @@ By default, dstat outputs one line per task. If you're using a batch job with
 many tasks then you may benefit from `--summary`.
 
 ```
-$ dstat --provider google-v2 --project my-project --status '*' --summary
+$ dstat --provider google-cls-v2 --project my-project --status '*' --summary
 
 Job Name        Status         Task Count
 -------------   -------------  -------------
@@ -694,25 +680,25 @@ Use the `--users` flag to specify other users, or `'*'` for all users.
 
 To delete a running job:
 
-    ddel --provider google-v2 --project my-cloud-project --jobs job-id
+    ddel --provider google-cls-v2 --project my-cloud-project --jobs job-id
 
 If the job is a batch job, all running tasks will be deleted.
 
 To delete specific tasks:
 
     ddel \
-        --provider google-v2 \
+        --provider google-cls-v2 \
         --project my-cloud-project \
         --jobs job-id \
         --tasks task-id1 task-id2
 
 To delete all running jobs for the current user:
 
-    ddel --provider google-v2 --project my-cloud-project --jobs '*'
+    ddel --provider google-cls-v2 --project my-cloud-project --jobs '*'
 
 ## Service Accounts and Scope (Google providers only)
 
-When you run the `dsub` command with the `google-v2` or `google-cls-v2`
+When you run the `dsub` command with the `google-cls-v2` or `google-batch`
 provider, there are two different sets of credentials to consider:
 
 - Account submitting the `pipelines.run()` request to run your command/script on a VM

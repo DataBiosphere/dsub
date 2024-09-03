@@ -40,7 +40,7 @@ gcloud builds submit "${SCRIPT_DIR}" \
 
 # Launch the task
 dsub \
-  --provider google-v2 \
+  --provider google-cls-v2 \
   --project "${MY_PROJECT}" \
   --zones "us-central1-*" \
   --logging "${OUTPUT_ROOT}/logging/" \

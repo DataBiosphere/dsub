@@ -206,12 +206,9 @@ function get_test_providers() {
   if [[ ${test_file} == *.*.sh ]]; then
     local providers="$(echo -n "${test_file}" | awk -F . '{ print $(NF-1) }')"
 
-    # Special case the google-v2 tests - run them against google-cls-v2 as well
-    if [[ "${providers}" == "google-v2" ]]; then
-      echo -n "google-v2 google-cls-v2"
     # Special case the google-batch tests - don't run them when this flag is set
     # To be renabled once batch client library is available in G3
-    elif [[ "${providers}" == "google-batch" ]] && [[ "${NO_GOOGLE_BATCH_TESTS:-0}" -eq 1 ]]; then
+    if [[ "${providers}" == "google-batch" ]] && [[ "${NO_GOOGLE_BATCH_TESTS:-0}" -eq 1 ]]; then
       echo -n ""
     else
       echo -n "${providers}"
@@ -219,7 +216,7 @@ function get_test_providers() {
     return
   fi
   if [[ "${NO_GOOGLE_BATCH_TESTS:-0}" -eq 1 ]]; then
-    echo -n "local google-v2 google-cls-v2"
+    echo -n "local google-cls-v2"
     return
   fi
   case "${test_file}" in
@@ -236,8 +233,8 @@ function get_test_providers() {
     e2e_io.sh | \
     e2e_io_auto.sh | \
     e2e_io_gcs_tasks.sh | \
-    e2e_io_mount_bucket.google-v2.sh | \
-    e2e_io_mount_bucket_requester_pays.google-v2.sh | \
+    e2e_io_mount_bucket.google-cls-v2.sh | \
+    e2e_io_mount_bucket_requester_pays.google-cls-v2.sh | \
     e2e_io_recursive.sh | \
     e2e_io_tasks.sh | \
     e2e_logging_content.sh | \
@@ -249,7 +246,7 @@ function get_test_providers() {
     e2e_logging_paths_retry_failure_tasks.sh | \
     e2e_logging_paths_retry_tasks.sh | \
     e2e_non_root.sh | \
-    e2e_preemptible_retries_fail.google-v2.sh | \
+    e2e_preemptible_retries_fail.google-cls-v2.sh | \
     e2e_python.sh | \
     e2e_requester_pays_buckets.sh | \
     e2e_retries_success.sh | \
@@ -258,10 +255,10 @@ function get_test_providers() {
     e2e_runtime.sh | \
     e2e_skip.sh | \
     e2e_skip_tasks.sh)
-      local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2 google-batch}"
+      local all_provider_list="${DSUB_PROVIDER:-local google-cls-v2 google-batch}"
       ;;
     *)
-      local all_provider_list="${DSUB_PROVIDER:-local google-v2 google-cls-v2}"
+      local all_provider_list="${DSUB_PROVIDER:-local google-cls-v2}"
       ;;
   esac
 

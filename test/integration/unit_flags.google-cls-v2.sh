@@ -17,10 +17,10 @@
 set -o errexit
 set -o nounset
 
-# unit_flags.google-v2.sh
+# unit_flags.google-cls-v2.sh
 #
 # Collection of unit tests for dsub command-line flags
-# specific to the google-v2 provider.
+# specific to the google-cls-v2 provider.
 
 readonly SCRIPT_DIR="$(dirname "${0}")"
 
@@ -42,13 +42,8 @@ function call_dsub() {
 }
 readonly -f call_dsub
 
-if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
-  readonly NETWORK_NAME_KEY="network"
-  readonly CONTAINER_NAME_KEY="containerName"
-elif [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
-  readonly NETWORK_NAME_KEY="name"
-  readonly CONTAINER_NAME_KEY="name"
-fi
+readonly NETWORK_NAME_KEY="network"
+readonly CONTAINER_NAME_KEY="containerName"
 
 # Define tests
 
@@ -129,7 +124,7 @@ function test_location() {
 }
 readonly -f test_location
 
-function test_neither_region_nor_zone_google-cls-v2() {
+function test_neither_region_nor_zone() {
   local subtest="${FUNCNAME[0]}"
 
   if call_dsub \
@@ -148,32 +143,6 @@ function test_neither_region_nor_zone_google-cls-v2() {
     test_failed "${subtest}"
   fi
 }
-readonly -f test_neither_region_nor_zone_google-cls-v2
-
-function test_neither_region_nor_zone_google-v2() {
-  local subtest="${FUNCNAME[0]}"
-
-  if call_dsub \
-    --command 'echo "${TEST_NAME}"'; then
-
-    1>&2 echo "Neither regions nor zones specified - not detected"
-
-    test_failed "${subtest}"
-  else
-
-    assert_output_empty
-
-    assert_err_contains \
-      "ValueError: Exactly one of --regions and --zones must be specified"
-
-    test_passed "${subtest}"
-  fi
-}
-readonly -f test_neither_region_nor_zone_google-v2
-
-function test_neither_region_nor_zone() {
-  test_neither_region_nor_zone_"${DSUB_PROVIDER}"
-}
 readonly -f test_neither_region_nor_zone
 
 function test_region_and_zone() {
@@ -191,13 +160,8 @@ function test_region_and_zone() {
 
     assert_output_empty
 
-    if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
-      assert_err_contains \
-        "ValueError: At most one of --regions and --zones may be specified"
-    elif [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
-      assert_err_contains \
-        "ValueError: Exactly one of --regions and --zones must be specified"
-    fi
+    assert_err_contains \
+      "ValueError: At most one of --regions and --zones may be specified"
 
     test_passed "${subtest}"
   fi
@@ -327,7 +291,7 @@ function test_machine_type_with_ram_and_cpu() {
     --min-cores 1 \
     --min-ram 1; then
 
-    1>&2 echo "min-ram/min-cores set with machine-type on google-v2 provider - not detected"
+    1>&2 echo "min-ram/min-cores set with machine-type on google-cls-v2 provider - not detected"
 
     test_failed "${subtest}"
   else
@@ -931,14 +895,8 @@ function test_block_external_network() {
     --regions us-central1 \
     --block-external-network; then
 
-    # Check that the output contains expected values
-    if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
-      assert_err_value_equals \
-        "[0].pipeline.actions.[3].blockExternalNetwork" "True"
-    elif [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
-      assert_err_value_equals \
-        "[0].pipeline.actions.[3].flags.[0]" "BLOCK_EXTERNAL_NETWORK"
-    fi
+    assert_err_value_equals \
+      "[0].pipeline.actions.[3].blockExternalNetwork" "True"
 
     test_passed "${subtest}"
   else
@@ -955,13 +913,8 @@ function test_no_block_external_network() {
     --regions us-central1; then
 
     # Check that the output does not contain block network flag
-    if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
-      assert_err_value_equals \
-       "[0].pipeline.actions.[3].blockExternalNetwork" "False"
-    elif [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
-      assert_err_not_contains \
-       "BLOCK_EXTERNAL_NETWORK"
-    fi
+    assert_err_value_equals \
+      "[0].pipeline.actions.[3].blockExternalNetwork" "False"
 
     test_passed "${subtest}"
   else
@@ -977,9 +930,7 @@ trap "exit_handler" EXIT
 mkdir -p "${TEST_TMP}"
 
 echo
-if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]]; then
-  test_location
-fi
+test_location
 
 echo
 test_preemptible_zero

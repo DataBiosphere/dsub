@@ -71,9 +71,8 @@ function verify_dstat_output() {
   done
 
   # Check provider-specific fields
-  if [[ "${DSUB_PROVIDER}" == "google" ]] || \
-     [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
-     [[ "${DSUB_PROVIDER}" == "google-v2" ]]; then
+  if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] || \
+     [[ "${DSUB_PROVIDER}" == "google-batch" ]]; then
     echo "Checking dstat ${DSUB_PROVIDER} provider fields"
     verify_dstat_google_provider_fields "${dstat_out}" "${ensure_complete}"
   fi

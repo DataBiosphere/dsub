@@ -61,22 +61,22 @@ dsub ... --after "${JOB_A}" "${JOB_B}"
 Here is the output of a sample run:
 
 ```
-$ JOBID_A=$(dsub --provider google-v2 --project "${MYPROJECT}" --regions us-central1 \
+$ JOBID_A=$(dsub --provider google-cls-v2 --project "${MYPROJECT}" --regions us-central1 \
 --logging "gs://${MYBUCKET}/logging/"   \
 --command 'echo "hello from job A"')
 Job: echo--<user>--180924-112256-64
 Launched job-id: echo--<user>--180924-112256-64
 To check the status, run:
-  dstat --provider google-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112256-64' --status '*'
+  dstat --provider google-cls-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112256-64' --status '*'
 To cancel the job, run:
-  ddel --provider google-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112256-64'
+  ddel --provider google-cls-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112256-64'
 
 $ echo "${JOBID_A}"
 echo--<user>--180924-112256-64
 
 $ JOBID_B=... (similar)
 
-$ JOBID_C=$(dsub --provider google-v2 --project "${MYPROJECT}" --regions us-central1 \
+$ JOBID_C=$(dsub --provider google-cls-v2 --project "${MYPROJECT}" --regions us-central1 \
 --logging "gs://${MYBUCKET}/logging/"   \
 --command 'echo "job C"' --after "${JOBID_A}" "${JOBID_B}")
 Waiting for predecessor jobs to complete...
@@ -86,9 +86,9 @@ Waiting for: echo--<user>--180924-112259-48.
   echo--<user>--180924-112259-48: SUCCESS
 Launched job-id: echo--<user>--180924-112302-87
 To check the status, run:
-  dstat --provider google-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112302-87' --status '*'
+  dstat --provider google-cls-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112302-87' --status '*'
 To cancel the job, run:
-  ddel --provider google-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112302-87'
+  ddel --provider google-cls-v2 --project ${MYPROJECT} --jobs 'echo--<user>--180924-112302-87'
 echo--<user>--180924-112302-87
 ```
 

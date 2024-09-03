@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# For google-v2, user-ids and job names are used as labels.
+# For google-cls-v2, user-ids and job names are used as labels.
 # Test that --user and --name works properly when it has underscores
 # and capital letters.
 

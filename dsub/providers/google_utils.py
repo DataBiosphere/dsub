@@ -13,7 +13,7 @@
 # limitations under the License.
 """Utility functions to be used by the Google providers.
 
-This module holds constants and methods useful to google-v2, google-cls-v2,
+This module holds constants and methods useful to google-cls-v2
 and google-batch providers.
 """
 import os

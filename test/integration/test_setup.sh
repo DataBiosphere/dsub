@@ -34,7 +34,7 @@
 #   If the script name is <test>.<provider>.sh, pull out the provider.
 #   If the script name is <test>.sh, use "local".
 # If the DSUB_PROVIDER is set, make sure it is correct for a provider test.
-#   Special-case the google-v2 tests to be runnable for google-cls-v2
+#   Special-case the google-cls-v2 tests to be runnable for google-batch
 #   and google-batch.
 
 readonly SCRIPT_NAME="$(basename "$0")"
@@ -46,12 +46,9 @@ readonly SCRIPT_DEFAULT_PROVIDER=$(
 if [[ -z "${DSUB_PROVIDER:-}" ]]; then
   readonly DSUB_PROVIDER="${SCRIPT_DEFAULT_PROVIDER:-local}"
 elif [[ -n "${SCRIPT_DEFAULT_PROVIDER}" ]]; then
-  if [[ "${DSUB_PROVIDER}" == "google-cls-v2" ]] && \
-     [[ "${SCRIPT_DEFAULT_PROVIDER}" == "google-v2" ]]; then
-     echo "Running google-v2 e2e/unit tests with provider google-cls-v2"
-  elif [[ "${DSUB_PROVIDER}" == "google-batch" ]] && \
-     [[ "${SCRIPT_DEFAULT_PROVIDER}" == "google-v2" ]]; then
-     echo "Running google-v2 e2e/unit tests with provider google-batch"
+  if [[ "${DSUB_PROVIDER}" == "google-batch" ]] && \
+     [[ "${SCRIPT_DEFAULT_PROVIDER}" == "google-cls-v2" ]]; then
+     echo "Running google-cls-v2 e2e/unit tests with provider google-batch"
   elif [[ "${DSUB_PROVIDER}" != "${SCRIPT_DEFAULT_PROVIDER}" ]]; then
     1>&2 echo "DSUB_PROVIDER is '${DSUB_PROVIDER:-}' not '${SCRIPT_DEFAULT_PROVIDER}'"
     exit 1
@@ -115,22 +112,6 @@ function dsub_google-cls-v2() {
     "${@}"
 }
 
-function dsub_google-v2() {
-  local zones="${ZONES:-}"
-  local regions="${REGIONS:-}"
-  if [[ -z "${regions}" ]] && [[ -z "${zones}" ]]; then
-    regions="us-central1"
-  fi
-
-  dsub \
-    --provider google-v2 \
-    --project "${PROJECT_ID}" \
-    --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
-    ${regions:+--regions "${regions}"} \
-    ${zones:+--zones "${zones}"} \
-    "${@}"
-}
-
 function dsub_local() {
   dsub \
     --provider local \
@@ -182,13 +163,6 @@ function dstat_google-cls-v2() {
     "${@}"
 }
 
-function dstat_google-v2() {
-  dstat \
-    --provider google-v2 \
-    --project "${PROJECT_ID}" \
-    "${@}"
-}
-
 function dstat_local() {
   dstat \
     --provider local \
@@ -220,13 +194,6 @@ function ddel_google-cls-v2() {
     --provider google-cls-v2 \
     --project "${PROJECT_ID}" \
     ${location:+--location "${location}"} \
-    "${@}"
-}
-
-function ddel_google-v2() {
-  ddel \
-    --provider google-v2 \
-    --project "${PROJECT_ID}" \
     "${@}"
 }
 
