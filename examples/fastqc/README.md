@@ -21,7 +21,7 @@ All of the source BAM files are stored in a public bucket at
 
 ## Setup
 
-* Follow the [dsub geting started](../../README.md#getting-started)
+* Follow the [dsub getting started](../../README.md#getting-started)
   instructions.
 
 * (Optional) [Enable](https://console.cloud.google.com/flows/enableapi?apiid=cloudbuild.googleapis.com)

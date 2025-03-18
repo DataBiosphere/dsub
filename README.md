@@ -45,7 +45,7 @@ To deactivate the virtual environment in your shell, run the command:
         deactivate
 
 Alternatively, a set of convenience scripts are provided that activate the
-virutalenv before calling `dsub`, `dstat`, and `ddel`. They are in the
+virtualenv before calling `dsub`, `dstat`, and `ddel`. They are in the
 [bin](https://github.com/DataBiosphere/dsub/tree/main/bin) directory. You can
 use these scripts if you don't want to activate the virtualenv explicitly in
 your shell.
@@ -472,7 +472,7 @@ using the environment variable. Please read
 and [Semantics](https://github.com/GoogleCloudPlatform/gcsfuse/blob/master/docs/semantics.md)
 before using Cloud Storage FUSE.
 
-##### Mounting an existing peristent disk
+##### Mounting an existing persistent disk
 
 To have the `google-cls-v2` or `google-batch` provider mount a persistent disk that
 you have pre-created and populated, use the `--mount` command line flag and the

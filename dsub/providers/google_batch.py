@@ -462,7 +462,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     # append the dsub task-id and task-attempt to the job-id for the
     # batch job ID.
     # For single-task dsub jobs, there is no task-id, so use 0.
-    # Use a '-' character as the delimeter because Batch API job ID
+    # Use a '-' character as the delimiter because Batch API job ID
     # must match regex ^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$
     task_id = task_metadata.get('task-id') or 0
     task_attempt = task_metadata.get('task-attempt') or 0
