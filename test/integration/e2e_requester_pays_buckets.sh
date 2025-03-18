@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 
 # This test is designed to verify that accessing a Requester Pays bucket
-# by specifiying a user-project to bill works. All input files used in this test
+# by specifying a user-project to bill works. All input files used in this test
 # are inside a requester-pays bucket.
 #
 # Note that we do not include a test for writing and logging to the requester

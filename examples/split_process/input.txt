@@ -9,9 +9,9 @@ l'homme comme l'idéal commun à atteindre par tous les peuples et toutes les
 nations afin que tous les individus et tous les organes de la société, ayant
 cette Déclaration constamment à l'esprit, s'efforcent, par l'enseignement et
 l'éducation, de développer le respect de ces droits et libertés et d'en assurer,
-par des mesures progressives d'ordre national et international, la
+par des measures progressives d'ordre national et international, la
 reconnaissance et l'application universelles et effectives, tant parmi les
-populations des Etats Membres eux-mêmes que parmi celles des territoires placés
+populations des Etats Membres eux-mêmes que parmi cells des territories placés
 sous leur juridiction.
 
 Article premier
@@ -35,4 +35,4 @@ autonome ou soumis à une limitation quelconque de souveraineté.
 
 Article 3
 
-Tout individu a droit à la vie, à la liberté et à la sûreté de sa personne.
+Tout individu a droit à la via, à la liberté et à la sûreté de sa personne.

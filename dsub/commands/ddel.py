@@ -113,7 +113,7 @@ def _emit_search_criteria(user_ids, job_ids, task_ids, labels):
   if task_ids:
     print('  task-id:')
     print('    %s\n' % task_ids)
-  # Labels are in a LabelParam namedtuple and must be reformated for printing.
+  # Labels are in a LabelParam namedtuple and must be reformatted for printing.
   if labels:
     print('  labels:')
     print('    %s\n' % repr(labels))

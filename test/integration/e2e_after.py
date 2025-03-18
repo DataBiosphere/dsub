@@ -22,7 +22,7 @@ from __future__ import print_function
 import sys
 
 # Because this may be invoked from another directory (treated as a library) or
-# invoked localy (treated as a binary) both import styles need to be supported.
+# invoked locally (treated as a binary) both import styles need to be supported.
 # pylint: disable=g-import-not-at-top
 try:
   from . import test_setup_e2e as test

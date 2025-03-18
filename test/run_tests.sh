@@ -207,7 +207,7 @@ function get_test_providers() {
     local providers="$(echo -n "${test_file}" | awk -F . '{ print $(NF-1) }')"
 
     # Special case the google-batch tests - don't run them when this flag is set
-    # To be renabled once batch client library is available in G3
+    # To be re-enabled once batch client library is available in G3
     if [[ "${providers}" == "google-batch" ]] && [[ "${NO_GOOGLE_BATCH_TESTS:-0}" -eq 1 ]]; then
       echo -n ""
     else

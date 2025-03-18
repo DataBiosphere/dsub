@@ -17,7 +17,7 @@ run on Google Cloud with minimal change (delete the --provider line).
 
 ## Setup
 
-* Follow the [dsub geting started](../../README.md#getting-started)
+* Follow the [dsub getting started](../../README.md#getting-started)
 instructions.
 
 Since this script uses the `local` backend provider, you will need

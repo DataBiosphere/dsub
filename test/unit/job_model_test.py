@@ -186,7 +186,7 @@ _ENV_LIST_JOB_DESCRIPTOR = job_model.JobDescriptor(
 # TASK_3 gs://bucket/path/NA06986.chrom18...bam gs://bucket/path/3/*.md5
 
 # pylint: disable=common_typos_disable
-# pilot3_exon_targetted_GRCh37_bams raises a "common typos" warning: "targetted"
+# pilot3_exon_targetted_GRCh37_bams raises a "common typos" warning: "targeted"
 
 _IO_TASKS_META = textwrap.dedent("""
   create-time: {}
