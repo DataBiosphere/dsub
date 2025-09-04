@@ -28,7 +28,6 @@ echo "Launching pipeline..."
 
 set +o errexit
 JOB_ID="$(run_dsub \
-  --image 'debian:stable-slim' \
   --name 'e2e-error' \
   --command 'idontknowhowtounix' \
   --wait)"

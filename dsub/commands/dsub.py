@@ -113,7 +113,7 @@ DEFAULT_INPUT_LOCAL_PATH = 'input'
 DEFAULT_OUTPUT_LOCAL_PATH = 'output'
 DEFAULT_MOUNT_LOCAL_PATH = 'mount'
 
-DEFAULT_IMAGE = 'ubuntu:14.04'
+DEFAULT_IMAGE = 'marketplace.gcr.io/google/ubuntu2204'
 
 
 class TaskParamAction(argparse.Action):
