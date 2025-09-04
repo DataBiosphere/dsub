@@ -48,6 +48,7 @@ def is_done(op: batch_v1.types.Job) -> bool:
   return op.status.state in [
       batch_v1.types.job.JobStatus.State.SUCCEEDED,
       batch_v1.types.job.JobStatus.State.FAILED,
+      batch_v1.types.job.JobStatus.State.CANCELLED,
   ]
 
 
@@ -56,10 +57,9 @@ def is_success(op: batch_v1.types.Job) -> bool:
   return op.status.state == batch_v1.types.job.JobStatus.State.SUCCEEDED
 
 
-def is_canceled() -> bool:
+def is_canceled(op: batch_v1.types.Job) -> bool:
   """Return whether the operation was canceled by the user."""
-  # TODO: Verify if the batch job has a canceled enum
-  return False
+  return op.status.state == batch_v1.types.job.JobStatus.State.CANCELLED
 
 
 def is_failed(op: batch_v1.types.Job) -> bool:
@@ -107,6 +107,44 @@ def get_preemptible(op: batch_v1.types.Job) -> bool:
     return False
   else:
     raise ValueError(f'Invalid provisioning_model value: {pm}')
+
+
+def get_boot_disk_size(op: batch_v1.types.Job) -> int:
+  return op.allocation_policy.instances[0].policy.boot_disk.size_gb
+
+
+def get_disk_size(op: batch_v1.types.Job) -> int:
+  return op.allocation_policy.instances[0].policy.disks[0].new_disk.size_gb
+
+
+def get_disk_type(op: batch_v1.types.Job) -> str:
+  return op.allocation_policy.instances[0].policy.disks[0].new_disk.type
+
+
+def get_machine_type(op: batch_v1.types.Job) -> str:
+  return op.allocation_policy.instances[0].policy.machine_type
+
+
+def get_zones(op: batch_v1.types.Job) -> List[str]:
+  list_of_locations = list(op.allocation_policy.location.allowed_locations)
+  # Filter to get only zones and remove the prefix
+  zones = [
+      location.replace('zones/', '')
+      for location in list_of_locations
+      if location.startswith('zones/')
+  ]
+  return zones
+
+
+def get_regions(op: batch_v1.types.Job) -> List[str]:
+  list_of_locations = list(op.allocation_policy.location.allowed_locations)
+  # Filter to get only regions and remove the prefix
+  regions = [
+      location.replace('regions/', '')
+      for location in list_of_locations
+      if location.startswith('regions/')
+  ]
+  return regions
 
 
 def build_job(

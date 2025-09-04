@@ -113,6 +113,8 @@ if ! util::dstat_yaml_job_has_valid_end_time "${DSTAT_OUTPUT}"; then
   exit 1
 fi
 
+echo "dstat output for ${JOB_ID} includes a valid end time."
+
 # Verify that there is a canceled event
 util::dstat_yaml_assert_field_equal "${DSTAT_OUTPUT}" "[0].events.[-1].name" "canceled"
 

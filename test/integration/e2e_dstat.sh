@@ -65,7 +65,12 @@ function verify_dstat_output() {
     check_completed_tasks="0 1 2"
   fi
 
-  local expected_events=(start pulling-image localizing-files running-docker delocalizing-files ok)
+  local expected_events
+  if [[ "${DSUB_PROVIDER}" == "google-batch" ]]; then
+    expected_events=(scheduled start ok)
+  else
+    expected_events=(start pulling-image localizing-files running-docker delocalizing-files ok)
+  fi
   for task in ${check_completed_tasks}; do
     util::dstat_out_assert_equal_events "${dstat_out}" "[${task}].events" "${expected_events[@]}"
   done
@@ -116,8 +121,12 @@ function verify_dstat_google_provider_fields() {
 
     # For simplicity, let's just check when the tasks are complete.
 
-    # Check boot disk: expect default of 10
-    util::dstat_yaml_assert_field_equal "${dstat_out}" "[${task}].provider-attributes.boot-disk-size" 10
+    # Check boot disk: expect default of 10 (30 for google-batch)
+    local expected_boot_disk_size=10
+    if [[ "${DSUB_PROVIDER}" == "google-batch" ]]; then
+      expected_boot_disk_size=30
+    fi
+    util::dstat_yaml_assert_field_equal "${dstat_out}" "[${task}].provider-attributes.boot-disk-size" "${expected_boot_disk_size}"
 
     # Check data disk: expect default of 200, pd-standard
     util::dstat_yaml_assert_field_equal "${dstat_out}" "[${task}].provider-attributes.disk-size" 200
@@ -130,19 +139,23 @@ function verify_dstat_google_provider_fields() {
     util::dstat_yaml_assert_boolean_field_equal "${dstat_out}" "[${task}].provider-attributes.preemptible" "false"
 
     # Check that instance name is not empty
-    local instance_name=$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider-attributes.instance-name")
-    if [[ -z "${instance_name}" ]]; then
-      1>&2 echo "  - FAILURE: Instance ${instance_name} for job ${job_name}, task $((task+1)) is empty."
-      1>&2 echo "${dstat_out}"
-      exit 1
-    fi
+    # Instance name is not available through google-batch provider
+    if [[ "${DSUB_PROVIDER}" != "google-batch" ]]; then
+      local instance_name=$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider-attributes.instance-name")
+      if [[ -z "${instance_name}" ]]; then
+        1>&2 echo "  - FAILURE: Instance ${instance_name} for job ${job_name}, task $((task+1)) is empty."
+        1>&2 echo "${dstat_out}"
+        exit 1
+      fi
 
-    # Check zone exists and is expected format
-    local job_zone=$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider-attributes.zone")
-    if ! [[ "${job_zone}" =~ ^[a-z]{1,4}-[a-z]{2,15}[0-9]-[a-z]$ ]]; then
-      1>&2 echo "  - FAILURE: Zone ${job_zone} for job ${job_name}, task $((task+1)) not valid."
-      1>&2 echo "${dstat_out}"
-      exit 1
+      # Check zone exists and is expected format
+      # Zone is not available through google-batch provider
+      local job_zone=$(python3 "${SCRIPT_DIR}"/get_data_value.py "yaml" "${dstat_out}" "[${task}].provider-attributes.zone")
+      if ! [[ "${job_zone}" =~ ^[a-z]{1,4}-[a-z]{2,15}[0-9]-[a-z]$ ]]; then
+        1>&2 echo "  - FAILURE: Zone ${job_zone} for job ${job_name}, task $((task+1)) not valid."
+        1>&2 echo "${dstat_out}"
+        exit 1
+      fi
     fi
   done
 
@@ -197,12 +210,6 @@ fi
 verify_dstat_output "${DSTAT_OUTPUT}"
 
 echo "Checking dstat (by job-name)..."
-
-# For the google provider, sleep briefly to allow the Pipelines v1
-# to set the compute properties, which occurs shortly after pipeline submit.
-if [[ "${DSUB_PROVIDER}" == "google" ]]; then
-  sleep 2
-fi
 
 if ! DSTAT_OUTPUT="$(run_dstat --status 'RUNNING' 'SUCCESS' --full --names "${RUNNING_JOB_NAME_2}" "${RUNNING_JOB_NAME}" "${COMPLETED_JOB_NAME}" --label "test-token=${TEST_TOKEN}")"; then
   1>&2 echo "dstat exited with a non-zero exit code!"
