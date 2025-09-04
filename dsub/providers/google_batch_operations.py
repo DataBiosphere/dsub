@@ -164,6 +164,7 @@ def build_job(
 def build_task_spec(
     runnables: List[batch_v1.types.task.Runnable],
     volumes: List[batch_v1.types.Volume],
+    max_run_duration: str,
 ) -> batch_v1.types.TaskSpec:
   """Build a TaskSpec object for a Batch request.
 
@@ -177,6 +178,7 @@ def build_task_spec(
   task_spec = batch_v1.TaskSpec()
   task_spec.runnables = runnables
   task_spec.volumes = volumes
+  task_spec.max_run_duration = max_run_duration
   return task_spec
 
 
