@@ -225,9 +225,14 @@ function get_test_providers() {
     e2e_after_fail.py | \
     e2e_after_fail.sh | \
     e2e_command_flag.sh | \
+    e2e_ddel.sh | \
+    e2e_ddel_tasks.sh | \
+    e2e_dstat.sh | \
+    e2e_dstat_tasks.sh | \
     e2e_dsub_summary.sh | \
     e2e_env_list.py | \
     e2e_env_tasks.sh | \
+    e2e_error.sh | \
     e2e_image.sh | \
     e2e_input_wildcards.sh | \
     e2e_io.sh | \
@@ -236,7 +241,9 @@ function get_test_providers() {
     e2e_io_mount_bucket.google-cls-v2.sh | \
     e2e_io_mount_bucket_requester_pays.google-cls-v2.sh | \
     e2e_io_recursive.sh | \
+    e2e_io_tasks.py | \
     e2e_io_tasks.sh | \
+    e2e_labels.sh | \
     e2e_logging_content.sh | \
     e2e_logging_fail.sh | \
     e2e_logging_paths.sh | \
@@ -248,13 +255,15 @@ function get_test_providers() {
     e2e_non_root.sh | \
     e2e_preemptible_retries_fail.google-cls-v2.sh | \
     e2e_python.sh | \
+    e2e_python_api.py | \
     e2e_requester_pays_buckets.sh | \
     e2e_retries_success.sh | \
     e2e_retries_fail_1.sh | \
     e2e_retries_fail_2.sh | \
     e2e_runtime.sh | \
     e2e_skip.sh | \
-    e2e_skip_tasks.sh)
+    e2e_skip_tasks.sh | \
+    e2e_user.google-cls-v2.sh)
       local all_provider_list="${DSUB_PROVIDER:-local google-cls-v2 google-batch}"
       ;;
     *)

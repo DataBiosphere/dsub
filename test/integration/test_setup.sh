@@ -94,6 +94,9 @@ function dsub_google-batch() {
     --project "${PROJECT_ID}" \
     ${location:+--location "${location}"} \
     --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
+    --network "global/networks/default" \
+    --subnetwork "regions/us-central1/subnetworks/default" \
+    --use-private-address \
     "${@}"
 }
 

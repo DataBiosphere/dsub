@@ -340,7 +340,10 @@ def _cancel_batch(batch_fn, cancel_fn, ops):
     """Callback for the cancel response."""
     del response  # unused
 
-    if exception:
+    if exception and isinstance(exception, TypeError):
+      # TODO: Remove once Batch Python Client is updated.
+      canceled.append({'name': request_id})
+    elif exception:
       # We don't generally expect any failures here, except possibly trying
       # to cancel an operation that is already canceled or finished.
       #

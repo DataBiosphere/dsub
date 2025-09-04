@@ -129,10 +129,9 @@ was assigned.**
 
 ### Ensure your job accesses only Google Services
 
-The default `--image` used for `dsub` tasks is `ubuntu:14.04` which is pulled
-from Dockerhub. For VMs that do not have a public IP address, set the `--image`
+The default `--image` used for `dsub` tasks is `marketplace.gcr.io/google/ubuntu2204` which is pulled
+from Artifact Registry. For VMs that do not have a public IP address, set the `--image`
 flag to a Docker image hosted by
-[Google Container Registry](https://cloud.google.com/container-registry/docs) or
 [Artifact Registry](https://cloud.google.com/artifact-registry/docs).
 
 Google provides a set of
