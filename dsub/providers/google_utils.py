@@ -26,10 +26,10 @@ from ..lib import job_model
 from ..lib import providers_util
 
 STATUS_FILTER_MAP = {
-    'RUNNING': 'done = false',
-    'CANCELED': 'error = 1',
-    'FAILURE': 'error > 1',
-    'SUCCESS': 'error = 0',
+    'RUNNING': 'status.state="RUNNING" OR status.state="QUEUED" OR status.state="SCHEDULED"',
+    'CANCELED': 'status.state="CANCELLED"',
+    'FAILURE': 'status.state="FAILED"',
+    'SUCCESS': 'status.state="SUCCEEDED"',
 }
 
 
@@ -54,7 +54,7 @@ def label_filter(label_key, label_value):
 
 def create_time_filter(create_time, comparator):
   """Return a valid createTime filter for operations.list()."""
-  return 'createTime {} "{}"'.format(comparator, create_time)
+  return 'createTime {} "{}"'.format(comparator, create_time.isoformat())
 
 
 # Generate command to create the directories for the dsub user environment
