@@ -177,7 +177,6 @@ def dsub_google_batch(dsub_args):
       "--project", PROJECT_ID,
       "--logging", LOGGING,
       "--regions", "us-central1",
-      "--regions", "us-central1",
       "--network", "global/networks/default",
       "--subnetwork", "regions/us-central1/subnetworks/default",
       "--use-private-address"
