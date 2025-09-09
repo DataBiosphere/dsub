@@ -18,7 +18,7 @@ All of the source VCF files are stored in a public bucket at
 
 ## Setup
 
-* Follow the [dsub geting started](../../README.md#getting-started)
+* Follow the [dsub getting started](../../README.md#getting-started)
 instructions.
 
 ## Decompress one file
@@ -85,7 +85,7 @@ Output should look like:
 ```
 ##fileformat=VCFv4.1
 ##FILTER=<ID=LowQual,Description="Low quality">
-##FILTER=<ID=PASS,Description="Passing basic quality fiters">
+##FILTER=<ID=PASS,Description="Passing basic quality filters">
 ##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth (reads with MQ=255 or with bad mates are filtered)">
 ```

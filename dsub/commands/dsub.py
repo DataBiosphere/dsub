@@ -700,7 +700,7 @@ def _generate_unique_job_id() -> str:
   """Generates a unique job identifier.
 
   Uses uuid4() to generate a Universally Unique IDentifier and performs a
-  small transformation to accomodate the Google Batch API.
+  small transformation to accommodate the Google Batch API.
 
   Google Batch requires a client-provided job identifier and
   requires that the first character be a non-digit.

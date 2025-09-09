@@ -30,7 +30,7 @@ documentation.
 
 ### Environment variables point to where to write `--output` files
 
-When you write your commands that run in your Docker container, you shoud
+When you write your commands that run in your Docker container, you should
 always write output files to the locations specified by the
 environment variables that are set for them.
 You may observe that providers consistently expect output files to be
@@ -197,7 +197,7 @@ The `local` provider does not support resource-related flags such as
 
 The `google-cls-v2` and `google-batch` providers share a significant amount of
 their implementation. The `google-cls-v2` provider utilizes the Google Cloud Life Sciences
-Piplines API [v2beta](https://cloud.google.com/life-sciences/docs/apis)
+Pipelines API [v2beta](https://cloud.google.com/life-sciences/docs/apis)
 while the `google-batch` provider utilizes the Google Cloud
 [Batch API](https://cloud.google.com/batch/docs/reference/rest)
 to queue a request for the following sequence of events:

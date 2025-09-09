@@ -35,7 +35,7 @@ including:
 
 - The folder for inputs is expected to be writeable. A historical pattern for
   some scripts has been to use the directory where inputs are as a scratch
-  working diretory. If your provider must make the input directories read-only
+  working directory. If your provider must make the input directories read-only
   it may limit portability of existing scripts.
 
 - The environment variable `TMPDIR` should be set explicitly to a directory
