@@ -42,7 +42,6 @@ echo "Launching pipeline..."
 run_dsub \
   --project "${PROJECT_ID}" \
   --logging "${LOGGING}" \
-  --image "debian:stable-slim" \
   --name "google_env.sh" \
   --command "${COMMAND}" \
   --wait

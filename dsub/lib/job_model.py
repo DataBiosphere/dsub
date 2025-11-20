@@ -445,6 +445,8 @@ class Resources(
         'max_retries',
         'max_preemptible_attempts',
         'block_external_network',
+        'boot_disk_image',
+        'install_gpu_drivers',
     ])):
   """Job resource parameters related to CPUs, memory, and disk.
 
@@ -484,6 +486,8 @@ class Resources(
       representing always preemtible.
     block_external_network (bool): Prevents the containers from accessing the
       external network.
+    boot_disk_image (str): Custom boot disk image to use
+    install_gpu_drivers (bool): Whether to install GPU drivers.
   """
   __slots__ = ()
 
@@ -515,7 +519,9 @@ class Resources(
               enable_stackdriver_monitoring=None,
               max_retries=None,
               max_preemptible_attempts=None,
-              block_external_network=None):
+              block_external_network=None,
+              boot_disk_image=None,
+              install_gpu_drivers=None):
     return super(Resources,
                  cls).__new__(cls, min_cores, min_ram, machine_type, disk_size,
                               disk_type, boot_disk_size, preemptible, image,
@@ -525,7 +531,8 @@ class Resources(
                               accelerator_count, nvidia_driver_version, timeout,
                               log_interval, ssh, enable_stackdriver_monitoring,
                               max_retries, max_preemptible_attempts,
-                              block_external_network)
+                              block_external_network, boot_disk_image,
+                              install_gpu_drivers)
 
 
 def ensure_job_params_are_complete(job_params):

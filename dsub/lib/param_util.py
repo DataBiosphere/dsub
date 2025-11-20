@@ -910,8 +910,7 @@ def age_to_create_time(age, from_time=None):
     else:
       # If no unit is given treat the age as seconds from epoch, otherwise apply
       # the correct time unit.
-      return dsub_util.replace_timezone(
-          datetime.datetime.utcfromtimestamp(int(age)), pytz.utc)
+      return datetime.datetime.fromtimestamp(int(age), tz=pytz.utc)
 
   except (ValueError, OverflowError) as e:
     raise ValueError('Unable to parse age string %s: %s' % (age, e))

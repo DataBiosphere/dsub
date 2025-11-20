@@ -27,7 +27,7 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 echo "Launching pipeline..."
 
 run_dsub \
-  --image python \
+  --image gcr.io/google-appengine/python \
   --script "${SCRIPT_DIR}/script_python.py" \
   --wait
 

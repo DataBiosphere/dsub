@@ -48,6 +48,7 @@ def is_done(op: batch_v1.types.Job) -> bool:
   return op.status.state in [
       batch_v1.types.job.JobStatus.State.SUCCEEDED,
       batch_v1.types.job.JobStatus.State.FAILED,
+      batch_v1.types.job.JobStatus.State.CANCELLED,
   ]
 
 
@@ -56,10 +57,9 @@ def is_success(op: batch_v1.types.Job) -> bool:
   return op.status.state == batch_v1.types.job.JobStatus.State.SUCCEEDED
 
 
-def is_canceled() -> bool:
+def is_canceled(op: batch_v1.types.Job) -> bool:
   """Return whether the operation was canceled by the user."""
-  # TODO: Verify if the batch job has a canceled enum
-  return False
+  return op.status.state == batch_v1.types.job.JobStatus.State.CANCELLED
 
 
 def is_failed(op: batch_v1.types.Job) -> bool:
@@ -109,6 +109,44 @@ def get_preemptible(op: batch_v1.types.Job) -> bool:
     raise ValueError(f'Invalid provisioning_model value: {pm}')
 
 
+def get_boot_disk_size(op: batch_v1.types.Job) -> int:
+  return op.allocation_policy.instances[0].policy.boot_disk.size_gb
+
+
+def get_disk_size(op: batch_v1.types.Job) -> int:
+  return op.allocation_policy.instances[0].policy.disks[0].new_disk.size_gb
+
+
+def get_disk_type(op: batch_v1.types.Job) -> str:
+  return op.allocation_policy.instances[0].policy.disks[0].new_disk.type
+
+
+def get_machine_type(op: batch_v1.types.Job) -> str:
+  return op.allocation_policy.instances[0].policy.machine_type
+
+
+def get_zones(op: batch_v1.types.Job) -> List[str]:
+  list_of_locations = list(op.allocation_policy.location.allowed_locations)
+  # Filter to get only zones and remove the prefix
+  zones = [
+      location.replace('zones/', '')
+      for location in list_of_locations
+      if location.startswith('zones/')
+  ]
+  return zones
+
+
+def get_regions(op: batch_v1.types.Job) -> List[str]:
+  list_of_locations = list(op.allocation_policy.location.allowed_locations)
+  # Filter to get only regions and remove the prefix
+  regions = [
+      location.replace('regions/', '')
+      for location in list_of_locations
+      if location.startswith('regions/')
+  ]
+  return regions
+
+
 def build_job(
     task_groups: List[batch_v1.types.TaskGroup],
     allocation_policy: batch_v1.types.AllocationPolicy,
@@ -126,6 +164,7 @@ def build_job(
 def build_task_spec(
     runnables: List[batch_v1.types.task.Runnable],
     volumes: List[batch_v1.types.Volume],
+    max_run_duration: str,
 ) -> batch_v1.types.TaskSpec:
   """Build a TaskSpec object for a Batch request.
 
@@ -139,6 +178,7 @@ def build_task_spec(
   task_spec = batch_v1.TaskSpec()
   task_spec.runnables = runnables
   task_spec.volumes = volumes
+  task_spec.max_run_duration = max_run_duration
   return task_spec
 
 
@@ -171,13 +211,14 @@ def build_task_group(
 
 
 def build_container(
-    image_uri: str, entrypoint: str, volumes: List[str], commands: List[str]
+    image_uri: str, entrypoint: str, volumes: List[str], commands: List[str], options: Optional[str]
 ) -> batch_v1.types.task.Runnable.Container:
   container = batch_v1.types.task.Runnable.Container()
   container.image_uri = image_uri
   container.entrypoint = entrypoint
   container.commands = commands
   container.volumes = volumes
+  container.options = options
   return container
 
 
@@ -189,6 +230,7 @@ def build_runnable(
     entrypoint: str,
     volumes: List[str],
     commands: List[str],
+    options: Optional[str],
 ) -> batch_v1.types.task.Runnable:
   """Build a Runnable object for a Batch request.
 
@@ -201,11 +243,12 @@ def build_runnable(
     entrypoint (str): Docker image entrypoint path
     volumes (List[str]): List of volume mounts (host_path:container_path)
     commands (List[str]): Command arguments to pass to the entrypoint
+    options (str): Container options such as "--gpus all"
 
   Returns:
     An object representing a Runnable
   """
-  container = build_container(image_uri, entrypoint, volumes, commands)
+  container = build_container(image_uri, entrypoint, volumes, commands, options)
   runnable = batch_v1.Runnable()
   runnable.container = container
   runnable.background = run_in_background
@@ -361,11 +404,13 @@ def build_attached_disk(
 
 
 def build_persistent_disk(
-    size_gb: int, disk_type: str
+    size_gb: int, disk_type: str, image: Optional[str]
 ) -> batch_v1.types.AllocationPolicy.Disk:
   disk = batch_v1.AllocationPolicy.Disk()
   disk.type = disk_type
   disk.size_gb = size_gb
+  if image:
+    disk.image = image
   return disk
 
 
