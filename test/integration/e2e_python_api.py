@@ -15,6 +15,7 @@
 
 from __future__ import print_function
 
+import datetime
 import sys
 import time
 
@@ -76,8 +77,12 @@ def dsub_start_job(command,
   labels['test-name'] = test_setup.TEST_NAME
 
   logging = param_util.build_logging_param(test.LOGGING)
+  zones = ['us-central1-*']
+  if test.DSUB_PROVIDER == 'google-batch':
+    zones = ['us-central1-a']
   job_resources = job_model.Resources(
-      image='ubuntu', logging=logging, zones=['us-central1-*'])
+      image='ubuntu', logging=logging, zones=zones
+  )
 
   env_data = {job_model.EnvParam(k, v) for (k, v) in envs.items()}
   label_data = {job_model.LabelParam(k, v) for (k, v) in labels.items()}
@@ -203,6 +208,10 @@ second_job = dstat_get_jobs(job_ids={job2['job-id']})[0]
 third_job = dstat_get_jobs(job_ids={job3['job-id']})[0]
 
 print('Checking jobs')
+# Add a small epsilon to the create_time_max to account for floating point
+# precision errors.
+epsilon = datetime.timedelta(seconds=0.1)
+
 first_ct = first_job['create-time']
 second_ct = second_job['create-time']
 third_ct = third_job['create-time']
@@ -210,63 +219,88 @@ third_ct = third_job['create-time']
 dstat_check_job_names(
     'Get jobs by create_time_min = {}.'.format(first_ct),
     ['job3', 'job2', 'job1'],
-    create_time_min=first_ct)
+    create_time_min=first_ct,
+)
 
 dstat_check_job_names(
-    'Get jobs by create_time_min = {}.'.format(second_ct), ['job3', 'job2'],
-    create_time_min=second_ct)
+    'Get jobs by create_time_min = {}.'.format(second_ct),
+    ['job3', 'job2'],
+    create_time_min=second_ct,
+)
 
 dstat_check_job_names(
-    'Get jobs by create_time_min = {}.'.format(third_ct), ['job3'],
-    create_time_min=third_ct)
+    'Get jobs by create_time_min = {}.'.format(third_ct),
+    ['job3'],
+    create_time_min=third_ct,
+)
 
 dstat_check_job_names(
-    'Get jobs by create_time_max = {}.'.format(first_ct), ['job1'],
-    create_time_max=first_ct)
+    'Get jobs by create_time_max = {}.'.format(first_ct + epsilon),
+    ['job1'],
+    create_time_max=first_ct + epsilon,
+)
 
 dstat_check_job_names(
-    'Get jobs by create_time_max = {}.'.format(second_ct), ['job2', 'job1'],
-    create_time_max=second_ct)
+    'Get jobs by create_time_max = {}.'.format(second_ct + epsilon),
+    ['job2', 'job1'],
+    create_time_max=second_ct + epsilon,
+)
 
 dstat_check_job_names(
     'Get jobs by create_time_max = {}.'.format(third_ct),
     ['job3', 'job2', 'job1'],
-    create_time_max=third_ct)
+    create_time_max=third_ct + epsilon,
+)
 
 dstat_check_job_names(
-    f'Get jobs by range: create_time_min = {first_ct}, create_time_max = {first_ct}.',
+    f'Get jobs by range: create_time_min = {first_ct}, create_time_max ='
+    f' {first_ct + epsilon}.',
     ['job1'],
     create_time_min=first_ct,
-    create_time_max=first_ct)
+    create_time_max=first_ct + epsilon,
+)
 
 dstat_check_job_names(
-    f'Get jobs by range: create_time_min = {second_ct}, create_time_max = {second_ct}.',
+    f'Get jobs by range: create_time_min = {second_ct}, create_time_max ='
+    f' {second_ct + epsilon}.',
     ['job2'],
     create_time_min=second_ct,
-    create_time_max=second_ct)
+    create_time_max=second_ct + epsilon,
+)
 
 dstat_check_job_names(
-    f'Get jobs by range: create_time_min = {third_ct}, create_time_max = {third_ct}.',
+    f'Get jobs by range: create_time_min = {third_ct}, create_time_max ='
+    f' {third_ct + epsilon}.',
     ['job3'],
     create_time_min=third_ct,
-    create_time_max=third_ct)
+    create_time_max=third_ct + epsilon,
+)
 
 dstat_check_job_names(
     'Get jobs by range: create_time_min = {}, create_time_max = {}.'.format(
-        first_ct, second_ct), ['job2', 'job1'],
+        first_ct, second_ct + epsilon
+    ),
+    ['job2', 'job1'],
     create_time_min=first_ct,
-    create_time_max=second_ct)
+    create_time_max=second_ct + epsilon,
+)
 
 dstat_check_job_names(
     'Get jobs by range: create_time_min = {}, create_time_max = {}.'.format(
-        second_ct, third_ct), ['job3', 'job2'],
+        second_ct, third_ct + epsilon
+    ),
+    ['job3', 'job2'],
     create_time_min=second_ct,
-    create_time_max=third_ct)
+    create_time_max=third_ct + epsilon,
+)
 
 dstat_check_job_names(
     'Get jobs by range: create_time_min = {}, create_time_max = {}.'.format(
-        first_ct, third_ct), ['job3', 'job2', 'job1'],
+        first_ct, third_ct + epsilon
+    ),
+    ['job3', 'job2', 'job1'],
     create_time_min=first_ct,
-    create_time_max=third_ct)
+    create_time_max=third_ct + epsilon,
+)
 
 print('SUCCESS')

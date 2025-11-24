@@ -18,7 +18,9 @@ Google Batch v1 APIs.
 """
 
 import ast
+import operator
 import os
+import re
 import sys
 import textwrap
 from typing import Dict, List, Set
@@ -92,7 +94,7 @@ _LOG_FILTER_SCRIPT_PATH = f'{_DATA_MOUNT_POINT}/.log_filter_script.py'
 #   [task_id:task/<job_uid>,runnable_index:<action_number>]
 
 # pylint: disable=anomalous-backslash-in-string
-_LOG_FILTER_PYTHON = textwrap.dedent("""
+_LOG_FILTER_PYTHON = textwrap.dedent(r"""
 import fileinput
 import glob
 import re
@@ -199,6 +201,52 @@ _CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
 """)
 
 
+_EVENT_REGEX_MAP = {
+    'scheduled': re.compile('^Job state is set from QUEUED to SCHEDULED'),
+    'start': re.compile('^Job state is set from SCHEDULED to RUNNING'),
+    'ok': re.compile('^Job state is set from RUNNING to SUCCEEDED'),
+    'fail': re.compile('^Job state is set from .+? to FAILED'),
+    'cancellation-in-progress': re.compile(
+        '^Job state is set from .+? to CANCELLATION_IN_PROGRESS'
+    ),
+    'canceled': re.compile('^Job state is set from .+? to CANCELLED'),
+}
+
+
+class GoogleBatchEventMap(object):
+  """Helper for extracing a set of normalized, filtered operation events."""
+
+  def __init__(self, op: batch_v1.types.Job):
+    self._op = op
+
+  def get_filtered_normalized_events(self):
+    """Map and filter the batch API events down to events of interest.
+
+    Returns:
+      A list of maps containing the normalized, filtered events.
+    """
+    events = {}
+    for event in google_batch_operations.get_status_events(self._op):
+      mapped, _ = self._map(event)
+      name = mapped['name']
+
+      events[name] = mapped
+
+    return sorted(list(events.values()), key=operator.itemgetter('event-time'))
+
+  def _map(self, event):
+    """Extract elements from a Batch status event and map to a named event."""
+    description = event.description
+    event_time = event.event_time.rfc3339()
+
+    for name, regex in _EVENT_REGEX_MAP.items():
+      match = regex.match(description)
+      if match:
+        return {'name': name, 'event-time': event_time}, match
+
+    return {'name': description, 'event-time': event_time}, None
+
+
 class GoogleBatchOperation(base.Task):
   """Task wrapper around a Batch API Job object."""
 
@@ -296,12 +344,19 @@ class GoogleBatchOperation(base.Task):
     elif field == 'provider':
       return _PROVIDER_NAME
     elif field == 'provider-attributes':
-      # TODO: This needs to return instance (VM) metadata
-      value = {}
-      value['preemptible'] = google_batch_operations.get_preemptible(self._op)
+      value = {
+          'boot-disk-size': google_batch_operations.get_boot_disk_size(
+              self._op
+          ),
+          'disk-size': google_batch_operations.get_disk_size(self._op),
+          'disk-type': google_batch_operations.get_disk_type(self._op),
+          'machine-type': google_batch_operations.get_machine_type(self._op),
+          'regions': google_batch_operations.get_regions(self._op),
+          'zones': google_batch_operations.get_zones(self._op),
+          'preemptible': google_batch_operations.get_preemptible(self._op),
+      }
     elif field == 'events':
-      # TODO: This needs to return a list of events
-      value = []
+      value = GoogleBatchEventMap(self._op).get_filtered_normalized_events()
     elif field == 'script-name':
       if self._job_descriptor:
         value = self._job_descriptor.job_metadata.get(field)
@@ -321,9 +376,14 @@ class GoogleBatchOperation(base.Task):
     elif field == 'status':
       value = self._operation_status()
     elif field == 'status-message':
-      value = self._operation_status_message()
+      msg, _, _ = self._operation_status_message()
+      value = msg
     elif field == 'status-detail':
-      value = self._operation_status_message()
+      # As much detail as we can reasonably get from the operation
+      msg, _, detail = self._operation_status_message()
+      if detail:
+        msg = detail
+      value = msg
     else:
       raise ValueError(f'Unsupported field: "{field}"')
 
@@ -348,7 +408,7 @@ class GoogleBatchOperation(base.Task):
       return 'RUNNING'
     if google_batch_operations.is_success(self._op):
       return 'SUCCESS'
-    if google_batch_operations.is_canceled():
+    if google_batch_operations.is_canceled(self._op):
       return 'CANCELED'
     if google_batch_operations.is_failed(self._op):
       return 'FAILURE'
@@ -360,11 +420,32 @@ class GoogleBatchOperation(base.Task):
     )
 
   def _operation_status_message(self):
-    # TODO: This is intended to grab as much detail as possible
-    # Currently, just grabbing the description field from the last status_event
+    """Returns the most relevant status string and failed action.
+
+    This string is meant for display only.
+
+    Returns:
+      A triple of:
+      - printable status message
+      - the action that failed (if any)
+      - a detail message (if available)
+    """
+    msg = ''
+    action = None
+    detail = None
     status_events = google_batch_operations.get_status_events(self._op)
+    if not google_batch_operations.is_done(self._op):
+      msg = 'RUNNING'
+    elif google_batch_operations.is_success(self._op):
+      msg = 'SUCCESS'
+    elif google_batch_operations.is_canceled(self._op):
+      msg = 'CANCELED'
+    elif google_batch_operations.is_failed(self._op):
+      msg = 'FAILURE'
+
     if status_events:
-      return status_events[-1].description
+      detail = status_events[-1].description
+    return msg, action, detail
 
 
 class GoogleBatchBatchHandler(object):
@@ -406,7 +487,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     return GoogleBatchBatchHandler
 
   def _operations_cancel_api_def(self):
-    return batch_v1.BatchServiceClient().delete_job
+    return batch_v1.BatchServiceClient().cancel_job
 
   def _get_provisioning_model(self, task_resources):
     if task_resources.preemptible:
@@ -435,10 +516,6 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     if not regions and not zones:
       return [f'regions/{self._location}']
     return (regions or []) + (zones or [])
-
-  def _get_create_time_filters(self, create_time_min, create_time_max):
-    # TODO: Currently, Batch API does not support filtering by create t.
-    return []
 
   def _get_logging_env(self, logging_uri, user_project, include_filter_script):
     """Returns the environment for actions that copy logging files."""
@@ -720,10 +797,11 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     # instance type and resources attached to each VM. The AllocationPolicy
     # describes when, where, and how compute resources should be allocated
     # for the Job.
+    boot_disk_size = (
+        job_resources.boot_disk_size if job_resources.boot_disk_size else 0
+    )
     boot_disk = google_batch_operations.build_persistent_disk(
-        size_gb=max(
-            job_resources.boot_disk_size, job_model.LARGE_BOOT_DISK_SIZE
-        ),
+        size_gb=max(boot_disk_size, job_model.LARGE_BOOT_DISK_SIZE),
         disk_type=job_model.DEFAULT_DISK_TYPE,
     )
     disk = google_batch_operations.build_persistent_disk(
@@ -800,7 +878,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
     # Bring together the task definition(s) and build the Job request.
     task_spec = google_batch_operations.build_task_spec(
-        runnables=runnables, volumes=([datadisk_volume] + gcs_volumes)
+        runnables=runnables, volumes=([datadisk_volume] + gcs_volumes), max_run_duration=job_resources.timeout
     )
     task_group = google_batch_operations.build_task_group(
         task_spec, task_count=1, task_count_per_node=1
@@ -938,11 +1016,8 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
       page_size=0,
   ):
     client = batch_v1.BatchServiceClient()
-    # TODO: Batch API has no 'done' filter like lifesciences API.
-    # Need to figure out how to filter for jobs that are completed.
-    empty_statuses = set()
     ops_filter = self._build_query_filter(
-        empty_statuses,
+        statuses,
         user_ids,
         job_ids,
         job_names,

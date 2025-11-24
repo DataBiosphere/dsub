@@ -81,14 +81,13 @@ def create_parser(prog):
 
   parser.add_argument(
       '--provider',
-      default='google-cls-v2',
-      choices=['local', 'google-cls-v2', 'google-batch', 'test-fails'],
+      default='google-batch',
+      choices=['local', 'google-batch', 'test-fails'],
       help="""Job service provider. Valid values are
-        "google-cls-v2" (Google's Pipelines API v2beta),
         "google-batch" (Google's Batch API v1alpha1),
         and "local" (local Docker execution).
         "test-*" providers are for testing purposes only.
-        (default: google-cls-v2)""",
+        (default: google-batch)""",
       metavar='PROVIDER',
   )
 

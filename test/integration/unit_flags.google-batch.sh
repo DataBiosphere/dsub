@@ -228,7 +228,7 @@ readonly -f test_no_service_account
 function test_network() {
   local subtest="${FUNCNAME[0]}"
 
-  if call_dsub \
+  if DOCKER_IMAGE_OVERRIDE="marketplace.gcr.io/google/debian9" call_dsub \
     --command 'echo "${TEST_NAME}"' \
     --network 'network-name-foo' \
     --subnetwork 'subnetwork-name-foo' \
@@ -311,24 +311,16 @@ function test_region_and_zone() {
     --zones us-central1-f \
     --regions us-central1; then
 
-    # Check that the output contains expected values
-    regions_result=$(grep " allowed_locations: \"regions/" "${TEST_STDERR}" | awk -F\" '{print $2}')
-    if [[ "${regions_result}" != "regions/us-central1" ]]; then
-        1>&2 echo "location was actually ${regions_result}, expected regions/us-central1"
-        exit 1
-    fi
-
-    zones_result=$(grep " allowed_locations: \"zones/" "${TEST_STDERR}" | awk -F\" '{print $2}')
-    if [[ "${zones_result}" != "zones/us-central1-f" ]]; then
-        1>&2 echo "location was actually ${zones_result}, expected zones/us-central1-f"
-        exit 1
-    fi
-
-    test_passed "${subtest}"
-  else
-    1>&2 echo "Location not used as default region"
+    1>&2 echo "Both regions and zones specified - not detected"
 
     test_failed "${subtest}"
+  else
+    assert_output_empty
+
+    assert_err_contains \
+      "ValueError: At most one of --regions and --zones may be specified"
+
+    test_passed "${subtest}"
   fi
 }
 readonly -f test_neither_region_nor_zone
