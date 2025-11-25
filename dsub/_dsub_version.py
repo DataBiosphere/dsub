@@ -26,4 +26,6 @@ A typical release sequence will be versioned as:
   0.1.3.dev0 -> 0.1.3 -> 0.1.4.dev0 -> ...
 """
 
-DSUB_VERSION = '0.5.1.dev0'
+
+DSUB_VERSION = '0.5.2.dev0'
+

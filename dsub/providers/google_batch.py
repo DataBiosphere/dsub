@@ -815,6 +815,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
       boot_disk_image = "batch-debian"
     else:
       boot_disk_image = None
+
     boot_disk = google_batch_operations.build_persistent_disk(
         size_gb=max(boot_disk_size, job_model.LARGE_BOOT_DISK_SIZE),
         disk_type=job_model.DEFAULT_DISK_TYPE,
