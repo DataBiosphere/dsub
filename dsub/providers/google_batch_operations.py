@@ -404,13 +404,12 @@ def build_attached_disk(
 
 
 def build_persistent_disk(
-    size_gb: int, disk_type: str, image: Optional[str]
+    size_gb: int, disk_type: str, image: str
 ) -> batch_v1.types.AllocationPolicy.Disk:
   disk = batch_v1.AllocationPolicy.Disk()
   disk.type = disk_type
   disk.size_gb = size_gb
-  if image:
-    disk.image = image
+  disk.image = image
   return disk
 
 
