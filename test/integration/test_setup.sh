@@ -89,16 +89,23 @@ function run_dsub() {
 }
 
 function dsub_google-batch() {
-  local location="${LOCATION:-}"
+  # Use REGIONS env var if set, otherwise fall back to LOCATION
+  local location="${LOCATION:-${REGIONS:-}}"
+
+  # Use environment variables for VPC-SC configuration if set
+  local network="${GPU_NETWORK:-global/networks/default}"
+  local subnetwork="${GPU_SUBNETWORK:-regions/us-central1/subnetworks/default}"
+  local service_account="${PET_SA_EMAIL:-}"
 
   dsub \
     --provider google-batch \
     --project "${PROJECT_ID}" \
     ${location:+--location "${location}"} \
     --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
-    --network "global/networks/default" \
-    --subnetwork "regions/us-central1/subnetworks/default" \
+    --network "${network}" \
+    --subnetwork "${subnetwork}" \
     --use-private-address \
+    ${service_account:+--service-account "${service_account}"} \
     "${@}"
 }
 
