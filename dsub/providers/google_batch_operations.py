@@ -211,13 +211,14 @@ def build_task_group(
 
 
 def build_container(
-    image_uri: str, entrypoint: str, volumes: List[str], commands: List[str]
+    image_uri: str, entrypoint: str, volumes: List[str], commands: List[str], options: Optional[str]
 ) -> batch_v1.types.task.Runnable.Container:
   container = batch_v1.types.task.Runnable.Container()
   container.image_uri = image_uri
   container.entrypoint = entrypoint
   container.commands = commands
   container.volumes = volumes
+  container.options = options
   return container
 
 
@@ -229,6 +230,7 @@ def build_runnable(
     entrypoint: str,
     volumes: List[str],
     commands: List[str],
+    options: Optional[str],
 ) -> batch_v1.types.task.Runnable:
   """Build a Runnable object for a Batch request.
 
@@ -241,11 +243,12 @@ def build_runnable(
     entrypoint (str): Docker image entrypoint path
     volumes (List[str]): List of volume mounts (host_path:container_path)
     commands (List[str]): Command arguments to pass to the entrypoint
+    options (str): Container options such as "--gpus all"
 
   Returns:
     An object representing a Runnable
   """
-  container = build_container(image_uri, entrypoint, volumes, commands)
+  container = build_container(image_uri, entrypoint, volumes, commands, options)
   runnable = batch_v1.Runnable()
   runnable.container = container
   runnable.background = run_in_background
@@ -401,11 +404,12 @@ def build_attached_disk(
 
 
 def build_persistent_disk(
-    size_gb: int, disk_type: str
+    size_gb: int, disk_type: str, image: str
 ) -> batch_v1.types.AllocationPolicy.Disk:
   disk = batch_v1.AllocationPolicy.Disk()
   disk.type = disk_type
   disk.size_gb = size_gb
+  disk.image = image
   return disk
 
 

@@ -89,6 +89,8 @@ function run_dsub() {
 }
 
 function dsub_google-batch() {
+  local location="${LOCATION:-}"
+
   dsub \
     --provider google-batch \
     --project "${PROJECT_ID}" \
