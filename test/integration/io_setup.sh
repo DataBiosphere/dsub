@@ -230,7 +230,7 @@ function io_setup::check_dstat() {
   local dstat_output=$(run_dstat --status '*' --jobs "${job_id}" --full)
 
   echo "  Checking user-id"
-  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].user-id" "${USER}"
+  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].user-id" "${USER:-jupyter}"
 
   echo "  Checking logging"
   util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].logging" "${LOGGING}"

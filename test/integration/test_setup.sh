@@ -30,6 +30,9 @@
 # * Provide functions run_dsub, run_dstat, run_ddel which will call a function
 #   with DSUB_PROVIDER-specific default parameters set.
 
+# Set default USER if not already set (needed for Jupyterlab/Docker environments)
+export USER="${USER:-jupyter}"
+
 # If the DSUB_PROVIDER is not set, figure it out from the name of the script.
 #   If the script name is <test>.<provider>.sh, pull out the provider.
 #   If the script name is <test>.sh, use "local".

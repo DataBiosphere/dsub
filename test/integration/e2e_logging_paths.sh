@@ -27,7 +27,7 @@ readonly LOGGING_BASE="$(dirname "${LOGGING}")"
 declare LOGGING_OVERRIDE
 
 readonly JOB_NAME="log-test"
-readonly JOB_USER="${USER}"
+readonly JOB_USER="${USER:-jupyter}"
 
 # Test a basic job with base logging path
 echo "Subtest #1: Basic logging path"

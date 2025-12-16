@@ -119,7 +119,7 @@ function io_tasks_setup::check_dstat() {
     echo "  Check task ${task_id}"
 
     echo "    Checking user-id"
-    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].user-id" "${USER}"
+    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].user-id" "${USER:-jupyter}"
 
     echo "    Checking logging"
     util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].logging" "${LOGGING}/${job_id}.${task_id}.log"
