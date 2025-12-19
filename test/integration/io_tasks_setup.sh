@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+readonly JOB_USER="${USER:-whoami}"
 readonly POPULATION_FILE="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/20131219.superpopulations.tsv"
 readonly POPULATION_MD5="68a73f849b82071afe11888bac1aa8a7"
 
@@ -119,7 +120,7 @@ function io_tasks_setup::check_dstat() {
     echo "  Check task ${task_id}"
 
     echo "    Checking user-id"
-    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].user-id" "${USER:-jupyter}"
+    util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].user-id" "${JOB_USER}"
 
     echo "    Checking logging"
     util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].logging" "${LOGGING}/${job_id}.${task_id}.log"

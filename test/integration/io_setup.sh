@@ -26,6 +26,8 @@ readonly INPUT_BAM_MD5="4afb9b8908959dbd4e2d5c54bf254c93"
 readonly REQUESTER_PAYS_INPUT_BAM_FULL_PATH="gs://${DSUB_BUCKET_REQUESTER_PAYS}/${INPUT_BAM_FILE}"
 readonly REQUESTER_PAYS_POPULATION_FILE_FULL_PATH="gs://${DSUB_BUCKET_REQUESTER_PAYS}/${POPULATION_FILE}"
 
+# Set user variable like in other tests
+readonly JOB_USER="${USER:-whoami}"
 # This is the image we use to test the PD mount feature.
 # Inject the TEST_TOKEN into the name so that multiple tests can run
 # concurrently. Since the image test can be run multiple times for one
@@ -230,7 +232,7 @@ function io_setup::check_dstat() {
   local dstat_output=$(run_dstat --status '*' --jobs "${job_id}" --full)
 
   echo "  Checking user-id"
-  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].user-id" "${USER:-jupyter}"
+  util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].user-id" "${JOB_USER}"
 
   echo "  Checking logging"
   util::dstat_yaml_assert_field_equal "${dstat_output}" "[0].logging" "${LOGGING}"
