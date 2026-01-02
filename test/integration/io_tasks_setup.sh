@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-readonly JOB_USER="${USER:-whoami}"
+readonly JOB_USER="${USER:-$(whoami)}"
 readonly POPULATION_FILE="gs://genomics-public-data/ftp-trace.ncbi.nih.gov/1000genomes/ftp/20131219.superpopulations.tsv"
 readonly POPULATION_MD5="68a73f849b82071afe11888bac1aa8a7"
 

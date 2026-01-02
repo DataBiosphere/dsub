@@ -27,7 +27,7 @@ readonly REQUESTER_PAYS_INPUT_BAM_FULL_PATH="gs://${DSUB_BUCKET_REQUESTER_PAYS}/
 readonly REQUESTER_PAYS_POPULATION_FILE_FULL_PATH="gs://${DSUB_BUCKET_REQUESTER_PAYS}/${POPULATION_FILE}"
 
 # Set user variable like in other tests
-readonly JOB_USER="${USER:-whoami}"
+readonly JOB_USER="${USER:-$(whoami)}"
 # This is the image we use to test the PD mount feature.
 # Inject the TEST_TOKEN into the name so that multiple tests can run
 # concurrently. Since the image test can be run multiple times for one
