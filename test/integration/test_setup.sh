@@ -31,7 +31,7 @@
 #   with DSUB_PROVIDER-specific default parameters set.
 
 # Set default USER if not already set (needed for Jupyterlab/Docker environments)
-export USER="${USER:-jupyter}"
+export USER="${USER:-$(whoami)}"
 
 # If the DSUB_PROVIDER is not set, figure it out from the name of the script.
 #   If the script name is <test>.<provider>.sh, pull out the provider.
