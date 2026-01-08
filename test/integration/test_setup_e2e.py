@@ -171,16 +171,27 @@ def dsub_google_batch(dsub_args):
     if val:
       opt_args.append(var[1], val)
 
-  # pyformat: disable
-  return dsub_command.call([
+  # Use environment variables for VPC-SC configuration if set
+  network = os.environ.get("GPU_NETWORK", "global/networks/default")
+  subnetwork = os.environ.get("GPU_SUBNETWORK",
+                               "regions/us-central1/subnetworks/default")
+  location = os.environ.get("LOCATION", os.environ.get("REGIONS", "us-central1"))
+  service_account = os.environ.get("PET_SA_EMAIL", "")
+
+  args = [
       "--provider", "google-batch",
       "--project", PROJECT_ID,
       "--logging", LOGGING,
-      "--regions", "us-central1",
-      "--network", "global/networks/default",
-      "--subnetwork", "regions/us-central1/subnetworks/default",
+      "--regions", location,
+      "--network", network,
+      "--subnetwork", subnetwork,
       "--use-private-address"
-      ] + opt_args + dsub_args)
+  ]
+  if service_account:
+    args.extend(["--service-account", service_account])
+
+  # pyformat: disable
+  return dsub_command.call(args + opt_args + dsub_args)
   # pyformat: enable
 
 
