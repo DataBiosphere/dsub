@@ -30,6 +30,9 @@
 # * Provide functions run_dsub, run_dstat, run_ddel which will call a function
 #   with DSUB_PROVIDER-specific default parameters set.
 
+# Set default USER if not already set (needed for Jupyterlab/Docker environments)
+export USER="${USER:-$(whoami)}"
+
 # If the DSUB_PROVIDER is not set, figure it out from the name of the script.
 #   If the script name is <test>.<provider>.sh, pull out the provider.
 #   If the script name is <test>.sh, use "local".
@@ -89,11 +92,23 @@ function run_dsub() {
 }
 
 function dsub_google-batch() {
+  # Use REGIONS env var if set, otherwise fall back to LOCATION
+  local location="${LOCATION:-${REGIONS:-}}"
+
+  # Use environment variables for VPC-SC configuration if set
+  local network="${GPU_NETWORK:-global/networks/default}"
+  local subnetwork="${GPU_SUBNETWORK:-regions/us-central1/subnetworks/default}"
+  local service_account="${PET_SA_EMAIL:-}"
+
   dsub \
     --provider google-batch \
     --project "${PROJECT_ID}" \
     ${location:+--location "${location}"} \
     --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
+    --network "${network}" \
+    --subnetwork "${subnetwork}" \
+    --use-private-address \
+    ${service_account:+--service-account "${service_account}"} \
     "${@}"
 }
 

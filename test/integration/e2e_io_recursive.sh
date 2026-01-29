@@ -69,7 +69,7 @@ gsutil -m rsync -r "${LOCAL_INPUTS}" "${INPUTS}/"
 echo "Launching pipeline..."
 
 JOB_ID="$(run_dsub \
-  --image "google/cloud-sdk:latest" \
+  --image "gcr.io/google.com/cloudsdktool/google-cloud-cli:latest" \
   --script "${SCRIPT_DIR}/script_io_recursive.sh" \
   --env FILE_CONTENTS="${FILE_CONTENTS}" \
   --input INPUT_PATH_SHALLOW="${INPUTS}/shallow/*" \

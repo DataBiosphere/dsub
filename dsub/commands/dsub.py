@@ -113,7 +113,7 @@ DEFAULT_INPUT_LOCAL_PATH = 'input'
 DEFAULT_OUTPUT_LOCAL_PATH = 'output'
 DEFAULT_MOUNT_LOCAL_PATH = 'mount'
 
-DEFAULT_IMAGE = 'ubuntu:14.04'
+DEFAULT_IMAGE = 'marketplace.gcr.io/google/ubuntu2204'
 
 
 class TaskParamAction(argparse.Action):
@@ -202,11 +202,12 @@ def _check_nvidia_driver_version(args):
     )
 
 
-def _google_cls_v2_parse_arguments(args):
-  """Validated google-cls-v2 arguments."""
+def _google_parse_arguments(args):
+  """Validated google-cls-v2 and google-batch arguments."""
 
-  # For the google-cls-v2 provider, the addition of the "--location" parameter,
-  # along with a default (us-central1), we can just default everything.
+  # For the google-cls-v2 and google-batch providers, with the addition of the
+  # "--location" parameter, along with a default (us-central1), we can just
+  # default everything.
 
   # So we only need to validate that there is not both a region and zone.
   if (args.zones and args.regions):
@@ -215,6 +216,12 @@ def _google_cls_v2_parse_arguments(args):
   if args.machine_type and (args.min_cores or args.min_ram):
     raise ValueError(
         '--machine-type not supported together with --min-cores or --min-ram.')
+
+  if args.provider == 'google-batch':
+    if args.zones and any('*' in zone for zone in args.zones):
+      raise ValueError('Wildcard zones not supported for google-batch.')
+    if args.regions and any('*' in region for region in args.regions):
+      raise ValueError('Wildcard regions not supported for google-batch.')
 
   _check_private_address(args)
   _check_nvidia_driver_version(args)
@@ -495,6 +502,20 @@ def _parse_arguments(prog, argv):
           instances: NVIDIA(R) Tesla(R) drivers and NVIDIA(R) CUDA toolkit.
           (default: 0)""")
   google_common.add_argument(
+      '--boot-disk-image',
+      help="""Custom boot disk image to use (e.g., a deeplearning image with
+          GPU drivers pre-installed). If not specified and an accelerator is
+          present, the `google-batch` provider defaults to 'batch-debian'.
+          (default: None)""")
+  google_common.add_argument(
+      '--install-gpu-drivers',
+      type=lambda x: {'true': True, 'false': False}[x.lower()],
+      default=None,
+      help="""Whether to install GPU drivers. Defaults to true when an
+          accelerator is present. Set to false when
+          using images with pre-installed drivers. Valid values: true, false.
+          (default: auto-detect)""")
+  google_common.add_argument(
       '--credentials-file',
       type=str,
       help='Path to a local file with JSON credentials for a service account.')
@@ -591,8 +612,8 @@ def _parse_arguments(prog, argv):
           'local': ['logging'],
       }, argv)
 
-  if args.provider == 'google-cls-v2':
-    _google_cls_v2_parse_arguments(args)
+  if args.provider == 'google-cls-v2' or args.provider == 'google-batch':
+    _google_parse_arguments(args)
 
   return args
 
@@ -638,7 +659,9 @@ def _get_job_resources(args):
       enable_stackdriver_monitoring=args.enable_stackdriver_monitoring,
       max_retries=args.retries,
       max_preemptible_attempts=args.preemptible,
-      block_external_network=args.block_external_network)
+      block_external_network=args.block_external_network,
+      boot_disk_image=args.boot_disk_image,
+      install_gpu_drivers=args.install_gpu_drivers)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids,

@@ -28,7 +28,6 @@ echo "Launching pipeline..."
 
 set +o errexit
 JOB_ID="$(run_dsub \
-  --image 'debian:stable-slim' \
   --name 'e2e-error' \
   --command 'idontknowhowtounix' \
   --wait)"
@@ -44,6 +43,8 @@ declare -a EXPECTED_EVENTS
 if [[ "${DSUB_PROVIDER}" == "local" ]]; then
   # The local provider has slightly different events in this error case
   EXPECTED_EVENTS=(start pulling-image localizing-files running-docker delocalizing-files fail)
+elif [[ "${DSUB_PROVIDER}" == "google-batch" ]]; then
+  EXPECTED_EVENTS=(scheduled start fail)
 else
   EXPECTED_EVENTS=(start pulling-image localizing-files running-docker fail)
 fi

@@ -32,7 +32,6 @@ echo "Launching pipeline..."
 
 BOOT_DISK_SIZE=20 \
 run_dsub \
-  --image "debian:stable-slim" \
   --min-cores "1" \
   --min-ram "3.75" \
   --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \

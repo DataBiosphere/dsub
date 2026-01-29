@@ -8,6 +8,7 @@ container in order to run:
 * --image "Docker image"
 * --input "path to file in cloud storage"
 * --input-recursive "path to directory in cloud storage"
+* --boot-disk-image "Custom boot disk image to use"
 
 The following explains each option and how to choose which to use.
 
@@ -231,3 +232,12 @@ chmod u+x ${SCRIPT_DIR}/*.sh
 ${SCRIPT_DIR}/script1.sh
 ${SCRIPT_DIR}/script2.sh
 ```
+
+## --boot-disk-image "Custom boot disk image to use"
+
+For most uses, the underlying virtual machine image is transparent to your tasks; the provider default is sufficient. However, there are cases where you may want to specify a custom boot disk image.
+
+When using GPU accelerators, an image with GPU drivers is needed. The `google-batch` provider will automatically select the `batch-debian` image when `--accelerator-type` and `--accelerator-count` are specified. 
+
+If your `dsub` task does not have internet access, it may fail as this image will attempt to update the GPU drivers. You may instead pre-build a custom image with the drivers installed, specify it with the `--boot-disk-image`, and set '--install-gpu-drivers' to `false`
+Specifically for the `google-batch` provider, information about available images can be found [here](https://cloud.google.com/batch/docs/view-os-images)

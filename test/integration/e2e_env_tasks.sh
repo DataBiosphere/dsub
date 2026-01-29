@@ -50,7 +50,6 @@ echo "Launching pipeline..."
 # VAL4 tests spaces in variable values
 # VAR6 tests empty variable value
 run_dsub \
-  --image "ubuntu" \
   --script "${SCRIPT_DIR}/script_env_test.sh" \
   --env VAR1="VAL1" VAR2="VAL2" VAR3="VAL3" \
   --env VAR4="VAL4 (four)" \
