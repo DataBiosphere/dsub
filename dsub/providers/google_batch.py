@@ -742,7 +742,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     for gcs_volume in self._get_gcs_volumes_for_user_command(mounts):
       user_command_volumes.append(gcs_volume)
     # Add --gpus all option for GPU-enabled containers
-    container_options = "--gpus all" if job_resources.accelerator_type and job_resources.accelerator_type.startswith('nvidia') else None
+    container_options = '--gpus all' if job_resources.accelerator_type and job_resources.accelerator_type.startswith('nvidia') else None
     runnables.append(
         # user-command
         google_batch_operations.build_runnable(
@@ -812,7 +812,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     if job_resources.boot_disk_image:
       boot_disk_image = job_resources.boot_disk_image
     elif job_resources.accelerator_type and job_resources.accelerator_type.startswith('nvidia'):
-      boot_disk_image = "batch-debian"
+      boot_disk_image = 'batch-debian'
     else:
       boot_disk_image = None
 
@@ -855,10 +855,8 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     # Determine whether to install GPU drivers: use user-specified value, or default to True for GPU jobs
     if job_resources.install_gpu_drivers is not None:
       install_gpu_drivers = job_resources.install_gpu_drivers
-    elif job_resources.accelerator_type is not None:
-      install_gpu_drivers = True
     else:
-      install_gpu_drivers = False
+      install_gpu_drivers = job_resources.accelerator_type is not None
 
     ipt = google_batch_operations.build_instance_policy_or_template(
         instance_policy=instance_policy,
