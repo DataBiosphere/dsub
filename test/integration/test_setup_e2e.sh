@@ -81,6 +81,46 @@ else
   DSUB_BUCKET_REQUESTER_PAYS="dsub-test-requester-pays-public"
 fi
 
+# GPU-specific prerequisites (optional, only needed for GPU tests)
+if [[ -n "${DOCKER_IMAGE:-}" ]]; then
+  echo "  GAR image for GPU tests: ${DOCKER_IMAGE}"
+
+  # Check if PET_SA_EMAIL is also set
+  if [[ -z "${PET_SA_EMAIL:-}" ]]; then
+    1>&2 echo "WARNING: DOCKER_IMAGE is set but PET_SA_EMAIL is not."
+    1>&2 echo "GPU tests require both DOCKER_IMAGE and PET_SA_EMAIL to be set."
+  else
+    echo "  Service account for GPU tests: ${PET_SA_EMAIL}"
+
+    # Validate that the service account can access the GAR image
+    # echo "  Validating service account access to GAR image..."
+
+    # # Extract the repository from the image path
+    # # Format: REGION-docker.pkg.dev/PROJECT/REPO/IMAGE:TAG
+    # GAR_REPO=$(echo "${DOCKER_IMAGE}" | sed -E 's|^([^/]+/[^/]+/[^/]+)/.*|\1|')
+
+    # # Check if the service account has permission to pull from this repository
+    # # We'll use gcloud artifacts docker images describe with impersonation
+    # if ! gcloud artifacts docker images describe "${DOCKER_IMAGE}" \
+    #      --impersonate-service-account="${PET_SA_EMAIL}" \
+    #      --quiet 2>/dev/null; then
+    #   1>&2 echo "WARNING: Service account ${PET_SA_EMAIL} may not have access to ${DOCKER_IMAGE}"
+    #   1>&2 echo "Please ensure the service account has 'Artifact Registry Reader' role on the repository."
+    #   1>&2 echo "You can grant access with:"
+    #   1>&2 echo "  gcloud artifacts repositories add-iam-policy-binding REPO_NAME \\"
+    #   1>&2 echo "    --location=LOCATION \\"
+    #   1>&2 echo "    --member=serviceAccount:${PET_SA_EMAIL} \\"
+    #   1>&2 echo "    --role=roles/artifactregistry.reader"
+    # else
+    #   echo "  ✓ Service account has access to GAR image"
+    # fi
+  fi
+elif [[ -n "${PET_SA_EMAIL:-}" ]]; then
+  echo "  Service account for GPU tests: ${PET_SA_EMAIL}"
+  1>&2 echo "WARNING: PET_SA_EMAIL is set but DOCKER_IMAGE is not."
+  1>&2 echo "GPU tests require both DOCKER_IMAGE and PET_SA_EMAIL to be set."
+fi
+
 # Set standard LOGGING, INPUTS, and OUTPUTS values
 readonly TEST_GCS_ROOT="gs://${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}"
 readonly TEST_GCS_DOCKER_ROOT="gs/${DSUB_BUCKET}/dsub/sh/${DSUB_PROVIDER}/${TEST_NAME}"

@@ -698,6 +698,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             entrypoint='/bin/bash',
             volumes=[f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}'],
             commands=['-c', continuous_logging_cmd],
+            options=None
         )
     )
 
@@ -711,6 +712,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             entrypoint='/bin/bash',
             volumes=[f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}'],
             commands=['-c', prepare_command],
+            options=None
         )
     )
 
@@ -732,12 +734,15 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
                     cp_loop=google_utils.LOCALIZATION_LOOP,
                 ),
             ],
+            options=None
         )
     )
 
     user_command_volumes = [f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}']
     for gcs_volume in self._get_gcs_volumes_for_user_command(mounts):
       user_command_volumes.append(gcs_volume)
+    # Add --gpus all option for GPU-enabled containers
+    container_options = '--gpus all' if job_resources.accelerator_type and job_resources.accelerator_type.startswith('nvidia') else None
     runnables.append(
         # user-command
         google_batch_operations.build_runnable(
@@ -756,6 +761,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
                     user_script=script_path,
                 ),
             ],
+            options=container_options,
         )
     )
 
@@ -777,6 +783,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
                     cp_loop=google_utils.DELOCALIZATION_LOOP,
                 ),
             ],
+            options=None
         )
     )
 
@@ -790,6 +797,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             entrypoint='/bin/bash',
             volumes=[f'{_VOLUME_MOUNT_POINT}:{_DATA_MOUNT_POINT}'],
             commands=['-c', logging_cmd],
+            options=None
         ),
     )
 
@@ -800,13 +808,23 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     boot_disk_size = (
         job_resources.boot_disk_size if job_resources.boot_disk_size else 0
     )
+    # Determine boot disk image: use user-specified value, or default to batch-debian for GPU jobs
+    if job_resources.boot_disk_image:
+      boot_disk_image = job_resources.boot_disk_image
+    elif job_resources.accelerator_type and job_resources.accelerator_type.startswith('nvidia'):
+      boot_disk_image = 'batch-debian'
+    else:
+      boot_disk_image = None
+
     boot_disk = google_batch_operations.build_persistent_disk(
         size_gb=max(boot_disk_size, job_model.LARGE_BOOT_DISK_SIZE),
         disk_type=job_model.DEFAULT_DISK_TYPE,
+        image=boot_disk_image,
     )
     disk = google_batch_operations.build_persistent_disk(
         size_gb=job_resources.disk_size,
         disk_type=job_resources.disk_type or job_model.DEFAULT_DISK_TYPE,
+        image=None
     )
     attached_disk = google_batch_operations.build_attached_disk(
         disk=disk, device_name=google_utils.DATA_DISK_NAME
@@ -834,11 +852,15 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         provisioning_model=self._get_provisioning_model(task_resources),
     )
 
+    # Determine whether to install GPU drivers: use user-specified value, or default to True for GPU jobs
+    if job_resources.install_gpu_drivers is not None:
+      install_gpu_drivers = job_resources.install_gpu_drivers
+    else:
+      install_gpu_drivers = job_resources.accelerator_type is not None
+
     ipt = google_batch_operations.build_instance_policy_or_template(
         instance_policy=instance_policy,
-        install_gpu_drivers=True
-        if job_resources.accelerator_type is not None
-        else False,
+        install_gpu_drivers=install_gpu_drivers,
     )
 
     if job_resources.service_account:
