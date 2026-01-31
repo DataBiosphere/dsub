@@ -31,7 +31,7 @@ readonly LOGGING_BASE="$(dirname "${LOGGING}")"
 declare LOGGING_OVERRIDE
 
 readonly JOB_NAME=$(logging_paths_tasks_setup::get_job_name)
-readonly JOB_USER="${USER}"
+readonly JOB_USER="${USER:-$(whoami)}"
 
 # Set up the tasks file
 logging_paths_tasks_setup::write_tasks_file

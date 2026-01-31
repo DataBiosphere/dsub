@@ -502,6 +502,20 @@ def _parse_arguments(prog, argv):
           instances: NVIDIA(R) Tesla(R) drivers and NVIDIA(R) CUDA toolkit.
           (default: 0)""")
   google_common.add_argument(
+      '--boot-disk-image',
+      help="""Custom boot disk image to use (e.g., a deeplearning image with
+          GPU drivers pre-installed). If not specified and an accelerator is
+          present, the `google-batch` provider defaults to 'batch-debian'.
+          (default: None)""")
+  google_common.add_argument(
+      '--install-gpu-drivers',
+      type=lambda x: {'true': True, 'false': False}[x.lower()],
+      default=None,
+      help="""Whether to install GPU drivers. Defaults to true when an
+          accelerator is present. Set to false when
+          using images with pre-installed drivers. Valid values: true, false.
+          (default: auto-detect)""")
+  google_common.add_argument(
       '--credentials-file',
       type=str,
       help='Path to a local file with JSON credentials for a service account.')
@@ -645,7 +659,9 @@ def _get_job_resources(args):
       enable_stackdriver_monitoring=args.enable_stackdriver_monitoring,
       max_retries=args.retries,
       max_preemptible_attempts=args.preemptible,
-      block_external_network=args.block_external_network)
+      block_external_network=args.block_external_network,
+      boot_disk_image=args.boot_disk_image,
+      install_gpu_drivers=args.install_gpu_drivers)
 
 
 def _get_job_metadata(provider, user_id, job_name, script, task_ids,
