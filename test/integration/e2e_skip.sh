@@ -29,9 +29,9 @@ source "${SCRIPT_DIR}/test_setup_e2e.sh"
 TEST_FILE_PATH_1="${OUTPUTS}/testfile_1.txt"
 TEST_FILE_PATH_2="${OUTPUTS}/testfile_2.txt"
 
-echo "hello world" | gsutil cp - "${TEST_FILE_PATH_1}"
+echo "hello world" | gcloud storage cp - "${TEST_FILE_PATH_1}"
 
-if gsutil ls "${TEST_FILE_PATH_2}" &> /dev/null; then
+if gcloud storage ls "${TEST_FILE_PATH_2}" &> /dev/null; then
   echo "Unexpected: the output file '${TEST_FILE_PATH_1}' already exists."
   exit 1
 fi
@@ -44,7 +44,7 @@ JOB_ID="$(
     --skip \
     --wait)"
 
-RESULT="$(gsutil cat "${TEST_FILE_PATH_1}")"
+RESULT="$(gcloud storage cat "${TEST_FILE_PATH_1}")"
 if [[ "${RESULT}" != "hello world" ]]; then
   echo "Output file does not match expected (from step 4)"
   echo "Expected: hello world"
@@ -60,7 +60,7 @@ JOB_ID="$(
     --skip \
     --wait)"
 
-RESULT="$(gsutil cat "${TEST_FILE_PATH_2}")"
+RESULT="$(gcloud storage cat "${TEST_FILE_PATH_2}")"
 if [[ "${RESULT}" != "hello from the job" ]]; then
   echo "Output file does not match expected (from step 2)"
   echo "Expected: hello world"

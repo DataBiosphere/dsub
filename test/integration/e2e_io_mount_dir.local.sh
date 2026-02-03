@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 
 # This test verifies that mounting a local directory works. The test will copy
-# input files via gsutil to the local disk.
+# input files via gcloud storage to the local disk.
 #
 # The actual operation performed here is to download a BAM and compute
 # the md5, writing it to <filename>.bam.md5.

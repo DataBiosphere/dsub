@@ -712,9 +712,9 @@ class LocalJobProvider(base.JobProvider):
     elif logging_path.file_provider == job_model.P_GCS:
       mkdir_cmd = ''
       if user_project:
-        cp_cmd = 'gsutil -u {} -mq cp'.format(user_project)
+        cp_cmd = 'gcloud storage cp --billing-project={} --no-user-output-enabled'.format(user_project)
       else:
-        cp_cmd = 'gsutil -mq cp'
+        cp_cmd = 'gcloud storage cp --no-user-output-enabled'
     else:
       assert False
 
@@ -773,7 +773,7 @@ class LocalJobProvider(base.JobProvider):
     return '\n'.join(provider_commands)
 
   def _get_input_target_path(self, local_file_path):
-    """Returns a directory or file path to be the target for "gsutil cp".
+    """Returns a directory or file path to be the target for "gcloud storage cp".
 
     If the filename contains a wildcard, then the target path must
     be a directory in order to ensure consistency whether the source pattern
@@ -784,7 +784,7 @@ class LocalJobProvider(base.JobProvider):
       local_file_path: A full path terminating in a file or a file wildcard.
 
     Returns:
-      The path to use as the "gsutil cp" target.
+      The path to use as the "gcloud storage cp" target.
     """
 
     path, filename = os.path.split(local_file_path)
@@ -808,17 +808,17 @@ class LocalJobProvider(base.JobProvider):
 
       if i.file_provider in [job_model.P_LOCAL, job_model.P_GCS]:
         # The semantics that we expect here are implemented consistently in
-        # "gsutil cp", and are a bit different than "cp" when it comes to
+        # "gcloud storage cp", and are a bit different than "cp" when it comes to
         # wildcard handling, so use it for both local and GCS:
         #
         # - `cp path/* dest/` will error if "path" has subdirectories.
         # - `cp "path/*" "dest/"` will fail (it expects wildcard expansion
         #   to come from shell).
         if user_project:
-          command = 'gsutil -u %s -mq cp "%s" "%s"' % (
+          command = 'gcloud storage cp --billing-project=%s --no-user-output-enabled "%s" "%s"' % (
               user_project, source_file_path, dest_file_path)
         else:
-          command = 'gsutil -mq cp "%s" "%s"' % (source_file_path,
+          command = 'gcloud storage cp --no-user-output-enabled "%s" "%s"' % (source_file_path,
                                                  dest_file_path)
         commands.append(command)
 
@@ -865,13 +865,13 @@ class LocalJobProvider(base.JobProvider):
       if o.file_provider == job_model.P_LOCAL:
         commands.append('mkdir -p "%s"' % dest_path)
 
-      # Use gsutil even for local files (explained in _localize_inputs_command).
+      # Use gcloud storage even for local files (explained in _localize_inputs_command).
       if o.file_provider in [job_model.P_LOCAL, job_model.P_GCS]:
         if user_project:
-          command = 'gsutil -u %s -mq cp "%s" "%s"' % (user_project, local_path,
+          command = 'gcloud storage cp --billing-project=%s --no-user-output-enabled "%s" "%s"' % (user_project, local_path,
                                                        dest_path)
         else:
-          command = 'gsutil -mq cp "%s" "%s"' % (local_path, dest_path)
+          command = 'gcloud storage cp --no-user-output-enabled "%s" "%s"' % (local_path, dest_path)
         commands.append(command)
 
     return '\n'.join(commands)

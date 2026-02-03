@@ -55,7 +55,7 @@ fi
 echo
 echo "Checking output..."
 
-readonly RESULT="$(gsutil cat "${TEST_FILE_PATH_2}")"
+readonly RESULT="$(gcloud storage cat "${TEST_FILE_PATH_2}")"
 if [[ "${RESULT}" != "hello world" ]]; then
   echo "Output file does not match expected"
   echo "Expected: hello world"

@@ -56,7 +56,7 @@ While not used directly by `dsub` for the `google-batch` provider, you are likel
 Cloud SDK](https://cloud.google.com/sdk/).
 
 If you will be using the `local` provider for faster job development,
-you *will* need to install the Google Cloud SDK, which uses `gsutil` to ensure
+you *will* need to install the Google Cloud SDK, which uses `gcloud storage` to ensure
 file operation semantics consistent with the Google `dsub` providers.
 
 1. [Install the Google Cloud SDK](https://cloud.google.com/sdk/)
@@ -182,10 +182,10 @@ The steps for getting started differ slightly as indicated in the steps below:
 
     The dsub logs and output files will be written to a bucket. Create a
     bucket using the [storage browser](https://console.cloud.google.com/storage/browser?project=)
-    or run the command-line utility [gsutil](https://cloud.google.com/storage/docs/gsutil),
+    or run the command-line utility [gcloud storage](https://cloud.google.com/storage/docs/gcloud-storage),
     included in the Cloud SDK.
 
-        gsutil mb gs://my-bucket
+        gcloud storage buckets create gs://my-bucket
 
     Change `my-bucket` to a unique name that follows the
     [bucket-naming conventions](https://cloud.google.com/storage/docs/bucket-naming).
@@ -215,7 +215,7 @@ The steps for getting started differ slightly as indicated in the steps below:
 
 1. View the output file.
 
-        gsutil cat gs://my-bucket/output/out.txt
+        gcloud storage cat gs://my-bucket/output/out.txt
 
 ## Backend providers
 
@@ -351,8 +351,8 @@ by:
 
 To upload the files to Google Cloud Storage, you can use the
 [storage browser](https://console.cloud.google.com/storage/browser?project=) or
-[gsutil](https://cloud.google.com/storage/docs/gsutil). You can also run on data
-that’s public or shared with your service account, an email address that you
+[gcloud storage](https://cloud.google.com/storage/docs/gcloud-storage). You can also run on data
+that's public or shared with your service account, an email address that you
 can find in the [Google Cloud Console](https://console.cloud.google.com).
 
 #### Files
@@ -728,7 +728,7 @@ of the service account will be `sa-name@project-id.iam.gserviceaccount.com`.
 
 2. Grant IAM access on buckets, etc. to the service account.
 
-        gsutil iam ch serviceAccount:sa-name@project-id.iam.gserviceaccount.com:roles/storage.objectAdmin gs://bucket-name
+        gcloud storage buckets add-iam-policy-binding gs://bucket-name --member=serviceAccount:sa-name@project-id.iam.gserviceaccount.com --role=roles/storage.objectAdmin
 
 3. Update your `dsub` command to include `--service-account`
 

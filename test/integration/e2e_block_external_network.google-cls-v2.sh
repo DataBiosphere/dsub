@@ -31,9 +31,8 @@ echo "Launching pipeline..."
 
 set +o errexit
 
-# Run gsutil with Boto:num_retries=0 option. Otherwise, gsutil will retry up to
-# 24 times due to the network error
-# https://stackoverflow.com/questions/44459685/sql-server-agent-job-and-gsutil
+# Note: gcloud storage commands will retry due to network errors.
+# This test validates that the job fails when network access is blocked.
 JOB_ID="$(run_dsub \
   --image 'gcr.io/google.com/cloudsdktool/cloud-sdk:327.0.0-slim' \
   --block-external-network \
@@ -54,9 +53,9 @@ readonly ATTEMPT_1_STDERR_LOG="$(dirname "${LOGGING}")/${TEST_NAME}.1-stderr.log
 readonly ATTEMPT_2_STDERR_LOG="$(dirname "${LOGGING}")/${TEST_NAME}.2-stderr.log"
 
 for STDERR_LOG_FILE in "${ATTEMPT_1_STDERR_LOG}" "${ATTEMPT_2_STDERR_LOG}" ; do
-  RESULT="$(gsutil cat "${STDERR_LOG_FILE}")"
+  RESULT="$(gcloud storage cat "${STDERR_LOG_FILE}")"
   if ! echo "${RESULT}" | grep -qi "Unable to find the server at storage.googleapis.com"; then
-    1>&2 echo "Network error from gsutil not found in the dsub stderr log!"
+    1>&2 echo "Network error from gcloud storage not found in the dsub stderr log!"
     1>&2 echo "${RESULT}"
     exit 1
   fi

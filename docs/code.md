@@ -187,7 +187,7 @@ To run the driver script, first copy `script1.sh` and `script2.sh` to
 cloud storage:
 
 ```
-gsutil cp my-code/script1.sh my-code/script2.sh gs://MY-BUCKET/my-code/
+gcloud storage cp my-code/script1.sh my-code/script2.sh gs://MY-BUCKET/my-code/
 ```
 
 Then launch a dsub job:
@@ -205,7 +205,7 @@ Extending the previous example, you could copy `script1.sh` and `script2.sh`
 to cloud storage with:
 
 ```
-gsutil rsync -r my-code gs://MY-BUCKET/my-code/
+gcloud storage rsync --recursive my-code gs://MY-BUCKET/my-code/
 ```
 
 and then launch a `dsub` job with:

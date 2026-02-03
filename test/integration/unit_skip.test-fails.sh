@@ -46,8 +46,8 @@ readonly NEWFILE="${OUTPUTS}/newfile"
 readonly OUT_FOLDER_2="${OUTPUTS}/newfolder"
 
 # Create pre-existing output
-echo "test output" | gsutil cp - "${EXISTING}"
-echo "test output" | gsutil cp - "${EXISTING_2}"
+echo "test output" | gcloud storage cp - "${EXISTING}"
+echo "test output" | gcloud storage cp - "${EXISTING_2}"
 
 echo "Job 1 ..."
 

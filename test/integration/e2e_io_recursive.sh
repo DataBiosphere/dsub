@@ -64,7 +64,7 @@ echo "Setting up test inputs"
 echo "Setting up pipeline input..."
 build_recursive_files "${INPUT_DEEP}" "${INPUT_SHALLOW}"
 
-gsutil -m rsync -r "${LOCAL_INPUTS}" "${INPUTS}/"
+gcloud storage rsync --recursive "${LOCAL_INPUTS}" "${INPUTS}/"
 
 echo "Launching pipeline..."
 
@@ -87,7 +87,7 @@ setup_expected_fs_output_entries "${DOCKER_GCS_OUTPUTS}"
 setup_expected_remote_output_entries "${OUTPUTS}"
 
 # Verify in the stdout file that the expected directories were written
-readonly RESULT=$(gsutil cat "${STDOUT_LOG}")
+readonly RESULT=$(gcloud storage cat "${STDOUT_LOG}")
 
 readonly FS_FIND_IN=$(echo "${RESULT}" | sed -n '/^BEGIN: find$/,/^END: find$/p' \
   | grep --fixed-strings /mnt/data/input/"${DOCKER_GCS_INPUTS}")
@@ -136,7 +136,7 @@ echo "On-disk output file list matches expected"
 # Verify in GCS that the DEEP directory is deep and the SHALLOW directory
 # is shallow. Gsutil prints directories with a trailing "/:" marker that is
 # stripped using sed in order to match the output format of the `find` utility.
-readonly GCS_FIND="$(gsutil ls -r "${OUTPUTS}" \
+readonly GCS_FIND="$(gcloud storage ls -r "${OUTPUTS}" \
                      | grep -v '^ *$' \
                      | sed -e 's#/:$##')"
 

@@ -43,7 +43,7 @@ function exit_handler() {
   # Only cleanup on success
   if [[ "${code}" -eq 0 ]]; then
     rm -rf "${TEST_TMP}"
-    gsutil -mq rm "${INPUTS}/**"
+    gcloud storage rm --no-user-output-enabled "${INPUTS}/**"
   fi
 
   return "${code}"
@@ -64,7 +64,7 @@ for INPUT_DIR in "${INPUT_BASIC}" "${INPUT_WITH_SPACE}"; do
   done
 done
 
-gsutil -m rsync -r "${INPUT_ROOT}" "${INPUTS}/"
+gcloud storage rsync --recursive "${INPUT_ROOT}" "${INPUTS}/"
 
 echo "Launching pipeline..."
 
@@ -94,7 +94,7 @@ FILE_NAME=file.3.txt
 EOF
 )
 
-readonly RESULT="$(gsutil cat "${STDOUT_LOG}")"
+readonly RESULT="$(gcloud storage cat "${STDOUT_LOG}")"
 if ! diff <(echo "${RESULT_EXPECTED}") <(echo "${RESULT}"); then
   echo "Output file does not match expected"
   exit 1
