@@ -155,7 +155,7 @@ echo
 echo "Checking GPU detection output..."
 
 # Check that GPU was detected and accessible
-RESULT="$(gsutil cat "${STDOUT_LOG}")"
+RESULT="$(gcloud storage cat "${STDOUT_LOG}")"
 
 # Validate GPU hardware was detected
 if ! echo "${RESULT}" | grep -qi "Tesla T4"; then

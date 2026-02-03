@@ -11,10 +11,10 @@
 # example:
 #   WORKSPACE=gs://mybucket/someprefix
 #   ./demo_split_process.sh input.txt "${WORKSPACE}"
-#   gsutil ls "${WORKSPACE}/output/"
-#   gsutil rm "${WORKSPACE}/temp/*"
+#   gcloud storage ls "${WORKSPACE}/output/"
+#   gcloud storage rm "${WORKSPACE}/temp/*"
 #
-# You need dsub, docker, and gsutil installed.
+# You need dsub, docker, and gcloud storage installed.
 # Change WORKSPACE to point to a bucket you have write permission to.
 #
 # Since this uses the local provider, you can set WORKSPACE to a local path,

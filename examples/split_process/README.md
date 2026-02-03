@@ -44,6 +44,6 @@ rm "${WORKSPACE}/temp/*"
 ```
 WORKSPACE=gs://mybucket/someprefix
 ./demo_split_process.sh input.txt "${WORKSPACE}"
-gsutil ls "${WORKSPACE}/output/"
-gsutil rm "${WORKSPACE}/temp/*"
+gcloud storage ls "${WORKSPACE}/output/"
+gcloud storage rm "${WORKSPACE}/temp/*"
 ```

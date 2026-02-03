@@ -21,8 +21,8 @@ set -o nounset
 
 RC=0
 
-if ! gsutil -o 'Boto:num_retries=0' ls gs://genomics-public-data; then
-  1>&2 echo "\`gsutil ls\` should not have succeeded"
+if ! gcloud storage ls gs://genomics-public-data; then
+  1>&2 echo "\`gcloud storage ls\` should not have succeeded"
   RC=1
 fi
 

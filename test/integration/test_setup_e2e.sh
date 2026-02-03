@@ -64,9 +64,9 @@ fi
 echo "  Bucket detected as: ${DSUB_BUCKET}"
 
 echo "  Checking if bucket exists"
-if ! gsutil ls "gs://${DSUB_BUCKET}" 2>/dev/null; then
+if ! gcloud storage ls "gs://${DSUB_BUCKET}" 2>/dev/null; then
   1>&2 echo "Bucket does not exist (or we have no access): ${DSUB_BUCKET}"
-  1>&2 echo "Create the bucket with \"gsutil mb\"."
+  1>&2 echo "Create the bucket with \"gcloud storage buckets create\"."
   1>&2 echo "Current gcloud settings:"
   1>&2 echo "  account: $(gcloud config get-value account 2>/dev/null)"
   1>&2 echo "  project: $(gcloud config get-value project 2>/dev/null)"
@@ -155,10 +155,10 @@ echo "Output path: ${OUTPUTS}"
 readonly DSUB_PARAMS="${TEST_GCS_ROOT}/params"
 
 echo "  Checking if remote test files already exists"
-if gsutil ls "${TEST_GCS_ROOT}/**" 2>/dev/null; then
+if gcloud storage ls "${TEST_GCS_ROOT}/**" 2>/dev/null; then
   1>&2 echo "Test files exist: ${TEST_GCS_ROOT}"
   1>&2 echo "Remove contents:"
-  1>&2 echo "  gsutil -m rm ${TEST_GCS_ROOT}/**"
+  1>&2 echo "  gcloud storage rm --recursive ${TEST_GCS_ROOT}/**"
   exit 1
 fi
 
