@@ -24,6 +24,7 @@ import httplib2
 import tenacity
 
 import google.auth
+import google.api_core.exceptions
 
 # Transient errors for the Google APIs should not cause them to fail.
 # There are a set of HTTP and socket errors which we automatically retry.
@@ -132,6 +133,17 @@ def retry_api_check(retry_state: tenacity.RetryCallState) -> bool:
 
   # Observed to be thrown transiently from auth libraries which use httplib2
   if isinstance(exception, http.client.ResponseNotReady):
+    _print_retry_error(attempt_number, MAX_API_ATTEMPTS, exception)
+    return True
+
+  # Transient errors from google-cloud-* libraries (e.g. google-cloud-batch)
+  # These use google.api_core.exceptions instead of googleapiclient.errors
+  if isinstance(exception, (
+      google.api_core.exceptions.DeadlineExceeded,
+      google.api_core.exceptions.ServiceUnavailable,
+      google.api_core.exceptions.ResourceExhausted,
+      google.api_core.exceptions.InternalServerError,
+  )):
     _print_retry_error(attempt_number, MAX_API_ATTEMPTS, exception)
     return True
 
