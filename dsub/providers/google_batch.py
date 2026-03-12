@@ -25,10 +25,13 @@ import sys
 import textwrap
 from typing import Dict, List, Set
 
+import tenacity
+
 from ..lib import dsub_util
 from ..lib import job_model
 from ..lib import param_util
 from ..lib import providers_util
+from ..lib import retry_util
 from . import base
 from . import google_base
 from . import google_batch_operations
@@ -898,6 +901,13 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     # pylint: enable=line-too-long
     return job_request
 
+  # Exponential backoff retrying API execution.
+  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
+  @tenacity.retry(
+      stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
+      retry=retry_util.retry_api_check,
+      wait=tenacity.wait_exponential(multiplier=1, max=64),
+      retry_error_callback=retry_util.on_give_up)
   def _submit_batch_job(self, request) -> str:
     client = batch_v1.BatchServiceClient()
     job_response = client.create_job(request=request)
@@ -1001,6 +1011,18 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         self._batch_handler_def(), self._operations_cancel_api_def(), tasks
     )
 
+  # Exponential backoff retrying API execution.
+  # Maximum 23 retries.  Wait 1, 2, 4 ... 64, 64, 64... seconds.
+  @tenacity.retry(
+      stop=tenacity.stop_after_attempt(retry_util.MAX_API_ATTEMPTS),
+      retry=retry_util.retry_api_check,
+      wait=tenacity.wait_exponential(multiplier=1, max=64),
+      retry_error_callback=retry_util.on_give_up)
+  def _list_jobs(self, request):
+    """Executes list_jobs API call with retry logic."""
+    client = batch_v1.BatchServiceClient()
+    return client.list_jobs(request=request)
+
   def lookup_job_tasks(
       self,
       statuses: Set[str],
@@ -1015,7 +1037,6 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
       max_tasks=0,
       page_size=0,
   ):
-    client = batch_v1.BatchServiceClient()
     ops_filter = self._build_query_filter(
         statuses,
         user_ids,
@@ -1034,7 +1055,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     )
 
     # Make the request
-    response = client.list_jobs(request=request)
+    response = self._list_jobs(request=request)
     # Sort the operations by create-time to match sort of other providers
     operations = [GoogleBatchOperation(page) for page in response]
     operations.sort(key=lambda op: op.get_field('create-time'), reverse=True)
