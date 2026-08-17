@@ -56,7 +56,7 @@ next_job = test.run_dsub([
 
 print('\nChecking output...')
 
-RESULT = test_util.gsutil_cat(TEST_FILE_PATH_2)
+RESULT = test_util.gcloud_cat(TEST_FILE_PATH_2)
 if 'hello world' not in RESULT:
   print('Output file does not match expected', file=sys.stderr)
   sys.exit(1)

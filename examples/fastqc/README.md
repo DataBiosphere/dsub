@@ -113,7 +113,7 @@ Because the `--wait` flag was set, `dsub` will block until the job completes.
 To list the output, use the command:
 
 ```
-gsutil ls -l gs://MY-BUCKET/fastqc/submit_one/output
+gcloud storage ls -l gs://MY-BUCKET/fastqc/submit_one/output
 ```
 
 Output should look like:
@@ -189,7 +189,7 @@ when all tasks for the job have completed, `dsub` will exit.
 To list the output objects, use the command:
 
 ```
-gsutil ls -l gs://MY-BUCKET/fastqc/submit_list/output
+gcloud storage ls -l gs://MY-BUCKET/fastqc/submit_list/output
 ```
 
 Output should look like:

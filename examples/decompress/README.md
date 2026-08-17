@@ -65,7 +65,7 @@ Because the `--wait` flag was set, `dsub` will block until the job completes.
 To list the output, use the command:
 
 ```
-gsutil ls gs://MY-BUCKET/decompress_one/output
+gcloud storage ls gs://MY-BUCKET/decompress_one/output
 ```
 
 Output should look like:
@@ -77,7 +77,7 @@ gs://MY-BUCKET/decompress_one/output/ALL.ChrY.Cornell.20130502.SNPs.Genotypes.vc
 To see the first few lines of the decompressed file, run:
 
 ```
-gsutil cat gs://MY-BUCKET/decompress_one/output/*.vcf | head -n 5
+gcloud storage cat gs://MY-BUCKET/decompress_one/output/*.vcf | head -n 5
 ```
 
 Output should look like:
@@ -153,7 +153,7 @@ when all tasks for the job have completed, `dsub` will exit.
 To list the output objects, use the command:
 
 ```
-gsutil ls gs://MY-BUCKET/decompress_list/output
+gcloud storage ls gs://MY-BUCKET/decompress_list/output
 ```
 
 Output should look like:

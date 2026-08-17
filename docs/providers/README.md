@@ -131,8 +131,8 @@ copying output files.
 
 The copying of files is performed in the host environment, not inside the
 Docker container. This means that for copying to/from Google Cloud Storage,
-the host environment requires a copy of
-[gsutil](https://cloud.google.com/storage/docs/gsutil) to be installed.
+the host environment requires the
+[Google Cloud SDK](https://cloud.google.com/sdk/docs/install) to be installed.
 
 #### Container runtime environment
 

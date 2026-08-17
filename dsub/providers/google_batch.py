@@ -145,11 +145,11 @@ _LOG_CP = textwrap.dedent("""
       "${{LOGGING_DIR}}/stderr.txt" \
       "{user_action}"
 
-  gsutil_cp "${{LOGGING_DIR}}/stdout.txt" "${{STDOUT_PATH}}" "text/plain" "${{USER_PROJECT}}" &
+  gcloud_cp "${{LOGGING_DIR}}/stdout.txt" "${{STDOUT_PATH}}" "text/plain" "${{USER_PROJECT}}" &
   STDOUT_PID=$!
-  gsutil_cp "${{LOGGING_DIR}}/stderr.txt" "${{STDERR_PATH}}" "text/plain"  "${{USER_PROJECT}}" &
+  gcloud_cp "${{LOGGING_DIR}}/stderr.txt" "${{STDERR_PATH}}" "text/plain"  "${{USER_PROJECT}}" &
   STDERR_PID=$!
-  gsutil_cp "${{LOGGING_DIR}}/log.txt" "${{LOGGING_PATH}}" "text/plain" "${{USER_PROJECT}}" &
+  gcloud_cp "${{LOGGING_DIR}}/log.txt" "${{LOGGING_PATH}}" "text/plain" "${{USER_PROJECT}}" &
   LOG_PID=$!
 
   wait "${{STDOUT_PID}}"
@@ -168,7 +168,7 @@ _FINAL_LOGGING_CMD = textwrap.dedent("""\
   touch "${{LOGGING_DIR}}/.stop_logging"
 
   {log_msg_fn}
-  {gsutil_cp_fn}
+  {gcloud_cp_fn}
 
   {log_cp}
 """)
@@ -182,7 +182,7 @@ _CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
   readonly LOGGING_DIR="{logging_dir}"
 
   {log_msg_fn}
-  {gsutil_cp_fn}
+  {gcloud_cp_fn}
 
   # Make sure the logging work directory exists
   mkdir -p "${{LOGGING_DIR}}"
@@ -609,7 +609,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
     continuous_logging_cmd = _CONTINUOUS_LOGGING_CMD.format(
         log_msg_fn=google_utils.LOG_MSG_FN,
-        gsutil_cp_fn=google_utils.GSUTIL_CP_FN,
+        gcloud_cp_fn=google_utils.GCLOUD_CP_FN,
         log_filter_var=_LOG_FILTER_VAR,
         log_filter_script_path=_LOG_FILTER_SCRIPT_PATH,
         python_decode_script=google_utils.PYTHON_DECODE_SCRIPT,
@@ -623,7 +623,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
 
     logging_cmd = _FINAL_LOGGING_CMD.format(
         log_msg_fn=google_utils.LOG_MSG_FN,
-        gsutil_cp_fn=google_utils.GSUTIL_CP_FN,
+        gcloud_cp_fn=google_utils.GCLOUD_CP_FN,
         log_filter_var=_LOG_FILTER_VAR,
         log_filter_script_path=_LOG_FILTER_SCRIPT_PATH,
         python_decode_script=google_utils.PYTHON_DECODE_SCRIPT,
@@ -729,8 +729,8 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
                 '-c',
                 google_utils.LOCALIZATION_CMD.format(
                     log_msg_fn=google_utils.LOG_MSG_FN,
-                    recursive_cp_fn=google_utils.GSUTIL_RSYNC_FN,
-                    cp_fn=google_utils.GSUTIL_CP_FN,
+                    recursive_cp_fn=google_utils.GCLOUD_RSYNC_FN,
+                    cp_fn=google_utils.GCLOUD_CP_FN,
                     cp_loop=google_utils.LOCALIZATION_LOOP,
                 ),
             ],
@@ -778,8 +778,8 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
                 '-c',
                 google_utils.LOCALIZATION_CMD.format(
                     log_msg_fn=google_utils.LOG_MSG_FN,
-                    recursive_cp_fn=google_utils.GSUTIL_RSYNC_FN,
-                    cp_fn=google_utils.GSUTIL_CP_FN,
+                    recursive_cp_fn=google_utils.GCLOUD_RSYNC_FN,
+                    cp_fn=google_utils.GCLOUD_CP_FN,
                     cp_loop=google_utils.DELOCALIZATION_LOOP,
                 ),
             ],

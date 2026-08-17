@@ -827,23 +827,23 @@ def directory_fmt(directory):
 
   Multiple files copy, works as intended in all cases:
       $ touch a.txt b.txt
-      $ gsutil cp ./*.txt gs://mybucket/text_dest
-      $ gsutil ls gs://mybucket/text_dest/
+      $ gcloud storage cp ./*.txt gs://mybucket/text_dest
+      $ gcloud storage ls gs://mybucket/text_dest/
             0  2017-07-19T21:44:36Z  gs://mybucket/text_dest/a.txt
             0  2017-07-19T21:44:36Z  gs://mybucket/text_dest/b.txt
       TOTAL: 2 objects, 0 bytes (0 B)
 
   Single file copy fails to copy into a directory:
       $ touch 1.bam
-      $ gsutil cp ./*.bam gs://mybucket/bad_dest
-      $ gsutil ls gs://mybucket/bad_dest
+      $ gcloud storage cp ./*.bam gs://mybucket/bad_dest
+      $ gcloud storage ls gs://mybucket/bad_dest
                0  2017-07-19T21:46:16Z  gs://mybucket/bad_dest
       TOTAL: 1 objects, 0 bytes (0 B)
 
   Adding a trailing forward slash fixes this:
       $ touch my.sam
-      $ gsutil cp ./*.sam gs://mybucket/good_folder
-      $ gsutil ls gs://mybucket/good_folder
+      $ gcloud storage cp ./*.sam gs://mybucket/good_folder
+      $ gcloud storage ls gs://mybucket/good_folder
                0  2017-07-19T21:46:16Z  gs://mybucket/good_folder/my.sam
       TOTAL: 1 objects, 0 bytes (0 B)
 
