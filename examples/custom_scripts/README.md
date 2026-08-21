@@ -55,7 +55,7 @@ To run a Bash script to decompress the VCF file, type:
 
 ```
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project MY-PROJECT \
   --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids.sh/logging" \
@@ -134,7 +134,7 @@ To run a Python script to decompress the VCF file, type:
 
 ```
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project MY-PROJECT \
   --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids.py/logging" \
@@ -221,7 +221,7 @@ Run either of the following commands:
 
 ```
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project MY-PROJECT \
   --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids/logging" \
@@ -234,7 +234,7 @@ dsub \
 
 ```
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project MY-PROJECT \
   --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids/logging" \

@@ -60,7 +60,7 @@ echo
 
 # Launch the task
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project "${MY_PROJECT}" \
   --regions "us-central1" \
   --logging "${LOGGING}" \
