@@ -806,20 +806,24 @@ class LocalJobProvider(base.JobProvider):
 
       commands.append('mkdir -p "%s"' % os.path.dirname(local_file_path))
 
-      if i.file_provider in [job_model.P_LOCAL, job_model.P_GCS]:
-        # The semantics that we expect here are implemented consistently in
-        # "gcloud storage cp", and are a bit different than "cp" when it comes to
-        # wildcard handling, so use it for both local and GCS:
-        #
-        # - `cp path/* dest/` will error if "path" has subdirectories.
-        # - `cp "path/*" "dest/"` will fail (it expects wildcard expansion
-        #   to come from shell).
+      if i.file_provider == job_model.P_GCS:
+        # `cp path/* dest/` will error if "path" has subdirectories, and
+        # `cp "path/*" "dest/"` will fail (it expects wildcard expansion
+        # to come from shell), so use "gcloud storage cp" instead.
         if user_project:
           command = 'gcloud storage cp --billing-project=%s "%s" "%s"' % (
               user_project, source_file_path, dest_file_path)
         else:
           command = 'gcloud storage cp "%s" "%s"' % (source_file_path,
                                                  dest_file_path)
+        commands.append(command)
+      elif i.file_provider == job_model.P_LOCAL:
+        # "gcloud storage cp" does not support local-to-local copies, so use
+        # rsync (without "-r", since this path is non-recursive) instead.
+        # It matches the wildcard semantics we need: like the old "gsutil
+        # cp", it silently skips subdirectories rather than erroring like
+        # plain "cp" does.
+        command = 'rsync "%s" "%s"' % (source_file_path, dest_file_path)
         commands.append(command)
 
     return '\n'.join(commands)
@@ -865,13 +869,17 @@ class LocalJobProvider(base.JobProvider):
       if o.file_provider == job_model.P_LOCAL:
         commands.append('mkdir -p "%s"' % dest_path)
 
-      # Use gcloud storage even for local files (explained in _localize_inputs_command).
-      if o.file_provider in [job_model.P_LOCAL, job_model.P_GCS]:
+      if o.file_provider == job_model.P_GCS:
         if user_project:
           command = 'gcloud storage cp --billing-project=%s "%s" "%s"' % (user_project, local_path,
                                                        dest_path)
         else:
           command = 'gcloud storage cp "%s" "%s"' % (local_path, dest_path)
+        commands.append(command)
+      elif o.file_provider == job_model.P_LOCAL:
+        # "gcloud storage cp" does not support local-to-local copies (see
+        # _localize_inputs_command), so use rsync instead.
+        command = 'rsync "%s" "%s"' % (local_path, dest_path)
         commands.append(command)
 
     return '\n'.join(commands)

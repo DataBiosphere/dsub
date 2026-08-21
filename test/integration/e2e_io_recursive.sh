@@ -134,10 +134,14 @@ echo
 echo "On-disk output file list matches expected"
 
 # Verify in GCS that the DEEP directory is deep and the SHALLOW directory
-# is shallow. Gcloud storage prints directories with a trailing "/" that is
-# stripped using sed in order to match the output format of the `find` utility.
+# is shallow. For each directory, `gcloud storage ls -r` prints both a
+# redundant header line ending in "/:" and a self-referencing entry line
+# ending in "/". The header lines are dropped and the trailing "/" is
+# stripped from the remaining lines to match the output format of the
+# `find` utility.
 readonly GCS_FIND="$(gcloud storage ls -r "${OUTPUTS}" \
                      | grep -v '^ *$' \
+                     | grep -v ':$' \
                      | sed -e 's#/$##')"
 
 for REC in "${EXPECTED_REMOTE_OUTPUT_ENTRIES[@]}"; do

@@ -21,7 +21,7 @@ set -o nounset
 
 RC=0
 
-if ! gcloud storage ls --retry-max-attempts=0 gs://genomics-public-data; then
+if ! CLOUDSDK_STORAGE_MAX_RETRIES=0 gcloud storage ls gs://genomics-public-data; then
   1>&2 echo "\`gcloud storage ls\` should not have succeeded"
   RC=1
 fi
