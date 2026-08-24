@@ -34,9 +34,9 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 
 # Launch the task
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project "${MY_PROJECT}" \
-  --zones "us-central1-*" \
+  --regions us-central1 \
   --logging "${MY_BUCKET}/decompress_list/logging/" \
   --disk-size 200 \
   --image ubuntu:14.04 \

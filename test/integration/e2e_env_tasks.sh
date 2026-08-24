@@ -101,7 +101,7 @@ for ((TASK_ID=1; TASK_ID <= NUM_TASKS; TASK_ID++)); do
     sed -e 's#^ *##'
   )"
 
-  RESULT="$(gsutil cat "${LOGGING}.${TASK_ID}-stdout.log")"
+  RESULT="$(gcloud storage cat "${LOGGING}.${TASK_ID}-stdout.log")"
   if ! diff <(echo "${RESULT_EXPECTED}") <(echo "${RESULT}"); then
     echo "Output file does not match expected"
     exit 1

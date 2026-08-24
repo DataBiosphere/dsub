@@ -104,7 +104,7 @@ for i in range(TASKS_COUNT):
       '--output OUTPUT_PATH')
   OUTPUT_FILE = '%s/%s.md5' % (OUTPUT_PATH[:-len('/*.md5')],
                                os.path.basename(INPUT_BAM))
-  RESULT = test_util.gsutil_cat(OUTPUT_FILE)
+  RESULT = test_util.gcloud_cat(OUTPUT_FILE)
 
   if not test_util.diff(RESULT_EXPECTED.strip(), RESULT.strip()):
     print('Output file does not match expected')
@@ -119,7 +119,7 @@ for i in range(TASKS_COUNT):
 RESULT_EXPECTED = POPULATION_MD5
 for i in range(TASKS_COUNT):
   OUTPUT_FILE = '%s/TASK_%s.md5' % (test.OUTPUTS, (i + 1))
-  RESULT = test_util.gsutil_cat(OUTPUT_FILE)
+  RESULT = test_util.gcloud_cat(OUTPUT_FILE)
 
   if not test_util.diff(RESULT_EXPECTED.strip(), RESULT.strip()):
     print('Output file does not match expected')

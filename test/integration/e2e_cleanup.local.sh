@@ -26,7 +26,7 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 source "${SCRIPT_DIR}/test_setup_e2e.sh"
 
 # Stage a test file.
-date | gsutil cp - "${INPUTS}/recursive/deep/today.txt"
+date | gcloud storage cp - "${INPUTS}/recursive/deep/today.txt"
 
 readonly TGT_1="${OUTPUTS}/testfile_1.txt"
 readonly TGT_2="${OUTPUTS}/testfile_2.txt"
@@ -82,7 +82,7 @@ JOB_ID=$(run_dsub \
 check_jobid "${JOB_ID}"
 
 for out in "${TGT_1}" "${TGT_2}" "${TGT_3}"; do
-  if ! gsutil ls "${out}" > /dev/null; then
+  if ! gcloud storage ls "${out}" > /dev/null; then
     echo "Missing output: ${out}"
     exit 1
   fi
