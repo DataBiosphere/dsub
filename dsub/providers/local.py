@@ -823,11 +823,16 @@ class LocalJobProvider(base.JobProvider):
         # It matches the wildcard semantics we need: like the old "gsutil
         # cp", it silently skips subdirectories rather than erroring like
         # plain "cp" does. rsync does not expand a quoted wildcard itself,
-        # so only the directory portion is quoted, leaving a wildcard
-        # filename for the shell to expand.
+        # so for a wildcard filename, only the directory portion is quoted,
+        # leaving the wildcard for the shell to expand. A non-wildcard
+        # filename is quoted as a whole so that spaces in it are preserved
+        # as a single rsync argument.
         source_dir, source_filename = os.path.split(source_file_path)
-        command = 'rsync "%s"/%s "%s"' % (source_dir, source_filename,
-                                           dest_file_path)
+        if '*' in source_filename:
+          command = 'rsync "%s"/%s "%s"' % (source_dir, source_filename,
+                                             dest_file_path)
+        else:
+          command = 'rsync "%s" "%s"' % (source_file_path, dest_file_path)
         commands.append(command)
 
     return '\n'.join(commands)
@@ -882,11 +887,16 @@ class LocalJobProvider(base.JobProvider):
         commands.append(command)
       elif o.file_provider == job_model.P_LOCAL:
         # "gcloud storage cp" does not support local-to-local copies (see
-        # _localize_inputs_command), so use rsync instead, quoting only the
-        # directory portion so a wildcard filename is expanded by the shell.
+        # _localize_inputs_command), so use rsync instead. As there, only
+        # quote the directory portion for a wildcard filename so the shell
+        # can expand it; a non-wildcard filename is quoted as a whole so
+        # that spaces in it are preserved as a single rsync argument.
         local_dir, local_filename = os.path.split(local_path)
-        command = 'rsync "%s"/%s "%s"' % (local_dir, local_filename,
-                                           dest_path)
+        if '*' in local_filename:
+          command = 'rsync "%s"/%s "%s"' % (local_dir, local_filename,
+                                             dest_path)
+        else:
+          command = 'rsync "%s" "%s"' % (local_path, dest_path)
         commands.append(command)
 
     return '\n'.join(commands)

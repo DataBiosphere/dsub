@@ -829,23 +829,20 @@ def directory_fmt(directory):
       $ touch a.txt b.txt
       $ gcloud storage cp ./*.txt gs://mybucket/text_dest
       $ gcloud storage ls gs://mybucket/text_dest/
-            0  2017-07-19T21:44:36Z  gs://mybucket/text_dest/a.txt
-            0  2017-07-19T21:44:36Z  gs://mybucket/text_dest/b.txt
-      TOTAL: 2 objects, 0 bytes (0 B)
+      gs://mybucket/text_dest/a.txt
+      gs://mybucket/text_dest/b.txt
 
   Single file copy fails to copy into a directory:
       $ touch 1.bam
       $ gcloud storage cp ./*.bam gs://mybucket/bad_dest
       $ gcloud storage ls gs://mybucket/bad_dest
-               0  2017-07-19T21:46:16Z  gs://mybucket/bad_dest
-      TOTAL: 1 objects, 0 bytes (0 B)
+      gs://mybucket/bad_dest
 
   Adding a trailing forward slash fixes this:
       $ touch my.sam
       $ gcloud storage cp ./*.sam gs://mybucket/good_folder
       $ gcloud storage ls gs://mybucket/good_folder
-               0  2017-07-19T21:46:16Z  gs://mybucket/good_folder/my.sam
-      TOTAL: 1 objects, 0 bytes (0 B)
+      gs://mybucket/good_folder/my.sam
 
   Args:
     directory (str): a uri without an blob or file basename.
