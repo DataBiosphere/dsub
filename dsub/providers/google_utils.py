@@ -115,18 +115,18 @@ GCLOUD_CP_FN = textwrap.dedent("""\
 
     local attempt
     for ((attempt = 0; attempt < 4; attempt++)); do
-      log_info "gcloud storage cp ${headers} ${user_project_flag} \"${src}\" \"${dst}\""
-      if gcloud storage cp ${headers} ${user_project_flag} "${src}" "${dst}"; then
+      log_info "gcloud storage cp --no-user-output-enabled ${headers} ${user_project_flag} \"${src}\" \"${dst}\""
+      if gcloud storage cp --no-user-output-enabled ${headers} ${user_project_flag} "${src}" "${dst}"; then
         return
       fi
       if (( attempt < 3 )); then
         log_warning "Sleeping 10s before the next attempt of failed gcloud command"
-        log_warning "gcloud storage cp ${headers} ${user_project_flag} \"${src}\" \"${dst}\""
+        log_warning "gcloud storage cp --no-user-output-enabled ${headers} ${user_project_flag} \"${src}\" \"${dst}\""
         sleep 10s
       fi
     done
 
-    log_error "gcloud storage cp ${headers} ${user_project_flag} \"${src}\" \"${dst}\""
+    log_error "gcloud storage cp --no-user-output-enabled ${headers} ${user_project_flag} \"${src}\" \"${dst}\""
     exit 1
   }
 """)
@@ -169,18 +169,18 @@ GCLOUD_RSYNC_FN = textwrap.dedent("""\
 
     local attempt
     for ((attempt = 0; attempt < 4; attempt++)); do
-      log_info "gcloud storage rsync -r ${user_project_flag} \"${src}\" \"${dst}\""
-      if gcloud storage rsync -r ${user_project_flag} "${src}" "${dst}"; then
+      log_info "gcloud storage rsync -r --no-user-output-enabled ${user_project_flag} \"${src}\" \"${dst}\""
+      if gcloud storage rsync -r --no-user-output-enabled ${user_project_flag} "${src}" "${dst}"; then
         return
       fi
       if (( attempt < 3 )); then
         log_warning "Sleeping 10s before the next attempt of failed gcloud command"
-        log_warning "gcloud storage rsync -r ${user_project_flag} \"${src}\" \"${dst}\""
+        log_warning "gcloud storage rsync -r --no-user-output-enabled ${user_project_flag} \"${src}\" \"${dst}\""
         sleep 10s
       fi
     done
 
-    log_error "gcloud storage rsync -r ${user_project_flag} \"${src}\" \"${dst}\""
+    log_error "gcloud storage rsync -r --no-user-output-enabled ${user_project_flag} \"${src}\" \"${dst}\""
     exit 1
   }
 """)

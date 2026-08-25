@@ -822,8 +822,12 @@ class LocalJobProvider(base.JobProvider):
         # rsync (without "-r", since this path is non-recursive) instead.
         # It matches the wildcard semantics we need: like the old "gsutil
         # cp", it silently skips subdirectories rather than erroring like
-        # plain "cp" does.
-        command = 'rsync "%s" "%s"' % (source_file_path, dest_file_path)
+        # plain "cp" does. rsync does not expand a quoted wildcard itself,
+        # so only the directory portion is quoted, leaving a wildcard
+        # filename for the shell to expand.
+        source_dir, source_filename = os.path.split(source_file_path)
+        command = 'rsync "%s"/%s "%s"' % (source_dir, source_filename,
+                                           dest_file_path)
         commands.append(command)
 
     return '\n'.join(commands)
@@ -878,8 +882,11 @@ class LocalJobProvider(base.JobProvider):
         commands.append(command)
       elif o.file_provider == job_model.P_LOCAL:
         # "gcloud storage cp" does not support local-to-local copies (see
-        # _localize_inputs_command), so use rsync instead.
-        command = 'rsync "%s" "%s"' % (local_path, dest_path)
+        # _localize_inputs_command), so use rsync instead, quoting only the
+        # directory portion so a wildcard filename is expanded by the shell.
+        local_dir, local_filename = os.path.split(local_path)
+        command = 'rsync "%s"/%s "%s"' % (local_dir, local_filename,
+                                           dest_path)
         commands.append(command)
 
     return '\n'.join(commands)

@@ -133,6 +133,8 @@ The copying of files is performed in the host environment, not inside the
 Docker container. This means that for copying to/from Google Cloud Storage,
 the host environment requires the
 [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) to be installed.
+For local-to-local file copying (including recursive paths), the host
+environment also requires `rsync` to be installed.
 
 #### Container runtime environment
 

@@ -31,10 +31,11 @@ echo "Launching pipeline..."
 
 set +o errexit
 
-# Run gcloud storage with --no-user-output-enabled and max retries set to 0.
-# Otherwise, gcloud storage will retry due to the network error
+# script_block_external_network.sh sets CLOUDSDK_STORAGE_MAX_RETRIES=0 when
+# running "gcloud storage ls" below. Otherwise, gcloud storage will retry
+# due to the network error.
 JOB_ID="$(run_dsub \
-  --image 'gcr.io/google.com/cloudsdktool/cloud-sdk:327.0.0-slim' \
+  --image 'gcr.io/google.com/cloudsdktool/cloud-sdk:499.0.0-slim' \
   --block-external-network \
   --script "${SCRIPT_DIR}/script_block_external_network.sh" \
   --retries 1 \
@@ -54,7 +55,8 @@ readonly ATTEMPT_2_STDERR_LOG="$(dirname "${LOGGING}")/${TEST_NAME}.2-stderr.log
 
 for STDERR_LOG_FILE in "${ATTEMPT_1_STDERR_LOG}" "${ATTEMPT_2_STDERR_LOG}" ; do
   RESULT="$(gcloud storage cat "${STDERR_LOG_FILE}")"
-  if ! echo "${RESULT}" | grep -qi "Unable to find the server at storage.googleapis.com"; then
+  if ! echo "${RESULT}" | grep -qi "storage.googleapis.com" \
+      || ! echo "${RESULT}" | grep -qi "Max retries exceeded"; then
     1>&2 echo "Network error from gcloud not found in the dsub stderr log!"
     1>&2 echo "${RESULT}"
     exit 1

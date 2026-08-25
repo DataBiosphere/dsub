@@ -727,8 +727,8 @@ of the service account will be `sa-name@project-id.iam.gserviceaccount.com`.
 
 2. Grant IAM access on buckets, etc. to the service account.
 
-        gcloud storage buckets add-iam-policy-binding gs://bucket-name
-            --member=serviceAccount:sa-name@project-id.iam.gserviceaccount.com
+        gcloud storage buckets add-iam-policy-binding gs://bucket-name \
+            --member=serviceAccount:sa-name@project-id.iam.gserviceaccount.com \
             --role=roles/storage.objectAdmin
 
 3. Update your `dsub` command to include `--service-account`
