@@ -70,7 +70,7 @@ function io_tasks_setup::check_output() {
 
     output_path="$(grep "${input_bam}" "${TASKS_FILE}" | cut -d $'\t' -f 3)"
     output_file="${output_path%/*.md5}/$(basename "${input_bam}").md5"
-    result="$(gsutil cat "${output_file}")"
+    result="$(gcloud storage cat "${output_file}")"
 
     if ! diff <(echo "${expected}") <(echo "${result}"); then
       echo "Output file does not match expected"
@@ -88,7 +88,7 @@ function io_tasks_setup::check_output() {
   expected="${POPULATION_MD5}"
   for ((i=0; i < tasks_count; i++)); do
     output_file="${OUTPUTS}/TASK_$((i+1)).md5"
-    result="$(gsutil cat "${output_file}")"
+    result="$(gcloud storage cat "${output_file}")"
 
     if ! diff <(echo "${expected}") <(echo "${result}"); then
       echo "Output file does not match expected"

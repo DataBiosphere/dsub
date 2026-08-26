@@ -38,9 +38,9 @@ To run a command to index the BAM file, type:
 
 ```
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project MY-PROJECT \
-  --zones "us-central1-*" \
+  --regions us-central1 \
   --logging "gs://MY-BUCKET/samtools/submit_one/logging" \
   --disk-size 200 \
   --name "samtools index" \
@@ -63,9 +63,9 @@ You should see output like:
 Job: samtools-i--<userid>--170522-153810-14
 Launched job-id: samtools-i--<userid>--170522-153810-14
 To check the status, run:
-  dstat --provider google-cls-v2 --project MY-PROJECT --jobs samtools-i--<userid>--170522-153810-14 --status '*'
+  dstat --provider google-batch --project MY-PROJECT --jobs samtools-i--<userid>--170522-153810-14 --status '*'
 To cancel the job, run:
-  ddel --provider google-cls-v2 --project MY-PROJECT --jobs samtools-i--<userid>--170522-153810-14
+  ddel --provider google-batch --project MY-PROJECT --jobs samtools-i--<userid>--170522-153810-14
 Waiting for job to complete...
 Waiting for: samtools-i--<userid>--170522-153810-14.
 ```
@@ -77,7 +77,7 @@ Because the `--wait` flag was set, `dsub` will block until the job completes.
 To list the output, use the command:
 
 ```
-gsutil ls -l gs://MY-BUCKET/samtools/submit_one/output
+gcloud storage ls -l gs://MY-BUCKET/samtools/submit_one/output
 ```
 
 Output should look like:
@@ -119,9 +119,9 @@ output file name.
 
 ```
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project MY-PROJECT \
-  --zones "us-central1-*" \
+  --regions us-central1 \
   --logging "gs://MY-BUCKET/samtools/submit_list/logging" \
   --disk-size 200 \
   --name "samtools index" \
@@ -141,9 +141,9 @@ Job: samtools-i--<userid>--170522-154943-70
 Launched job-id: samtools-i--<userid>--170522-154943-70
 3 task(s)
 To check the status, run:
-  dstat --provider google-cls-v2 --project MY-PROJECT --jobs samtools-i--<userid>--170522-154943-70 --status '*'
+  dstat --provider google-batch --project MY-PROJECT --jobs samtools-i--<userid>--170522-154943-70 --status '*'
 To cancel the job, run:
-  ddel --provider google-cls-v2 --project MY-PROJECT --jobs samtools-i--<userid>--170522-154943-70
+  ddel --provider google-batch --project MY-PROJECT --jobs samtools-i--<userid>--170522-154943-70
 Waiting for job to complete...
 Waiting for: samtools-i--<userid>--170522-154943-70.
 ```
@@ -155,7 +155,7 @@ when all tasks for the job have completed, `dsub` will exit.
 To list the output objects, use the command:
 
 ```
-gsutil ls -l gs://MY-BUCKET/samtools/submit_list/output
+gcloud storage ls -l gs://MY-BUCKET/samtools/submit_list/output
 ```
 
 Output should look like:

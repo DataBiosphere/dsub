@@ -45,7 +45,7 @@ echo
 echo "Checking output..."
 
 # Check the results
-RESULT="$(gsutil cat "${STDOUT_LOG}")"
+RESULT="$(gcloud storage cat "${STDOUT_LOG}")"
 if ! echo "${RESULT}" | grep -qi "GPU Memory"; then
   1>&2 echo "GPU Memory not found in the dsub output!"
   1>&2 echo "${RESULT}"
