@@ -70,7 +70,12 @@ def make_runtime_dirs_command(script_dir: str, tmp_dir: str,
 
 # Action steps that interact with GCS need gcloud and Python.
 # Use the 'slim' variant of the cloud-sdk image as it is much smaller.
-CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:499.0.0-slim'
+# Use the rolling tag rather than a pinned version: gcr.io enforces a 1-year
+# retention policy that deletes older numbered tags, which breaks every dsub
+# release that pins one. See
+# https://github.com/GoogleCloudPlatform/cloud-sdk-docker#package-retention-policy
+# and https://github.com/DataBiosphere/dsub/issues/336.
+CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
 
 # Name of the data disk
 DATA_DISK_NAME = 'datadisk'
