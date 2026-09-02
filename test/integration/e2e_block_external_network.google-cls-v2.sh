@@ -35,7 +35,7 @@ set +o errexit
 # running "gcloud storage ls" below. Otherwise, gcloud storage will retry
 # due to the network error.
 JOB_ID="$(run_dsub \
-  --image 'gcr.io/google.com/cloudsdktool/cloud-sdk:499.0.0-slim' \
+  --image 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim' \
   --block-external-network \
   --script "${SCRIPT_DIR}/script_block_external_network.sh" \
   --retries 1 \
