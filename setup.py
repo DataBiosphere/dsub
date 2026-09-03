@@ -10,6 +10,13 @@ from setuptools import find_packages
 from setuptools import setup
 
 
+# Note that this pinning policy covers the Python libraries dsub itself runs
+# with; it deliberately does not extend to the cloud-sdk container image the
+# Google providers run their auxiliary steps in. Pinning that image is actively
+# harmful, because gcr.io deletes numbered tags after a year and every release
+# pinning one then breaks. See CLOUD_SDK_IMAGE in dsub/providers/google_utils.py
+# for that tradeoff and for DSUB_CLOUD_SDK_IMAGE, which lets an operator pin the
+# image locally when a cloud-sdk release regresses them.
 _DEPENDENCIES = [
     # dependencies for dsub, ddel, dstat
     # Pin to known working versions to prevent episodic breakage from library
