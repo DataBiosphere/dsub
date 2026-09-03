@@ -70,12 +70,25 @@ def make_runtime_dirs_command(script_dir: str, tmp_dir: str,
 
 # Action steps that interact with GCS need gcloud and Python.
 # Use the 'slim' variant of the cloud-sdk image as it is much smaller.
-# Use the rolling tag rather than a pinned version: gcr.io enforces a 1-year
-# retention policy that deletes older numbered tags, which breaks every dsub
-# release that pins one. See
+#
+# The default is the rolling 'slim' tag rather than a pinned version. This is a
+# deliberate exception to the version-pinning policy described in setup.py:
+# gcr.io enforces a 1-year retention policy that deletes older numbered tags,
+# so pinning guarantees that every released version of dsub breaks on a
+# schedule. See
 # https://github.com/GoogleCloudPlatform/cloud-sdk-docker#package-retention-policy
 # and https://github.com/DataBiosphere/dsub/issues/336.
-CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+#
+# The tradeoff is that the auxiliary runnables now follow whatever the cloud-sdk
+# image ships, including python3 (used to decode the user script) and the
+# "gcloud storage" flag surface (used to localize and delocalize files).
+# DSUB_CLOUD_SDK_IMAGE lets an operator pin a known-good image immediately if a
+# cloud-sdk release regresses them, rather than waiting on a dsub release:
+#
+#   export DSUB_CLOUD_SDK_IMAGE=gcr.io/google.com/cloudsdktool/cloud-sdk:537.0.0-slim
+DEFAULT_CLOUD_SDK_IMAGE = 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+CLOUD_SDK_IMAGE = (
+    os.environ.get('DSUB_CLOUD_SDK_IMAGE') or DEFAULT_CLOUD_SDK_IMAGE)
 
 # Name of the data disk
 DATA_DISK_NAME = 'datadisk'
