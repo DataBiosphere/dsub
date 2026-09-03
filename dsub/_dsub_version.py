@@ -27,5 +27,5 @@ A typical release sequence will be versioned as:
 """
 
 
-DSUB_VERSION = '0.5.5.dev0'
+DSUB_VERSION = '0.5.5'
 
