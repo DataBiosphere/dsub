@@ -29,7 +29,7 @@ _DEPENDENCIES = [
     'python-dateutil<=2.9.0',
     'pytz<=2025.2',
     'pyyaml<=6.0.1',
-    'tenacity<=8.2.3',
+    'tenacity<=9.1.4',
     'tabulate<=0.9.0',
     # downstream dependencies
     'funcsigs==1.0.2',
