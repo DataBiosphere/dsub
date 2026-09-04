@@ -145,7 +145,7 @@ _WORKING_DIR = f'{_DATA_MOUNT_POINT}/workingdir'
 
 
 class GoogleV2EventMap(object):
-  """Helper for extracing a set of normalized, filtered operation events."""
+  """Helper for extracting a set of normalized, filtered operation events."""
 
   def __init__(self, op):
     self._op = op
@@ -271,7 +271,7 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
     raise NotImplementedError('Derived class must implement this function')
 
   def _operations_list_api(self, ops_filter, page_token, page_size):
-    """Executes the provider-specific operaitons.list() API."""
+    """Executes the provider-specific operations.list() API."""
     raise NotImplementedError('Derived class must implement this function')
 
   def _operations_cancel_api_def(self):
@@ -797,7 +797,7 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
       create_time_max: a timezone-aware datetime value for the most recent
                        create time of a task, inclusive.
       max_tasks: the maximum number of job tasks to return or 0 for no limit.
-      page_size: the page size to use for each query to the pipelins API.
+      page_size: the page size to use for each query to the pipelines API.
 
     Raises:
       ValueError: if both a job id list and a job name list are provided
@@ -1027,7 +1027,7 @@ class GoogleOperation(base.Task):
     """Returns an error message if the operation failed for any reason.
 
     Failure as defined here means ended for any reason other than 'success'.
-    This means that a successful cancelation will also return an error message.
+    This means that a successful cancellation will also return an error message.
 
     Returns:
       string, string will be empty if job did not error.

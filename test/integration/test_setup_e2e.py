@@ -42,7 +42,7 @@ import sys
 from dsub.commands import dsub as dsub_command
 
 # Because this may be invoked from another directory (treated as a library) or
-# invoked localy (treated as a binary) both import styles need to be supported.
+# invoked locally (treated as a binary) both import styles need to be supported.
 # pylint: disable=g-import-not-at-top
 try:
   from . import test_setup
@@ -58,7 +58,7 @@ TEST_E2E_VARS = ("PROJECT_ID", "DSUB_BUCKET", "LOGGING", "INPUTS", "OUTPUTS",
 
 
 def _environ():
-  """Merge the current enviornment and test variables into a dictionary."""
+  """Merge the current environment and test variables into a dictionary."""
   e = dict(os.environ)
   for var in TEST_VARS + TEST_E2E_VARS:
     e[var] = globals()[var]

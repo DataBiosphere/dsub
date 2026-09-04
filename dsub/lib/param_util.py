@@ -32,7 +32,7 @@ AUTO_PREFIX_OUTPUT = 'OUTPUT_'  # Prefix for auto-generated output names
 class ListParamAction(argparse.Action):
   """Append each value as a separate element to the parser destination.
 
-  This class satisifes the action interface of argparse.ArgumentParser and
+  This class satisfies the action interface of argparse.ArgumentParser and
   refines the 'append' action for arguments with `nargs='*'`.
 
   For the parameters:

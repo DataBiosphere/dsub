@@ -32,7 +32,7 @@ All of the source VCF files are stored in a public bucket at
 
 ## Setup
 
-* Follow the [dsub geting started](../../README.md#getting-started)
+* Follow the [dsub getting started](../../README.md#getting-started)
 instructions.
 
 ## Process one file with a Bash shell script

@@ -138,7 +138,7 @@ def get_last_event(op):
 
 
 def external_network_blocked(op):
-  """Retun True if the blockExternalNetwork flag is set for the user action."""
+  """Return True if the blockExternalNetwork flag is set for the user action."""
   user_action = get_action_by_name(op, 'user-command')
   if user_action:
     if _API_VERSION == google_v2_versions.V2BETA:
@@ -149,7 +149,7 @@ def external_network_blocked(op):
 
 
 def is_unexpected_exit_status_event(e):
-  """Retun True if the event is for an unexpected exit status."""
+  """Return True if the event is for an unexpected exit status."""
   if _API_VERSION == google_v2_versions.V2BETA:
 
     return 'unexpectedExitStatus' in e
@@ -159,7 +159,7 @@ def is_unexpected_exit_status_event(e):
 
 
 def is_failed_event(e):
-  """Retun True if the event is an operation failed event."""
+  """Return True if the event is an operation failed event."""
   if _API_VERSION == google_v2_versions.V2BETA:
 
     return 'failed' in e
@@ -169,7 +169,7 @@ def is_failed_event(e):
 
 
 def is_container_stopped_event(e):
-  """Retun True if the event is a container stopped event."""
+  """Return True if the event is a container stopped event."""
   if _API_VERSION == google_v2_versions.V2BETA:
 
     return 'containerStopped' in e

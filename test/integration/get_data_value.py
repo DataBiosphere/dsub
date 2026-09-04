@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Utililty for helping shell scripts extract values from JSON or YAML.
+"""Utility for helping shell scripts extract values from JSON or YAML.
 
 Usage:
 
