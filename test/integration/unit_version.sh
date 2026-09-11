@@ -39,7 +39,19 @@ function test_shell_util_version() {
     1> "${TEST_STDOUT}" \
     2> "${TEST_STDERR}"
 
-  # Stderr must be empty and stdout should have the version.
+  # Some environments print benign warnings from third-party libraries on
+  # every invocation (e.g. urllib3's OpenSSL check, google-cloud-batch's
+  # Python-version notice). Strip those known, harmless warning stanzas
+  # before asserting stderr is otherwise empty.
+  grep -v \
+      -e 'NotOpenSSLWarning' \
+      -e 'FutureWarning' \
+      -e '^[[:space:]]*warnings\.warn(' \
+      "${TEST_STDERR}" > "${TEST_STDERR}.filtered" || true
+  mv "${TEST_STDERR}.filtered" "${TEST_STDERR}"
+
+  # Stderr must be empty (aside from the known warnings filtered above) and
+  # stdout should have the version.
   assert_err_empty
   if [[ "$(cat "${TEST_STDOUT}")" != "${EXPECTED_STRING}" ]] ; then
     1>&2 echo "Assert: version was not printed by '$@ --version'"
