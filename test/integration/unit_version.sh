@@ -42,10 +42,12 @@ function test_shell_util_version() {
   # Some environments print benign warnings from third-party libraries on
   # every invocation (e.g. urllib3's OpenSSL check, google-cloud-batch's
   # Python-version notice). Strip those known, harmless warning stanzas
-  # before asserting stderr is otherwise empty.
+  # before asserting stderr is otherwise empty. Match the specific known
+  # message text, not the bare warning category, so unrelated warnings of
+  # the same category are not silently hidden.
   grep -v \
       -e 'NotOpenSSLWarning' \
-      -e 'FutureWarning' \
+      -e 'FutureWarning: You are using a Python version.*will stop supporting in google.cloud.batch_v1' \
       -e '^[[:space:]]*warnings\.warn(' \
       "${TEST_STDERR}" > "${TEST_STDERR}.filtered" || true
   mv "${TEST_STDERR}.filtered" "${TEST_STDERR}"
