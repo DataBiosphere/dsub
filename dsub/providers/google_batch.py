@@ -25,6 +25,9 @@ import sys
 import textwrap
 from typing import Dict, List, Set
 
+from google.api_core import exceptions as core_exceptions
+from google.api_core import retry
+
 from ..lib import dsub_util
 from ..lib import job_model
 from ..lib import param_util
@@ -42,6 +45,22 @@ except ImportError:
   # TODO: Remove conditional import when batch library is available
   from . import batch_dummy as batch_v1
 # pylint: enable=g-import-not-at-top
+
+# The default GAPIC retry for list_jobs gives up quickly on transient errors
+# such as 504 Deadline Exceeded. Retry more patiently since dsub polls this
+# call while waiting on jobs.
+_LIST_JOBS_RETRY = retry.Retry(
+    predicate=retry.if_exception_type(
+        core_exceptions.DeadlineExceeded,
+        core_exceptions.InternalServerError,
+        core_exceptions.ServiceUnavailable,
+        core_exceptions.TooManyRequests,
+    ),
+    initial=1.0,
+    maximum=60.0,
+    multiplier=2.0,
+    timeout=600.0,
+)
 _PROVIDER_NAME = 'google-batch'
 # Index of the prepare action in the runnable list
 _PREPARE_INDEX = 1
@@ -1056,7 +1075,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     )
 
     # Make the request
-    response = client.list_jobs(request=request)
+    response = client.list_jobs(request=request, retry=_LIST_JOBS_RETRY)
     # Sort the operations by create-time to match sort of other providers
     operations = [GoogleBatchOperation(page) for page in response]
     operations.sort(key=lambda op: op.get_field('create-time'), reverse=True)
