@@ -25,6 +25,10 @@ import sys
 import textwrap
 from typing import Dict, List, Set
 
+from google.api_core import exceptions as core_exceptions
+from google.api_core import retry
+import tenacity
+
 from ..lib import dsub_util
 from ..lib import job_model
 from ..lib import param_util
@@ -42,6 +46,43 @@ except ImportError:
   # TODO: Remove conditional import when batch library is available
   from . import batch_dummy as batch_v1
 # pylint: enable=g-import-not-at-top
+
+# The default GAPIC retry for list_jobs gives up quickly on transient errors
+# such as 504 Deadline Exceeded. Retry more patiently since dsub polls this
+# call while waiting on jobs.
+_LIST_JOBS_RETRY = retry.Retry(
+    predicate=retry.if_exception_type(
+        core_exceptions.DeadlineExceeded,
+        core_exceptions.InternalServerError,
+        core_exceptions.ServiceUnavailable,
+        core_exceptions.TooManyRequests,
+    ),
+    initial=1.0,
+    maximum=60.0,
+    multiplier=2.0,
+    timeout=600.0,
+)
+
+# Outer layer: the pager returned by list_jobs fetches later pages lazily, and
+# the inner retry can be exhausted (raising RetryError), so also retry the whole
+# list operation, including page iteration.
+_LIST_JOBS_OUTER_RETRY_ERRORS = (
+    core_exceptions.DeadlineExceeded,
+    core_exceptions.InternalServerError,
+    core_exceptions.ServiceUnavailable,
+    core_exceptions.TooManyRequests,
+    core_exceptions.RetryError,
+)
+_LIST_JOBS_OUTER_ATTEMPTS = 5
+
+# Transient errors worth retrying when submitting a job.
+_CREATE_JOB_RETRY_ERRORS = (
+    core_exceptions.DeadlineExceeded,
+    core_exceptions.InternalServerError,
+    core_exceptions.ServiceUnavailable,
+    core_exceptions.TooManyRequests,
+)
+_CREATE_JOB_ATTEMPTS = 5
 _PROVIDER_NAME = 'google-batch'
 # Index of the prepare action in the runnable list
 _PREPARE_INDEX = 1
@@ -920,9 +961,44 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     # pylint: enable=line-too-long
     return job_request
 
+  def _create_job_with_retry(self, client, request):
+    """Calls create_job, retrying transient errors such as 504.
+
+    A timed-out create may have succeeded server-side. The job id is fixed in
+    the request, so a retry then fails with AlreadyExists; in that case return
+    the existing job rather than failing. AlreadyExists on the first attempt is
+    a genuine duplicate and is raised.
+
+    Args:
+      client: The BatchServiceClient.
+      request: The CreateJobRequest.
+
+    Returns:
+      The created (or already existing) Job.
+    """
+    attempts = 0
+
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(_CREATE_JOB_ATTEMPTS),
+        retry=tenacity.retry_if_exception_type(_CREATE_JOB_RETRY_ERRORS),
+        wait=tenacity.wait_exponential(multiplier=2, max=60),
+        reraise=True,
+    )
+    def create():
+      nonlocal attempts
+      attempts += 1
+      try:
+        return client.create_job(request=request)
+      except core_exceptions.AlreadyExists:
+        if attempts == 1:
+          raise
+        return client.get_job(name=f'{request.parent}/jobs/{request.job_id}')
+
+    return create()
+
   def _submit_batch_job(self, request) -> str:
     client = batch_v1.BatchServiceClient()
-    job_response = client.create_job(request=request)
+    job_response = self._create_job_with_retry(client, request)
     op = GoogleBatchOperation(job_response)
     print(f'Provider internal-id (operation): {job_response.name}')
     return op.get_field('task-id')
@@ -1023,6 +1099,17 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         self._batch_handler_def(), self._operations_cancel_api_def(), tasks
     )
 
+  @tenacity.retry(
+      stop=tenacity.stop_after_attempt(_LIST_JOBS_OUTER_ATTEMPTS),
+      retry=tenacity.retry_if_exception_type(_LIST_JOBS_OUTER_RETRY_ERRORS),
+      wait=tenacity.wait_exponential(multiplier=2, max=60),
+      reraise=True,
+  )
+  def _list_all_jobs(self, request):
+    """Lists all jobs, retrying the whole fetch (including later pages)."""
+    client = batch_v1.BatchServiceClient()
+    return list(client.list_jobs(request=request, retry=_LIST_JOBS_RETRY))
+
   def lookup_job_tasks(
       self,
       statuses: Set[str],
@@ -1037,7 +1124,6 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
       max_tasks=0,
       page_size=0,
   ):
-    client = batch_v1.BatchServiceClient()
     ops_filter = self._build_query_filter(
         statuses,
         user_ids,
@@ -1056,9 +1142,9 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     )
 
     # Make the request
-    response = client.list_jobs(request=request)
+    jobs = self._list_all_jobs(request)
     # Sort the operations by create-time to match sort of other providers
-    operations = [GoogleBatchOperation(page) for page in response]
+    operations = [GoogleBatchOperation(page) for page in jobs]
     operations.sort(key=lambda op: op.get_field('create-time'), reverse=True)
     for op in operations:
       yield op
