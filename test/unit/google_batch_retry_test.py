@@ -34,7 +34,8 @@ def _make_provider():
   return provider
 
 
-class LookupJobTasksRetryTest(unittest.TestCase):
+class _RetryTestBase(unittest.TestCase):
+  """Real Batch client over a mocked transport."""
 
   def setUp(self):
     # Use a real client with a mocked transport so the real GAPIC retry
@@ -54,11 +55,12 @@ class LookupJobTasksRetryTest(unittest.TestCase):
     sleep.start()
     self.addCleanup(sleep.stop)
 
-  def _install_rpc(self, stub):
+  def _install_rpc(self, stub, method='list_jobs'):
     # Wrap the stub the same way the client wraps the real gRPC method, with a
     # short default retry that callers are expected to override.
     transport = self.client._transport
-    transport._wrapped_methods[transport.list_jobs] = (
+    rpc = getattr(transport, method)
+    transport._wrapped_methods[rpc] = (
         gapic_v1.method.wrap_method(
             stub,
             default_retry=retries.Retry(initial=0.01, timeout=0.05),
@@ -66,6 +68,10 @@ class LookupJobTasksRetryTest(unittest.TestCase):
             client_info=gapic_v1.client_info.ClientInfo(),
         )
     )
+
+
+
+class LookupJobTasksRetryTest(_RetryTestBase):
 
   def test_retries_deadline_exceeded(self):
     stub = mock.Mock(
@@ -128,6 +134,57 @@ class LookupJobTasksRetryTest(unittest.TestCase):
       list(_make_provider().lookup_job_tasks({'*'}))
 
     self.assertEqual(google_batch._LIST_JOBS_OUTER_ATTEMPTS, stub.call_count)
+
+
+class SubmitBatchJobRetryTest(_RetryTestBase):
+  """Tests retrying create_job in _submit_batch_job."""
+
+  def _request(self):
+    return batch_v1.CreateJobRequest(
+        parent='projects/p/locations/l', job_id='j', job=batch_v1.Job()
+    )
+
+  def _submit(self):
+    provider = _make_provider()
+    with mock.patch.object(
+        google_batch,
+        'GoogleBatchOperation',
+        side_effect=lambda j: mock.Mock(get_field=lambda f: j.name),
+    ):
+      return provider._submit_batch_job(self._request())
+
+  def test_retries_deadline_exceeded_on_create(self):
+    job = batch_v1.Job(name='projects/p/locations/l/jobs/j')
+    stub = mock.Mock(
+        side_effect=[core_exceptions.DeadlineExceeded('504'), job]
+    )
+    self._install_rpc(stub, 'create_job')
+
+    self.assertEqual(job.name, self._submit())
+    self.assertEqual(2, stub.call_count)
+
+  def test_already_exists_after_retry_returns_existing_job(self):
+    job = batch_v1.Job(name='projects/p/locations/l/jobs/j')
+    create = mock.Mock(
+        side_effect=[
+            core_exceptions.DeadlineExceeded('504'),
+            core_exceptions.AlreadyExists('exists'),
+        ]
+    )
+    get = mock.Mock(return_value=job)
+    self._install_rpc(create, 'create_job')
+    self._install_rpc(get, 'get_job')
+
+    self.assertEqual(job.name, self._submit())
+    get.assert_called_once()
+
+  def test_already_exists_on_first_attempt_raises(self):
+    stub = mock.Mock(side_effect=core_exceptions.AlreadyExists('exists'))
+    self._install_rpc(stub, 'create_job')
+    with self.assertRaises(core_exceptions.AlreadyExists):
+      self._submit()
+
+    self.assertEqual(1, stub.call_count)
 
 
 if __name__ == '__main__':

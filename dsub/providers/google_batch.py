@@ -74,6 +74,15 @@ _LIST_JOBS_OUTER_RETRY_ERRORS = (
     core_exceptions.RetryError,
 )
 _LIST_JOBS_OUTER_ATTEMPTS = 5
+
+# Transient errors worth retrying when submitting a job.
+_CREATE_JOB_RETRY_ERRORS = (
+    core_exceptions.DeadlineExceeded,
+    core_exceptions.InternalServerError,
+    core_exceptions.ServiceUnavailable,
+    core_exceptions.TooManyRequests,
+)
+_CREATE_JOB_ATTEMPTS = 5
 _PROVIDER_NAME = 'google-batch'
 # Index of the prepare action in the runnable list
 _PREPARE_INDEX = 1
@@ -952,9 +961,44 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     # pylint: enable=line-too-long
     return job_request
 
+  def _create_job_with_retry(self, client, request):
+    """Calls create_job, retrying transient errors such as 504.
+
+    A timed-out create may have succeeded server-side. The job id is fixed in
+    the request, so a retry then fails with AlreadyExists; in that case return
+    the existing job rather than failing. AlreadyExists on the first attempt is
+    a genuine duplicate and is raised.
+
+    Args:
+      client: The BatchServiceClient.
+      request: The CreateJobRequest.
+
+    Returns:
+      The created (or already existing) Job.
+    """
+    attempts = 0
+
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(_CREATE_JOB_ATTEMPTS),
+        retry=tenacity.retry_if_exception_type(_CREATE_JOB_RETRY_ERRORS),
+        wait=tenacity.wait_exponential(multiplier=2, max=60),
+        reraise=True,
+    )
+    def create():
+      nonlocal attempts
+      attempts += 1
+      try:
+        return client.create_job(request=request)
+      except core_exceptions.AlreadyExists:
+        if attempts == 1:
+          raise
+        return client.get_job(name=f'{request.parent}/jobs/{request.job_id}')
+
+    return create()
+
   def _submit_batch_job(self, request) -> str:
     client = batch_v1.BatchServiceClient()
-    job_response = client.create_job(request=request)
+    job_response = self._create_job_with_retry(client, request)
     op = GoogleBatchOperation(job_response)
     print(f'Provider internal-id (operation): {job_response.name}')
     return op.get_field('task-id')
