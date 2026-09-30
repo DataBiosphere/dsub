@@ -147,12 +147,24 @@ readonly -f assert_err_not_contains
 
 
 function assert_output_empty() {
-  [[ ! -s "${TEST_STDOUT}" ]] || "Assert: stdout is not empty"
+  if [[ -s "${TEST_STDOUT}" ]]; then
+    1>&2 echo "Assert: stdout is not empty"
+    1>&2 echo "ACTUAL:"
+    1>&2 echo "$(<"${TEST_STDOUT}")"
+
+    exit 1
+  fi
 }
 readonly -f assert_output_empty
 
 function assert_err_empty() {
-  [[ ! -s "${TEST_STDERR}" ]] || "Assert: stderr is not empty"
+  if [[ -s "${TEST_STDERR}" ]]; then
+    1>&2 echo "Assert: stderr is not empty"
+    1>&2 echo "ACTUAL:"
+    1>&2 echo "$(<"${TEST_STDERR}")"
+
+    exit 1
+  fi
 }
 readonly -f assert_err_empty
 

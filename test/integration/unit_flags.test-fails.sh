@@ -37,7 +37,7 @@ run_dsub \
   --label CAPS=bad \
   --command 'echo "Hi"' \
   1> "${TEST_STDOUT}" \
-  2> "${TEST_STDERR}" || /bin/true
+  2> "${TEST_STDERR}" || true
 
 assert_err_contains \
     'ValueError: Invalid name for label: "CAPS"'
@@ -47,7 +47,7 @@ run_dsub \
   --label lowercase_understores=ok-dashes_too \
   --command 'echo "Hi"' \
   1> "${TEST_STDOUT}" \
-  2> "${TEST_STDERR}" || /bin/true
+  2> "${TEST_STDERR}" || true
 
 # Fancier testing of the label syntax is done in test_param_util.py
 
