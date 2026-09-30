@@ -27,6 +27,7 @@ from typing import Dict, List, Set
 
 from google.api_core import exceptions as core_exceptions
 from google.api_core import retry
+import tenacity
 
 from ..lib import dsub_util
 from ..lib import job_model
@@ -61,6 +62,18 @@ _LIST_JOBS_RETRY = retry.Retry(
     multiplier=2.0,
     timeout=600.0,
 )
+
+# Outer layer: the pager returned by list_jobs fetches later pages lazily, and
+# the inner retry can be exhausted (raising RetryError), so also retry the whole
+# list operation, including page iteration.
+_LIST_JOBS_OUTER_RETRY_ERRORS = (
+    core_exceptions.DeadlineExceeded,
+    core_exceptions.InternalServerError,
+    core_exceptions.ServiceUnavailable,
+    core_exceptions.TooManyRequests,
+    core_exceptions.RetryError,
+)
+_LIST_JOBS_OUTER_ATTEMPTS = 5
 _PROVIDER_NAME = 'google-batch'
 # Index of the prepare action in the runnable list
 _PREPARE_INDEX = 1
@@ -1042,6 +1055,17 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         self._batch_handler_def(), self._operations_cancel_api_def(), tasks
     )
 
+  @tenacity.retry(
+      stop=tenacity.stop_after_attempt(_LIST_JOBS_OUTER_ATTEMPTS),
+      retry=tenacity.retry_if_exception_type(_LIST_JOBS_OUTER_RETRY_ERRORS),
+      wait=tenacity.wait_exponential(multiplier=2, max=60),
+      reraise=True,
+  )
+  def _list_all_jobs(self, request):
+    """Lists all jobs, retrying the whole fetch (including later pages)."""
+    client = batch_v1.BatchServiceClient()
+    return list(client.list_jobs(request=request, retry=_LIST_JOBS_RETRY))
+
   def lookup_job_tasks(
       self,
       statuses: Set[str],
@@ -1056,7 +1080,6 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
       max_tasks=0,
       page_size=0,
   ):
-    client = batch_v1.BatchServiceClient()
     ops_filter = self._build_query_filter(
         statuses,
         user_ids,
@@ -1075,9 +1098,9 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
     )
 
     # Make the request
-    response = client.list_jobs(request=request, retry=_LIST_JOBS_RETRY)
+    jobs = self._list_all_jobs(request)
     # Sort the operations by create-time to match sort of other providers
-    operations = [GoogleBatchOperation(page) for page in response]
+    operations = [GoogleBatchOperation(page) for page in jobs]
     operations.sort(key=lambda op: op.get_field('create-time'), reverse=True)
     for op in operations:
       yield op

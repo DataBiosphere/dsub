@@ -89,6 +89,46 @@ class LookupJobTasksRetryTest(unittest.TestCase):
 
     self.assertEqual(1, stub.call_count)
 
+  def test_outer_retry_restarts_fetch_when_later_page_fails(self):
+    # Disable the inner retry so the error surfaces to the outer layer.
+    no_inner_retry = mock.patch.object(
+        google_batch, '_LIST_JOBS_RETRY', retries.Retry(predicate=lambda e: False)
+    )
+    no_inner_retry.start()
+    self.addCleanup(no_inner_retry.stop)
+    job = batch_v1.Job(name='projects/p/locations/l/jobs/j')
+    stub = mock.Mock(
+        side_effect=[
+            batch_v1.ListJobsResponse(jobs=[job], next_page_token='page2'),
+            core_exceptions.DeadlineExceeded('504 Deadline Exceeded'),
+            batch_v1.ListJobsResponse(jobs=[job], next_page_token='page2'),
+            batch_v1.ListJobsResponse(jobs=[job]),
+        ]
+    )
+    self._install_rpc(stub)
+    with mock.patch.object(
+        google_batch,
+        'GoogleBatchOperation',
+        side_effect=lambda j: mock.Mock(get_field=lambda f: j.name),
+    ):
+      tasks = list(_make_provider().lookup_job_tasks({'*'}))
+
+    self.assertEqual(2, len(tasks))
+    self.assertEqual(4, stub.call_count)
+
+  def test_outer_retry_gives_up_after_max_attempts(self):
+    no_inner_retry = mock.patch.object(
+        google_batch, '_LIST_JOBS_RETRY', retries.Retry(predicate=lambda e: False)
+    )
+    no_inner_retry.start()
+    self.addCleanup(no_inner_retry.stop)
+    stub = mock.Mock(side_effect=core_exceptions.DeadlineExceeded('504'))
+    self._install_rpc(stub)
+    with self.assertRaises(core_exceptions.DeadlineExceeded):
+      list(_make_provider().lookup_job_tasks({'*'}))
+
+    self.assertEqual(google_batch._LIST_JOBS_OUTER_ATTEMPTS, stub.call_count)
+
 
 if __name__ == '__main__':
   unittest.main()
