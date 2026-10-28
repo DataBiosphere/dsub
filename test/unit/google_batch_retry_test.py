@@ -87,6 +87,17 @@ class LookupJobTasksRetryTest(_RetryTestBase):
     self.assertEqual([], tasks)
     self.assertEqual(3, stub.call_count)
 
+  def test_list_jobs_uses_longer_per_call_deadline(self):
+    stub = mock.Mock(return_value=batch_v1.ListJobsResponse(jobs=[]))
+    self._install_rpc(stub)
+    list(_make_provider().lookup_job_tasks({'*'}))
+
+    seen_timeout = stub.call_args.kwargs['timeout']
+    self.assertGreater(seen_timeout, 60.0)
+    self.assertAlmostEqual(
+        google_batch._LIST_JOBS_TIMEOUT, seen_timeout, delta=1.0
+    )
+
   def test_does_not_retry_permanent_errors(self):
     stub = mock.Mock(side_effect=core_exceptions.PermissionDenied('denied'))
     self._install_rpc(stub)

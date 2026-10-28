@@ -63,6 +63,11 @@ _LIST_JOBS_RETRY = retry.Retry(
     timeout=600.0,
 )
 
+# Deadline for each single list_jobs request. The GAPIC default is 60s, so a
+# slow query (for example a label filter on a project with many jobs) would hit
+# DeadlineExceeded on every retry. Retrying alone does not help such a query.
+_LIST_JOBS_TIMEOUT = 120.0
+
 # Outer layer: the pager returned by list_jobs fetches later pages lazily, and
 # the inner retry can be exhausted (raising RetryError), so also retry the whole
 # list operation, including page iteration.
@@ -1108,7 +1113,13 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
   def _list_all_jobs(self, request):
     """Lists all jobs, retrying the whole fetch (including later pages)."""
     client = batch_v1.BatchServiceClient()
-    return list(client.list_jobs(request=request, retry=_LIST_JOBS_RETRY))
+    return list(
+        client.list_jobs(
+            request=request,
+            retry=_LIST_JOBS_RETRY,
+            timeout=_LIST_JOBS_TIMEOUT,
+        )
+    )
 
   def lookup_job_tasks(
       self,
