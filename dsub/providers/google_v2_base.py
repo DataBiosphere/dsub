@@ -529,8 +529,8 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
                 '-c',
                 google_utils.LOCALIZATION_CMD.format(
                     log_msg_fn=google_utils.LOG_MSG_FN,
-                    recursive_cp_fn=google_utils.GSUTIL_RSYNC_FN,
-                    cp_fn=google_utils.GSUTIL_CP_FN,
+                    recursive_cp_fn=google_utils.GCLOUD_RSYNC_FN,
+                    cp_fn=google_utils.GCLOUD_CP_FN,
                     cp_loop=google_utils.LOCALIZATION_LOOP,
                 ),
             ],
@@ -566,8 +566,8 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
                 '-c',
                 google_utils.LOCALIZATION_CMD.format(
                     log_msg_fn=google_utils.LOG_MSG_FN,
-                    recursive_cp_fn=google_utils.GSUTIL_RSYNC_FN,
-                    cp_fn=google_utils.GSUTIL_CP_FN,
+                    recursive_cp_fn=google_utils.GCLOUD_RSYNC_FN,
+                    cp_fn=google_utils.GCLOUD_CP_FN,
                     cp_loop=google_utils.DELOCALIZATION_LOOP,
                 ),
             ],

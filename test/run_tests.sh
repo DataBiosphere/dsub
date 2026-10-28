@@ -216,7 +216,7 @@ function get_test_providers() {
     return
   fi
   if [[ "${NO_GOOGLE_BATCH_TESTS:-0}" -eq 1 ]]; then
-    echo -n "local google-cls-v2"
+    echo -n "local"
     return
   fi
   case "${test_file}" in
@@ -238,8 +238,6 @@ function get_test_providers() {
     e2e_io.sh | \
     e2e_io_auto.sh | \
     e2e_io_gcs_tasks.sh | \
-    e2e_io_mount_bucket.google-cls-v2.sh | \
-    e2e_io_mount_bucket_requester_pays.google-cls-v2.sh | \
     e2e_io_recursive.sh | \
     e2e_io_tasks.py | \
     e2e_io_tasks.sh | \
@@ -253,7 +251,6 @@ function get_test_providers() {
     e2e_logging_paths_retry_failure_tasks.sh | \
     e2e_logging_paths_retry_tasks.sh | \
     e2e_non_root.sh | \
-    e2e_preemptible_retries_fail.google-cls-v2.sh | \
     e2e_python.sh | \
     e2e_python_api.py | \
     e2e_requester_pays_buckets.sh | \
@@ -262,12 +259,11 @@ function get_test_providers() {
     e2e_retries_fail_2.sh | \
     e2e_runtime.sh | \
     e2e_skip.sh | \
-    e2e_skip_tasks.sh | \
-    e2e_user.google-cls-v2.sh)
-      local all_provider_list="${DSUB_PROVIDER:-local google-cls-v2 google-batch}"
+    e2e_skip_tasks.sh)
+      local all_provider_list="${DSUB_PROVIDER:-local google-batch}"
       ;;
     *)
-      local all_provider_list="${DSUB_PROVIDER:-local google-cls-v2}"
+      local all_provider_list="${DSUB_PROVIDER:-local}"
       ;;
   esac
 

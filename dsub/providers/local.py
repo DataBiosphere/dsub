@@ -712,9 +712,9 @@ class LocalJobProvider(base.JobProvider):
     elif logging_path.file_provider == job_model.P_GCS:
       mkdir_cmd = ''
       if user_project:
-        cp_cmd = 'gsutil -u {} -mq cp'.format(user_project)
+        cp_cmd = 'gcloud storage cp --billing-project={}'.format(user_project)
       else:
-        cp_cmd = 'gsutil -mq cp'
+        cp_cmd = 'gcloud storage cp'
     else:
       assert False
 
@@ -773,7 +773,7 @@ class LocalJobProvider(base.JobProvider):
     return '\n'.join(provider_commands)
 
   def _get_input_target_path(self, local_file_path):
-    """Returns a directory or file path to be the target for "gsutil cp".
+    """Returns a directory or file path to be the target for "gcloud storage cp".
 
     If the filename contains a wildcard, then the target path must
     be a directory in order to ensure consistency whether the source pattern
@@ -784,7 +784,7 @@ class LocalJobProvider(base.JobProvider):
       local_file_path: A full path terminating in a file or a file wildcard.
 
     Returns:
-      The path to use as the "gsutil cp" target.
+      The path to use as the "gcloud storage cp" target.
     """
 
     path, filename = os.path.split(local_file_path)
@@ -806,20 +806,33 @@ class LocalJobProvider(base.JobProvider):
 
       commands.append('mkdir -p "%s"' % os.path.dirname(local_file_path))
 
-      if i.file_provider in [job_model.P_LOCAL, job_model.P_GCS]:
-        # The semantics that we expect here are implemented consistently in
-        # "gsutil cp", and are a bit different than "cp" when it comes to
-        # wildcard handling, so use it for both local and GCS:
-        #
-        # - `cp path/* dest/` will error if "path" has subdirectories.
-        # - `cp "path/*" "dest/"` will fail (it expects wildcard expansion
-        #   to come from shell).
+      if i.file_provider == job_model.P_GCS:
+        # `cp path/* dest/` will error if "path" has subdirectories, and
+        # `cp "path/*" "dest/"` will fail (it expects wildcard expansion
+        # to come from shell), so use "gcloud storage cp" instead.
         if user_project:
-          command = 'gsutil -u %s -mq cp "%s" "%s"' % (
+          command = 'gcloud storage cp --billing-project=%s "%s" "%s"' % (
               user_project, source_file_path, dest_file_path)
         else:
-          command = 'gsutil -mq cp "%s" "%s"' % (source_file_path,
+          command = 'gcloud storage cp "%s" "%s"' % (source_file_path,
                                                  dest_file_path)
+        commands.append(command)
+      elif i.file_provider == job_model.P_LOCAL:
+        # "gcloud storage cp" does not support local-to-local copies, so use
+        # rsync (without "-r", since this path is non-recursive) instead.
+        # It matches the wildcard semantics we need: like the old "gsutil
+        # cp", it silently skips subdirectories rather than erroring like
+        # plain "cp" does. rsync does not expand a quoted wildcard itself,
+        # so for a wildcard filename, only the directory portion is quoted,
+        # leaving the wildcard for the shell to expand. A non-wildcard
+        # filename is quoted as a whole so that spaces in it are preserved
+        # as a single rsync argument.
+        source_dir, source_filename = os.path.split(source_file_path)
+        if '*' in source_filename:
+          command = 'rsync "%s"/%s "%s"' % (source_dir, source_filename,
+                                             dest_file_path)
+        else:
+          command = 'rsync "%s" "%s"' % (source_file_path, dest_file_path)
         commands.append(command)
 
     return '\n'.join(commands)
@@ -865,13 +878,25 @@ class LocalJobProvider(base.JobProvider):
       if o.file_provider == job_model.P_LOCAL:
         commands.append('mkdir -p "%s"' % dest_path)
 
-      # Use gsutil even for local files (explained in _localize_inputs_command).
-      if o.file_provider in [job_model.P_LOCAL, job_model.P_GCS]:
+      if o.file_provider == job_model.P_GCS:
         if user_project:
-          command = 'gsutil -u %s -mq cp "%s" "%s"' % (user_project, local_path,
+          command = 'gcloud storage cp --billing-project=%s "%s" "%s"' % (user_project, local_path,
                                                        dest_path)
         else:
-          command = 'gsutil -mq cp "%s" "%s"' % (local_path, dest_path)
+          command = 'gcloud storage cp "%s" "%s"' % (local_path, dest_path)
+        commands.append(command)
+      elif o.file_provider == job_model.P_LOCAL:
+        # "gcloud storage cp" does not support local-to-local copies (see
+        # _localize_inputs_command), so use rsync instead. As there, only
+        # quote the directory portion for a wildcard filename so the shell
+        # can expand it; a non-wildcard filename is quoted as a whole so
+        # that spaces in it are preserved as a single rsync argument.
+        local_dir, local_filename = os.path.split(local_path)
+        if '*' in local_filename:
+          command = 'rsync "%s"/%s "%s"' % (local_dir, local_filename,
+                                             dest_path)
+        else:
+          command = 'rsync "%s" "%s"' % (local_path, dest_path)
         commands.append(command)
 
     return '\n'.join(commands)

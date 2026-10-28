@@ -37,9 +37,9 @@ readonly SCRIPT_DIR="$(dirname "${0}")"
 
 # Launch the task
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project "${MY_PROJECT}" \
-  --zones "us-central1-*" \
+  --regions us-central1 \
   --logging "${OUTPUT_ROOT}"/logging \
   --disk-size 200 \
   --name "samtools index" \

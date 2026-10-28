@@ -100,9 +100,9 @@ else:
 print("  Bucket detected as: %s" % DSUB_BUCKET)
 
 print("  Checking if bucket exists")
-if not test_util.gsutil_ls_check("gs://%s" % DSUB_BUCKET):
+if not test_util.gcloud_ls_check("gs://%s" % DSUB_BUCKET):
   print("Bucket does not exist: %s" % DSUB_BUCKET, file=sys.stderr)
-  print("Create the bucket with \"gsutil mb\".", file=sys.stderr)
+  print("Create the bucket with \"gcloud storage buckets create\".", file=sys.stderr)
   sys.exit(1)
 
 # Set standard LOGGING, INPUTS, and OUTPUTS values
@@ -130,10 +130,10 @@ print("Input path: %s" % INPUTS)
 print("Output path: %s" % OUTPUTS)
 
 print("  Checking if remote test files already exists")
-if test_util.gsutil_ls_check("%s/**" % TEST_GCS_ROOT):
+if test_util.gcloud_ls_check("%s/**" % TEST_GCS_ROOT):
   print("Test files exist: %s" % TEST_GCS_ROOT, file=sys.stderr)
   print("Remove contents:", file=sys.stderr)
-  print("  gsutil -m rm %s/**" % TEST_GCS_ROOT, file=sys.stderr)
+  print("  gcloud storage rm %s/**" % TEST_GCS_ROOT, file=sys.stderr)
   sys.exit(1)
 
 if TASKS_FILE:
@@ -192,31 +192,6 @@ def dsub_google_batch(dsub_args):
 
   # pyformat: disable
   return dsub_command.call(args + opt_args + dsub_args)
-  # pyformat: enable
-
-
-def dsub_google_cls_v2(dsub_args):
-  """Call dsub appending google-cls-v2 required arguments."""
-  # pyformat: disable
-  google_cls_v2_opt_args = [
-      ("BOOT_DISK_SIZE", "--boot-disk-size"),
-      ("DISK_SIZE", "--disk-size")
-  ]
-  # pyformat: enable
-
-  opt_args = []
-  for var in google_cls_v2_opt_args:
-    val = globals().get(var[0])
-    if val:
-      opt_args.append(var[1], val)
-
-  # pyformat: disable
-  return dsub_command.call([
-      "--provider", "google-cls-v2",
-      "--project", PROJECT_ID,
-      "--logging", LOGGING,
-      "--regions", "us-central1"
-      ] + opt_args + dsub_args)
   # pyformat: enable
 
 

@@ -73,7 +73,7 @@ VAR4=VAL4
 VAR5=VAL5
 """.lstrip()
 
-RESULT = test_util.gsutil_cat(test.STDOUT_LOG)
+RESULT = test_util.gcloud_cat(test.STDOUT_LOG)
 if not test_util.diff(RESULT_EXPECTED, RESULT):
   print('Output file does not match expected')
   sys.exit(1)

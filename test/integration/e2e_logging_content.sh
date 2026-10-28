@@ -74,7 +74,7 @@ echo "Checking output..."
 # Check the results
 readonly STDOUT_RESULT_EXPECTED="$(echo -n "${STDOUT_MSG%.}")"
 
-readonly STDOUT_RESULT="$(gsutil cat "${STDOUT_LOG}")"
+readonly STDOUT_RESULT="$(gcloud storage cat "${STDOUT_LOG}")"
 if ! diff <(echo "${STDOUT_RESULT_EXPECTED}") <(echo "${STDOUT_RESULT}"); then
   echo "STDOUT file does not match expected"
   exit 1
@@ -82,7 +82,7 @@ fi
 
 readonly STDERR_RESULT_EXPECTED="$(echo -n "${STDERR_MSG%.}")"
 
-readonly STDERR_RESULT="$(gsutil cat "${STDERR_LOG}")"
+readonly STDERR_RESULT="$(gcloud storage cat "${STDERR_LOG}")"
 if ! diff <(echo "${STDERR_RESULT_EXPECTED}") <(echo "${STDERR_RESULT}"); then
   echo "STDERR file does not match expected"
   exit 1

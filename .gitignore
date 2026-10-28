@@ -5,3 +5,5 @@ build/
 dist/
 dsub_libs/
 dsub.egg-info/
+.ipynb_checkpoints/
+.DS_Store

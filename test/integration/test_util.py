@@ -29,13 +29,13 @@ def to_string(stdoutbytes):
   return stdoutbytes.decode(encoding)
 
 
-def gsutil_ls_check(path):
-  return not subprocess.call('gsutil ls "%s" 2>/dev/null' % path, shell=True)
+def gcloud_ls_check(path):
+  return not subprocess.call('gcloud storage ls "%s" 2>/dev/null' % path, shell=True)
 
 
-def gsutil_cat(path):
+def gcloud_cat(path):
   return to_string(
-      subprocess.check_output('gsutil cat "%s"' % path, shell=True))
+      subprocess.check_output('gcloud storage cat "%s"' % path, shell=True))
 
 
 def diff(str1, str2):

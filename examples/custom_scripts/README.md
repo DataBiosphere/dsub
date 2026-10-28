@@ -55,7 +55,7 @@ To run a Bash script to decompress the VCF file, type:
 
 ```
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project MY-PROJECT \
   --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids.sh/logging" \
@@ -87,7 +87,7 @@ Because the `--wait` flag was set, `dsub` will block until the job completes.
 To list the output, use the command:
 
 ```
-gsutil ls gs://MY-BUCKET/get_vcf_sample_ids.sh/output
+gcloud storage ls gs://MY-BUCKET/get_vcf_sample_ids.sh/output
 ```
 
 Output should look like:
@@ -99,7 +99,7 @@ gs://MY-BUCKET/get_vcf_sample_ids.sh/output/sample_ids.txt
 To see the first few lines of the sample IDs file, run:
 
 ```
-gsutil cat gs://MY-BUCKET/get_vcf_sample_ids.sh/output/sample_ids.txt | head -n 5
+gcloud storage cat gs://MY-BUCKET/get_vcf_sample_ids.sh/output/sample_ids.txt | head -n 5
 ```
 
 Output should look like:
@@ -134,7 +134,7 @@ To run a Python script to decompress the VCF file, type:
 
 ```
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project MY-PROJECT \
   --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids.py/logging" \
@@ -166,7 +166,7 @@ Because the `--wait` flag was set, `dsub` will block until the job completes.
 To list the output, use the command:
 
 ```
-gsutil ls gs://MY-BUCKET/get_vcf_sample_ids.py/output
+gcloud storage ls gs://MY-BUCKET/get_vcf_sample_ids.py/output
 ```
 
 Output should look like:
@@ -178,7 +178,7 @@ gs://MY-BUCKET/get_vcf_sample_ids.py/output/sample_ids.txt
 To see the first few lines of the sample IDs file, run:
 
 ```
-gsutil cat gs://MY-BUCKET/get_vcf_sample_ids.py/output/sample_ids.txt | head -n 5
+gcloud storage cat gs://MY-BUCKET/get_vcf_sample_ids.py/output/sample_ids.txt | head -n 5
 ```
 
 Output should look like:
@@ -221,7 +221,7 @@ Run either of the following commands:
 
 ```
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project MY-PROJECT \
   --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids/logging" \
@@ -234,7 +234,7 @@ dsub \
 
 ```
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project MY-PROJECT \
   --regions "us-central1" \
   --logging "gs://MY-BUCKET/get_vcf_sample_ids/logging" \
@@ -265,7 +265,7 @@ When all tasks for the job have completed, `dsub` will exit.
 To list the output objects, use the command:
 
 ```
-gsutil ls gs://MY-BUCKET/get_vcf_sample_ids/output
+gcloud storage ls gs://MY-BUCKET/get_vcf_sample_ids/output
 ```
 
 Output should look like:

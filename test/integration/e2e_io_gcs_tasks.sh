@@ -44,11 +44,11 @@ io_tasks_setup::write_tasks_file
 
 # Copy the script to GCS to test loading the script remotely
 echo "Copying script to ${DSUB_PARAMS}"
-gsutil cp "${SCRIPT_DIR}/script_io_test.sh" "${DSUB_PARAMS}/"
+gcloud storage cp "${SCRIPT_DIR}/script_io_test.sh" "${DSUB_PARAMS}/"
 
 # Copy the TASKS_FILE to GCS to test loading the tasks file remotely
 echo "Copying tasks file to ${DSUB_PARAMS}"
-gsutil cp "${TASKS_FILE}" "${DSUB_PARAMS}/"
+gcloud storage cp "${TASKS_FILE}" "${DSUB_PARAMS}/"
 
 echo "Launching pipelines..."
 
@@ -62,4 +62,4 @@ io_tasks_setup::check_output
 io_tasks_setup::check_dstat "${JOB_ID}"
 
 # Clean up what we uploaded after the test is done.
-gsutil rm "${DSUB_PARAMS}"/**
+gcloud storage rm "${DSUB_PARAMS}"/**

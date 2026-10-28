@@ -57,7 +57,7 @@ VAR5=VAL5
 EOF
 )
 
-readonly RESULT="$(gsutil cat "${STDOUT_LOG}")"
+readonly RESULT="$(gcloud storage cat "${STDOUT_LOG}")"
 if ! diff <(echo "${RESULT_EXPECTED}") <(echo "${RESULT}"); then
   echo "Output file does not match expected"
   exit 1

@@ -64,7 +64,7 @@ readonly EXPECTED_FS_OUTPUT_ENTRIES=(
 )
 
 # Get the results- "env" and "find" output is bounded by "BEGIN" and "END"
-readonly RESULT=$(gsutil cat "${STDOUT_LOG}")
+readonly RESULT=$(gcloud storage cat "${STDOUT_LOG}")
 readonly ENV=$(echo "${RESULT}" | sed -n '/^BEGIN: env$/,/^END: env$/p')
 readonly FIND=$(echo "${RESULT}" | sed -n '/^BEGIN: find$/,/^END: find$/p')
 

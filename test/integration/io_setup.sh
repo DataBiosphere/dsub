@@ -54,10 +54,10 @@ readonly TEST_LOCAL_MOUNT_PARAMETER="file://${TEST_TMP_PATH}"
 function io_setup::mount_local_path_setup() {
   mkdir -p "${TEST_TMP_PATH}"
   if [[ ! -f "${TEST_TMP_PATH}/${POPULATION_FILE}" ]]; then
-    gsutil cp "${POPULATION_FILE_FULL_PATH}" "${TEST_TMP_PATH}/${POPULATION_FILE}"
+    gcloud storage cp "${POPULATION_FILE_FULL_PATH}" "${TEST_TMP_PATH}/${POPULATION_FILE}"
   fi
   if [[ ! -f "${TEST_TMP_PATH}/${INPUT_BAM_FILE}" ]]; then
-    gsutil cp "${INPUT_BAM_FULL_PATH}" "${TEST_TMP_PATH}/${INPUT_BAM_FILE}"
+    gcloud storage cp "${INPUT_BAM_FULL_PATH}" "${TEST_TMP_PATH}/${INPUT_BAM_FILE}"
   fi
 }
 readonly -f io_setup::mount_local_path_setup
@@ -190,7 +190,7 @@ function io_setup::_check_output() {
   local output_file="${1}"
   local result_expected="${2}"
 
-  local result=$(gsutil cat "${output_file}")
+  local result=$(gcloud storage cat "${output_file}")
   if ! diff <(echo "${result_expected}") <(echo "${result}"); then
     echo "Output file does not match expected"
     exit 1

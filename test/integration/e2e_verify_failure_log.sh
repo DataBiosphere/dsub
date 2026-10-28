@@ -43,7 +43,7 @@ if [[ ${STATUS_MESSAGE} == *"no.such.image"* ]]; then
 else
   echo
   echo "ERROR: dstat output for failed job doesn't mention image problem."
-  echo "${dstat_output}"
+  echo "${STATUS_MESSAGE}"
   echo
   exit 1
 fi

@@ -58,7 +58,7 @@ for image in ${IMAGE_ARRAY[@]}; do
   echo "Checking output..."
 
   # Check the results
-  RESULT="$(gsutil cat "${STDOUT_LOG}")"
+  RESULT="$(gcloud storage cat "${STDOUT_LOG}")"
   if ! diff <(echo "${RESULT_EXPECTED}") <(echo "${RESULT}"); then
     echo "Output file does not match expected"
     exit 1

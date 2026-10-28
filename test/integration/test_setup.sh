@@ -37,8 +37,6 @@ export USER="${USER:-$(whoami)}"
 #   If the script name is <test>.<provider>.sh, pull out the provider.
 #   If the script name is <test>.sh, use "local".
 # If the DSUB_PROVIDER is set, make sure it is correct for a provider test.
-#   Special-case the google-cls-v2 tests to be runnable for google-batch
-#   and google-batch.
 
 readonly SCRIPT_NAME="$(basename "$0")"
 readonly SCRIPT_DEFAULT_PROVIDER=$(
@@ -49,10 +47,7 @@ readonly SCRIPT_DEFAULT_PROVIDER=$(
 if [[ -z "${DSUB_PROVIDER:-}" ]]; then
   readonly DSUB_PROVIDER="${SCRIPT_DEFAULT_PROVIDER:-local}"
 elif [[ -n "${SCRIPT_DEFAULT_PROVIDER}" ]]; then
-  if [[ "${DSUB_PROVIDER}" == "google-batch" ]] && \
-     [[ "${SCRIPT_DEFAULT_PROVIDER}" == "google-cls-v2" ]]; then
-     echo "Running google-cls-v2 e2e/unit tests with provider google-batch"
-  elif [[ "${DSUB_PROVIDER}" != "${SCRIPT_DEFAULT_PROVIDER}" ]]; then
+  if [[ "${DSUB_PROVIDER}" != "${SCRIPT_DEFAULT_PROVIDER}" ]]; then
     1>&2 echo "DSUB_PROVIDER is '${DSUB_PROVIDER:-}' not '${SCRIPT_DEFAULT_PROVIDER}'"
     exit 1
   fi
@@ -112,21 +107,6 @@ function dsub_google-batch() {
     "${@}"
 }
 
-function dsub_google-cls-v2() {
-  local location="${LOCATION:-}"
-  local zones="${ZONES:-}"
-  local regions="${REGIONS:-}"
-
-  dsub \
-    --provider google-cls-v2 \
-    --project "${PROJECT_ID}" \
-    ${location:+--location "${location}"} \
-    --logging "${LOGGING_OVERRIDE:-${LOGGING}}" \
-    ${regions:+--regions "${regions}"} \
-    ${zones:+--zones "${zones}"} \
-    "${@}"
-}
-
 function dsub_local() {
   dsub \
     --provider local \
@@ -168,16 +148,6 @@ function dstat_google-batch() {
     "${@}"
 }
 
-function dstat_google-cls-v2() {
-  local location="${LOCATION:-}"
-
-  dstat \
-    --provider google-cls-v2 \
-    --project "${PROJECT_ID}" \
-    ${location:+--location "${location}"} \
-    "${@}"
-}
-
 function dstat_local() {
   dstat \
     --provider local \
@@ -200,16 +170,6 @@ function run_ddel() {
   # from other test runs.
   # If a test takes longer than 45 minutes, then we should fix the test.
   run_ddel_age "45m" "${@}"
-}
-
-function ddel_google-cls-v2() {
-  local location="${LOCATION:-}"
-
-  ddel \
-    --provider google-cls-v2 \
-    --project "${PROJECT_ID}" \
-    ${location:+--location "${location}"} \
-    "${@}"
 }
 
 function ddel_google-batch() {

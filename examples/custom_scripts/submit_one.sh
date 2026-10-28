@@ -60,7 +60,7 @@ echo
 
 # Launch the task
 dsub \
-  --provider google-cls-v2 \
+  --provider google-batch \
   --project "${MY_PROJECT}" \
   --regions "us-central1" \
   --logging "${LOGGING}" \
@@ -73,5 +73,5 @@ dsub \
 
 # Check output
 echo "Check the head of the output file:"
-2>&1 gsutil cat "${OUTPUT_FILE}" | head
+2>&1 gcloud storage cat "${OUTPUT_FILE}" | head
 
