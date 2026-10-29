@@ -17,6 +17,7 @@ import unittest
 from unittest import mock
 
 from dsub.providers import google_batch
+import tenacity
 from google.api_core import exceptions as core_exceptions
 from google.api_core import gapic_v1
 from google.api_core import retry as retries
@@ -74,6 +75,14 @@ class _RetryTestBase(unittest.TestCase):
 class LookupJobTasksRetryTest(_RetryTestBase):
 
   def test_retries_deadline_exceeded(self):
+    # Allow only one outer attempt, so only the inner retry can absorb the 504s.
+    outer_retry_off = mock.patch.object(
+        google_batch.GoogleBatchJobProvider._list_all_jobs.retry,
+        'stop',
+        tenacity.stop_after_attempt(1),
+    )
+    outer_retry_off.start()
+    self.addCleanup(outer_retry_off.stop)
     stub = mock.Mock(
         side_effect=[
             core_exceptions.DeadlineExceeded('504 Deadline Exceeded'),
