@@ -265,6 +265,18 @@ LOCALIZATION_CMD = textwrap.dedent("""\
 SCRIPT_VARNAME = '_SCRIPT_REPR'
 META_YAML_VARNAME = '_META_YAML_REPR'
 
+# Recent cloud-sdk images (including "slim") no longer put python3 on the PATH;
+# the only Python left is the one bundled with gcloud. Define a python3 shell
+# function that falls back to the Python that gcloud itself runs with.
+PYTHON_FN = textwrap.dedent("""\
+  if ! command -v python3 >/dev/null 2>&1; then
+    readonly _DSUB_PYTHON="$(gcloud info --format='value(basic.python_location)')"
+    function python3() {
+      "${_DSUB_PYTHON}" "$@"
+    }
+  fi
+""")
+
 PYTHON_DECODE_SCRIPT = textwrap.dedent("""\
   import ast
   import sys
@@ -289,6 +301,7 @@ PREPARE_CMD = textwrap.dedent("""\
   set -o pipefail
 
   {log_msg_fn}
+  {python_fn}
   {mk_runtime_dirs}
 
   echo "${{{script_var}}}" \

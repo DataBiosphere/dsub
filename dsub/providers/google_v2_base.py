@@ -466,6 +466,7 @@ class GoogleV2JobProviderBase(google_utils.GoogleJobProviderBase):
         mk_runtime_dirs=google_utils.make_runtime_dirs_command(
             _SCRIPT_DIR, _TMP_DIR, _WORKING_DIR),
         script_var=google_utils.SCRIPT_VARNAME,
+        python_fn=google_utils.PYTHON_FN,
         python_decode_script=google_utils.PYTHON_DECODE_SCRIPT,
         script_path=script_path,
         mk_io_dirs=google_utils.MK_IO_DIRS)

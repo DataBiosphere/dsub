@@ -210,6 +210,7 @@ _FINAL_LOGGING_CMD = textwrap.dedent("""\
 
   {log_msg_fn}
   {gcloud_cp_fn}
+  {python_fn}
 
   {log_cp}
 """)
@@ -224,6 +225,7 @@ _CONTINUOUS_LOGGING_CMD = textwrap.dedent("""\
 
   {log_msg_fn}
   {gcloud_cp_fn}
+  {python_fn}
 
   # Make sure the logging work directory exists
   mkdir -p "${{LOGGING_DIR}}"
@@ -653,6 +655,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         gcloud_cp_fn=google_utils.GCLOUD_CP_FN,
         log_filter_var=_LOG_FILTER_VAR,
         log_filter_script_path=_LOG_FILTER_SCRIPT_PATH,
+        python_fn=google_utils.PYTHON_FN,
         python_decode_script=google_utils.PYTHON_DECODE_SCRIPT,
         logging_dir=_LOGGING_DIR,
         log_cp=_LOG_CP.format(
@@ -667,6 +670,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
         gcloud_cp_fn=google_utils.GCLOUD_CP_FN,
         log_filter_var=_LOG_FILTER_VAR,
         log_filter_script_path=_LOG_FILTER_SCRIPT_PATH,
+        python_fn=google_utils.PYTHON_FN,
         python_decode_script=google_utils.PYTHON_DECODE_SCRIPT,
         logging_dir=_LOGGING_DIR,
         log_cp=_LOG_CP.format(
@@ -686,6 +690,7 @@ class GoogleBatchJobProvider(google_utils.GoogleJobProviderBase):
             _SCRIPT_DIR, _TMP_DIR, _WORKING_DIR
         ),
         script_var=google_utils.SCRIPT_VARNAME,
+        python_fn=google_utils.PYTHON_FN,
         python_decode_script=google_utils.PYTHON_DECODE_SCRIPT,
         script_path=script_path,
         mk_io_dirs=google_utils.MK_IO_DIRS,
