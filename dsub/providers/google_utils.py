@@ -247,6 +247,7 @@ LOCALIZATION_CMD = textwrap.dedent("""\
   {log_msg_fn}
   {recursive_cp_fn}
   {cp_fn}
+  {python_fn}
 
   {cp_loop}
 """)
@@ -265,17 +266,24 @@ LOCALIZATION_CMD = textwrap.dedent("""\
 SCRIPT_VARNAME = '_SCRIPT_REPR'
 META_YAML_VARNAME = '_META_YAML_REPR'
 
-# Recent cloud-sdk images (including "slim") no longer put python3 on the PATH;
-# the only Python left is the one bundled with gcloud. Define a python3 shell
-# function that falls back to the Python that gcloud itself runs with.
+# Recent cloud-sdk images (including "slim") no longer have /usr/bin/python3.
+# The "gcloud" wrapper script then fails too, because it runs that python3.
+# The only Python left is the one bundled with the Cloud SDK. Point gcloud at it
+# with CLOUDSDK_PYTHON, and use it for the python3 shell function.
+#
+# Do not ask gcloud for the Python location (gcloud info): gcloud cannot run
+# without Python, so that returns an empty string.
+CLOUD_SDK_BUNDLED_PYTHON = (
+    '/usr/lib/google-cloud-sdk/platform/bundledpythonunix/bin/python3')
+
 PYTHON_FN = textwrap.dedent("""\
   if ! command -v python3 >/dev/null 2>&1; then
-    readonly _DSUB_PYTHON="$(gcloud info --format='value(basic.python_location)')"
-    function python3() {
-      "${_DSUB_PYTHON}" "$@"
-    }
+    export CLOUDSDK_PYTHON="{bundled_python}"
+    function python3() {{
+      "${{CLOUDSDK_PYTHON}}" "$@"
+    }}
   fi
-""")
+""").format(bundled_python=CLOUD_SDK_BUNDLED_PYTHON)
 
 PYTHON_DECODE_SCRIPT = textwrap.dedent("""\
   import ast
