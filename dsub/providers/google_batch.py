@@ -63,9 +63,10 @@ _LIST_JOBS_RETRY = retry.Retry(
     timeout=600.0,
 )
 
-# Deadline for each single list_jobs request. The GAPIC default is 60s, so a
-# slow query (for example a label filter on a project with many jobs) would hit
-# DeadlineExceeded on every retry. Retrying alone does not help such a query.
+# Deadline for list_jobs, shared by the inner retry attempts for one page.
+# The GAPIC default is 60s, too short for a slow query (for example a label
+# filter on a project with many jobs). Later attempts get the time left of
+# the 120s, and the full 120s again when less than 1s is left.
 _LIST_JOBS_TIMEOUT = 120.0
 
 # Outer layer: the pager returned by list_jobs fetches later pages lazily, and
