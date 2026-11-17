@@ -29,7 +29,7 @@ _LOCALIZE_COMMAND_MAP = {
 # Requirements can be found in the docs/providers/README.md.
 #
 # This module defines some utility names and functions such that new providers
-# can follow the patterns of exising providers.
+# can follow the patterns of existing providers.
 #
 # Unless providers have a compelling reason not to, they should just provide
 # a single disk for everything that needs to be written by the dsub

@@ -16,7 +16,7 @@ jobs.
 
 When you submit a `dsub` job using one of the Google providers, the single
 implicit task (for jobs that do not use a `--tasks` file) or the set of tasks
-submited (for jobs that do use a `--tasks` file) are submitted to the
+submitted (for jobs that do use a `--tasks` file) are submitted to the
 [Cloud Life Sciences pipelines.run() API](https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.pipelines/run).
 The API maintains a queue of
 [operations](https://cloud.google.com/life-sciences/docs/reference/rest/v2beta/projects.locations.operations)
@@ -39,7 +39,7 @@ If the lack of sufficient quota is not transient (the VM requires more resources
 than your quota maximum), then the Life Sciences API will mark the operation
 as failed and provide an informative message.
 
-## Handling insufficent quota
+## Handling insufficient quota
 
 When you have insufficient quota to run your job tasks, you have a few options:
 
