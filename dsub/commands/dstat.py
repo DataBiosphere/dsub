@@ -198,6 +198,7 @@ def main():
   # to provide a username automatically.
   user_ids = set(args.users) if args.users else {dsub_util.get_os_user()}
   labels = param_util.parse_pair_args(args.label, job_model.LabelParam)
+  raw_format = bool(args.format == 'provider-json')
 
   job_producer = dstat_job_producer(
       provider=provider,
@@ -213,12 +214,15 @@ def main():
       full_output=args.full,
       summary_output=args.summary,
       poll_interval=poll_interval,
-      raw_format=bool(args.format == 'provider-json'))
+      raw_format=raw_format)
 
   # Track if any jobs are running in the event --wait was requested.
   for poll_event_tasks in job_producer:
     rows = poll_event_tasks
-    formatter.prepare_and_print_table(rows, args.summary)
+    if raw_format:
+        formatter.print_table(rows)
+    else:
+      formatter.prepare_and_print_table(rows, args.summary)
 
 
 def dstat_job_producer(provider,
