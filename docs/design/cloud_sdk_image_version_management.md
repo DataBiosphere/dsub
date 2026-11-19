@@ -38,6 +38,8 @@ tag is deleted. `setup.py` states that the pinning policy does not cover this im
 
 - Replace the Cloud SDK image with an image that dsub builds.
 - Change the user's own container image (`--image`).
+- Support or test `google-cls-v2`. The Life Sciences API is shut down. The provider shares
+  `CLOUD_SDK_IMAGE`, so the new default reaches it, but nothing here tests it.
 
 ## Options
 
@@ -57,10 +59,13 @@ Option C, with the canary from E.
 
 1. **Mirror.** Copy one pinned `cloud-sdk` tag, by digest, to a repo in a Verily-owned public
    Artifact Registry (`crane copy`, so the digest does not change). The repo never deletes tags.
-   A public repo is readable without authentication. It must use a `pkg.dev` or `gcr.io` host,
-   because `--use-private-address` accepts only those hosts.
-2. **Default.** `DEFAULT_CLOUD_SDK_IMAGE` points to the mirror with a numbered tag.
-   `DSUB_CLOUD_SDK_IMAGE` stays as the override. `docs/` names it.
+   A public repo is readable without authentication. The repo uses immutable tags and has no
+   cleanup policy. The host must be `pkg.dev` or `gcr.io`. A VM without an external IP reaches
+   registries only through Private Google Access, and that covers Google-hosted registries.
+2. **Default.** `DEFAULT_CLOUD_SDK_IMAGE` points to the mirror as `<tag>@sha256:<digest>`. The
+   digest binds the default to one image, even if a tag is re-pushed. A bump updates the tag and
+   the digest together. `DSUB_CLOUD_SDK_IMAGE` stays as the override. This work adds the first
+   docs for it (see Rollout).
 3. **Bump.** Run the bump about every 3 months, or sooner for a security fix or a break.
    A bump runs the gating tests against the candidate tag. The new pin is merged only if they pass.
 4. **Canary.** A scheduled job runs the same gating tests against the upstream rolling tag. A
@@ -74,7 +79,8 @@ Option C, with the canary from E.
 - They cover each action in the helper list above: script decode, log upload, localize and
   delocalize of files and directories, and the flags `--no-user-output-enabled`, `--content-type`
   and `--billing-project`.
-- Also run with `--use-private-address` to prove the image host is accepted.
+- Also run with `--use-private-address`. This proves that a VM with no external IP can pull the
+  image from the mirror.
 
 The exact test subset is open (see below).
 
@@ -85,6 +91,9 @@ The exact test subset is open (see below).
 - **VPC-SC.** Customers with a perimeter must allow the `pkg.dev` host.
 - **Mirror outage.** If the mirror is down, jobs fail to pull. `DSUB_CLOUD_SDK_IMAGE` is the
   workaround, and `docs/troubleshooting.md` should say so.
+- **Tag removal.** An Artifact Registry cleanup policy or a project deletion can still remove
+  tags. The repo has no cleanup policy, a named owner and deletion protection. The bump job
+  checks the repo's cleanup policy list.
 - **Stale pin.** A pin that is never bumped carries known CVEs. The cadence covers this.
 
 ## Open items
@@ -95,7 +104,6 @@ The exact test subset is open (see below).
 - Image path: `cloud-sdk` (dsub today) or `google-cloud-cli` (named in the upstream README).
 - Region or multi-region for the mirror.
 - Record the image digest in job metadata, so a failure maps to one image. Follow-up work.
-- Does `google-cls-v2` use the same mirror, or only `google-batch`?
 - Does dsub in Workbench apps use the same default?
 
 ## Rollout
@@ -103,4 +111,5 @@ The exact test subset is open (see below).
 1. Create the mirror repo and push the first pinned tag.
 2. Build the gating test job and the canary.
 3. Change the default to the mirror in a dsub release.
-4. Document `DSUB_CLOUD_SDK_IMAGE` and the bump process.
+4. Add a section to `docs/troubleshooting.md` for `DSUB_CLOUD_SDK_IMAGE`, and document the bump
+   process.
